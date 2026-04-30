@@ -8,8 +8,8 @@
     "whatsapp": "node whatsapp-agent.js"
   },
   "dependencies": {
-    "playwright": "^1.49.0",
+    "axios": "^1.15.2",
     "node-cron": "^3.0.3",
-    "axios": "^1.7.9"
+    "playwright": "^1.49.0"
   }
 }
