@@ -1,0 +1,16 @@
+{
+  "name": "nexo-dashboard-pro",
+  "version": "1.0.0",
+  "description": "Dashboard operacional privado da NEXO DIGITAL - Self-hosted, VPN-only",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && node server.js",
+    "client": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && node server.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

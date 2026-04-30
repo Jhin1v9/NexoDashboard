@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  nexo-dashboard:
+    build: .
+    container_name: nexo-dashboard-pro
+    ports:
+      - "${VPN_IP:-127.0.0.1}:3456:3456"
+    environment:
+      - PORT=3456
+      - BIND_IP=0.0.0.0
+      - NEXO_BASE_PATH=/data/nexo
+    volumes:
+      - ./data:/app/backend/data
+      - ${NEXO_BASE_PATH:-C:\Users\Administrator\Documents\NEXO DIGITAL}:/data/nexo:ro
+    restart: unless-stopped

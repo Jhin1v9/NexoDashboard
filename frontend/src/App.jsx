@@ -1,0 +1,42 @@
+import { Routes, Route } from 'react-router-dom'
+import { useState } from 'react'
+import Sidebar from './components/Sidebar'
+import TopBar from './components/TopBar'
+import CommandPalette from './components/CommandPalette'
+import Dashboard from './pages/Dashboard'
+import Clientes from './pages/Clientes'
+import Projetos from './pages/Projetos'
+import Tarefas from './pages/Tarefas'
+import WhatsApp from './pages/WhatsApp'
+import GitHub from './pages/GitHub'
+import VercelProjects from './pages/VercelProjects'
+import Ferramentas from './pages/Ferramentas'
+
+function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [cmdOpen, setCmdOpen] = useState(false)
+
+  return (
+    <div className="flex h-screen bg-nexo-bg text-nexo-text overflow-hidden">
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} onSearchClick={() => setCmdOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-6">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/projetos" element={<Projetos />} />
+            <Route path="/tarefas" element={<Tarefas />} />
+            <Route path="/whatsapp" element={<WhatsApp />} />
+            <Route path="/github" element={<GitHub />} />
+            <Route path="/vercel" element={<VercelProjects />} />
+            <Route path="/ferramentas" element={<Ferramentas />} />
+          </Routes>
+        </main>
+      </div>
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+    </div>
+  )
+}
+
+export default App

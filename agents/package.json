@@ -1,0 +1,15 @@
+{
+  "name": "nexo-agents",
+  "version": "1.0.0",
+  "description": "Agentes de automação do NEXO Dashboard",
+  "scripts": {
+    "agent": "node nexo-agent-brain.js",
+    "monitor": "node auto-monitor.js",
+    "whatsapp": "node whatsapp-agent.js"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0",
+    "node-cron": "^3.0.3",
+    "axios": "^1.7.9"
+  }
+}
