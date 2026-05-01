@@ -15,6 +15,7 @@ import Ferramentas from './pages/Ferramentas'
 import Financeiro from './pages/Financeiro'
 import Orcamentos from './pages/Orcamentos'
 import Operacoes from './pages/Operacoes'
+import Changelog from './pages/Changelog'
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -40,6 +41,7 @@ function App() {
             <Route path="/vercel" element={<VercelProjects />} />
             <Route path="/ferramentas" element={<Ferramentas />} />
             <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </main>
       </div>

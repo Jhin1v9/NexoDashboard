@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Command, LayoutDashboard, FileText, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, DollarSign } from 'lucide-react'
+import { Command, LayoutDashboard, FileText, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, DollarSign, Newspaper } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Command, label: 'Operações' },
@@ -13,6 +13,7 @@ const navItems = [
   { path: '/github', icon: Github, label: 'GitHub' },
   { path: '/vercel', icon: Triangle, label: 'Vercel' },
   { path: '/ferramentas', icon: Wrench, label: 'Ferramentas' },
+  { path: '/changelog', icon: Newspaper, label: 'Changelog' },
 ]
 
 export default function Sidebar({ open, setOpen }) {

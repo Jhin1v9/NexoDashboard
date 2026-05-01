@@ -1,13 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Menu, Search, Wifi, WifiOff, Clock, User, Bell } from 'lucide-react'
+import { Menu, Search, Wifi, WifiOff, Clock, User } from 'lucide-react'
 import axios from 'axios'
 import PushNotificationButton from './PushNotificationButton'
+import ChangelogBadge from './changelog/ChangelogBadge'
+import useChangelog from '../hooks/useChangelog'
 
 export default function TopBar({ onMenuClick, onSearchClick }) {
   const [connected, setConnected] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [activeUser, setActiveUser] = useState('abner')
   const [users, setUsers] = useState({})
+  
+  const {
+    entries,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    updateLastVisit,
+    isUnread,
+  } = useChangelog()
 
   useEffect(() => {
     fetchUsers()
@@ -46,6 +57,14 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
         </button>
       </div>
       <div className="flex items-center gap-4">
+        <ChangelogBadge
+          entries={entries}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onUpdateLastVisit={updateLastVisit}
+          isUnread={isUnread}
+        />
         <PushNotificationButton />
         <div className="flex items-center gap-1.5 text-xs text-nexo-muted">
           {connected ? <Wifi size={14} className="text-nexo-success" /> : <WifiOff size={14} className="text-nexo-danger" />}
