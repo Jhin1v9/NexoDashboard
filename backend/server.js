@@ -1822,6 +1822,134 @@ function getEmojiForCategory(category) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LEADS API — Receber formulários do site chatopsmaster.com
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
+
+// GET /api/leads — Listar todos os leads
+app.get('/api/leads', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const { status, source, limit = 50 } = req.query;
+    let leads = [...data.leads];
+
+    if (status) leads = leads.filter(l => l.status === status);
+    if (source) leads = leads.filter(l => l.source === source);
+    leads = leads.slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      count: leads.length,
+      total: data.leads.length,
+      leads: leads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/leads — Receber novo lead (webhook do site)
+app.post('/api/leads', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const lead = {
+      id: generateId('lead'),
+      name: req.body.name || '',
+      email: req.body.email || '',
+      phone: req.body.phone || '',
+      company: req.body.company || '',
+      message: req.body.message || '',
+      service: req.body.service || '',
+      source: req.body.source || 'website',
+      sourceUrl: req.body.sourceUrl || '',
+      status: 'new',
+      statusLabel: 'Novo',
+      priority: 'medium',
+      assignedTo: null,
+      notes: [],
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+
+    data.leads.unshift(lead);
+    writeJSON(LEADS_FILE, data);
+
+    // Criar tarefa automaticamente para follow-up
+    const tasks = readJSON(TASKS_FILE) || [];
+    tasks.unshift({
+      id: generateId('task'),
+      title: `[LEAD] Contactar ${lead.name || 'Novo lead'}`,
+      description: `Lead do site: ${lead.email}. Serviço: ${lead.service}. Mensagem: ${lead.message}`,
+      completed: false,
+      author: 'system',
+      source: 'lead-auto',
+      category: 'lead',
+      priority: 'high',
+      clientId: null,
+      leadId: lead.id,
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    });
+    writeJSON(TASKS_FILE, tasks);
+
+    // Notificar via WebSocket
+    broadcast({ type: 'lead:new', data: lead });
+
+    res.json({ success: true, lead, message: 'Lead recebido com sucesso' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/leads/:id/status — Atualizar status do lead
+app.put('/api/leads/:id/status', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const lead = data.leads.find(l => l.id === req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+    lead.status = req.body.status || lead.status;
+    lead.statusLabel = req.body.statusLabel || lead.statusLabel;
+    lead.priority = req.body.priority || lead.priority;
+    lead.assignedTo = req.body.assignedTo || lead.assignedTo;
+    lead.notes.push({
+      text: req.body.note || '',
+      author: req.body.author || 'system',
+      date: nowISO()
+    });
+    lead.updatedAt = nowISO();
+
+    writeJSON(LEADS_FILE, data);
+    broadcast({ type: 'lead:updated', data: lead });
+    res.json({ success: true, lead });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/leads/stats — Estatísticas de leads
+app.get('/api/leads/stats', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const leads = data.leads;
+    const stats = {
+      total: leads.length,
+      new: leads.filter(l => l.status === 'new').length,
+      contacted: leads.filter(l => l.status === 'contacted').length,
+      qualified: leads.filter(l => l.status === 'qualified').length,
+      proposal: leads.filter(l => l.status === 'proposal').length,
+      closed: leads.filter(l => l.status === 'closed').length,
+      lost: leads.filter(l => l.status === 'lost').length,
+      conversionRate: leads.length > 0 ? ((leads.filter(l => l.status === 'closed').length / leads.length) * 100).toFixed(1) : 0
+    };
+    res.json({ success: true, stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Catch-all
 // ═══════════════════════════════════════════════════════════════════════════════
 

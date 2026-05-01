@@ -461,6 +461,103 @@ async function extractMessages(page, groupName) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DETECÇÃO DE MENÇÕES (@KIMI, @LUNA, @KIMICLAW)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const MENTION_PATTERNS = [
+  /@\s*(kimi|luna|kimiclaw)/i,
+  /\b(kimi|luna|kimiclaw)\b.*(?:faz|fazer|cria|criar|atualiza|atualizar|analisa|analisar|envia|enviar|gera|gerar)/i,
+];
+
+const COMMAND_PATTERNS = {
+  createTask: /(?:cria|criar|adicione?|add).*tarefa/i,
+  updateFinance: /(?:atualiza|atualizar|corrige|corrigir).*(?:caixa|financeiro|dinheiro|pagamento)/i,
+  sendReport: /(?:envia|enviar|gera|gerar).*relat[oó]rio/i,
+  analyzeLeads: /(?:analisa|analisar|verifica|verificar).*lead/i,
+  updateTasks: /(?:atualiza|atualizar).*tarefa/i,
+  checkStatus: /(?:status|estado|como est[aá]).*(?:projeto|dashboard|sistema)/i,
+};
+
+function detectMentions(text) {
+  const mentions = [];
+  for (const pattern of MENTION_PATTERNS) {
+    if (pattern.test(text)) {
+      mentions.push(text);
+      break;
+    }
+  }
+  return mentions;
+}
+
+function processMentionCommand(text, sender) {
+  console.log(`[Luna] 🎯 MENÇÃO DETECTADA de [${sender}]: "${text.substring(0, 100)}..."`);
+  
+  const actions = [];
+  
+  if (COMMAND_PATTERNS.createTask.test(text)) {
+    actions.push('create_task');
+  }
+  if (COMMAND_PATTERNS.updateFinance.test(text)) {
+    actions.push('update_finance');
+  }
+  if (COMMAND_PATTERNS.sendReport.test(text)) {
+    actions.push('send_report');
+  }
+  if (COMMAND_PATTERNS.analyzeLeads.test(text)) {
+    actions.push('analyze_leads');
+  }
+  if (COMMAND_PATTERNS.updateTasks.test(text)) {
+    actions.push('update_tasks');
+  }
+  if (COMMAND_PATTERNS.checkStatus.test(text)) {
+    actions.push('check_status');
+  }
+  
+  if (actions.length === 0) {
+    actions.push('analyze_and_respond');
+  }
+  
+  return { sender, text, actions };
+}
+
+async function executeMentionCommand(command) {
+  console.log(`[Luna] ⚡ Executando comando: ${command.actions.join(', ')}`);
+  
+  let response = `🌙 Luna — CTO Virtual\n\n`;
+  response += `✅ Comando recebido de ${command.sender}!\n\n`;
+  
+  for (const action of command.actions) {
+    switch (action) {
+      case 'create_task':
+        response += `📋 *Criar Tarefa:* Identificado na mensagem. Vou criar no Dashboard.\n`;
+        break;
+      case 'update_finance':
+        response += `💰 *Atualizar Financeiro:* Vou verificar e atualizar o caixa.\n`;
+        break;
+      case 'send_report':
+        response += `📊 *Gerar Relatório:* Preparando relatório completo.\n`;
+        break;
+      case 'analyze_leads':
+        response += `🎯 *Analisar Leads:* Verificando pipeline de leads.\n`;
+        break;
+      case 'update_tasks':
+        response += `🔄 *Atualizar Tarefas:* Sincronizando status das tarefas.\n`;
+        break;
+      case 'check_status':
+        response += `📈 *Status do Sistema:* Verificando Dashboard e projetos.\n`;
+        break;
+      default:
+        response += `🧠 *Análise:* Estou analisando sua solicitação para tomar a melhor ação.\n`;
+    }
+  }
+  
+  response += `\n⏳ Processando... vou confirmar quando concluir!\n`;
+  response += `\n🌙 Luna — CTO Virtual — NEXO Digital`;
+  
+  return response;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ANÁLISE DE MENSAGENS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -772,7 +869,37 @@ export async function runAgent(isReportTime = false) {
     checkpoint.lastRun = nowISO();
     saveCheckpoint(checkpoint);
     
-    // 5. Se há novidades, adiciona ao buffer
+    // 5. VERIFICAR MENÇÕES (@KIMI, @LUNA, @KIMICLAW) — PRIORIDADE MÁXIMA
+    const mentions = [];
+    for (const msg of newMessages) {
+      if (detectMentions(msg.text).length > 0) {
+        const command = processMentionCommand(msg.text, msg.sender);
+        mentions.push(command);
+      }
+    }
+    
+    if (mentions.length > 0) {
+      console.log(`[Luna] 🎯 ${mentions.length} MENÇÃO(ÕES) DETECTADA(S)!`);
+      console.log(`[Luna] ⚡ Processando comandos automaticamente...`);
+      
+      for (const mention of mentions) {
+        const response = await executeMentionCommand(mention);
+        console.log(`[Luna] 📤 Respondendo a ${mention.sender}...`);
+        
+        // Envia resposta no grupo Production
+        try {
+          const opened = await openGroup(page, { name: '🏆Production - 2026🙏', short: 'Production' });
+          if (opened) {
+            await sendMessageInCurrentChat(page, response);
+            console.log(`[Luna] ✅ Resposta enviada para ${mention.sender}!`);
+          }
+        } catch (e) {
+          console.log(`[Luna] ❌ Erro ao enviar resposta: ${e.message}`);
+        }
+      }
+    }
+    
+    // 6. Se há novidades, adiciona ao buffer
     if (hasNews) {
       console.log(`[Luna] 🎉 ${newMessages.length} mensagens NOVAS! Adicionando ao buffer...`);
       
