@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
@@ -8,6 +8,130 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+
+// ─── UTILITÁRIOS ───
+
+function extractLinksFromMessages(messages) {
+  const urlRegex = /(https?:\/\/[^\s<>'"{}|\[\]`]+)/gi
+  const links = []
+  const seen = new Set()
+  
+  for (const msg of messages) {
+    const text = msg.text || ''
+    const matches = text.match(urlRegex)
+    if (matches) {
+      for (const url of matches) {
+        const cleanUrl = url.replace(/[.,;!?]$/, '')
+        if (!seen.has(cleanUrl)) {
+          seen.add(cleanUrl)
+          links.push({
+            url: cleanUrl,
+            title: cleanUrl.replace(/^https?:\/\//, '').substring(0, 50),
+            description: text.substring(0, 120),
+            sender: msg.sender || msg.author || 'Desconhecido',
+            group: msg.group || 'Production',
+            time: msg.time || msg.timestamp || ''
+          })
+        }
+      }
+    }
+  }
+  return links
+}
+
+function normalizeAgentData(agentData, opsData, whatsappTasks) {
+  // Dados do agente (whatsapp-agent-data.json)
+  const messages = agentData?.messages || agentData?.bufferedMessages || agentData?.recentMessages || []
+  // bufferedMessages pode ser número em versões antigas
+  const normalizedMessages = Array.isArray(messages) ? messages : []
+  
+  const tasks = agentData?.tasks || agentData?.bufferedTasks || []
+  const normalizedTasks = Array.isArray(tasks) ? tasks : []
+  
+  const ideas = agentData?.ideas || agentData?.bufferedIdeas || []
+  const normalizedIdeas = Array.isArray(ideas) ? ideas : []
+  
+  const decisions = agentData?.decisions || []
+  const normalizedDecisions = Array.isArray(decisions) ? decisions : []
+  
+  const totalMessages = agentData?.totalMessages || agentData?.stats?.totalMessages || 0
+  
+  // Extrair links das mensagens
+  const extractedLinks = extractLinksFromMessages(normalizedMessages)
+  
+  // Adicionar links do agente se houver
+  const agentLinks = agentData?.links || []
+  const allLinks = [...extractedLinks, ...(Array.isArray(agentLinks) ? agentLinks : [])]
+  
+  // Normalizar mensagens para o formato da UI
+  const recentMessages = normalizedMessages.slice(0, 50).map((m, i) => ({
+    id: m.id || `msg-${i}`,
+    sender: m.sender || m.author || 'Desconhecido',
+    text: m.text || m.message || '(sem texto)',
+    time: m.time || m.timestamp || '',
+    group: m.group || 'Production',
+    type: m.type || 'text'
+  }))
+  
+  // Normalizar tarefas
+  const allTasks = normalizedTasks.map((t, i) => ({
+    id: t.id || `task-${i}`,
+    text: t.text || t.title || t.message || '(sem texto)',
+    sender: t.sender || t.author || 'Desconhecido',
+    group: t.group || 'Production',
+    priority: t.priority || 'medium',
+    status: t.status || 'pending',
+    time: t.time || t.timestamp || '',
+    project: t.project || null
+  }))
+  
+  const highTasks = allTasks.filter(t => t.priority === 'high')
+  
+  // Normalizar ideias
+  const normalizedIdeasList = normalizedIdeas.map((idea, i) => ({
+    id: idea.id || `idea-${i}`,
+    text: idea.text || idea.title || idea.message || '(sem texto)',
+    sender: idea.sender || idea.author || 'Desconhecido',
+    group: idea.group || 'Production'
+  }))
+  
+  // Grupos monitorados
+  const groups = [
+    { name: '🏆Production - 2026🙏', short: 'Production', type: 'internal', messageCount: normalizedMessages.filter(m => !(m.group || '').includes('Paulo')).length, taskCount: allTasks.filter(t => !(t.group || '').includes('Paulo')).length, participants: ['Abner', 'Nonoke', 'Elias'], urgency: 'normal' },
+    { name: 'Paulo (web)', short: 'Paulo', type: 'client', messageCount: normalizedMessages.filter(m => (m.group || '').includes('Paulo')).length, taskCount: allTasks.filter(t => (t.group || '').includes('Paulo')).length, participants: ['Paulo'], urgency: 'normal' }
+  ]
+  
+  // Stats
+  const stats = {
+    totalMessages: totalMessages || normalizedMessages.length,
+    totalTasks: allTasks.length,
+    highPriorityTasks: highTasks.length,
+    totalIdeas: normalizedIdeasList.length,
+    totalDecisions: normalizedDecisions.length,
+    totalLinks: allLinks.length,
+    activeGroups: 2,
+    participants: ['Abner', 'Nonoke', 'Elias', 'Paulo']
+  }
+  
+  // Project progress (mock baseado nos projetos reais da NEXO)
+  const projectProgress = [
+    { name: 'Tropicale (Juan)', progress: 85, status: 'Fase de entrega final', health: 'good', type: 'client' },
+    { name: 'Santafe (Paulo)', progress: 45, status: 'Pagamento pendente', health: 'warning', type: 'client' },
+    { name: 'NEXO Dashboard', progress: 75, status: 'Em desenvolvimento ativo', health: 'good', type: 'internal' },
+    { name: 'NEXO Intelligence', progress: 20, status: 'Protótipo inicial', health: 'neutral', type: 'internal' }
+  ]
+  
+  return {
+    stats,
+    tasks: { all: allTasks, high: highTasks },
+    ideas: normalizedIdeasList,
+    projects: projectProgress,
+    messages: recentMessages,
+    groups,
+    links: allLinks,
+    decisions: normalizedDecisions
+  }
+}
 
 // ─── COMPONENTES AUXILIARES ───
 
@@ -179,7 +303,9 @@ const LinkPreview = ({ link, index }) => (
 // ─── PÁGINA PRINCIPAL ───
 
 export default function WhatsApp() {
-  const [data, setData] = useState(null)
+  const [agentData, setAgentData] = useState(null)
+  const [opsData, setOpsData] = useState(null)
+  const [whatsappTasks, setWhatsappTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -187,17 +313,44 @@ export default function WhatsApp() {
   const [refreshing, setRefreshing] = useState(false)
   const navigate = useNavigate()
 
+  const data = useMemo(() => {
+    if (!agentData) return null
+    return normalizeAgentData(agentData, opsData, whatsappTasks)
+  }, [agentData, opsData, whatsappTasks])
+
   const fetchData = async () => {
     try {
       setLoading(true)
-      const res = await axios.get('/api/whatsapp-agent')
-      setData(res.data)
-      setLastUpdate(new Date(res.data.updatedAt))
-      setError(null)
+      
+      // Buscar múltiplas fontes de dados em paralelo
+      const [agentRes, opsRes, tasksRes] = await Promise.allSettled([
+        axios.get('/api/whatsapp-agent'),
+        axios.get('/api/ops'),
+        axios.get('/api/whatsapp')
+      ])
+      
+      if (agentRes.status === 'fulfilled') {
+        setAgentData(agentRes.value.data)
+        setLastUpdate(new Date(agentRes.value.data.updatedAt))
+      }
+      
+      if (opsRes.status === 'fulfilled') {
+        setOpsData(opsRes.value.data)
+      }
+      
+      if (tasksRes.status === 'fulfilled') {
+        setWhatsappTasks(tasksRes.value.data || [])
+      }
+      
+      if (agentRes.status === 'rejected') {
+        setError(agentRes.reason.response?.status === 404 
+          ? 'Agente não iniciado. Execute: node agents/luna-cto-agent.mjs' 
+          : agentRes.reason.message)
+      } else {
+        setError(null)
+      }
     } catch (e) {
-      setError(e.response?.status === 404 
-        ? 'Agente não iniciado. Execute: node agents/nexo-whatsapp-agent-v8.mjs' 
-        : e.message)
+      setError(e.message)
     } finally {
       setLoading(false)
     }
@@ -251,8 +404,8 @@ export default function WhatsApp() {
   const tasks = data?.tasks?.all || []
   const highTasks = data?.tasks?.high || []
   const ideas = data?.ideas || []
-  const projects = data?.projectProgress || []
-  const messages = data?.recentMessages || []
+  const projects = data?.projects || []
+  const messages = data?.messages || []
   const groups = data?.groups || []
   const links = data?.links || []
 
@@ -260,7 +413,7 @@ export default function WhatsApp() {
     { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
     { id: 'tasks', label: `Tarefas (${tasks.length})`, icon: CheckSquare },
     { id: 'projects', label: 'Projetos', icon: Target },
-    { id: 'messages', label: 'Mensagens', icon: MessageCircle },
+    { id: 'messages', label: `Mensagens (${messages.length})`, icon: MessageCircle },
     { id: 'links', label: `Links (${links.length})`, icon: Link2 },
   ]
 
@@ -527,6 +680,7 @@ export default function WhatsApp() {
               <div className="text-center text-nexo-muted py-12">
                 <MessageCircle size={48} className="mx-auto mb-4 opacity-30" />
                 <p>Nenhuma mensagem recente</p>
+                <p className="text-xs mt-2">As mensagens aparecem quando o Luna faz scan com novidades.</p>
               </div>
             )}
           </motion.div>
@@ -541,6 +695,7 @@ export default function WhatsApp() {
               <div className="text-center text-nexo-muted py-12">
                 <Link2 size={48} className="mx-auto mb-4 opacity-30" />
                 <p>Nenhum link encontrado</p>
+                <p className="text-xs mt-2">Links são extraídos automaticamente das mensagens do WhatsApp.</p>
               </div>
             )}
           </motion.div>
