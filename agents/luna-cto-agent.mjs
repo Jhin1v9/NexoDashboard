@@ -36,12 +36,14 @@ const CONFIG = {
     { name: 'Paulo (web)', short: 'Paulo', type: 'client' }
   ],
   
-  // Chat pessoal do Abner — ORDENS E COMANDOS
-  ABNER_PERSONAL: { name: 'Abner', number: '34685093192', type: 'command' },
+  // REGRA: NUNCA enviar mensagens no chat pessoal do Abner
+  // Apenas LER ordens/comandos se necessário no futuro
+  // ABNER_PERSONAL: { name: 'Abner', number: '34685093192', type: 'command' },
   
-  // Destino do relatório — SEMPRE ENVIADO
+  // REGRA ESTRITA: Só envia no grupo Production 2026
+  // NUNCA enviar em chats pessoais ou outros grupos
   REPORT_DESTINATIONS: [
-    { name: 'Abner', number: '34685093192', type: 'primary' }
+    { name: 'Production', number: '34685093192', type: 'group', groupName: '🏆Production - 2026🙏' }
   ],
   
   // Arquivos
@@ -511,12 +513,19 @@ function generateLunaReport(data, checkpoint) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function sendReportViaWhatsApp(page, reportText, destination) {
-  console.log(`[Luna] 📤 Enviando relatório para ${destination.name} (${destination.number})...`);
+  // REGRA ESTRITA: Só envia no grupo Production 2026
+  // NUNCA enviar em chats pessoais ou outros grupos
+  console.log(`[Luna] 📤 Enviando relatório para o grupo: ${destination.groupName}...`);
   
   try {
-    const chatUrl = `https://web.whatsapp.com/send?phone=${destination.number}`;
-    await page.goto(chatUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(8000);
+    // Abre o grupo Production em vez de chat por número
+    const opened = await openGroup(page, { name: destination.groupName, short: 'Production' });
+    if (!opened) {
+      console.log('[Luna] ❌ Não conseguiu abrir o grupo Production');
+      return false;
+    }
+    
+    await page.waitForTimeout(3000);
     
     // Tenta múltiplos seletores
     const inputSelectors = [
@@ -529,12 +538,10 @@ async function sendReportViaWhatsApp(page, reportText, destination) {
     ];
     
     let input = null;
-    let foundSelector = '';
     for (const sel of inputSelectors) {
       input = page.locator(sel).first();
       const count = await input.count();
       if (count > 0) {
-        foundSelector = sel;
         console.log(`[Luna] ✅ Input encontrado: ${sel}`);
         break;
       }
@@ -542,7 +549,6 @@ async function sendReportViaWhatsApp(page, reportText, destination) {
     
     if (!input || await input.count() === 0) {
       console.log('[Luna] ❌ Input não encontrado, tentando fallback JS...');
-      // Fallback: usa JavaScript injection
       await page.evaluate((text) => {
         const inputs = document.querySelectorAll('[contenteditable="true"]');
         for (const inp of inputs) {
@@ -558,7 +564,7 @@ async function sendReportViaWhatsApp(page, reportText, destination) {
       await page.waitForTimeout(1000);
       await page.keyboard.press('Enter');
       await page.waitForTimeout(3000);
-      console.log(`[Luna] ✅ Enviado via fallback!`);
+      console.log(`[Luna] ✅ Relatório enviado no grupo via fallback!`);
       return true;
     }
     
@@ -567,7 +573,7 @@ async function sendReportViaWhatsApp(page, reportText, destination) {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(3000);
     
-    console.log(`[Luna] ✅ Relatório enviado para ${destination.name}!`);
+    console.log(`[Luna] ✅ Relatório enviado no grupo Production!`);
     return true;
   } catch (e) {
     console.log(`[Luna] ❌ Erro ao enviar: ${e.message}`);
