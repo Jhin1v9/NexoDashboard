@@ -212,11 +212,48 @@ async function connectWhatsApp() {
 // EXTRAÇÃO DE MENSAGENS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+async function isChatOpen(page, groupName) {
+  try {
+    // Verifica o título no header do chat atual
+    const currentTitle = await page.evaluate(() => {
+      const headerTitle = document.querySelector('[data-testid="conversation-header-title"]');
+      if (headerTitle) return headerTitle.textContent?.trim() || '';
+      
+      // Fallback: verifica span[title] no header
+      const header = document.querySelector('header span[title]');
+      if (header) return header.getAttribute('title') || header.textContent?.trim() || '';
+      
+      return '';
+    });
+    
+    const isOpen = currentTitle.includes(groupName) || 
+                   currentTitle.includes('Production') || 
+                   currentTitle.includes('2026') ||
+                   currentTitle.includes('Paulo');
+    
+    if (isOpen) {
+      console.log(`[Luna] ✅ Chat já está aberto: "${currentTitle}"`);
+    }
+    
+    return isOpen;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function openGroup(page, groupConfig) {
   const { name, short } = groupConfig;
   console.log(`[Luna] 🔍 Procurando: ${name}`);
   
   try {
+    // 0. VERIFICA SE O CHAT JÁ ESTÁ ABERTO (BUG FIX)
+    const alreadyOpen = await isChatOpen(page, short);
+    if (alreadyOpen) {
+      console.log(`[Luna] ✅ Chat já está aberto, não vou clicar novamente!`);
+      await page.waitForTimeout(1000);
+      return true;
+    }
+    
     // 1. Garante que estamos na tela principal (lista de chats)
     await page.evaluate(() => {
       // Pressiona Escape para voltar
