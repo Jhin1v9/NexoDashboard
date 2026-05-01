@@ -1,10 +1,13 @@
 /**
- * LUNA Scheduler — Adaptativo
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * LUNA SCHEDULER v10.2 — Adaptativo
+ * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * Modo Normal: 30 minutos (quando há novidades)
- * Modo Acelerado: 10 minutos (quando não há novidades)
- * 
- * Sempre envia relatório para 685093192 (Abner)
+ * REGRAS:
+ * • SCAN: A cada 10 minutos → extrai mensagens, guarda no buffer, NÃO envia
+ * • RELATÓRIO: A cada 30 minutos → junta TODAS as novidades e envia no grupo
+ * • Se não há novidades → envia 1x "sem novidades", depois SILÊNCIO
+ * • Só volta a enviar quando detectar novas mensagens
  */
 
 import { runAgent } from './luna-cto-agent.mjs';
@@ -13,89 +16,116 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CHECKPOINT_FILE = path.join(__dirname, '..', 'backend', 'data', 'luna-checkpoint.json');
 
-function readJSON(file, defaultVal = null) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch { return defaultVal; }
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SCAN_INTERVAL_MS = 10 * 60 * 1000;      // 10 minutos
+const REPORT_INTERVAL_MS = 30 * 60 * 1000;     // 30 minutos
+
+const LOG_FILE = path.join(__dirname, '..', 'backend', 'data', 'luna-scheduler.log');
+const PID_FILE = path.join(__dirname, '..', 'artifacts', 'luna-scheduler.pid');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITÁRIOS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function now() { return new Date().toLocaleString('pt-BR', { timeZone: 'Europe/Madrid' }); }
+function nowTime() { return new Date().toLocaleTimeString('pt-BR', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' }); }
+
+function log(msg) {
+  const line = `[${now()}] ${msg}`;
+  console.log(line);
+  fs.appendFileSync(LOG_FILE, line + '\n');
 }
 
-function nowBR() {
-  return new Date().toLocaleString('pt-BR', { timeZone: 'Europe/Madrid' });
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-const MODE_NORMAL = 30 * 60 * 1000;      // 30 minutos
-const MODE_ACCELERATED = 10 * 60 * 1000;  // 10 minutos
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCHEDULER
+// ═══════════════════════════════════════════════════════════════════════════════
 
-let currentTimer = null;
-let isRunning = false;
-
-console.log('╔══════════════════════════════════════════════════════════════════════╗');
-console.log('║  🌙 LUNA Scheduler — Modo Adaptativo                                ║');
-console.log('║                                                                     ║');
-console.log('║  📭 Sem novidades → 10 minutos (acelerado)                          ║');
-console.log('║  🎉 Com novidades → 30 minutos (normal)                             ║');
-console.log('║                                                                     ║');
-console.log('║  📱 Relatório SEMPRE enviado para 34685093192                       ║');
-console.log('╚══════════════════════════════════════════════════════════════════════╝');
-
-async function runCycle() {
-  if (isRunning) {
-    console.log(`[${nowBR()}] ⏳ Ciclo anterior ainda em execução. Aguardando...`);
-    return;
-  }
-  
-  isRunning = true;
-  const now = nowBR();
-  console.log(`\n[${now}] 🌙 Executando ciclo Luna...`);
-  
+async function runScan() {
+  log('🔍 INICIANDO SCAN (10min)');
   try {
-    const result = await runAgent();
+    const result = await runAgent(false); // isReportTime = false
+    log(`✅ Scan completo: ${result.status} | buffered: ${result.buffered || 0}`);
+    return result;
+  } catch (e) {
+    log(`❌ Erro no scan: ${e.message}`);
+    return { status: 'error', hasNews: false };
+  }
+}
+
+async function runReport() {
+  log('📋 INICIANDO RELATÓRIO (30min)');
+  try {
+    const result = await runAgent(true); // isReportTime = true
+    log(`✅ Relatório: ${result.status} | hasNews: ${result.hasNews}`);
+    return result;
+  } catch (e) {
+    log(`❌ Erro no relatório: ${e.message}`);
+    return { status: 'error', hasNews: false };
+  }
+}
+
+async function main() {
+  ensureDir(path.dirname(LOG_FILE));
+  ensureDir(path.dirname(PID_FILE));
+  fs.writeFileSync(PID_FILE, process.pid.toString());
+  
+  log('═══════════════════════════════════════════════════════════════════════');
+  log('  🌙 LUNA SCHEDULER v10.2 INICIADO');
+  log('  SCAN: 10min | RELATÓRIO: 30min');
+  log('  Só envia no grupo Production | Silêncio quando não há novidades');
+  log('═══════════════════════════════════════════════════════════════════════');
+  
+  let lastReportTime = 0;
+  let scanCount = 0;
+  
+  while (true) {
+    const now = Date.now();
+    const timeSinceLastReport = now - lastReportTime;
+    const isReportTime = timeSinceLastReport >= REPORT_INTERVAL_MS;
     
-    // Determina próximo intervalo baseado no resultado
-    let nextInterval;
-    let modeLabel;
-    
-    if (result?.hasNews) {
-      // Novidades detectadas → modo normal (30min)
-      nextInterval = MODE_NORMAL;
-      modeLabel = 'NORMAL (30min)';
-      console.log(`[${now}] 🎉 Novidades! Próximo ciclo em 30 minutos.`);
+    if (isReportTime) {
+      // ═══ HORA DO RELATÓRIO ═══
+      log(`\n📋 RODADA #${scanCount + 1} — HORA DO RELATÓRIO!`);
+      const result = await runReport();
+      lastReportTime = Date.now();
+      scanCount = 0;
+      
+      log(`\n⏰ Próximo relatório em 30 minutos`);
+      log(`   Próximo scan em 10 minutos`);
+      
     } else {
-      // Sem novidades → modo acelerado (10min)
-      nextInterval = MODE_ACCELERATED;
-      modeLabel = 'ACELERADO (10min)';
-      console.log(`[${now}] 📭 Sem novidades. Próximo ciclo em 10 minutos.`);
+      // ═══ APENAS SCAN ═══
+      scanCount++;
+      log(`\n🔍 RODADA #${scanCount} — SCAN RÁPIDO`);
+      const result = await runScan();
+      
+      const nextReportIn = Math.ceil((REPORT_INTERVAL_MS - (Date.now() - lastReportTime)) / 60000);
+      log(`   Próximo scan: 10 min | Próximo relatório: ${nextReportIn} min`);
     }
     
-    // Agenda próximo ciclo
-    if (currentTimer) clearTimeout(currentTimer);
-    currentTimer = setTimeout(runCycle, nextInterval);
-    
-    const nextRun = new Date(Date.now() + nextInterval).toLocaleString('pt-BR', { timeZone: 'Europe/Madrid' });
-    console.log(`[${now}] 🕐 Próximo ciclo: ${nextRun} [${modeLabel}]`);
-    
-  } catch (e) {
-    console.error(`[${now}] ❌ Erro no ciclo:`, e.message);
-    
-    // Em caso de erro, tenta novamente em 5 minutos
-    if (currentTimer) clearTimeout(currentTimer);
-    currentTimer = setTimeout(runCycle, 5 * 60 * 1000);
-    console.log(`[${now}] 🔄 Tentando novamente em 5 minutos...`);
-    
-  } finally {
-    isRunning = false;
+    // Aguarda 10 minutos
+    log(`⏳ Aguardando ${SCAN_INTERVAL_MS / 60000} minutos...\n`);
+    await sleep(SCAN_INTERVAL_MS);
   }
 }
 
-// Executa imediatamente
-runCycle();
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-// Mantém o processo vivo
-process.on('SIGINT', () => {
-  console.log('\n🌙 Luna encerrando...');
-  if (currentTimer) clearTimeout(currentTimer);
-  process.exit(0);
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXECUÇÃO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+main().catch(e => {
+  log(`💥 ERRO FATAL: ${e.message}`);
+  process.exit(1);
 });
-
-console.log('\n✅ Luna iniciada. Aguardando ciclos...');

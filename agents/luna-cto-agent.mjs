@@ -1,19 +1,17 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * LUNA — CTO Virtual da NEXO Digital v10.0
+ * LUNA — CTO Virtual da NEXO Digital v10.2
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * Assinatura: "— Luna 🌙 CTO Virtual NEXO"
+ * REGRAS DE ENVIO (definitivas):
  * 
- * Funcionalidades:
- * 1. Relatório SEMPRE enviado para 685093192 (Abner)
- * 2. Modo Acelerado: 10 min quando não há novidades
- * 3. Modo Normal: 30 min quando encontra novidades
- * 4. Checkpoint inteligente — evita processar mensagens repetidas
- * 5. Relatório completo e fácil de entender
- * 6. Verifica chat pessoal do Abner para ordens/comandos
+ * 1. SCAN: A cada 10 minutos — verifica mensagens, guarda dados, NÃO envia
+ * 2. RELATÓRIO: A cada 30 minutos — junta TODAS as novidades e envia no grupo
+ * 3. Se não houver novidades em 30min → envia 1x "sem novidades", depois silêncio
+ * 4. Só volta a enviar quando detectar novas mensagens
  * 
- * SPLIT: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital)
+ * DESTINO: Só grupo 🏆Production - 2026🙏
+ * NUNCA: chats pessoais, outros grupos, números individuais
  */
 
 import { chromium } from 'playwright';
@@ -36,28 +34,20 @@ const CONFIG = {
     { name: 'Paulo (web)', short: 'Paulo', type: 'client' }
   ],
   
-  // REGRA: NUNCA enviar mensagens no chat pessoal do Abner
-  // Apenas LER ordens/comandos se necessário no futuro
-  // ABNER_PERSONAL: { name: 'Abner', number: '34685093192', type: 'command' },
-  
   // REGRA ESTRITA: Só envia no grupo Production 2026
-  // NUNCA enviar em chats pessoais ou outros grupos
   REPORT_DESTINATIONS: [
     { name: 'Production', number: '34685093192', type: 'group', groupName: '🏆Production - 2026🙏' }
   ],
   
   // Arquivos
   CHECKPOINT_FILE: path.join(__dirname, '..', 'backend', 'data', 'luna-checkpoint.json'),
+  BUFFER_FILE: path.join(__dirname, '..', 'backend', 'data', 'luna-buffer.json'),
   OUTPUT_FILE: path.join(__dirname, '..', 'backend', 'data', 'whatsapp-agent-data.json'),
   OPS_STATE_FILE: path.join(__dirname, '..', 'backend', 'data', 'ops-state.json'),
   
   // Limites
   MAX_SCROLLS: 30,
   SCROLL_DELAY: 800,
-  
-  // Modos de operação
-  MODE_NORMAL: 30 * 60 * 1000,    // 30 minutos
-  MODE_ACCELERATED: 10 * 60 * 1000, // 10 minutos
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -97,22 +87,61 @@ function writeJSON(file, data) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CHECKPOINT SYSTEM
+// CHECKPOINT + BUFFER DE NOVIDADES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function loadCheckpoint() {
   return readJSON(CONFIG.CHECKPOINT_FILE, {
-    version: '10.0',
+    version: '10.2',
     lastRun: null,
     knownMessageHashes: [],
     totalMessagesSeen: 0,
-    consecutiveNoNews: 0,
-    currentMode: 'normal', // 'normal' (30min) ou 'accelerated' (10min)
+    lastReportHadNews: false,
+    lastReportTime: null,
   });
 }
 
 function saveCheckpoint(cp) {
   writeJSON(CONFIG.CHECKPOINT_FILE, cp);
+}
+
+// Buffer: acumula novidades entre scans para o relatório de 30min
+function loadBuffer() {
+  return readJSON(CONFIG.BUFFER_FILE, {
+    newMessages: [],
+    tasks: [],
+    ideas: [],
+    decisions: [],
+    firstNewMessageTime: null,
+    lastScanTime: null,
+  });
+}
+
+function saveBuffer(buf) {
+  writeJSON(CONFIG.BUFFER_FILE, buf);
+}
+
+function clearBuffer() {
+  saveBuffer({
+    newMessages: [],
+    tasks: [],
+    ideas: [],
+    decisions: [],
+    firstNewMessageTime: null,
+    lastScanTime: null,
+  });
+}
+
+function addToBuffer(buffer, newMessages, tasks, ideas, decisions) {
+  buffer.newMessages.push(...newMessages);
+  buffer.tasks.push(...tasks);
+  buffer.ideas.push(...ideas);
+  buffer.decisions.push(...decisions);
+  if (!buffer.firstNewMessageTime && newMessages.length > 0) {
+    buffer.firstNewMessageTime = nowISO();
+  }
+  buffer.lastScanTime = nowISO();
+  saveBuffer(buffer);
 }
 
 function getNewMessagesOnly(currentMessages, checkpoint) {
@@ -188,13 +217,24 @@ async function openGroup(page, groupConfig) {
   console.log(`[Luna] 🔍 Procurando: ${name}`);
   
   try {
-    const found = await page.evaluate((searchTerm) => {
-      const items = document.querySelectorAll('[data-testid="chat-list-item"]');
+    // 1. Garante que estamos na tela principal (lista de chats)
+    await page.evaluate(() => {
+      // Pressiona Escape para voltar
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await page.waitForTimeout(1000);
+    
+    // 2. Espera a lista de chats carregar (usando seletor correto)
+    await page.waitForSelector('[data-testid="cell-frame-container"]', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+    
+    // 3. Tenta encontrar pelo data-testid="cell-frame-title" (título do chat)
+    let found = await page.evaluate((searchTerm) => {
+      const items = document.querySelectorAll('[data-testid="cell-frame-container"]');
       for (const item of items) {
-        if (item.textContent.includes(searchTerm) || 
-            item.textContent.includes('Production') || 
-            item.textContent.includes('2026') || 
-            item.textContent.includes('Paulo')) {
+        const titleEl = item.querySelector('[data-testid="cell-frame-title"]');
+        const title = titleEl?.textContent?.trim() || titleEl?.getAttribute('title') || '';
+        if (title.includes(searchTerm)) {
           item.click();
           return true;
         }
@@ -202,8 +242,75 @@ async function openGroup(page, groupConfig) {
       return false;
     }, short);
     
+    // 4. Se não encontrou, tenta por texto parcial no container
+    if (!found) {
+      found = await page.evaluate((searchTerm) => {
+        const items = document.querySelectorAll('[data-testid="cell-frame-container"]');
+        for (const item of items) {
+          const text = item.textContent || '';
+          if (text.includes(searchTerm) || 
+              text.includes('Production') || 
+              text.includes('2026') || 
+              text.includes('Paulo')) {
+            item.click();
+            return true;
+          }
+        }
+        return false;
+      }, short);
+    }
+    
+    // 5. Se ainda não encontrou, tenta usar a barra de busca
+    if (!found) {
+      console.log(`[Luna] 🔍 Usando busca para: ${short}`);
+      try {
+        // Clica no container de busca
+        const searchContainer = page.locator('[data-testid="chat-list-search-container"]').first();
+        if (await searchContainer.count() > 0) {
+          await searchContainer.click();
+          await page.waitForTimeout(500);
+          
+          // Digita o termo de busca
+          await page.keyboard.type(short);
+          await page.waitForTimeout(2000);
+          
+          // Clica no primeiro resultado
+          const firstResult = page.locator('[data-testid="cell-frame-container"]').first();
+          if (await firstResult.count() > 0) {
+            await firstResult.click();
+            found = true;
+          }
+        }
+      } catch (e) {
+        console.log(`[Luna] ⚠️ Busca falhou: ${e.message}`);
+      }
+    }
+    
+    // 6. Último recurso: navegar diretamente via URL
+    if (!found) {
+      console.log(`[Luna] 🔍 Tentando navegação direta...`);
+      try {
+        await page.goto('https://web.whatsapp.com', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForTimeout(5000);
+        
+        found = await page.evaluate((searchTerm) => {
+          const items = document.querySelectorAll('[data-testid="cell-frame-container"]');
+          for (const item of items) {
+            const text = item.textContent || '';
+            if (text.includes(searchTerm)) {
+              item.click();
+              return true;
+            }
+          }
+          return false;
+        }, short);
+      } catch (e) {
+        console.log(`[Luna] ⚠️ Navegação direta falhou: ${e.message}`);
+      }
+    }
+    
     if (found) {
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
       console.log(`[Luna] ✅ Grupo aberto: ${name}`);
       return true;
     }
@@ -222,10 +329,14 @@ async function extractMessages(page, groupName) {
   let lastHeight = 0;
   let stableCount = 0;
   
+  // Espera o painel de conversa carregar
+  await page.waitForTimeout(2000);
+  
+  // Scroll para o final primeiro
   await page.evaluate(() => {
-    const container = document.querySelector('div[tabindex="0"]._ajx_') || 
-                      document.querySelector('[data-testid="conversation-panel-messages"]') ||
-                      document.querySelector('.copyable-area');
+    const container = document.querySelector('[data-testid="conversation-panel-messages"]') ||
+                      document.querySelector('.copyable-area') ||
+                      document.querySelector('div[tabindex="0"]');
     if (container) container.scrollTop = container.scrollHeight;
   });
   await page.waitForTimeout(1500);
@@ -233,18 +344,22 @@ async function extractMessages(page, groupName) {
   while (scrollCount < CONFIG.MAX_SCROLLS && stableCount < 3) {
     const batch = await page.evaluate(() => {
       const msgs = [];
-      const containers = document.querySelectorAll('.message-in, .message-out') || 
-                         document.querySelectorAll('div[role="row"]');
+      // Usa div[role="row"] como seletor principal (funciona na nova UI)
+      const containers = document.querySelectorAll('div[role="row"]');
       
       containers.forEach(container => {
         try {
+          // Tenta encontrar texto da mensagem
           let textEl = container.querySelector('span.selectable-text.copyable-text');
           if (!textEl) textEl = container.querySelector('span[dir="ltr"].selectable-text');
           if (!textEl) {
+            // Procura por spans com texto significativo
             const spans = container.querySelectorAll('span');
             for (const s of spans) {
-              if (s.textContent.length > 2 && s.textContent.length < 2000 && 
-                  !s.closest('[data-testid="msg-meta"]')) {
+              const txt = s.textContent?.trim();
+              if (txt && txt.length > 2 && txt.length < 2000 && 
+                  !s.closest('[data-testid="msg-meta"]') &&
+                  !s.closest('[data-testid="last-msg-status"]')) {
                 textEl = s;
                 break;
               }
@@ -254,21 +369,26 @@ async function extractMessages(page, groupName) {
           const text = textEl?.textContent?.trim();
           if (!text || text.length < 2 || text.length > 2000) return;
           
+          // Tenta encontrar hora
           let time = '';
           const timeEl = container.querySelector('span[data-testid="msg-meta"] span[dir="auto"]');
           if (timeEl) time = timeEl.textContent.trim();
           
+          // Tenta encontrar remetente
           let sender = '';
+          // Primeiro: procura por span[title] fora do meta
           const senderEl = container.querySelector('span[title]:not([data-testid="msg-meta"] *)');
           if (senderEl && senderEl.textContent !== text && senderEl.textContent.length < 50) {
             sender = senderEl.textContent.trim();
           }
+          // Segundo: procura por qualquer span com título
           if (!sender) {
             const titled = container.querySelector('span[title]');
             if (titled && titled.textContent !== text && titled.textContent.length < 50) {
               sender = titled.getAttribute('title') || titled.textContent.trim();
             }
           }
+          // Terceiro: procura spans com texto curto
           if (!sender) {
             const allSpans = container.querySelectorAll('span');
             for (const sp of allSpans) {
@@ -281,10 +401,18 @@ async function extractMessages(page, groupName) {
             }
           }
           
+          // Detecta se é mensagem enviada (outgoing)
           const isOutgoing = container.classList.contains('message-out') || 
-                            container.closest('.message-out') !== null;
+                            container.closest('.message-out') !== null ||
+                            container.querySelector('[data-testid="msg-dblcheck"]') !== null ||
+                            container.querySelector('[data-testid="status-dblcheck"]') !== null;
           
-          msgs.push({ text, sender: sender || (isOutgoing ? 'Você' : 'Desconhecido'), time, isOutgoing });
+          msgs.push({ 
+            text, 
+            sender: sender || (isOutgoing ? 'Você' : 'Desconhecido'), 
+            time, 
+            isOutgoing 
+          });
         } catch {}
       });
       
@@ -301,10 +429,11 @@ async function extractMessages(page, groupName) {
       }
     }
     
+    // Scroll para cima
     const currentHeight = await page.evaluate(() => {
-      const container = document.querySelector('div[tabindex="0"]._ajx_') || 
-                        document.querySelector('[data-testid="conversation-panel-messages"]') ||
-                        document.querySelector('.copyable-area');
+      const container = document.querySelector('[data-testid="conversation-panel-messages"]') ||
+                        document.querySelector('.copyable-area') ||
+                        document.querySelector('div[tabindex="0"]');
       if (container) {
         const before = container.scrollTop;
         container.scrollTop -= 800;
@@ -415,9 +544,9 @@ function detectMentions(text) {
 // GERAÇÃO DE RELATÓRIO LUNA
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function generateLunaReport(data, checkpoint) {
-  const { hasNews, newMessages, tasks, ideas, decisions, allMessages, stats } = data;
+function generateLunaReport(buffer, checkpoint, isReportTime = false) {
   const time = nowTime();
+  const hasNews = buffer.newMessages.length > 0;
   
   let text = `🌙 *LUNA — Relatório ${time}*\n`;
   text += `━`.repeat(36) + '\n\n';
@@ -426,30 +555,32 @@ function generateLunaReport(data, checkpoint) {
     // ═══ RELATÓRIO COM NOVIDADES ═══
     text += `✅ *NOVIDADES DETECTADAS!*\n\n`;
     
-    text += `📊 *Resumo:*\n`;
-    text += `  • ${newMessages.length} mensagens novas\n`;
-    text += `  • ${tasks.length} tarefas novas\n`;
-    text += `  • ${ideas.length} ideias novas\n`;
-    text += `  • ${decisions.length} decisões novas\n`;
-    text += `  • Total acumulado: ${stats.totalMessages} msgs\n\n`;
+    // Resumo das rodadas
+    const scanCount = Math.ceil((Date.now() - new Date(buffer.firstNewMessageTime).getTime()) / (10 * 60 * 1000));
+    text += `📊 *Resumo (últimos ${scanCount} scans):*\n`;
+    text += `  • ${buffer.newMessages.length} mensagens novas\n`;
+    text += `  • ${buffer.tasks.length} tarefas detectadas\n`;
+    text += `  • ${buffer.ideas.length} ideias novas\n`;
+    text += `  • ${buffer.decisions.length} decisões\n`;
+    text += `  • Total acumulado: ${checkpoint.totalMessagesSeen} msgs\n\n`;
     
     // Mensagens novas
-    if (newMessages.length > 0) {
+    if (buffer.newMessages.length > 0) {
       text += `💬 *Mensagens Novas:*\n`;
-      newMessages.slice(0, 15).forEach((m, i) => {
+      buffer.newMessages.slice(0, 15).forEach((m, i) => {
         const shortText = m.text.length > 70 ? m.text.substring(0, 70) + '…' : m.text;
         text += `  ${i+1}. [${m.sender}] ${shortText}\n`;
       });
-      if (newMessages.length > 15) {
-        text += `  …e mais ${newMessages.length - 15} mensagens\n`;
+      if (buffer.newMessages.length > 15) {
+        text += `  …e mais ${buffer.newMessages.length - 15} mensagens\n`;
       }
       text += '\n';
     }
     
     // Tarefas
-    if (tasks.length > 0) {
+    if (buffer.tasks.length > 0) {
       text += `📋 *Tarefas Detectadas:*\n`;
-      tasks.forEach(t => {
+      buffer.tasks.forEach(t => {
         const icon = t.priority === 'high' ? '🔴' : '🟡';
         const proj = t.project ? ` [${t.project}]` : '';
         text += `  ${icon} ${t.text.substring(0, 80)}${proj}\n`;
@@ -458,9 +589,9 @@ function generateLunaReport(data, checkpoint) {
     }
     
     // Ideias
-    if (ideas.length > 0) {
+    if (buffer.ideas.length > 0) {
       text += `💡 *Ideias:*\n`;
-      ideas.forEach(i => {
+      buffer.ideas.forEach(i => {
         const proj = i.project ? ` [${i.project}]` : '';
         text += `  • ${i.text.substring(0, 80)}${proj}\n`;
       });
@@ -468,57 +599,51 @@ function generateLunaReport(data, checkpoint) {
     }
     
     // Decisões
-    if (decisions.length > 0) {
+    if (buffer.decisions.length > 0) {
       text += `✓ *Decisões:*\n`;
-      decisions.forEach(d => {
+      buffer.decisions.forEach(d => {
         text += `  ✓ [${d.sender}] ${d.text.substring(0, 80)}\n`;
       });
       text += '\n';
     }
     
-    text += `🔄 *Próximo relatório:* 30 minutos\n`;
+    text += `🔄 *Próximo relatório: 30 minutos*\n`;
     
   } else {
-    // ═══ RELATÓRIO SEM NOVIDADES ═══
+    // ═══ RELATÓRIO SEM NOVIDADES (só 1x) ═══
     text += `📭 *Nada de novo por aqui…*\n\n`;
     
     text += `📊 *Status atual:*\n`;
-    text += `  • Mensagens monitoradas: ${stats.totalMessages}\n`;
-    text += `  • Última novidade: ${checkpoint.lastRun ? new Date(checkpoint.lastRun).toLocaleTimeString('pt-BR') : 'Nunca'}\n`;
-    text += `  • Verificações sem novidades: ${checkpoint.consecutiveNoNews}x\n\n`;
+    text += `  • Mensagens monitoradas: ${checkpoint.totalMessagesSeen}\n`;
+    text += `  • Última novidade: ${checkpoint.lastReportTime ? new Date(checkpoint.lastReportTime).toLocaleTimeString('pt-BR') : 'Nunca'}\n\n`;
     
     text += `🔍 *Grupos monitorados:*\n`;
     text += `  • 🏆 Production - 2026\n`;
     text += `  • 👤 Paulo (web)\n\n`;
     
-    text += `🔄 *Modo acelerado ativado:*\n`;
-    text += `  Próximo relatório em 10 minutos\n`;
-    text += `  (volta a 30 min quando encontrar novidades)\n\n`;
-    
-    text += `💡 *Dica:* Quando houver conversa nova,\n`;
-    text += `   vou te avisar imediatamente!\n`;
+    text += `💡 *Aguardando novas mensagens…*\n`;
+    text += `   Vou te avisar quando tiver novidade!\n`;
   }
   
   // Rodapé Luna — SEMPRE PRESENTE
   text += `\n` + `━`.repeat(36) + '\n';
   text += `🌙 *Luna* — CTO Virtual NEXO Digital\n`;
-  text += `📅 ${nowBR()} | v10.0\n`;
+  text += `📅 ${nowBR()} | v10.2\n`;
   text += `💰 Split: 25% cada (Abner/Nonoke/Elias/NEXO)`;
   
   return text;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ENVIO VIA WHATSAPP
+// ENVIO VIA WHATSAPP — SÓ GRUPO PRODUCTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function sendReportViaWhatsApp(page, reportText, destination) {
   // REGRA ESTRITA: Só envia no grupo Production 2026
-  // NUNCA enviar em chats pessoais ou outros grupos
-  console.log(`[Luna] 📤 Enviando relatório para o grupo: ${destination.groupName}...`);
+  console.log(`[Luna] 📤 Enviando relatório no grupo: ${destination.groupName}...`);
   
   try {
-    // Abre o grupo Production em vez de chat por número
+    // Abre o grupo Production
     const opened = await openGroup(page, { name: destination.groupName, short: 'Production' });
     if (!opened) {
       console.log('[Luna] ❌ Não conseguiu abrir o grupo Production');
@@ -599,17 +724,22 @@ async function notifyOps(message, type = 'whatsapp') {
 // FUNÇÃO PRINCIPAL — LUNA
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export async function runAgent() {
+export async function runAgent(isReportTime = false) {
   console.log('╔══════════════════════════════════════════════════════════════════════╗');
-  console.log('║  🌙 LUNA — CTO Virtual NEXO Digital v10.0                           ║');
-  console.log('║  Relatório SEMPRE enviado | Checkpoint Inteligente                  ║');
+  if (isReportTime) {
+    console.log('║  🌙 LUNA — HORA DO RELATÓRIO (30 min)                               ║');
+  } else {
+    console.log('║  🌙 LUNA — SCAN RÁPIDO (10 min)                                     ║');
+  }
+  console.log('║  Só envia no grupo Production | Silêncio quando não há novidades    ║');
   console.log('╚══════════════════════════════════════════════════════════════════════╝');
   
   const checkpoint = loadCheckpoint();
-  console.log(`[Luna] Última execução: ${checkpoint.lastRun || 'Nunca'}`);
-  console.log(`[Luna] Modo atual: ${checkpoint.currentMode} (${checkpoint.currentMode === 'normal' ? '30min' : '10min'})`);
-  console.log(`[Luna] Mensagens conhecidas: ${checkpoint.knownMessageHashes?.length || 0}`);
-  console.log(`[Luna] Sem novidades seguidas: ${checkpoint.consecutiveNoNews}x`);
+  const buffer = loadBuffer();
+  
+  console.log(`[Luna] Checkpoint: ${checkpoint.knownMessageHashes?.length || 0} msgs conhecidas`);
+  console.log(`[Luna] Buffer: ${buffer.newMessages?.length || 0} novas msgs pendentes`);
+  console.log(`[Luna] Modo: ${isReportTime ? 'RELATÓRIO' : 'SCAN'}`);
   
   let browser, page;
   
@@ -634,116 +764,142 @@ export async function runAgent() {
     const { newMessages, newHashes } = getNewMessagesOnly(allMessages, checkpoint);
     const hasNews = newMessages.length > 0;
     
-    // 4. Analisa novas mensagens
-    const allTasks = [];
-    const allIdeas = [];
-    const allDecisions = [];
-    
-    if (hasNews) {
-      console.log(`[Luna] 🎉 ${newMessages.length} mensagens NOVAS detectadas!`);
-      
+    // 4. Atualiza checkpoint (marca como lidas)
+    if (newHashes.length > 0) {
       checkpoint.knownMessageHashes.push(...newHashes);
-      checkpoint.consecutiveNoNews = 0;
-      checkpoint.currentMode = 'normal';
-      
-      for (const msg of newMessages) {
-        const tasks = extractTasks(msg.text);
-        const ideas = extractIdeas(msg.text);
-        const isDec = isDecision(msg.text);
-        
-        allTasks.push(...tasks.map(t => ({ ...t, sender: msg.sender, group: msg.group })));
-        allIdeas.push(...ideas.map(i => ({ ...i, sender: msg.sender, group: msg.group })));
-        if (isDec) allDecisions.push({ text: msg.text, sender: msg.sender, group: msg.group });
-      }
-    } else {
-      console.log(`[Luna] 📭 Nenhuma mensagem nova.`);
-      checkpoint.consecutiveNoNews++;
-      checkpoint.currentMode = 'accelerated';
+      checkpoint.totalMessagesSeen = checkpoint.knownMessageHashes.length;
     }
-    
-    // 5. Atualiza checkpoint
     checkpoint.lastRun = nowISO();
-    checkpoint.totalMessagesSeen = checkpoint.knownMessageHashes.length;
     saveCheckpoint(checkpoint);
     
-    // 6. Prepara dados do relatório
-    const reportData = {
-      hasNews,
-      newMessages,
-      tasks: allTasks,
-      ideas: allIdeas,
-      decisions: allDecisions,
-      allMessages,
-      stats: {
-        totalMessages: allMessages.length,
-        newMessages: newMessages.length,
-        totalTasks: allTasks.length,
-        totalIdeas: allIdeas.length,
-        totalDecisions: allDecisions.length,
+    // 5. Se há novidades, adiciona ao buffer
+    if (hasNews) {
+      console.log(`[Luna] 🎉 ${newMessages.length} mensagens NOVAS! Adicionando ao buffer...`);
+      
+      const tasks = [];
+      const ideas = [];
+      const decisions = [];
+      
+      for (const msg of newMessages) {
+        const msgTasks = extractTasks(msg.text);
+        const msgIdeas = extractIdeas(msg.text);
+        const isDec = isDecision(msg.text);
+        
+        tasks.push(...msgTasks.map(t => ({ ...t, sender: msg.sender, group: msg.group })));
+        ideas.push(...msgIdeas.map(i => ({ ...i, sender: msg.sender, group: msg.group })));
+        if (isDec) decisions.push({ text: msg.text, sender: msg.sender, group: msg.group });
       }
-    };
-    
-    // 7. Gera relatório LUNA (SEMPRE, mesmo sem novidades)
-    const reportText = generateLunaReport(reportData, checkpoint);
-    
-    // 8. Salva dados
-    writeJSON(CONFIG.OUTPUT_FILE, {
-      version: '10.0',
-      updatedAt: nowISO(),
-      reportTime: nowBR(),
-      stats: reportData.stats,
-      hasNews,
-      newMessages: newMessages.slice(0, 50),
-      recentMessages: newMessages.slice(0, 20),
-      tasks: { high: allTasks.filter(t => t.priority === 'high'), medium: allTasks.filter(t => t.priority === 'medium'), all: allTasks },
-      ideas: allIdeas,
-      decisions: allDecisions,
-      mode: checkpoint.currentMode,
-      consecutiveNoNews: checkpoint.consecutiveNoNews,
-    });
-    
-    // 9. Envia relatório SEMPRE para Abner
-    console.log('\n[Luna] 📤 Enviando relatório...');
-    let sent = false;
-    
-    for (const dest of CONFIG.REPORT_DESTINATIONS) {
-      const ok = await sendReportViaWhatsApp(page, reportText, dest);
-      if (ok) sent = true;
+      
+      addToBuffer(buffer, newMessages, tasks, ideas, decisions);
+      console.log(`[Luna] 📦 Buffer atualizado: ${buffer.newMessages.length} msgs, ${buffer.tasks.length} tarefas`);
+    } else {
+      console.log(`[Luna] 📭 Nenhuma mensagem nova.`);
     }
     
-    // 10. Notifica Centro de Operações
-    if (hasNews) {
+    // 6. Se NÃO é hora do relatório, só guarda e sai
+    if (!isReportTime) {
+      console.log('\n[Luna] 🔇 Não é hora do relatório. Dados guardados. Aguardando...');
+      
+      // Salva dados para o dashboard
+      writeJSON(CONFIG.OUTPUT_FILE, {
+        version: '10.2',
+        updatedAt: nowISO(),
+        reportTime: nowBR(),
+        hasNews: buffer.newMessages.length > 0,
+        bufferedMessages: buffer.newMessages.length,
+        bufferedTasks: buffer.tasks.length,
+        bufferedIdeas: buffer.ideas.length,
+        totalMessages: checkpoint.totalMessagesSeen,
+        mode: 'scan',
+      });
+      
       await notifyOps(
-        `Luna: ${newMessages.length} mensagens novas, ${allTasks.length} tarefas, ${allIdeas.length} ideias`,
+        `Luna Scan: ${hasNews ? newMessages.length + ' novas msgs no buffer' : 'Sem novidades'}`,
         'whatsapp'
       );
-    } else {
+      
+      return { status: 'scan_complete', hasNews, buffered: buffer.newMessages.length };
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // 7. É HORA DO RELATÓRIO (30 min) — decide se envia
+    // ═══════════════════════════════════════════════════════════════════
+    
+    const bufferedNews = buffer.newMessages.length > 0;
+    
+    if (bufferedNews) {
+      // ✅ Há novidades no buffer → envia relatório COMPLETO
+      console.log('\n[Luna] 🎉 HORA DO RELATÓRIO! Enviando novidades acumuladas...');
+      
+      const reportText = generateLunaReport(buffer, checkpoint, true);
+      
+      // Envia no grupo Production
+      let sent = false;
+      for (const dest of CONFIG.REPORT_DESTINATIONS) {
+        const ok = await sendReportViaWhatsApp(page, reportText, dest);
+        if (ok) sent = true;
+      }
+      
+      // Atualiza checkpoint
+      checkpoint.lastReportHadNews = true;
+      checkpoint.lastReportTime = nowISO();
+      saveCheckpoint(checkpoint);
+      
+      // Limpa buffer
+      clearBuffer();
+      
+      // Notifica ops
       await notifyOps(
-        `Luna: Sem novidades (${checkpoint.consecutiveNoNews}x seguidas). Modo acelerado (10min).`,
+        `Luna Relatório: ${buffer.newMessages.length} msgs, ${buffer.tasks.length} tarefas, ${buffer.ideas.length} ideias`,
         'whatsapp'
       );
-    }
-    
-    // 11. Resumo
-    const nextInterval = checkpoint.currentMode === 'normal' ? '30 minutos' : '10 minutos';
-    console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
-    if (hasNews) {
-      console.log('║  ✅ NOVIDADES! Relatório enviado.                                   ║');
-      console.log(`║  📨 ${newMessages.length} novas | ${allTasks.length} tarefas | ${allIdeas.length} ideias          ║`);
+      
+      console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
+      console.log('║  ✅ RELATÓRIO ENVIADO NO GRUPO PRODUCTION!                          ║');
+      console.log(`║  📨 ${buffer.newMessages.length} msgs | ${buffer.tasks.length} tarefas | ${buffer.ideas.length} ideias          ║`);
+      console.log(`║  📤 Status: ${sent ? 'ENVIADO ✅' : 'FALHA ❌'}                                          ║`);
+      console.log('╚══════════════════════════════════════════════════════════════════════╝');
+      
+      return { status: 'report_sent', hasNews: true, sent };
+      
     } else {
-      console.log('║  📭 Sem novidades. Relatório enviado.                               ║');
-      console.log(`║  📊 ${allMessages.length} mensagens monitoradas | ${checkpoint.consecutiveNoNews}x sem novas    ║`);
+      // 📭 Não há novidades no buffer
+      
+      if (checkpoint.lastReportHadNews) {
+        // Último relatório teve novidades → envia 1x "sem novidades"
+        console.log('\n[Luna] 📭 Sem novidades. Enviando relatório de fechamento...');
+        
+        const reportText = generateLunaReport(buffer, checkpoint, true);
+        
+        let sent = false;
+        for (const dest of CONFIG.REPORT_DESTINATIONS) {
+          const ok = await sendReportViaWhatsApp(page, reportText, dest);
+          if (ok) sent = true;
+        }
+        
+        checkpoint.lastReportHadNews = false;
+        checkpoint.lastReportTime = nowISO();
+        saveCheckpoint(checkpoint);
+        
+        await notifyOps('Luna: Sem novidades. Próximo: silêncio até novas msgs.', 'whatsapp');
+        
+        console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
+        console.log('║  📭 RELATÓRIO DE FECHAMENTO ENVIADO.                                ║');
+        console.log('║  🔇 Próximos relatórios: SILÊNCIO até novas mensagens               ║');
+        console.log('╚══════════════════════════════════════════════════════════════════════╝');
+        
+        return { status: 'report_no_news', hasNews: false, sent };
+        
+      } else {
+        // Já enviou "sem novidades" antes → SILÊNCIO TOTAL
+        console.log('\n[Luna] 🔇 SILÊNCIO. Nenhuma novidade desde o último relatório.');
+        console.log('      Não vou enviar nada. Aguardando novas mensagens...');
+        
+        await notifyOps('Luna: Silêncio. Aguardando novas mensagens.', 'whatsapp');
+        
+        return { status: 'silent', hasNews: false };
+      }
     }
-    console.log(`║  🕐 Próximo: ${nextInterval}                                          ║`);
-    console.log('╚══════════════════════════════════════════════════════════════════════╝');
-    
-    return {
-      status: hasNews ? 'success' : 'no_news',
-      hasNews,
-      newMessages: newMessages.length,
-      nextMode: checkpoint.currentMode,
-      nextInterval: checkpoint.currentMode === 'normal' ? CONFIG.MODE_NORMAL : CONFIG.MODE_ACCELERATED
-    };
     
   } catch (e) {
     if (e.message === 'WHATSAPP_NEEDS_LOGIN') {
@@ -760,8 +916,8 @@ export async function runAgent() {
 
 // Se executado diretamente
 const modulePath = decodeURIComponent(import.meta.url.replace('file:///', '').replace(/\//g, '\\'));
-const scriptPath = process.argv[1];
-const isMainModule = modulePath.toLowerCase() === scriptPath.toLowerCase();
+const scriptPath = process.argv[1] || '';
+const isMainModule = scriptPath && modulePath.toLowerCase() === scriptPath.toLowerCase();
 if (isMainModule) {
   runAgent().then(() => process.exit(process.exitCode || 0)).catch(() => process.exit(1));
 }
