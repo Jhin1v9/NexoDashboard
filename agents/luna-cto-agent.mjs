@@ -511,35 +511,61 @@ function generateLunaReport(data, checkpoint) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function sendReportViaWhatsApp(page, reportText, destination) {
-  console.log(`[Luna] 📤 Enviando relatório para ${destination.name}...`);
+  console.log(`[Luna] 📤 Enviando relatório para ${destination.name} (${destination.number})...`);
   
   try {
     const chatUrl = `https://web.whatsapp.com/send?phone=${destination.number}`;
-    await page.goto(chatUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(5000);
+    await page.goto(chatUrl, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForTimeout(8000);
     
+    // Tenta múltiplos seletores
     const inputSelectors = [
       'div[contenteditable="true"][data-tab="1"]',
       'div[contenteditable="true"][data-tab="3"]',
+      'div[contenteditable="true"][data-tab="10"]',
       '[data-testid="conversation-compose-box-input"]',
+      'footer div[contenteditable="true"]',
       'div[contenteditable="true"]'
     ];
     
     let input = null;
+    let foundSelector = '';
     for (const sel of inputSelectors) {
       input = page.locator(sel).first();
-      if (await input.count() > 0) break;
+      const count = await input.count();
+      if (count > 0) {
+        foundSelector = sel;
+        console.log(`[Luna] ✅ Input encontrado: ${sel}`);
+        break;
+      }
     }
     
     if (!input || await input.count() === 0) {
-      console.log('[Luna] ❌ Input não encontrado');
-      return false;
+      console.log('[Luna] ❌ Input não encontrado, tentando fallback JS...');
+      // Fallback: usa JavaScript injection
+      await page.evaluate((text) => {
+        const inputs = document.querySelectorAll('[contenteditable="true"]');
+        for (const inp of inputs) {
+          if (inp.offsetParent !== null && inp.clientHeight > 20) {
+            inp.focus();
+            inp.textContent = text;
+            inp.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            return true;
+          }
+        }
+        return false;
+      }, reportText);
+      await page.waitForTimeout(1000);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(3000);
+      console.log(`[Luna] ✅ Enviado via fallback!`);
+      return true;
     }
     
     await input.fill(reportText);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
     
     console.log(`[Luna] ✅ Relatório enviado para ${destination.name}!`);
     return true;
