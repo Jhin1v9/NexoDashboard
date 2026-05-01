@@ -95,13 +95,12 @@ export default function Dashboard() {
   const pendingTasks = tasks.filter(t => !t.completed).length
   const avgHealth = clients.length > 0 ? Math.round(clients.reduce((a, c) => a + c.health, 0) / clients.length) : 0
 
-  // Financial metrics — TODOS REATIVOS da API /api/finance/summary
+  // Financial metrics
   const totalExpected = summary.totalExpected || 5850
   const totalReceived = summary.totalReceived || 175
   const totalPending = summary.totalPending || 5675
-  const cashBalance = summary.balance?.value ?? cashBox.balance?.value ?? 0
-  const monthlyExpenses = summary.totalExpense?.value ?? cashBox.monthlyExpenses?.value ?? 0
-  const totalIncome = summary.totalIncome?.value ?? 0
+  const cashBalance = cashBox.balance?.value || 467.50
+  const monthlyExpenses = cashBox.monthlyExpenses?.value || 10
 
   // Payment progress
   const paymentProgress = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0

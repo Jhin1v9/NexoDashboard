@@ -1,0 +1,108 @@
+[
+  {
+    "paymentId": "pay-tropicale-001",
+    "clientId": "juan-tropicale",
+    "clientName": "Juan - Sorveteria Tropicale",
+    "projectName": "TPV Sorveteria Tropicale",
+    "totalAmount": {
+      "value": 5500,
+      "currency": "EUR"
+    },
+    "status": "waiting_quote",
+    "statusLabel": "Aguardando Resposta do Orçamento",
+    "paymentTerms": {
+      "type": "split",
+      "splits": [
+        {
+          "phase": 1,
+          "percent": 30,
+          "dueDate": "2026-05-15",
+          "label": "Entrada (30%)",
+          "status": "pending",
+          "amount": 1650
+        },
+        {
+          "phase": 2,
+          "percent": 40,
+          "dueDate": "2026-06-15",
+          "label": "Desenvolvimento (40%)",
+          "status": "pending",
+          "amount": 2200
+        },
+        {
+          "phase": 3,
+          "percent": 30,
+          "dueDate": "2026-07-15",
+          "label": "Entrega (30%)",
+          "status": "pending",
+          "amount": 1650
+        }
+      ]
+    },
+    "revenueSplit": [
+      { "personId": "abner", "percent": 25, "amountEUR": 1375, "received": false },
+      { "personId": "nonoke-enoque", "percent": 25, "amountEUR": 1375, "received": false },
+      { "personId": "elias", "percent": 25, "amountEUR": 1375, "received": false },
+      { "personId": "nexo-digital", "percent": 25, "amountEUR": 1375, "received": false }
+    ],
+    "companySharePercent": 25,
+    "companyShareAmount": 1375,
+    "quoteUrl": "https://github.com/Jhin1v9/tpv-orcamento-sorveteria/tree/main/pressuposto",
+    "quoteStatus": "sent",
+    "quoteSentDate": "2026-04-30",
+    "createdAt": "2026-04-01",
+    "updatedAt": "2026-04-30"
+  },
+  {
+    "paymentId": "pay-santafe-001",
+    "clientId": "paulo-santafe",
+    "clientName": "Paulo - Santafe Construcciones",
+    "projectName": "Site Santafe Construcciones",
+    "totalAmount": {
+      "value": 350,
+      "currency": "EUR"
+    },
+    "status": "partial",
+    "statusLabel": "Parcela 1 Paga / Parcela 2 Pendente",
+    "paymentTerms": {
+      "type": "split",
+      "splits": [
+        {
+          "phase": 1,
+          "percent": 50,
+          "dueDate": "2026-05-01",
+          "label": "Parcela 1 (50%)",
+          "status": "paid",
+          "amount": 175,
+          "paidDate": "2026-05-01"
+        },
+        {
+          "phase": 2,
+          "percent": 50,
+          "dueDate": "2026-06-15",
+          "label": "Parcela 2 (50%)",
+          "status": "pending",
+          "amount": 175
+        }
+      ]
+    },
+    "revenueSplit": [
+      { "personId": "abner", "percent": 25, "amountEUR": 87.5, "received": false },
+      { "personId": "nonoke-enoque", "percent": 25, "amountEUR": 87.5, "received": false },
+      { "personId": "elias", "percent": 25, "amountEUR": 87.5, "received": false },
+      { "personId": "nexo-digital", "percent": 25, "amountEUR": 87.5, "received": false }
+    ],
+    "companySharePercent": 25,
+    "companyShareAmount": 87.5,
+    "transactions": [
+      {
+        "id": "tx-001",
+        "amount": { "value": 175, "currency": "EUR" },
+        "date": "2026-05-01",
+        "note": "Parcela 1/2 - 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital)"
+      }
+    ],
+    "createdAt": "2026-04-15",
+    "updatedAt": "2026-05-01"
+  }
+]
