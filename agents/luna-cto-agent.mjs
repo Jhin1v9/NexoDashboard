@@ -844,12 +844,16 @@ async function sendReportViaWhatsApp(page, reportText, destination) {
 // NOTIFICAÇÃO PARA CENTRO DE OPERAÇÕES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function notifyOps(message, type = 'whatsapp') {
+async function notifyOps(message, type = 'whatsapp', details = null) {
   try {
+    const body = { type, message, timestamp: nowISO() };
+    if (details) {
+      body.details = details;
+    }
     await fetch('http://127.0.0.1:3456/api/ops/changes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, message, timestamp: nowISO() })
+      body: JSON.stringify(body)
     });
   } catch {}
 }
@@ -964,22 +968,27 @@ export async function runAgent(isReportTime = false) {
     if (!isReportTime) {
       console.log('\n[Luna] 🔇 Não é hora do relatório. Dados guardados. Aguardando...');
       
-      // Salva dados para o dashboard
-      writeJSON(CONFIG.OUTPUT_FILE, {
+      // Salva dados para o dashboard (COM DETALHES COMPLETOS)
+      const scanData = {
         version: '10.2',
         updatedAt: nowISO(),
         reportTime: nowBR(),
         hasNews: buffer.newMessages.length > 0,
-        bufferedMessages: buffer.newMessages.length,
-        bufferedTasks: buffer.tasks.length,
-        bufferedIdeas: buffer.ideas.length,
+        // Arrays completos para o frontend
+        messages: buffer.newMessages.slice(0, 50),
+        tasks: buffer.tasks.slice(0, 50),
+        ideas: buffer.ideas.slice(0, 50),
+        decisions: buffer.decisions.slice(0, 50),
         totalMessages: checkpoint.totalMessagesSeen,
         mode: 'scan',
-      });
+        scanId: `scan-${Date.now()}`,
+      };
+      writeJSON(CONFIG.OUTPUT_FILE, scanData);
       
       await notifyOps(
         `Luna Scan: ${hasNews ? newMessages.length + ' novas msgs no buffer' : 'Sem novidades'}`,
-        'whatsapp'
+        'whatsapp',
+        { scanId: scanData.scanId, messages: scanData.messages, tasks: scanData.tasks, ideas: scanData.ideas }
       );
       
       return { status: 'scan_complete', hasNews, buffered: buffer.newMessages.length };
@@ -1012,10 +1021,34 @@ export async function runAgent(isReportTime = false) {
       // Limpa buffer
       clearBuffer();
       
-      // Notifica ops
+      // Notifica ops com DETALHES
+      const reportData = {
+        reportId: `report-${Date.now()}`,
+        messages: buffer.newMessages.slice(0, 50),
+        tasks: buffer.tasks.slice(0, 50),
+        ideas: buffer.ideas.slice(0, 50),
+        decisions: buffer.decisions.slice(0, 50),
+        messageCount: buffer.newMessages.length,
+        taskCount: buffer.tasks.length,
+        ideaCount: buffer.ideas.length,
+      };
+      writeJSON(CONFIG.OUTPUT_FILE, {
+        version: '10.2',
+        updatedAt: nowISO(),
+        reportTime: nowBR(),
+        hasNews: true,
+        messages: reportData.messages,
+        tasks: reportData.tasks,
+        ideas: reportData.ideas,
+        decisions: reportData.decisions,
+        totalMessages: checkpoint.totalMessagesSeen,
+        mode: 'report',
+        reportId: reportData.reportId,
+      });
       await notifyOps(
         `Luna Relatório: ${buffer.newMessages.length} msgs, ${buffer.tasks.length} tarefas, ${buffer.ideas.length} ideias`,
-        'whatsapp'
+        'whatsapp',
+        reportData
       );
       
       console.log('\n╔══════════════════════════════════════════════════════════════════════╗');

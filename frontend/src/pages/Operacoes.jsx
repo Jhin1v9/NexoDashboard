@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, MessageSquare,
   TrendingUp, TrendingDown, Zap, Users, GitBranch, Server,
-  X, Bell, RefreshCw, Command, BarChart3, Eye
+  X, Bell, RefreshCw, Command, BarChart3, Eye,
+  CheckSquare, Lightbulb, Gavel, ChevronRight
 } from 'lucide-react'
 import useRealtime from '../hooks/useRealtime'
 
@@ -74,38 +75,149 @@ function AlertItem({ alert, onDismiss }) {
   )
 }
 
-function ActivityFeed({ changes }) {
+function ActivityDetailModal({ change, onClose }) {
+  if (!change) return null;
+  const details = change.details;
+  const hasMessages = details?.messages?.length > 0;
+  const hasTasks = details?.tasks?.length > 0;
+  const hasIdeas = details?.ideas?.length > 0;
+  const hasDecisions = details?.decisions?.length > 0;
+  const hasAny = hasMessages || hasTasks || hasIdeas || hasDecisions;
+
   return (
-    <div className="space-y-2 max-h-96 overflow-y-auto">
-      <AnimatePresence>
-        {(changes || []).slice(0, 20).map((change) => (
-          <motion.div
-            key={change.id}
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center gap-3 p-2 rounded-lg hover:bg-nexo-card/50 transition-colors"
-          >
-            <div className={`w-2 h-2 rounded-full ${
-              change.type === 'whatsapp' ? 'bg-nexo-success' :
-              change.type === 'finance' ? 'bg-nexo-primary' :
-              change.type === 'github' ? 'bg-nexo-warning' :
-              'bg-nexo-info'
-            }`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-nexo-text truncate">{change.message}</p>
-              <p className="text-xs text-nexo-muted">
-                {new Date(change.timestamp).toLocaleTimeString('pt-BR')}
-              </p>
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="bg-nexo-card border border-nexo-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 border-b border-nexo-border flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-nexo-text">Detalhes da Atividade</h3>
+              <p className="text-xs text-nexo-muted">{change.message}</p>
             </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-      {(!changes || changes.length === 0) && (
-        <p className="text-center text-nexo-muted text-sm py-8">Nenhuma atividade recente</p>
-      )}
-    </div>
+            <button onClick={onClose} className="text-nexo-muted hover:text-nexo-text transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
+            {!hasAny && (
+              <p className="text-nexo-muted text-sm text-center py-4">Nenhum detalhe disponível para esta atividade.</p>
+            )}
+            {hasMessages && (
+              <div>
+                <h4 className="text-sm font-medium text-nexo-success mb-2 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" /> Mensagens ({details.messages.length})
+                </h4>
+                <div className="space-y-2">
+                  {details.messages.slice(0, 20).map((msg, i) => (
+                    <div key={i} className="bg-nexo-bg/50 p-2 rounded text-sm text-nexo-text border-l-2 border-nexo-success">
+                      <p className="truncate">{msg.text || msg}</p>
+                      {msg.author && <p className="text-xs text-nexo-muted mt-1">{msg.author}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {hasTasks && (
+              <div>
+                <h4 className="text-sm font-medium text-nexo-warning mb-2 flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4" /> Tarefas ({details.tasks.length})
+                </h4>
+                <div className="space-y-2">
+                  {details.tasks.slice(0, 20).map((task, i) => (
+                    <div key={i} className="bg-nexo-bg/50 p-2 rounded text-sm text-nexo-text border-l-2 border-nexo-warning flex items-center gap-2">
+                      <CheckSquare className="w-3 h-3 text-nexo-warning" />
+                      <span>{task.text || task}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {hasIdeas && (
+              <div>
+                <h4 className="text-sm font-medium text-nexo-primary mb-2 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4" /> Ideias ({details.ideas.length})
+                </h4>
+                <div className="space-y-2">
+                  {details.ideas.slice(0, 20).map((idea, i) => (
+                    <div key={i} className="bg-nexo-bg/50 p-2 rounded text-sm text-nexo-text border-l-2 border-nexo-primary flex items-center gap-2">
+                      <Lightbulb className="w-3 h-3 text-nexo-primary" />
+                      <span>{idea.text || idea}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {hasDecisions && (
+              <div>
+                <h4 className="text-sm font-medium text-nexo-info mb-2 flex items-center gap-2">
+                  <Gavel className="w-4 h-4" /> Decisões ({details.decisions.length})
+                </h4>
+                <div className="space-y-2">
+                  {details.decisions.slice(0, 20).map((dec, i) => (
+                    <div key={i} className="bg-nexo-bg/50 p-2 rounded text-sm text-nexo-text border-l-2 border-nexo-info flex items-center gap-2">
+                      <Gavel className="w-3 h-3 text-nexo-info" />
+                      <span>{dec.text || dec}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function ActivityFeed({ changes }) {
+  const [selectedChange, setSelectedChange] = useState(null);
+  return (
+    <>
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        <AnimatePresence>
+          {(changes || []).slice(0, 20).map((change) => (
+            <motion.div
+              key={change.id}
+              layout
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`flex items-center gap-3 p-2 rounded-lg hover:bg-nexo-card/50 transition-colors ${change.details ? 'cursor-pointer' : ''}`}
+              onClick={() => change.details && setSelectedChange(change)}
+            >
+              <div className={`w-2 h-2 rounded-full ${
+                change.type === 'whatsapp' ? 'bg-nexo-success' :
+                change.type === 'finance' ? 'bg-nexo-primary' :
+                change.type === 'github' ? 'bg-nexo-warning' :
+                'bg-nexo-info'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-nexo-text truncate">{change.message}</p>
+                <p className="text-xs text-nexo-muted">
+                  {new Date(change.timestamp).toLocaleTimeString('pt-BR')}
+                </p>
+              </div>
+              {change.details && <ChevronRight className="w-4 h-4 text-nexo-muted" />}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {(!changes || changes.length === 0) && (
+          <p className="text-center text-nexo-muted text-sm py-8">Nenhuma atividade recente</p>
+        )}
+      </div>
+      <ActivityDetailModal change={selectedChange} onClose={() => setSelectedChange(null)} />
+    </>
   )
 }
 
