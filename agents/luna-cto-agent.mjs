@@ -26,6 +26,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const CONFIG = {
+  // Chrome CDP usa perfil COPIADO de .luna-chrome para .luna-chrome-debug
+  // NUNCA reinicie o Chrome PWA original (menu Iniciar) — perde o login!
+  // Para reiniciar CDP: scripts\start-chrome-cdp.bat
   CDP_URL: 'http://127.0.0.1:9223',
   
   // Grupos monitorados
