@@ -42,9 +42,9 @@ const CONFIG = {
   
   // Contatos identificados do grupo Production
   CONTACTS: {
-    '34685093192': { name: 'Abner', role: 'CEO', id: 'abner' },
-    '34624529442': { name: 'Elias', role: 'Sócio', id: 'elias' },
-    // Nonoke e Enoque - numeros a identificar pelas conversas
+    '34685093192': { name: 'Abner', role: 'CEO', id: 'abner', share: 25 },
+    '34624529442': { name: 'Elias', role: 'Sócio', id: 'elias', share: 25 },
+    // Nonoke/Enoque = mesma pessoa, share: 25%
   },
   
   // Destino do relatório via WhatsApp (número para enviar)
@@ -1355,4 +1355,5 @@ const isMainModule = modulePath.toLowerCase() === scriptPath.toLowerCase();
 if (isMainModule) {
   runAgent().then(() => process.exit(process.exitCode || 0)).catch(() => process.exit(1));
 }
+
 
