@@ -1,0 +1,94 @@
+---
+description: Regras principais do NEXO Dashboard PRO para Cursor AI
+glob: "*"
+alwaysApply: true
+---
+
+# NEXO Dashboard PRO — Regras Cursor
+
+## Contexto
+Dashboard de operacoes para NEXO Digital (agencia dev Barcelona). Stack: React 18 + Vite + Tailwind + Express + WebSocket + Playwright.
+
+## Regras Gerais de Codigo
+
+### JavaScript / React
+- Use `const` e `let`; nunca `var`
+- Funcoes de componente: arrow function exportada
+- Hooks customizados: prefixo `use` (ex: `useTransactions`)
+- Estados complexos: useReducer ou Zustand (evitar prop drilling)
+- Efeitos colaterais: sempre em useEffect com cleanup
+- Async/await preferido over Promise chains
+
+### Nomenclatura
+```
+Componentes:    PascalCase   (ex: ChangelogCard.jsx)
+Hooks:          camelCase + use (ex: useChangelog.js)
+Utilitarios:    camelCase    (ex: formatDate.js)
+Estilos:        kebab-case   (ex: nexo-card)
+Constantes:     UPPER_SNAKE  (ex: API_URL)
+```
+
+### Estrutura de Componente
+```jsx
+// 1. Imports externos
+import React from 'react'
+import { motion } from 'framer-motion'
+
+// 2. Imports internos
+import useChangelog from '../hooks/useChangelog'
+
+// 3. Componente
+export default function MeuComponente({ prop1, prop2 }) {
+  // Hooks primeiro
+  const { data } = useChangelog()
+  
+  // Handlers depois
+  const handleClick = () => { ... }
+  
+  // Render por ultimo
+  return <div>...</div>
+}
+```
+
+### Backend (Express)
+- Rotas: camelCase (ex: `/api/changelog`)
+- Middlewares: prefixo `verify` ou `handle`
+- JSON files: sempre com `JSON.stringify(data, null, 2)`
+- Erros: sempre retornar `{ success: false, error: 'msg' }`
+
+## Regras de UI/UX
+- Dark mode obrigatorio (ja configurado no Tailwind)
+- Glassmorphism: use `glass` e `glass-card` classes
+- Cores NEXO: `nexo-accent` (#6366f1), `nexo-bg` (#0f0f1a), `nexo-card` (#1a1a2e)
+- Animacoes: Framer Motion para transicoes; `duration-300` padrao
+- Icones: Lucide React apenas (nao mixing com outros icon libs)
+- Responsive: mobile-first com Tailwind breakpoints
+
+## Anti-Patterns (NAO FACA)
+- ❌ `console.log` em producao — usar sistema de logs ou remover
+- ❌ `any` TypeScript — tipar sempre (mesmo com JS, use JSDoc)
+- ❌ Mutacao direta de estado — sempre criar copia
+- ❌ CSS inline — usar Tailwind classes ou styled-components
+- ❌ Arquivos >500 linhas — dividir em componentes menores
+- ❌ Fetch dentro de render — sempre em useEffect ou hook
+
+## Comandos Essenciais
+```bash
+# Build frontend
+cd frontend && npm run build
+
+# Iniciar backend
+node backend/server.js
+
+# Testar APIs
+curl http://127.0.0.1:3456/api/state
+
+# Ver logs Luna
+tail -f backend/data/luna-scheduler.log
+```
+
+## Escopo Proibido (NAO MODIFIQUE)
+- `node_modules/`, `.git/`, `.vercel/`
+- Arquivos fora do working directory
+- Secrets em `.env.local` (leia, nao edite)
+- Migrations Supabase sem confirmacao

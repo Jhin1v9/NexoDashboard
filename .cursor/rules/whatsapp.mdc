@@ -1,0 +1,43 @@
+---
+description: Regras para agente WhatsApp Luna
+glob: "agents/**/*"
+alwaysApply: true
+---
+
+# WhatsApp Agent Rules
+
+## Arquitetura
+- `luna-cto-agent.mjs` — Logica principal (extracao, analise, envio)
+- `luna-scheduler.mjs` — Loop de scans/relatorios
+- `luna-daemon.mjs` — Monitoramento e reinicio automatico
+
+## Regras de Envio (CRITICO)
+1. SOMENTE grupo "🏆Production - 2026🙏"
+2. NUNCA chats pessoais, outros grupos, ou numeros individuais
+3. SCAN a cada 10min — extrai, compara checkpoint, guarda no buffer
+4. RELATORIO a cada 30min — junta novidades do buffer e envia
+5. Sem novidades → envia 1x "sem novidades", depois SILENCIO
+6. So volta a enviar quando detectar NOVAS mensagens
+
+## Parser de Mensagens
+- Tarefas: palavras-chave "fazer", "precisamos", "implementar", "bug"
+- Ideias: "ideia", "sugestao", "podemos", "que tal"
+- Decisoes: "ok", "feito", "aprovado", "combinado", "vamos"
+- Pagamentos: "paguei", "transferi", "bizum", "recebi", "€"
+- Links: regex `https?://[^\s]+`
+
+## Checkpoint
+- `backend/data/luna-checkpoint.json` — hashes conhecidos
+- `backend/data/luna-buffer.json` — novidades pendentes
+- NUNCA resetar checkpoint sem backup
+
+## Seletores WhatsApp Web (atualizados para nova UI)
+- Chat list item: `[data-testid="cell-frame-container"]`
+- Chat title: `[data-testid="cell-frame-title"]`
+- Messages: `div[role="row"]`
+- Input: `[contenteditable="true"]` com fallback JS
+
+## Testing
+- Testar com `node agents/luna-cto-agent.mjs`
+- Verificar logs: `backend/data/luna-scheduler.log`
+- Verificar se mensagem apareceu no grupo apos envio

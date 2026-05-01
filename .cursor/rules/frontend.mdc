@@ -1,0 +1,68 @@
+---
+description: Regras para desenvolvimento frontend React
+glob: "frontend/src/**/*"
+alwaysApply: true
+---
+
+# Frontend Rules
+
+## Componentes React
+- Funcoes com export default; nome igual ao arquivo
+- Props desestruturadas no parametro
+- useState/useEffect no topo; handlers depois; JSX por ultimo
+- Nunca usar class components
+
+## Hooks Customizados
+- Prefixo `use`; retornam objeto com dados + funcoes
+- Sempre tratar loading, error, e dados
+- Cleanup em useEffect quando necessario
+
+## Exemplo Padrao
+```jsx
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+
+export default function useMeuHook() {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const res = await axios.get('/api/resource')
+      setData(res.data.items)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchData() }, [])
+
+  return { data, loading, error, refetch: fetchData }
+}
+```
+
+## Estilos (Tailwind)
+- Classes utilitarias; nunca CSS inline
+- Variantes: `hover:`, `focus:`, `dark:`, `md:`
+- Cores NEXO: `bg-nexo-card`, `text-nexo-accent`, `border-nexo-border`
+- Espacamento: padrao 4px (1 = 4px, 2 = 8px, 4 = 16px)
+
+## Chamadas API
+- useRealtime hook para polling automatico
+- axios para POST/PUT/DELETE
+- fetch apenas quando axios nao disponivel
+- Base URL via proxy Vite (`/api/*` → localhost:3456)
+
+## Roteamento
+- react-router-dom v6
+- Nova pagina: criar em `src/pages/`, importar em `App.jsx`, adicionar em `Sidebar.jsx`
+- Route path em kebab-case
+
+## Animacoes
+- Framer Motion para transicoes de pagina e componentes
+- `motion.div` com `initial`, `animate`, `exit`
+- Duracao padrao: `duration-300` (0.3s)

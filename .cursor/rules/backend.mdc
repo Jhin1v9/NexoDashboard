@@ -1,0 +1,55 @@
+---
+description: Regras para desenvolvimento backend Node.js/Express
+glob: "backend/**/*"
+alwaysApply: true
+---
+
+# Backend Rules
+
+## API Design
+- Todas as rotas retornam `{ success: boolean, ...data }`
+- Status HTTP: 200 (OK), 201 (Created), 400 (Bad Request), 404 (Not Found), 500 (Error)
+- Parametros de query: sempre validar antes de usar
+- Body JSON: sempre usar `express.json()` middleware
+
+## Estrutura de Endpoint
+```javascript
+// GET — lista ou unico
+app.get('/api/resource', (req, res) => {
+  const data = readJSON(FILE) || { items: [] }
+  res.json({ success: true, count: data.items.length, items: data.items })
+})
+
+// POST — criar
+app.post('/api/resource', (req, res) => {
+  const { name, value } = req.body
+  if (!name || !value) {
+    return res.status(400).json({ success: false, error: 'name and value required' })
+  }
+  const newItem = { id: `res-${Date.now()}`, name, value, createdAt: new Date().toISOString() }
+  // ...salvar e retornar
+})
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err)
+  res.status(500).json({ success: false, error: err.message })
+})
+```
+
+## Persistencia (JSON Files)
+- Use helpers `readJSON(file)` e `writeJSON(file, data)`
+- Sempre criar diretorio antes de escrever: `ensureDir(path.dirname(file))`
+- Backup automatico antes de writes criticos
+- Datas: sempre ISO string (`new Date().toISOString()`)
+
+## WebSocket
+- Broadcast para todas as conexoes abertas
+- Tipos de mensagem: `type: 'update' | 'notification' | 'alert'`
+- Nunca enviar dados sensiveis via WS (sem auth)
+
+## Seguranca
+- Nunca exponha stack trace para cliente
+- Valide todos os inputs (SQL injection prevention)
+- Sem secrets hardcoded — use `.env.local`
+- CORS configurado apenas para origens confiaveis
