@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, DollarSign } from 'lucide-react'
+import { Command, LayoutDashboard, FileText, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, DollarSign } from 'lucide-react'
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/', icon: Command, label: 'Operações' },
+  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/orcamentos', icon: FileText, label: 'Orçamentos' },
   { path: '/financeiro', icon: DollarSign, label: 'Financeiro' },
   { path: '/clientes', icon: Users, label: 'Clientes' },
   { path: '/projetos', icon: Rocket, label: 'Projetos' },

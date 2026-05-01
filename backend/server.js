@@ -218,13 +218,72 @@ app.get('/api/predictions', (req, res) => {
   res.json(getPredictions(scanClients()));
 });
 
-// WhatsApp tasks
+// WhatsApp tasks (legado)
 app.get('/api/whatsapp', (req, res) => res.json(readJSON(WAPP_FILE) || []));
 app.post('/api/whatsapp', (req, res) => {
   const msgs = readJSON(WAPP_FILE) || [];
   msgs.push({ ...req.body, id: Date.now().toString(), time: new Date().toISOString() });
   writeJSON(WAPP_FILE, msgs);
   res.json({ ok: true });
+});
+
+// WhatsApp Agent v8.0 — Dados do agente inteligente
+const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
+const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
+const REPORTS_DIR = path.join(DATA_DIR, 'reports');
+
+// Ensure reports dir exists
+if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
+if (!fs.existsSync(REPORT_HISTORY_FILE)) writeJSON(REPORT_HISTORY_FILE, { reports: [] });
+
+// Serve report files statically
+app.use('/reports', express.static(REPORTS_DIR));
+
+app.get('/api/whatsapp-agent', (req, res) => {
+  const data = readJSON(AGENT_DATA_FILE);
+  if (!data) return res.status(404).json({ error: 'Agent data not found. Run: node agents/nexo-whatsapp-agent-v8.mjs' });
+  res.json(data);
+});
+
+app.get('/api/whatsapp-agent/status', (req, res) => {
+  const data = readJSON(AGENT_DATA_FILE);
+  res.json({
+    active: !!data,
+    lastUpdate: data?.updatedAt || null,
+    stats: data?.stats || null
+  });
+});
+
+// Trigger manual refresh of WhatsApp agent
+app.post('/api/whatsapp-agent/refresh', async (req, res) => {
+  try {
+    const { spawn } = require('child_process');
+    const agentPath = path.join(__dirname, '..', 'agents', 'nexo-whatsapp-agent-v8.mjs');
+    
+    const child = spawn('node', [agentPath], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: path.join(__dirname, '..')
+    });
+    child.unref();
+    
+    res.json({ ok: true, message: 'Agent refresh triggered' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Reports history
+app.get('/api/reports/history', (req, res) => {
+  const data = readJSON(REPORT_HISTORY_FILE, { reports: [] });
+  res.json(data);
+});
+
+app.get('/api/reports/latest', (req, res) => {
+  const data = readJSON(REPORT_HISTORY_FILE, { reports: [] });
+  const latest = data.reports[data.reports.length - 1];
+  if (!latest) return res.status(404).json({ error: 'No reports yet' });
+  res.json(latest);
 });
 
 // External refresh (força refresh manual de serviço externo)
@@ -490,7 +549,9 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
     // If status changed to paid or partial, add company share to cash box
     if (oldStatus === 'pending' && (payment.status === 'partial' || payment.status === 'paid')) {
       const txBase = getTxValueInBase(tx, payment);
-      const companyShare = txBase * 0.25;
+      // Use companySharePercent from payment config, default to 25%
+      const companySharePercent = payment.companySharePercent || 25;
+      const companyShare = txBase * (companySharePercent / 100);
       const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
       const oldBalance = cashBox.balance.value;
       const newBalance = oldBalance + companyShare;
@@ -502,7 +563,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
         date: tx.date || new Date().toISOString().slice(0, 10),
         type: 'income',
         amount: parseFloat(companyShare.toFixed(2)),
-        source: `${payment.clientShortName || 'Cliente'} — empresa (25%)`,
+        source: `${payment.clientShortName || 'Cliente'} — empresa (${companySharePercent}%)`,
         balanceAfter: cashBox.balance.value,
         recordedBy: tx.recordedBy || 'system',
         recordedAt: nowISO()
@@ -878,6 +939,176 @@ app.get('/api/cash-box/history', async (req, res) => {
   }
 });
 
+// GET cash box statement (extrato completo tipo banco)
+app.get('/api/cash-box/statement', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [], balance: { value: 0, currency: 'EUR' } };
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    
+    const { from, to, type, category } = req.query;
+    
+    // Build statement from cash box history + pending items
+    let entries = (cashBox.history || []).map(h => ({
+      id: h.id,
+      date: h.date,
+      type: h.type,
+      amount: h.amount,
+      description: h.source,
+      balanceAfter: h.balanceAfter,
+      category: h.type === 'income' ? 'receita' : 'despesa',
+      status: 'completed',
+      recordedBy: h.recordedBy,
+      note: h.note || ''
+    }));
+    
+    // Add pending payments as "expected income"
+    payments.forEach(p => {
+      if (p.status === 'pending' || p.status === 'partial') {
+        const pendingAmount = (p.totalAmount?.value || 0) - (p.transactions || []).reduce((s, t) => s + (t.amount?.value || 0), 0);
+        if (pendingAmount > 0) {
+          entries.push({
+            id: `pending-${p.paymentId}`,
+            date: p.paymentTerms?.splits?.find(s => s.status === 'pending')?.dueDate || p.updatedAt?.slice(0, 10),
+            type: 'expected_income',
+            amount: pendingAmount,
+            description: `${p.clientShortName} — pendente`,
+            balanceAfter: null,
+            category: 'receita',
+            status: 'pending',
+            note: p.notes || ''
+          });
+        }
+      }
+    });
+    
+    // Add recurring expenses as "expected expense"
+    expenses.forEach(e => {
+      if (e.type === 'recurring' && e.autoDeductFromCashBox) {
+        const monthly = getEquivalentMonthly(e);
+        if (monthly > 0) {
+          entries.push({
+            id: `recurring-${e.id}`,
+            date: e.renewDate || new Date().toISOString().slice(0, 10),
+            type: 'expected_expense',
+            amount: monthly,
+            description: `${e.name} — mensal`,
+            balanceAfter: null,
+            category: e.category || 'others',
+            status: 'recurring',
+            note: e.notes || ''
+          });
+        }
+      }
+    });
+    
+    // Filter
+    if (from) entries = entries.filter(e => e.date >= from);
+    if (to) entries = entries.filter(e => e.date <= to);
+    if (type) entries = entries.filter(e => e.type === type || (type === 'income' && e.type === 'expected_income') || (type === 'expense' && e.type === 'expected_expense'));
+    if (category) entries = entries.filter(e => e.category === category);
+    
+    // Sort by date descending
+    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Calculate running balance for display
+    let runningBalance = cashBox.balance.value;
+    const statement = entries.map(e => {
+      const item = { ...e };
+      if (e.status === 'completed') {
+        item.displayBalance = e.balanceAfter;
+      } else {
+        // For pending items, show projected balance
+        if (e.type === 'expected_income') {
+          runningBalance += e.amount;
+        } else if (e.type === 'expected_expense') {
+          runningBalance -= e.amount;
+        }
+        item.displayBalance = runningBalance;
+        item.isProjected = true;
+      }
+      return item;
+    });
+    
+    res.json({
+      entries: statement,
+      currentBalance: cashBox.balance.value,
+      currency: cashBox.balance.currency || 'EUR',
+      totalIncome: entries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0),
+      totalExpense: entries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0),
+      pendingIncome: entries.filter(e => e.type === 'expected_income').reduce((s, e) => s + e.amount, 0),
+      pendingExpense: entries.filter(e => e.type === 'expected_expense').reduce((s, e) => s + e.amount, 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST quick expense (gastei com tal, adiciono lá)
+app.post('/api/expenses/quick', async (req, res) => {
+  try {
+    const { name, amount, category, categoryLabel, note, deductFromCashBox } = req.body;
+    if (!name || amount === undefined) {
+      return res.status(400).json({ error: 'name and amount required' });
+    }
+    
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expense = {
+      id: generateId('exp'),
+      name: name || 'Despesa',
+      description: note || '',
+      amount: { value: parseFloat(amount), currency: 'EUR' },
+      costPerPerson: { value: parseFloat(amount), currency: 'EUR' },
+      type: 'one_time',
+      period: null,
+      periodLabel: 'Único',
+      startDate: new Date().toISOString().slice(0, 10),
+      renewDate: null,
+      endDate: null,
+      category: category || 'others',
+      categoryLabel: categoryLabel || 'Outros',
+      splitAmong: [],
+      paidBy: {},
+      fullyPaid: true,
+      autoDeductFromCashBox: deductFromCashBox !== false,
+      notes: note || '',
+      attachments: [],
+      createdBy: req.body.createdBy || 'system',
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+    expenses.push(expense);
+    writeJSON(EXPENSES_FILE, expenses);
+    
+    // Deduct from cash box if enabled
+    if (expense.autoDeductFromCashBox && parseFloat(amount) > 0) {
+      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+      const amountVal = parseFloat(amount);
+      cashBox.balance.value = parseFloat((cashBox.balance.value - amountVal).toFixed(2));
+      cashBox.lastUpdated = nowISO();
+      cashBox.history = cashBox.history || [];
+      cashBox.history.push({
+        id: generateId('etx'),
+        date: new Date().toISOString().slice(0, 10),
+        type: 'expense',
+        amount: amountVal,
+        source: `${name} — despesa rápida`,
+        balanceAfter: cashBox.balance.value,
+        recordedBy: req.body.createdBy || 'system',
+        recordedAt: nowISO(),
+        note: note || ''
+      });
+      writeJSON(CASH_BOX_FILE, cashBox);
+      broadcast({ type: 'cashbox', data: cashBox });
+    }
+    
+    broadcast({ type: 'expenses', data: expenses });
+    res.json(expense);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // === FINANCE SUMMARY =========================================================
 // ============================================================================
@@ -1106,6 +1337,108 @@ setTimeout(() => {
 console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
 
 // Catch-all -> SPA
+// ── Quotes / Orçamentos ──
+const QUOTES_FILE = path.join(DATA_DIR, 'quotes.json');
+
+app.get('/api/quotes', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  res.json(quotes);
+});
+
+app.get('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const quote = quotes.find(q => q.quoteId === req.params.id);
+  if (!quote) return res.status(404).json({ error: 'Orçamento não encontrado' });
+  res.json(quote);
+});
+
+app.post('/api/quotes', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const newQuote = { ...req.body, quoteId: `quote-${Date.now()}`, createdAt: new Date().toISOString() };
+  quotes.push(newQuote);
+  writeJSON(QUOTES_FILE, quotes);
+  broadcast({ type: 'quotes', data: quotes });
+  res.json(newQuote);
+});
+
+app.put('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const idx = quotes.findIndex(q => q.quoteId === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Orçamento não encontrado' });
+  quotes[idx] = { ...quotes[idx], ...req.body, updatedAt: new Date().toISOString() };
+  writeJSON(QUOTES_FILE, quotes);
+  broadcast({ type: 'quotes', data: quotes });
+  res.json(quotes[idx]);
+});
+
+app.delete('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const filtered = quotes.filter(q => q.quoteId !== req.params.id);
+  writeJSON(QUOTES_FILE, filtered);
+  broadcast({ type: 'quotes', data: filtered });
+  res.json({ success: true });
+});
+
+// ── Operations Center / Centro de Operações ──
+const OPS_STATE_FILE = path.join(DATA_DIR, 'ops-state.json');
+
+app.get('/api/ops', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || {
+    alerts: [],
+    activeOperations: [],
+    recentChanges: [],
+    systemHealth: { status: 'ok', lastCheck: new Date().toISOString() }
+  };
+  res.json(state);
+});
+
+app.post('/api/ops/alerts', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  const alert = { id: `alert-${Date.now()}`, ...req.body, createdAt: new Date().toISOString() };
+  state.alerts.unshift(alert);
+  if (state.alerts.length > 50) state.alerts = state.alerts.slice(0, 50);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json(alert);
+});
+
+app.delete('/api/ops/alerts/:id', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  state.alerts = state.alerts.filter(a => a.id !== req.params.id);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json({ success: true });
+});
+
+app.post('/api/ops/changes', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  const change = { id: `change-${Date.now()}`, ...req.body, timestamp: new Date().toISOString() };
+  state.recentChanges.unshift(change);
+  if (state.recentChanges.length > 100) state.recentChanges = state.recentChanges.slice(0, 100);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json(change);
+});
+
+// ── Members ──
+const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
+
+app.get('/api/members', (req, res) => {
+  const members = readJSON(MEMBERS_FILE) || [];
+  res.json(members);
+});
+
+app.put('/api/members/:id', (req, res) => {
+  const members = readJSON(MEMBERS_FILE) || [];
+  const idx = members.findIndex(m => m.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Membro não encontrado' });
+  members[idx] = { ...members[idx], ...req.body, updatedAt: new Date().toISOString() };
+  writeJSON(MEMBERS_FILE, members);
+  broadcast({ type: 'members', data: members });
+  res.json(members[idx]);
+});
+
+// Catch-all
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
