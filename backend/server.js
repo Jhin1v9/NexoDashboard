@@ -41,6 +41,50 @@ const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 };
 
+// --- Schema Loaders v16.0 ---
+const SCHEMA_DIR = path.join(__dirname, 'data', 'schema');
+const CONFIG_DIR = path.join(__dirname, 'data', 'config');
+
+function loadSchema(filename) {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(SCHEMA_DIR, filename), 'utf8'));
+    console.log(`[SCHEMA] Carregado: ${filename}`);
+    return data;
+  } catch (e) {
+    console.error(`[SCHEMA] Erro ao carregar ${filename}:`, e.message);
+    return null;
+  }
+}
+
+function loadConfig(filename) {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, filename), 'utf8'));
+    console.log(`[CONFIG] Carregado: ${filename}`);
+    return data;
+  } catch (e) {
+    console.error(`[CONFIG] Erro ao carregar ${filename}:`, e.message);
+    return null;
+  }
+}
+
+// Garantir diretórios existem
+if (!fs.existsSync(SCHEMA_DIR)) fs.mkdirSync(SCHEMA_DIR, { recursive: true });
+if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+
+// Carregar todos os schemas na inicialização
+const schemas = {
+  contacts: loadSchema('contacts-map.json'),
+  clients: loadSchema('clients-registry.json'),
+  projects: loadSchema('projects-registry.json'),
+  groups: loadSchema('groups-config.json'),
+  version: loadSchema('schema-version.json')
+};
+
+const configs = {
+  integrations: loadConfig('integrations-config.json'),
+  dashboard: loadConfig('luna-dashboard-config.json')
+};
+
 // --- Data Files ---
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -2237,7 +2281,191 @@ app.post('/api/luna/scan', (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
-});// Catch-all
+});
+
+// ============================================================================
+// === SCHEMA APIs v16.0 ===================================================
+// ============================================================================
+
+// GET /api/schema/contacts - contacts-map.json
+app.get('/api/schema/contacts', (req, res) => {
+  try {
+    const data = schemas.contacts;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'contacts-map.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/schema/clients - clients-registry.json
+app.get('/api/schema/clients', (req, res) => {
+  try {
+    const data = schemas.clients;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'clients-registry.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/schema/projects - projects-registry.json
+app.get('/api/schema/projects', (req, res) => {
+  try {
+    const data = schemas.projects;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'projects-registry.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/schema/groups - groups-config.json
+app.get('/api/schema/groups', (req, res) => {
+  try {
+    const data = schemas.groups;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'groups-config.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/schema/version - schema-version.json
+app.get('/api/schema/version', (req, res) => {
+  try {
+    const data = schemas.version;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'schema-version.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/config/integrations - integrations-config.json
+app.get('/api/config/integrations', (req, res) => {
+  try {
+    const data = configs.integrations;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'integrations-config.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/config/dashboard - luna-dashboard-config.json
+app.get('/api/config/dashboard', (req, res) => {
+  try {
+    const data = configs.dashboard;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'luna-dashboard-config.json não encontrado' });
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/nexo-state - Combined API com TODOS os schemas + dados antigos
+app.get('/api/nexo-state', (req, res) => {
+  try {
+    // Dados antigos (compatibilidade)
+    const tasks = readJSON(TASKS_FILE) || [];
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+    const quotes = readJSON(QUOTES_FILE) || [];
+    const leads = readJSON(LEADS_FILE) || { leads: [] };
+    const members = readJSON(MEMBERS_FILE) || [];
+    const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };
+    const transactions = readJSON(TRANSACTIONS_FILE) || [];
+    const whatsappTasks = readJSON(WAPP_FILE) || [];
+    const agentData = readJSON(AGENT_DATA_FILE) || {};
+    const luna = readJSON(path.join(__dirname, '..', 'agents', 'luna-buffer.json')) || { messages: [], tasks: [], ideas: [] };
+    const reportHistory = readJSON(REPORT_HISTORY_FILE) || { reports: [] };
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      data: {
+        // --- SCHEMAS v16.0 ---
+        contacts: schemas.contacts || null,
+        clients: schemas.clients || null,
+        projects: schemas.projects || null,
+        groups: schemas.groups || null,
+        schemaVersion: schemas.version?.currentVersion || 'unknown',
+        
+        // --- CONFIGS v16.0 ---
+        integrations: configs.integrations || null,
+        dashboardConfig: configs.dashboard || null,
+
+        // --- DADOS ANTIGOS (compatibilidade) ---
+        tasks: tasks,
+        payments: payments,
+        expenses: expenses,
+        cashBox: cashBox,
+        quotes: quotes,
+        leads: leads,
+        members: members,
+        opsState: opsState,
+        transactions: transactions,
+        whatsappTasks: whatsappTasks,
+        whatsappAgent: agentData,
+        luna: luna,
+        reportHistory: reportHistory,
+
+        // --- SUMMARIES ---
+        summary: {
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter(t => t.completed).length,
+          totalClients: (leads.leads || []).length,
+          totalPayments: payments.length,
+          totalExpenses: expenses.length,
+          cashBoxBalance: cashBox.balance?.value || 0,
+          totalLeads: (leads.leads || []).length,
+          totalQuotes: quotes.length
+        }
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Catch-all
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 app.get('*', (req, res) => {
