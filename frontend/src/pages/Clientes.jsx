@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Folder, FolderOpen, FileText, Code, Image, MessageSquare, 
@@ -406,3 +406,4 @@ export default function Clientes() {
     </div>
   )
 }
+

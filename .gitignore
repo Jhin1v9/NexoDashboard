@@ -1,40 +1,41 @@
-# Dependencies
+backups/
+backend/data/
+backend/cache/
+backend/*.backup*
+backend/*.log
+agents/
+artifacts/
+dist/
+build/
+*.tar.gz
+*.zip
+*.ps1
+*.bat
+docker-compose.yml
+PROMPT_*.md
+AGENTS.md
+.env
+.env.local
+.env.production
+*.local
 node_modules/
-agents/node_modules/
-backend/node_modules/
-frontend/node_modules/
-
-# Package lock files
-agents/package-lock.json
-backend/package-lock.json
-frontend/package-lock.json
-
-# Vercel
-.vercel/
-frontend/.vercel/
-
-# Chrome/CDP data profiles - NEVER commit these
-data/
-
-# Screenshots (generated)
-data/screenshots/
-
-# Logs
-*.log
-backend/server.log
-backend/server.err
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
+npm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Environment
-.env
-.env.local
-.env.*.local
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+logs/
+*.log
+coverage/
+.nyc_output/
+tmp/
+temp/
+*.tmp
+data/

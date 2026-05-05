@@ -1,16 +1,16 @@
 {
-  "name": "nexo-dashboard-pro",
-  "version": "1.0.0",
-  "description": "Dashboard operacional privado da NEXO DIGITAL - Self-hosted, VPN-only",
-  "private": true,
+  "name": "luna-omnia-control",
+  "version": "13.2.1",
+  "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd backend && node server.js",
-    "client": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "start": "cd backend && node server.js"
+    "start": "node agents/luna-cto-agent.mjs",
+    "once": "node agents/luna-cto-agent.mjs --once",
+    "diagnose": "node agents/luna-cto-agent.mjs --diagnose"
   },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.52.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
   }
 }

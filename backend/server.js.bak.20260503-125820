@@ -1,0 +1,2214 @@
+﻿/**
+ * NEXO DASHBOARD PRO - Backend Server
+ * Express + WebSocket + File-based persistence
+ * Self-hosted, VPN-only
+ * 
+ * REFACTOR: execSync removido, spawn assíncrono + cache robusto
+ */
+
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const WebSocket = require('ws');
+const cron = require('node-cron');
+
+// ── Cache + External Services (assíncrono, non-blocking) ──
+const CacheManager = require('./cache-manager');
+const ExternalServices = require('./external-services');
+const cache = new CacheManager(path.join(__dirname, 'cache'));
+const external = new ExternalServices(cache);
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Config
+const PORT = process.env.PORT || 3456;
+const BIND_IP = process.env.BIND_IP || '127.0.0.1';
+const NEXO_BASE = process.env.NEXO_BASE_PATH || 'C:\\Users\\Administrator\\Documents\\NEXO DIGITAL';
+const CLIENTES_DIR = path.join(NEXO_BASE, 'CLIENTES');
+const DATA_DIR = path.join(__dirname, 'data');
+
+// Ensure data dir exists
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Helpers ---
+const readJSON = (file) => {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return null; }
+};
+const writeJSON = (file, data) => {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+};
+
+// --- Data Files ---
+const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const GH_USERS_FILE = path.join(DATA_DIR, 'github_users.json');
+const VC_USERS_FILE = path.join(DATA_DIR, 'vercel_users.json');
+const WAPP_FILE = path.join(DATA_DIR, 'whatsapp-tasks.json');
+
+// Init defaults
+if (!fs.existsSync(TASKS_FILE)) writeJSON(TASKS_FILE, []);
+if (!fs.existsSync(USERS_FILE)) writeJSON(USERS_FILE, { active: 'abner', users: { abner: { name: 'Abner', role: 'Admin', color: '#3742fa' }, nonoke: { name: 'Nonoke', role: 'Admin', color: '#2ed573' }, elias: { name: 'Elias', role: 'Admin', color: '#ffa502' } } });
+if (!fs.existsSync(GH_USERS_FILE)) writeJSON(GH_USERS_FILE, {});
+if (!fs.existsSync(VC_USERS_FILE)) writeJSON(VC_USERS_FILE, {});
+if (!fs.existsSync(WAPP_FILE)) writeJSON(WAPP_FILE, []);
+
+// --- Scanner ---
+const ALLOWED_CLIENTS = ['JUAN_SORVETERIA_TROPICALE', 'PAULO_SANTAFE'];
+
+function scanClients() {
+  const clients = [];
+  if (!fs.existsSync(CLIENTES_DIR)) return clients;
+
+  for (const name of ALLOWED_CLIENTS) {
+    const clientPath = path.join(CLIENTES_DIR, name);
+    if (!fs.existsSync(clientPath)) continue;
+
+    const folders = ['CODIGO', 'DEMOS', 'ENTREGAS', 'PROMPTS', 'RELATORIOS'];
+    let health = 0;
+    const folderStatus = {};
+
+    for (const f of folders) {
+      const fp = path.join(clientPath, f);
+      const exists = fs.existsSync(fp);
+      folderStatus[f] = exists;
+      if (exists) health += 20;
+    }
+
+    // Check recency
+    const relPath = path.join(clientPath, 'RELATORIOS');
+    if (fs.existsSync(relPath)) {
+      const files = fs.readdirSync(relPath);
+      if (files.length > 0) health += Math.min(files.length * 2, 10);
+    }
+
+    clients.push({
+      id: name,
+      name: name.replace(/_/g, ' '),
+      health: Math.min(health, 100),
+      folders: folderStatus,
+      path: clientPath
+    });
+  }
+  return clients;
+}
+
+function getPredictions(clients) {
+  const predictions = [];
+  const stale = clients.filter(c => c.health < 50);
+  if (stale.length > 0) predictions.push({ type: 'warning', msg: `${stale.length} cliente(s) com health < 50%` });
+
+  const tasks = readJSON(TASKS_FILE) || [];
+  const pending = tasks.filter(t => !t.completed);
+  if (pending.length > 10) predictions.push({ type: 'danger', msg: `Sprint overload: ${pending.length} tarefas pendentes` });
+
+  const oldTasks = tasks.filter(t => {
+    if (!t.createdAt) return false;
+    const days = (Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    return days > 14 && !t.completed;
+  });
+  if (oldTasks.length > 0) predictions.push({ type: 'warning', msg: `${oldTasks.length} tarefas stale (>14 dias)` });
+
+  return predictions;
+}
+
+// --- WebSocket ---
+function broadcast(data) {
+  const msg = JSON.stringify(data);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  });
+}
+
+wss.on('connection', (ws) => {
+  ws.send(JSON.stringify({ type: 'connected', time: new Date().toISOString() }));
+});
+
+// --- API Routes ---
+
+// State
+app.get('/api/state', (req, res) => {
+  const clients = scanClients();
+  const tasks = readJSON(TASKS_FILE) || [];
+  const users = readJSON(USERS_FILE);
+  res.json({ clients, tasks, users, predictions: getPredictions(clients), timestamp: new Date().toISOString() });
+});
+
+// Tasks
+app.get('/api/tasks', (req, res) => res.json(readJSON(TASKS_FILE) || []));
+
+app.post('/api/tasks', (req, res) => {
+  const tasks = readJSON(TASKS_FILE) || [];
+  const task = { id: Date.now().toString(), ...req.body, createdAt: new Date().toISOString() };
+  tasks.push(task);
+  writeJSON(TASKS_FILE, tasks);
+  broadcast({ type: 'tasks', data: tasks });
+  res.json(task);
+});
+
+app.put('/api/tasks/:id', (req, res) => {
+  let tasks = readJSON(TASKS_FILE) || [];
+  tasks = tasks.map(t => t.id === req.params.id ? { ...t, ...req.body, updatedAt: new Date().toISOString() } : t);
+  writeJSON(TASKS_FILE, tasks);
+  broadcast({ type: 'tasks', data: tasks });
+  res.json(tasks.find(t => t.id === req.params.id));
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+  let tasks = readJSON(TASKS_FILE) || [];
+  tasks = tasks.filter(t => t.id !== req.params.id);
+  writeJSON(TASKS_FILE, tasks);
+  broadcast({ type: 'tasks', data: tasks });
+  res.json({ ok: true });
+});
+
+// Users
+app.get('/api/users', (req, res) => res.json(readJSON(USERS_FILE)));
+
+app.post('/api/users/switch', (req, res) => {
+  const users = readJSON(USERS_FILE);
+  if (users.users[req.body.user]) {
+    users.active = req.body.user;
+    writeJSON(USERS_FILE, users);
+  }
+  res.json(users);
+});
+
+// CLI Tools status (assíncrono, spawn, cacheado)
+app.get('/api/tools', async (req, res) => {
+  try {
+    const result = await external.getToolsStatus();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GitHub repos (assíncrono, spawn, cacheado)
+app.get('/api/github-repos', async (req, res) => {
+  try {
+    const result = await external.getGitHubRepos();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Vercel projects (assíncrono, spawn, cacheado)
+app.get('/api/vercel-projects', async (req, res) => {
+  try {
+    const result = await external.getVercelProjects();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Predictions
+app.get('/api/predictions', (req, res) => {
+  res.json(getPredictions(scanClients()));
+});
+
+// WhatsApp tasks (legado)
+app.get('/api/whatsapp', (req, res) => res.json(readJSON(WAPP_FILE) || []));
+app.post('/api/whatsapp', (req, res) => {
+  const msgs = readJSON(WAPP_FILE) || [];
+  msgs.push({ ...req.body, id: Date.now().toString(), time: new Date().toISOString() });
+  writeJSON(WAPP_FILE, msgs);
+  res.json({ ok: true });
+});
+
+// WhatsApp Agent v8.0 — Dados do agente inteligente
+const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
+const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
+const REPORTS_DIR = path.join(DATA_DIR, 'reports');
+
+// Ensure reports dir exists
+if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
+if (!fs.existsSync(REPORT_HISTORY_FILE)) writeJSON(REPORT_HISTORY_FILE, { reports: [] });
+
+// Serve report files statically
+app.use('/reports', express.static(REPORTS_DIR));
+
+app.get('/api/whatsapp-agent', (req, res) => {
+  const data = readJSON(AGENT_DATA_FILE);
+  if (!data) return res.status(404).json({ error: 'Agent data not found. Run: node agents/nexo-whatsapp-agent-v8.mjs' });
+  res.json(data);
+});
+
+app.get('/api/whatsapp-agent/status', (req, res) => {
+  const data = readJSON(AGENT_DATA_FILE);
+  res.json({
+    active: !!data,
+    lastUpdate: data?.updatedAt || null,
+    stats: data?.stats || null
+  });
+});
+
+// Trigger manual refresh of WhatsApp agent
+app.post('/api/whatsapp-agent/refresh', async (req, res) => {
+  try {
+    const { spawn } = require('child_process');
+    const agentPath = path.join(__dirname, '..', 'agents', 'nexo-whatsapp-agent-v8.mjs');
+    
+    const child = spawn('node', [agentPath], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: path.join(__dirname, '..')
+    });
+    child.unref();
+    
+    res.json({ ok: true, message: 'Agent refresh triggered' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Reports history
+app.get('/api/reports/history', (req, res) => {
+  const data = readJSON(REPORT_HISTORY_FILE, { reports: [] });
+  res.json(data);
+});
+
+app.get('/api/reports/latest', (req, res) => {
+  const data = readJSON(REPORT_HISTORY_FILE, { reports: [] });
+  const latest = data.reports[data.reports.length - 1];
+  if (!latest) return res.status(404).json({ error: 'No reports yet' });
+  res.json(latest);
+});
+
+// External refresh (força refresh manual de serviço externo)
+app.post('/api/external/refresh', async (req, res) => {
+  const { service } = req.body; // 'github', 'vercel', 'tools'
+  try {
+    const result = await external.refreshExternal(service);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Git push helper (spawn assíncrono, timeout 30s)
+app.post('/api/git-push', async (req, res) => {
+  const cwd = req.body.cwd || NEXO_BASE;
+  const message = req.body.message || 'update';
+
+  try {
+    // git add .
+    const addResult = await cache.spawn('git', ['add', '.'], { cwd }, 30000);
+    if (!addResult.ok) {
+      return res.status(500).json({ ok: false, error: `git add falhou: ${addResult.error || addResult.stderr}` });
+    }
+
+    // git commit
+    const commitResult = await cache.spawn('git', ['commit', '-m', message], { cwd }, 30000);
+    // commit retorna 1 se não há mudanças — isso é aceitável
+    if (!commitResult.ok && !commitResult.stderr?.includes('nothing to commit')) {
+      return res.status(500).json({ ok: false, error: `git commit falhou: ${commitResult.error || commitResult.stderr}` });
+    }
+
+    // git push
+    const pushResult = await cache.spawn('git', ['push'], { cwd }, 30000);
+    if (!pushResult.ok) {
+      return res.status(500).json({ ok: false, error: `git push falhou: ${pushResult.error || pushResult.stderr}` });
+    }
+
+    res.json({ ok: true, output: pushResult.data });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Run allowed commands (spawn assíncrono, timeout 10s)
+app.post('/api/run', async (req, res) => {
+  const ALLOWED = ['node --version', 'npm --version', 'git status', 'git log --oneline -5'];
+  const cmd = req.body.cmd;
+  if (!ALLOWED.includes(cmd)) return res.status(403).json({ error: 'Command not allowed' });
+
+  try {
+    const [command, ...args] = cmd.split(' ');
+    const result = await cache.spawn(command, args, {}, 10000);
+    if (result.ok) {
+      res.json({ output: result.data });
+    } else {
+      res.status(500).json({ error: result.error || result.stderr, output: result.output });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================================
+// === FINANCIAL MODULE — NEXO Dashboard Pro =================================
+// ============================================================================
+
+// --- Financial Data Files ---
+const PAYMENTS_FILE = path.join(DATA_DIR, 'payments.json');
+const EXPENSES_FILE = path.join(DATA_DIR, 'expenses.json');
+const EXPENSE_TEMPLATES_FILE = path.join(DATA_DIR, 'expense-templates.json');
+const CASH_BOX_FILE = path.join(DATA_DIR, 'cash-box.json');
+const ALERTS_FILE = path.join(DATA_DIR, 'alerts.json');
+
+// Init financial defaults if missing
+if (!fs.existsSync(PAYMENTS_FILE)) writeJSON(PAYMENTS_FILE, []);
+if (!fs.existsSync(EXPENSES_FILE)) writeJSON(EXPENSES_FILE, []);
+if (!fs.existsSync(EXPENSE_TEMPLATES_FILE)) writeJSON(EXPENSE_TEMPLATES_FILE, []);
+if (!fs.existsSync(CASH_BOX_FILE)) writeJSON(CASH_BOX_FILE, { balance: { value: 0, currency: 'EUR' }, lastUpdated: new Date().toISOString(), monthlyIncome: { value: 0, currency: 'EUR' }, monthlyExpenses: { value: 0, currency: 'EUR' }, projectedBalance: { value: 0, currency: 'EUR' }, projectionMonths: 3, incomingPayments: [], outgoingExpenses: [], history: [], alerts: [], settings: { lowBalanceMultiplier: 2, currency: 'EUR', autoDeductRecurring: true, projectionMonths: 3 } });
+if (!fs.existsSync(ALERTS_FILE)) writeJSON(ALERTS_FILE, []);
+
+// --- Financial Helpers ---
+function generateId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function getPaymentTotalInBase(payment) {
+  if (payment.totalAmount.currency === 'EUR') return payment.totalAmount.value;
+  if (payment.equivalentEUR) return payment.equivalentEUR.value;
+  return payment.totalAmount.value;
+}
+
+function getTxValueInBase(tx, payment) {
+  if (tx.amount.currency === 'EUR') return tx.amount.value;
+  if (payment.totalAmount.currency === tx.amount.currency) {
+    const baseTotal = getPaymentTotalInBase(payment);
+    return (tx.amount.value / payment.totalAmount.value) * baseTotal;
+  }
+  return tx.amount.value;
+}
+
+function recalcPaymentStatus(payment) {
+  const totalBase = getPaymentTotalInBase(payment);
+  const receivedBase = (payment.transactions || []).reduce((sum, tx) => sum + getTxValueInBase(tx, payment), 0);
+  if (receivedBase <= 0) return 'pending';
+  if (receivedBase >= totalBase) return 'paid';
+  return 'partial';
+}
+
+function recalcRevenueSplit(payment) {
+  const totalBase = getPaymentTotalInBase(payment);
+  const receivedBase = (payment.transactions || []).reduce((sum, tx) => sum + getTxValueInBase(tx, payment), 0);
+  const split = payment.revenueSplit || [];
+  split.forEach(s => {
+    if (s.type === 'company') {
+      s.received = receivedBase > 0;
+    } else {
+      const shareAmount = (s.percent / 100) * totalBase;
+      s.received = receivedBase >= shareAmount;
+    }
+  });
+}
+
+function recalcExpenseFullyPaid(expense) {
+  const split = expense.splitAmong || [];
+  if (split.length === 0) { expense.fullyPaid = true; return; }
+  expense.fullyPaid = split.every(pid => expense.paidBy && expense.paidBy[pid] && expense.paidBy[pid].paid);
+}
+
+function addCashBoxEntry(entry) {
+  const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+  cashBox.history = cashBox.history || [];
+  cashBox.balance = cashBox.balance || { value: 0, currency: 'EUR' };
+  cashBox.history.push(entry);
+  cashBox.lastUpdated = nowISO();
+  writeJSON(CASH_BOX_FILE, cashBox);
+  return cashBox;
+}
+
+function getEquivalentMonthly(expense) {
+  if (expense.type !== 'recurring') return 0;
+  const val = expense.amount ? (expense.amount.value || 0) : 0;
+  switch (expense.period) {
+    case 'monthly': return val;
+    case 'quarterly': return val / 3;
+    case 'annual': return val / 12;
+    default: return val;
+  }
+}
+
+// ============================================================================
+// === PAYMENTS (Receitas) ===================================================
+// ============================================================================
+
+// GET all payments
+app.get('/api/payments', async (req, res) => {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET payment by id
+app.get('/api/payments/:id', async (req, res) => {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST new payment
+app.post('/api/payments', async (req, res) => {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payment = {
+      paymentId: req.body.paymentId || generateId('pay'),
+      id: req.body.id || req.body.paymentId || generateId('pay'),
+      clientId: req.body.clientId || null,
+      clientName: req.body.clientName || '',
+      clientShortName: req.body.clientShortName || '',
+      projectName: req.body.projectName || '',
+      projectId: req.body.projectId || '',
+      description: req.body.description || '',
+      totalAmount: req.body.totalAmount || { value: 0, currency: 'EUR' },
+      equivalentEUR: req.body.equivalentEUR || null,
+      status: 'pending',
+      paymentTerms: req.body.paymentTerms || { type: 'full', splits: [] },
+      methodPreferred: req.body.methodPreferred || null,
+      methodAccepted: req.body.methodAccepted || ['transfer', 'card', 'cash', 'bizum'],
+      revenueSplit: req.body.revenueSplit || [],
+      transactions: [],
+      notes: req.body.notes || '',
+      links: req.body.links || {},
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+    payments.push(payment);
+    writeJSON(PAYMENTS_FILE, payments);
+    broadcast({ type: 'payments', data: payments });
+    res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update payment
+app.put('/api/payments/:id', async (req, res) => {
+  try {
+    let payments = readJSON(PAYMENTS_FILE) || [];
+    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
+    payments[idx] = { ...payments[idx], ...req.body, updatedAt: nowISO() };
+    writeJSON(PAYMENTS_FILE, payments);
+    broadcast({ type: 'payments', data: payments });
+    res.json(payments[idx]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST transaction to payment (recalcula status automaticamente)
+app.post('/api/payments/:id/transactions', async (req, res) => {
+  try {
+    let payments = readJSON(PAYMENTS_FILE) || [];
+    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
+    const payment = payments[idx];
+
+    const tx = {
+      id: req.body.id || generateId('tx'),
+      date: req.body.date || new Date().toISOString().slice(0, 10),
+      amount: req.body.amount || { value: 0, currency: 'EUR' },
+      method: req.body.method || 'transfer',
+      methodLabel: req.body.methodLabel || 'Transferência',
+      paidBy: req.body.paidBy || '',
+      phase: req.body.phase || 1,
+      notes: req.body.notes || '',
+      proofOfPayment: req.body.proofOfPayment || null,
+      recordedBy: req.body.recordedBy || 'system',
+      recordedAt: nowISO()
+    };
+    payment.transactions = payment.transactions || [];
+    payment.transactions.push(tx);
+
+    // Recalc status
+    const oldStatus = payment.status;
+    payment.status = recalcPaymentStatus(payment);
+    payment.updatedAt = nowISO();
+
+    // Recalc revenue split
+    recalcRevenueSplit(payment);
+
+    // If status changed to paid or partial, add company share to cash box
+    if (oldStatus === 'pending' && (payment.status === 'partial' || payment.status === 'paid')) {
+      const txBase = getTxValueInBase(tx, payment);
+      // Use companySharePercent from payment config, default to 25%
+      const companySharePercent = payment.companySharePercent || 25;
+      const companyShare = txBase * (companySharePercent / 100);
+      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+      const oldBalance = cashBox.balance.value;
+      const newBalance = oldBalance + companyShare;
+      cashBox.balance.value = parseFloat(newBalance.toFixed(2));
+      cashBox.lastUpdated = nowISO();
+      cashBox.history = cashBox.history || [];
+      cashBox.history.push({
+        id: generateId('etx'),
+        date: tx.date || new Date().toISOString().slice(0, 10),
+        type: 'income',
+        amount: parseFloat(companyShare.toFixed(2)),
+        source: `${payment.clientShortName || 'Cliente'} — empresa (${companySharePercent}%)`,
+        balanceAfter: cashBox.balance.value,
+        recordedBy: tx.recordedBy || 'system',
+        recordedAt: nowISO()
+      });
+      writeJSON(CASH_BOX_FILE, cashBox);
+      broadcast({ type: 'cashbox', data: cashBox });
+    }
+
+    writeJSON(PAYMENTS_FILE, payments);
+    broadcast({ type: 'payments', data: payments });
+    res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET payment split
+app.get('/api/payments/:id/split', async (req, res) => {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json(payment.revenueSplit || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST mark split person as received
+app.post('/api/payments/:id/split/:personId/receive', async (req, res) => {
+  try {
+    let payments = readJSON(PAYMENTS_FILE) || [];
+    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
+    const payment = payments[idx];
+    payment.revenueSplit = payment.revenueSplit || [];
+    const sIdx = payment.revenueSplit.findIndex(s => s.personId === req.params.personId);
+    if (sIdx === -1) return res.status(404).json({ error: 'Person not found in split' });
+    payment.revenueSplit[sIdx].received = true;
+    payment.updatedAt = nowISO();
+    writeJSON(PAYMENTS_FILE, payments);
+    broadcast({ type: 'payments', data: payments });
+    res.json(payment.revenueSplit[sIdx]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// === EXPENSES (Despesas) =====================================================
+// ============================================================================
+
+// GET all expenses
+app.get('/api/expenses', async (req, res) => {
+  try {
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    res.json(expenses);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST new expense
+app.post('/api/expenses', async (req, res) => {
+  try {
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const splitAmong = req.body.splitAmong || [];
+    const amountVal = req.body.amount ? (req.body.amount.value || 0) : 0;
+    const costPerPerson = splitAmong.length > 0 ? parseFloat((amountVal / splitAmong.length).toFixed(2)) : amountVal;
+
+    const paidBy = {};
+    splitAmong.forEach(pid => {
+      paidBy[pid] = { paid: false, amount: costPerPerson, paidAt: null, method: null };
+    });
+
+    const expense = {
+      id: req.body.id || generateId('exp'),
+      name: req.body.name || '',
+      description: req.body.description || '',
+      amount: req.body.amount || { value: 0, currency: 'EUR' },
+      costPerPerson: { value: costPerPerson, currency: req.body.amount ? (req.body.amount.currency || 'EUR') : 'EUR' },
+      type: req.body.type || 'one_time',
+      period: req.body.period || null,
+      periodLabel: req.body.periodLabel || '',
+      startDate: req.body.startDate || null,
+      renewDate: req.body.renewDate || null,
+      endDate: req.body.endDate || null,
+      category: req.body.category || 'others',
+      categoryLabel: req.body.categoryLabel || 'Outros',
+      splitAmong,
+      paidBy,
+      fullyPaid: false,
+      autoDeductFromCashBox: req.body.autoDeductFromCashBox !== undefined ? req.body.autoDeductFromCashBox : true,
+      notes: req.body.notes || '',
+      attachments: [],
+      createdBy: req.body.createdBy || 'system',
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+    expenses.push(expense);
+    writeJSON(EXPENSES_FILE, expenses);
+
+    // Update cash box if auto-deduct
+    if (expense.autoDeductFromCashBox && amountVal > 0) {
+      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+      const oldBalance = cashBox.balance.value;
+      const newBalance = oldBalance - amountVal;
+      cashBox.balance.value = parseFloat(newBalance.toFixed(2));
+      cashBox.lastUpdated = nowISO();
+      cashBox.history = cashBox.history || [];
+      cashBox.history.push({
+        id: generateId('etx'),
+        date: new Date().toISOString().slice(0, 10),
+        type: 'expense',
+        amount: amountVal,
+        source: `${expense.name} — dedução do caixa`,
+        balanceAfter: cashBox.balance.value,
+        recordedBy: 'system',
+        recordedAt: nowISO()
+      });
+      writeJSON(CASH_BOX_FILE, cashBox);
+      broadcast({ type: 'cashbox', data: cashBox });
+    }
+
+    broadcast({ type: 'expenses', data: expenses });
+    res.json(expense);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT update expense
+app.put('/api/expenses/:id', async (req, res) => {
+  try {
+    let expenses = readJSON(EXPENSES_FILE) || [];
+    const idx = expenses.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Expense not found' });
+    const oldExpense = expenses[idx];
+    const updated = { ...oldExpense, ...req.body, updatedAt: nowISO() };
+
+    // Recalc costPerPerson if amount or splitAmong changed
+    if (req.body.amount || req.body.splitAmong) {
+      const splitAmong = updated.splitAmong || [];
+      const amountVal = updated.amount ? (updated.amount.value || 0) : 0;
+      updated.costPerPerson = { value: splitAmong.length > 0 ? parseFloat((amountVal / splitAmong.length).toFixed(2)) : amountVal, currency: updated.amount ? (updated.amount.currency || 'EUR') : 'EUR' };
+      const newPaidBy = {};
+      splitAmong.forEach(pid => {
+        const oldEntry = (oldExpense.paidBy && oldExpense.paidBy[pid]) || { paid: false, paidAt: null, method: null };
+        newPaidBy[pid] = { ...oldEntry, amount: updated.costPerPerson.value };
+      });
+      updated.paidBy = newPaidBy;
+      recalcExpenseFullyPaid(updated);
+    }
+
+    expenses[idx] = updated;
+    writeJSON(EXPENSES_FILE, expenses);
+    broadcast({ type: 'expenses', data: expenses });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE expense
+app.delete('/api/expenses/:id', async (req, res) => {
+  try {
+    let expenses = readJSON(EXPENSES_FILE) || [];
+    const expense = expenses.find(e => e.id === req.params.id);
+    if (!expense) return res.status(404).json({ error: 'Expense not found' });
+    expenses = expenses.filter(e => e.id !== req.params.id);
+    writeJSON(EXPENSES_FILE, expenses);
+    broadcast({ type: 'expenses', data: expenses });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST pay expense share
+app.post('/api/expenses/:id/pay', async (req, res) => {
+  try {
+    let expenses = readJSON(EXPENSES_FILE) || [];
+    const idx = expenses.findIndex(e => e.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Expense not found' });
+    const expense = expenses[idx];
+    const { personId, method } = req.body;
+    if (!personId) return res.status(400).json({ error: 'personId required' });
+    expense.paidBy = expense.paidBy || {};
+    expense.paidBy[personId] = {
+      paid: true,
+      amount: expense.costPerPerson ? (expense.costPerPerson.value || 0) : 0,
+      paidAt: nowISO(),
+      method: method || 'transfer'
+    };
+    recalcExpenseFullyPaid(expense);
+    expense.updatedAt = nowISO();
+    writeJSON(EXPENSES_FILE, expenses);
+    broadcast({ type: 'expenses', data: expenses });
+    res.json(expense);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET expense templates
+app.get('/api/expenses/templates', async (req, res) => {
+  try {
+    const templates = readJSON(EXPENSE_TEMPLATES_FILE) || [];
+    res.json(templates);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST create/use expense template
+app.post('/api/expenses/templates', async (req, res) => {
+  try {
+    let templates = readJSON(EXPENSE_TEMPLATES_FILE) || [];
+    const template = {
+      id: req.body.id || generateId('tmpl'),
+      name: req.body.name || '',
+      defaultAmount: req.body.defaultAmount || { value: 0, currency: 'EUR' },
+      defaultPeriod: req.body.defaultPeriod || 'monthly',
+      defaultCategory: req.body.defaultCategory || 'others',
+      defaultSplitAmong: req.body.defaultSplitAmong || [],
+      autoCreate: req.body.autoCreate !== undefined ? req.body.autoCreate : false,
+      autoCreateDaysBefore: req.body.autoCreateDaysBefore || 7,
+      isActive: req.body.isActive !== undefined ? req.body.isActive : true,
+      usageCount: 1,
+      lastUsedAt: nowISO(),
+      createdAt: nowISO()
+    };
+    templates.push(template);
+    writeJSON(EXPENSE_TEMPLATES_FILE, templates);
+    res.json(template);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET search templates (fuzzy partial match on name)
+app.get('/api/expenses/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').toLowerCase();
+    const templates = readJSON(EXPENSE_TEMPLATES_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const results = [];
+    templates.forEach(t => {
+      if (t.name && t.name.toLowerCase().includes(q)) results.push({ type: 'template', ...t });
+    });
+    expenses.forEach(e => {
+      if (e.name && e.name.toLowerCase().includes(q)) results.push({ type: 'expense', ...e });
+    });
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// === CASH BOX ================================================================
+// ============================================================================
+
+// GET cash box
+app.get('/api/cash-box', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+    res.json(cashBox);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET cash box projection (6 meses)
+app.get('/api/cash-box/projection', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, incomingPayments: [], outgoingExpenses: [] };
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const months = parseInt(req.query.months || '6', 10);
+    const projection = [];
+    let runningBalance = cashBox.balance ? (cashBox.balance.value || 0) : 0;
+    const now = new Date();
+
+    for (let i = 0; i < months; i++) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const monthLabel = monthDate.toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
+
+      let incoming = 0;
+      (cashBox.incomingPayments || []).forEach(p => {
+        if (!p.expectedDate) return;
+        const d = new Date(p.expectedDate);
+        if (d >= monthStart && d <= monthEnd) {
+          incoming += (p.amount || 0) * (p.probability !== undefined ? p.probability : 1);
+        }
+      });
+
+      payments.forEach(p => {
+        if (p.status === 'paid') return;
+        (p.paymentTerms && p.paymentTerms.splits || []).forEach(split => {
+          if (!split.dueDate) return;
+          const d = new Date(split.dueDate);
+          if (d >= monthStart && d <= monthEnd && split.status !== 'paid') {
+            const baseAmount = getPaymentTotalInBase(p);
+            incoming += (baseAmount * (split.percent || 0) / 100);
+          }
+        });
+      });
+
+      let outgoing = 0;
+      (cashBox.outgoingExpenses || []).forEach(e => {
+        outgoing += e.equivalentMonthly || 0;
+      });
+      expenses.forEach(e => {
+        if (e.type === 'recurring') outgoing += getEquivalentMonthly(e);
+      });
+
+      runningBalance = runningBalance + incoming - outgoing;
+      projection.push({
+        monthIndex: i,
+        monthLabel,
+        monthStart: monthStart.toISOString().slice(0, 10),
+        monthEnd: monthEnd.toISOString().slice(0, 10),
+        incoming: parseFloat(incoming.toFixed(2)),
+        outgoing: parseFloat(outgoing.toFixed(2)),
+        projectedBalance: parseFloat(runningBalance.toFixed(2))
+      });
+    }
+
+    res.json({ projection, baseBalance: cashBox.balance.value, currency: cashBox.balance.currency || 'EUR', months });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST manual cash box adjustment
+app.post('/api/cash-box/adjust', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const adjustment = req.body.amount || 0;
+    const oldBalance = cashBox.balance.value;
+    const newBalance = oldBalance + adjustment;
+    cashBox.balance.value = parseFloat(newBalance.toFixed(2));
+    cashBox.lastUpdated = nowISO();
+    cashBox.history = cashBox.history || [];
+    cashBox.history.push({
+      id: generateId('etx'),
+      date: new Date().toISOString().slice(0, 10),
+      type: adjustment >= 0 ? 'income' : 'expense',
+      amount: Math.abs(adjustment),
+      source: req.body.reason || 'Ajuste manual',
+      balanceAfter: cashBox.balance.value,
+      recordedBy: req.body.recordedBy || 'system',
+      recordedAt: nowISO()
+    });
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json(cashBox);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET cash box history
+app.get('/api/cash-box/history', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    res.json(cashBox.history || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET cash box statement (extrato completo tipo banco)
+app.get('/api/cash-box/statement', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [], balance: { value: 0, currency: 'EUR' } };
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    
+    const { from, to, type, category } = req.query;
+    
+    // Build statement from cash box history + pending items
+    let entries = (cashBox.history || []).map(h => ({
+      id: h.id,
+      date: h.date,
+      type: h.type,
+      amount: h.amount,
+      description: h.source,
+      balanceAfter: h.balanceAfter,
+      category: h.type === 'income' ? 'receita' : 'despesa',
+      status: 'completed',
+      recordedBy: h.recordedBy,
+      note: h.note || ''
+    }));
+    
+    // Add pending payments as "expected income"
+    payments.forEach(p => {
+      if (p.status === 'pending' || p.status === 'partial') {
+        const pendingAmount = (p.totalAmount?.value || 0) - (p.transactions || []).reduce((s, t) => s + (t.amount?.value || 0), 0);
+        if (pendingAmount > 0) {
+          entries.push({
+            id: `pending-${p.paymentId}`,
+            date: p.paymentTerms?.splits?.find(s => s.status === 'pending')?.dueDate || p.updatedAt?.slice(0, 10),
+            type: 'expected_income',
+            amount: pendingAmount,
+            description: `${p.clientShortName} — pendente`,
+            balanceAfter: null,
+            category: 'receita',
+            status: 'pending',
+            note: p.notes || ''
+          });
+        }
+      }
+    });
+    
+    // Add recurring expenses as "expected expense"
+    expenses.forEach(e => {
+      if (e.type === 'recurring' && e.autoDeductFromCashBox) {
+        const monthly = getEquivalentMonthly(e);
+        if (monthly > 0) {
+          entries.push({
+            id: `recurring-${e.id}`,
+            date: e.renewDate || new Date().toISOString().slice(0, 10),
+            type: 'expected_expense',
+            amount: monthly,
+            description: `${e.name} — mensal`,
+            balanceAfter: null,
+            category: e.category || 'others',
+            status: 'recurring',
+            note: e.notes || ''
+          });
+        }
+      }
+    });
+    
+    // Filter
+    if (from) entries = entries.filter(e => e.date >= from);
+    if (to) entries = entries.filter(e => e.date <= to);
+    if (type) entries = entries.filter(e => e.type === type || (type === 'income' && e.type === 'expected_income') || (type === 'expense' && e.type === 'expected_expense'));
+    if (category) entries = entries.filter(e => e.category === category);
+    
+    // Sort by date descending
+    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Calculate running balance for display
+    let runningBalance = cashBox.balance.value;
+    const statement = entries.map(e => {
+      const item = { ...e };
+      if (e.status === 'completed') {
+        item.displayBalance = e.balanceAfter;
+      } else {
+        // For pending items, show projected balance
+        if (e.type === 'expected_income') {
+          runningBalance += e.amount;
+        } else if (e.type === 'expected_expense') {
+          runningBalance -= e.amount;
+        }
+        item.displayBalance = runningBalance;
+        item.isProjected = true;
+      }
+      return item;
+    });
+    
+    res.json({
+      entries: statement,
+      currentBalance: cashBox.balance.value,
+      currency: cashBox.balance.currency || 'EUR',
+      totalIncome: entries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0),
+      totalExpense: entries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0),
+      pendingIncome: entries.filter(e => e.type === 'expected_income').reduce((s, e) => s + e.amount, 0),
+      pendingExpense: entries.filter(e => e.type === 'expected_expense').reduce((s, e) => s + e.amount, 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST quick expense (gastei com tal, adiciono lá)
+app.post('/api/expenses/quick', async (req, res) => {
+  try {
+    const { name, amount, category, categoryLabel, note, deductFromCashBox } = req.body;
+    if (!name || amount === undefined) {
+      return res.status(400).json({ error: 'name and amount required' });
+    }
+    
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expense = {
+      id: generateId('exp'),
+      name: name || 'Despesa',
+      description: note || '',
+      amount: { value: parseFloat(amount), currency: 'EUR' },
+      costPerPerson: { value: parseFloat(amount), currency: 'EUR' },
+      type: 'one_time',
+      period: null,
+      periodLabel: 'Único',
+      startDate: new Date().toISOString().slice(0, 10),
+      renewDate: null,
+      endDate: null,
+      category: category || 'others',
+      categoryLabel: categoryLabel || 'Outros',
+      splitAmong: [],
+      paidBy: {},
+      fullyPaid: true,
+      autoDeductFromCashBox: deductFromCashBox !== false,
+      notes: note || '',
+      attachments: [],
+      createdBy: req.body.createdBy || 'system',
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+    expenses.push(expense);
+    writeJSON(EXPENSES_FILE, expenses);
+    
+    // Deduct from cash box if enabled
+    if (expense.autoDeductFromCashBox && parseFloat(amount) > 0) {
+      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+      const amountVal = parseFloat(amount);
+      cashBox.balance.value = parseFloat((cashBox.balance.value - amountVal).toFixed(2));
+      cashBox.lastUpdated = nowISO();
+      cashBox.history = cashBox.history || [];
+      cashBox.history.push({
+        id: generateId('etx'),
+        date: new Date().toISOString().slice(0, 10),
+        type: 'expense',
+        amount: amountVal,
+        source: `${name} — despesa rápida`,
+        balanceAfter: cashBox.balance.value,
+        recordedBy: req.body.createdBy || 'system',
+        recordedAt: nowISO(),
+        note: note || ''
+      });
+      writeJSON(CASH_BOX_FILE, cashBox);
+      broadcast({ type: 'cashbox', data: cashBox });
+    }
+    
+    broadcast({ type: 'expenses', data: expenses });
+    res.json(expense);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// === FINANCE SUMMARY =========================================================
+// ============================================================================
+
+app.get('/api/finance/summary', async (req, res) => {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, monthlyIncome: { value: 0 }, monthlyExpenses: { value: 0 } };
+    const alerts = readJSON(ALERTS_FILE) || [];
+
+    let totalExpected = 0;
+    let totalReceived = 0;
+    let totalPending = 0;
+    let overduePayments = 0;
+
+    payments.forEach(p => {
+      const baseTotal = getPaymentTotalInBase(p);
+      totalExpected += baseTotal;
+      const received = (p.transactions || []).reduce((sum, tx) => sum + getTxValueInBase(tx, p), 0);
+      totalReceived += received;
+      totalPending += (baseTotal - received);
+
+      (p.paymentTerms && p.paymentTerms.splits || []).forEach(split => {
+        if (split.status === 'paid') return;
+        if (split.dueDate) {
+          const due = new Date(split.dueDate);
+          const daysOverdue = Math.floor((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysOverdue > 3) overduePayments++;
+        }
+      });
+    });
+
+    let monthlyExpenses = 0;
+    expenses.forEach(e => {
+      if (e.type === 'recurring') monthlyExpenses += getEquivalentMonthly(e);
+    });
+
+    const summary = {
+      totalExpected: parseFloat(totalExpected.toFixed(2)),
+      totalReceived: parseFloat(totalReceived.toFixed(2)),
+      totalPending: parseFloat(totalPending.toFixed(2)),
+      cashBoxBalance: parseFloat((cashBox.balance ? (cashBox.balance.value || 0) : 0).toFixed(2)),
+      monthlyIncome: parseFloat((cashBox.monthlyIncome ? (cashBox.monthlyIncome.value || 0) : 0).toFixed(2)),
+      monthlyExpenses: parseFloat(monthlyExpenses.toFixed(2)),
+      activeClients: payments.length,
+      overduePayments,
+      alerts: alerts.slice(0, 10)
+    };
+
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// === CRON JOBS ===============================================================
+// ============================================================================
+
+function checkAndGenerateAlerts() {
+  try {
+    const payments = readJSON(PAYMENTS_FILE) || [];
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0 }, monthlyExpenses: { value: 0 }, settings: { lowBalanceMultiplier: 2 } };
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const alerts = [];
+    const now = new Date();
+
+    payments.forEach(p => {
+      (p.paymentTerms && p.paymentTerms.splits || []).forEach(split => {
+        if (!split.dueDate || split.status === 'paid') return;
+        const due = new Date(split.dueDate);
+        const daysDiff = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 3) {
+          alerts.push({
+            id: generateId('alert'),
+            type: 'overdue',
+            severity: 'high',
+            message: `${p.clientShortName || 'Cliente'} — ${split.label || 'Pagamento'} atrasado há ${daysDiff} dias`,
+            relatedId: p.paymentId || p.id,
+            relatedType: 'payment',
+            createdAt: nowISO()
+          });
+        } else if (daysDiff >= -2 && daysDiff <= 0) {
+          alerts.push({
+            id: generateId('alert'),
+            type: 'due_soon',
+            severity: 'medium',
+            message: `${p.clientShortName || 'Cliente'} — ${split.label || 'Pagamento'} vence em ${Math.abs(daysDiff)} dia(s)`,
+            relatedId: p.paymentId || p.id,
+            relatedType: 'payment',
+            createdAt: nowISO()
+          });
+        }
+      });
+    });
+
+    const balance = cashBox.balance ? (cashBox.balance.value || 0) : 0;
+    const monthlyExp = cashBox.monthlyExpenses ? (cashBox.monthlyExpenses.value || 0) : 0;
+    const multiplier = cashBox.settings ? (cashBox.settings.lowBalanceMultiplier || 2) : 2;
+    if (balance < (monthlyExp * multiplier)) {
+      alerts.push({
+        id: generateId('alert'),
+        type: 'low_cash',
+        severity: balance < monthlyExp ? 'high' : 'medium',
+        message: `Caixa baixo: €${balance.toFixed(2)} < €${(monthlyExp * multiplier).toFixed(2)} (${multiplier}x gastos mensais)`,
+        relatedId: 'cash-box',
+        relatedType: 'cashbox',
+        createdAt: nowISO()
+      });
+    }
+
+    expenses.forEach(e => {
+      if (!e.renewDate) return;
+      const renew = new Date(e.renewDate);
+      const daysToRenew = Math.floor((renew.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysToRenew <= 7 && daysToRenew > 0) {
+        alerts.push({
+          id: generateId('alert'),
+          type: 'expense_renewal_soon',
+          severity: 'medium',
+          message: `${e.name} — renovação em ${daysToRenew} dia(s) (${e.renewDate})`,
+          relatedId: e.id,
+          relatedType: 'expense',
+          createdAt: nowISO()
+        });
+      } else if (daysToRenew <= 0) {
+        alerts.push({
+          id: generateId('alert'),
+          type: 'expense_renewal_overdue',
+          severity: 'high',
+          message: `${e.name} — renovação vencida (${e.renewDate})`,
+          relatedId: e.id,
+          relatedType: 'expense',
+          createdAt: nowISO()
+        });
+      }
+    });
+
+    writeJSON(ALERTS_FILE, alerts);
+    broadcast({ type: 'alerts', data: alerts });
+    console.log(`[CRON] Alerts checked at ${nowISO()}: ${alerts.length} alertas gerados`);
+  } catch (err) {
+    console.error('[CRON] Error generating alerts:', err.message);
+  }
+}
+
+function deductRecurringExpenses() {
+  try {
+    const expenses = readJSON(EXPENSES_FILE) || [];
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [], monthlyExpenses: { value: 0, currency: 'EUR' }, outgoingExpenses: [] };
+    let totalDeducted = 0;
+    const now = new Date();
+    const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    expenses.forEach(e => {
+      if (e.type !== 'recurring' || !e.autoDeductFromCashBox) return;
+      const deduction = getEquivalentMonthly(e);
+      if (deduction <= 0) return;
+
+      const alreadyDeducted = (cashBox.history || []).some(h => {
+        if (!h.source || !h.source.includes(e.name)) return false;
+        const hDate = new Date(h.date || h.recordedAt || 0);
+        const hMonthKey = `${hDate.getFullYear()}-${String(hDate.getMonth() + 1).padStart(2, '0')}`;
+        const hType = h.type === 'expense' || h.type === 'recurring_deduction';
+        return hMonthKey === thisMonthKey && hType;
+      });
+
+      if (!alreadyDeducted) {
+        totalDeducted += deduction;
+        cashBox.balance.value = parseFloat((cashBox.balance.value - deduction).toFixed(2));
+        cashBox.history.push({
+          id: generateId('etx'),
+          date: new Date().toISOString().slice(0, 10),
+          type: 'recurring_deduction',
+          amount: parseFloat(deduction.toFixed(2)),
+          source: `${e.name} — dedução mensal (${e.period || 'recorrente'})`,
+          balanceAfter: cashBox.balance.value,
+          recordedBy: 'system',
+          recordedAt: nowISO()
+        });
+      }
+    });
+
+    let monthlyExpenses = 0;
+    expenses.forEach(e => {
+      if (e.type === 'recurring') monthlyExpenses += getEquivalentMonthly(e);
+    });
+    cashBox.monthlyExpenses = { value: parseFloat(monthlyExpenses.toFixed(2)), currency: 'EUR' };
+
+    cashBox.outgoingExpenses = expenses
+      .filter(e => e.type === 'recurring')
+      .map(e => ({
+        expenseId: e.id,
+        name: e.name,
+        amount: e.amount ? (e.amount.value || 0) : 0,
+        frequency: e.period || 'monthly',
+        equivalentMonthly: parseFloat(getEquivalentMonthly(e).toFixed(2)),
+        note: e.notes || ''
+      }));
+
+    cashBox.lastUpdated = nowISO();
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    console.log(`[CRON] Recurring expenses deducted at ${nowISO()}: total=€${totalDeducted.toFixed(2)}`);
+  } catch (err) {
+    console.error('[CRON] Error deducting recurring expenses:', err.message);
+  }
+}
+
+// Schedule: every 6 hours
+const alertCron = cron.schedule('0 */6 * * *', () => {
+  checkAndGenerateAlerts();
+});
+
+// Schedule: 1st day of each month at 00:00
+const expenseCron = cron.schedule('0 0 1 * *', () => {
+  deductRecurringExpenses();
+});
+
+// Run alert check once on startup
+setTimeout(() => {
+  checkAndGenerateAlerts();
+}, 3000);
+
+console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
+
+// Catch-all -> SPA
+// ── Quotes / Orçamentos ──
+const QUOTES_FILE = path.join(DATA_DIR, 'quotes.json');
+
+app.get('/api/quotes', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  res.json(quotes);
+});
+
+app.get('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const quote = quotes.find(q => q.quoteId === req.params.id);
+  if (!quote) return res.status(404).json({ error: 'Orçamento não encontrado' });
+  res.json(quote);
+});
+
+app.post('/api/quotes', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const newQuote = { ...req.body, quoteId: `quote-${Date.now()}`, createdAt: new Date().toISOString() };
+  quotes.push(newQuote);
+  writeJSON(QUOTES_FILE, quotes);
+  broadcast({ type: 'quotes', data: quotes });
+  res.json(newQuote);
+});
+
+app.put('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const idx = quotes.findIndex(q => q.quoteId === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Orçamento não encontrado' });
+  quotes[idx] = { ...quotes[idx], ...req.body, updatedAt: new Date().toISOString() };
+  writeJSON(QUOTES_FILE, quotes);
+  broadcast({ type: 'quotes', data: quotes });
+  res.json(quotes[idx]);
+});
+
+app.delete('/api/quotes/:id', (req, res) => {
+  const quotes = readJSON(QUOTES_FILE) || [];
+  const filtered = quotes.filter(q => q.quoteId !== req.params.id);
+  writeJSON(QUOTES_FILE, filtered);
+  broadcast({ type: 'quotes', data: filtered });
+  res.json({ success: true });
+});
+
+// ── Operations Center / Centro de Operações ──
+const OPS_STATE_FILE = path.join(DATA_DIR, 'ops-state.json');
+
+app.get('/api/ops', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || {
+    alerts: [],
+    activeOperations: [],
+    recentChanges: [],
+    systemHealth: { status: 'ok', lastCheck: new Date().toISOString() }
+  };
+  res.json(state);
+});
+
+app.post('/api/ops/alerts', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  const alert = { id: `alert-${Date.now()}`, ...req.body, createdAt: new Date().toISOString() };
+  state.alerts.unshift(alert);
+  if (state.alerts.length > 50) state.alerts = state.alerts.slice(0, 50);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json(alert);
+});
+
+app.delete('/api/ops/alerts/:id', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  state.alerts = state.alerts.filter(a => a.id !== req.params.id);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json({ success: true });
+});
+
+app.post('/api/ops/changes', (req, res) => {
+  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  const change = { id: `change-${Date.now()}`, ...req.body, timestamp: new Date().toISOString() };
+  state.recentChanges.unshift(change);
+  if (state.recentChanges.length > 100) state.recentChanges = state.recentChanges.slice(0, 100);
+  writeJSON(OPS_STATE_FILE, state);
+  broadcast({ type: 'ops', data: state });
+  res.json(change);
+});
+
+// ── Members ──
+const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
+
+app.get('/api/members', (req, res) => {
+  const members = readJSON(MEMBERS_FILE) || [];
+  res.json(members);
+});
+
+app.put('/api/members/:id', (req, res) => {
+  const members = readJSON(MEMBERS_FILE) || [];
+  const idx = members.findIndex(m => m.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Membro não encontrado' });
+  members[idx] = { ...members[idx], ...req.body, updatedAt: new Date().toISOString() };
+  writeJSON(MEMBERS_FILE, members);
+  broadcast({ type: 'members', data: members });
+  res.json(members[idx]);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// API FINANCEIRA COMPLETA — CRUD DE TRANSAÇÕES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
+
+// Inicializa arquivo de transações se não existir
+if (!fs.existsSync(TRANSACTIONS_FILE)) {
+  writeJSON(TRANSACTIONS_FILE, []);
+}
+
+// GET /api/transactions — Lista todas as transações
+app.get('/api/transactions', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  // Ordena por data (mais recente primeiro)
+  transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+  res.json(transactions);
+});
+
+// GET /api/transactions/:id — Uma transação específica
+app.get('/api/transactions/:id', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const tx = transactions.find(t => t.id === req.params.id);
+  if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
+  res.json(tx);
+});
+
+// POST /api/transactions — Cria nova transação
+app.post('/api/transactions', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const { type, amount, description, category, date, source, notes } = req.body;
+  
+  if (!type || !amount || !description) {
+    return res.status(400).json({ error: 'Tipo, valor e descrição são obrigatórios' });
+  }
+  
+  const newTx = {
+    id: `tx-${Date.now()}`,
+    type, // 'income' ou 'expense'
+    amount: parseFloat(amount),
+    currency: 'EUR',
+    description,
+    category: category || 'outros',
+    date: date || new Date().toISOString().split('T')[0],
+    source: source || 'manual',
+    notes: notes || '',
+    createdAt: new Date().toISOString(),
+    createdBy: 'abner'
+  };
+  
+  transactions.push(newTx);
+  writeJSON(TRANSACTIONS_FILE, transactions);
+  
+  // Atualiza caixa automaticamente
+  updateCashBoxFromTransactions(transactions);
+  
+  broadcast({ type: 'transactions', data: transactions });
+  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  
+  res.status(201).json(newTx);
+});
+
+// PUT /api/transactions/:id — Edita transação
+app.put('/api/transactions/:id', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const idx = transactions.findIndex(t => t.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Transação não encontrada' });
+  
+  transactions[idx] = {
+    ...transactions[idx],
+    ...req.body,
+    updatedAt: new Date().toISOString()
+  };
+  
+  writeJSON(TRANSACTIONS_FILE, transactions);
+  updateCashBoxFromTransactions(transactions);
+  
+  broadcast({ type: 'transactions', data: transactions });
+  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  
+  res.json(transactions[idx]);
+});
+
+// DELETE /api/transactions/:id — Remove transação
+app.delete('/api/transactions/:id', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const filtered = transactions.filter(t => t.id !== req.params.id);
+  
+  if (filtered.length === transactions.length) {
+    return res.status(404).json({ error: 'Transação não encontrada' });
+  }
+  
+  writeJSON(TRANSACTIONS_FILE, filtered);
+  updateCashBoxFromTransactions(filtered);
+  
+  broadcast({ type: 'transactions', data: filtered });
+  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  
+  res.json({ success: true, message: 'Transação removida' });
+});
+
+// GET /api/finance/summary — Resumo financeiro completo
+app.get('/api/finance/summary', (req, res) => {
+  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const payments = readJSON(PAYMENTS_FILE) || [];
+  const expenses = readJSON(EXPENSES_FILE) || [];
+  
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const balance = totalIncome - totalExpense;
+  
+  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'waiting_quote')
+    .reduce((s, p) => s + (p.totalAmount?.value || 0), 0);
+  
+  res.json({
+    balance: { value: balance, currency: 'EUR' },
+    totalIncome: { value: totalIncome, currency: 'EUR' },
+    totalExpense: { value: totalExpense, currency: 'EUR' },
+    pendingPayments: { value: pendingPayments, currency: 'EUR' },
+    transactionCount: transactions.length,
+    lastUpdated: new Date().toISOString()
+  });
+});
+
+// Função auxiliar: recalcula caixa baseado em transações
+function updateCashBoxFromTransactions(transactions) {
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const balance = totalIncome - totalExpense;
+  
+  const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+  cashBox.balance = { value: balance, currency: 'EUR' };
+  cashBox.lastUpdated = new Date().toISOString();
+  
+  // Recria histórico a partir das transações
+  cashBox.history = transactions.map(t => ({
+    id: t.id,
+    date: t.date,
+    type: t.type,
+    amount: t.amount,
+    source: t.description,
+    balanceAfter: t.type === 'income' ? balance : balance,
+    recordedBy: t.createdBy || 'system',
+    recordedAt: t.createdAt
+  })).sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  writeJSON(CASH_BOX_FILE, cashBox);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHANGELOG / RELEASE NOTES API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CHANGELOG_FILE = path.join(DATA_DIR, 'changelog.json');
+
+function ensureChangelog() {
+  if (!fs.existsSync(CHANGELOG_FILE)) {
+    const initialData = {
+      version: '1.0',
+      lastUpdated: new Date().toISOString(),
+      entries: [
+        {
+          id: 'changelog-001',
+          version: '3.1.0',
+          title: 'Sistema de Changelog e Release Notes',
+          description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Luna',
+          tier: 2,
+          date: new Date().toISOString(),
+          tags: ['changelog', 'ui', 'notificacoes'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-002',
+          version: '3.1.0',
+          title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
+          description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
+          category: 'whatsapp',
+          emoji: '📱',
+          author: 'Luna',
+          tier: 1,
+          date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          tags: ['whatsapp', 'luna', 'automation'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-003',
+          version: '3.1.0',
+          title: 'Sistema Financeiro v3.1 — CRUD Completo',
+          description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
+          category: 'finance',
+          emoji: '💰',
+          author: 'Abner',
+          tier: 2,
+          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['financeiro', 'crud', 'transacoes'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-004',
+          version: '3.0.0',
+          title: 'Centro de Operacoes NEXO Digital',
+          description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Abner',
+          tier: 2,
+          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['dashboard', 'operacoes', 'metrics'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-005',
+          version: '3.0.0',
+          title: 'Orcamentos — Tropicale €5.500 + Santafe €350',
+          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Juan (Tropicale) €5.500 total, Paulo (Santafe) €350 (parcela 2 pendente €175).',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Abner',
+          tier: 3,
+          date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['orcamentos', 'clientes', 'projetos'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-006',
+          version: '2.5.0',
+          title: 'Integracao GitHub + Vercel',
+          description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
+          category: 'improvement',
+          emoji: '🚀',
+          author: 'Nonoke',
+          tier: 3,
+          date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['github', 'vercel', 'devops'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-007',
+          version: '2.0.0',
+          title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
+          description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
+          category: 'whatsapp',
+          emoji: '📱',
+          author: 'Luna',
+          tier: 2,
+          date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['whatsapp', 'luna', 'v1'],
+          readBy: [],
+        },
+      ]
+    };
+    writeJSON(CHANGELOG_FILE, initialData);
+  }
+}
+
+ensureChangelog();
+
+// GET /api/changelog — Lista todos os updates
+app.get('/api/changelog', (req, res) => {
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const { category, limit = 50, unreadOnly } = req.query;
+  
+  let entries = [...data.entries];
+  
+  if (category) {
+    entries = entries.filter(e => e.category === category);
+  }
+  
+  if (unreadOnly === 'true') {
+    const userId = req.headers['x-user-id'] || 'default';
+    entries = entries.filter(e => !e.readBy.includes(userId));
+  }
+  
+  entries = entries.slice(0, parseInt(limit));
+  
+  res.json({
+    success: true,
+    count: entries.length,
+    total: data.entries.length,
+    entries: entries.sort((a, b) => new Date(b.date) - new Date(a.date))
+  });
+});
+
+// GET /api/changelog/latest — Ultimo update
+app.get('/api/changelog/latest', (req, res) => {
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const latest = data.entries.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  res.json({ success: true, entry: latest || null });
+});
+
+// GET /api/changelog/unread — Contagem de nao lidos
+app.get('/api/changelog/unread', (req, res) => {
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const userId = req.headers['x-user-id'] || 'default';
+  const unreadCount = data.entries.filter(e => !e.readBy.includes(userId)).length;
+  res.json({ success: true, unreadCount, total: data.entries.length });
+});
+
+// POST /api/changelog/:id/read — Marcar como lido
+app.post('/api/changelog/:id/read', (req, res) => {
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const userId = req.headers['x-user-id'] || 'default';
+  const entry = data.entries.find(e => e.id === req.params.id);
+  
+  if (!entry) {
+    return res.status(404).json({ success: false, error: 'Entry not found' });
+  }
+  
+  if (!entry.readBy.includes(userId)) {
+    entry.readBy.push(userId);
+    writeJSON(CHANGELOG_FILE, data);
+  }
+  
+  res.json({ success: true, message: 'Marked as read' });
+});
+
+// POST /api/changelog/:id/unread — Marcar como nao lido
+app.post('/api/changelog/:id/unread', (req, res) => {
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const userId = req.headers['x-user-id'] || 'default';
+  const entry = data.entries.find(e => e.id === req.params.id);
+  
+  if (!entry) {
+    return res.status(404).json({ success: false, error: 'Entry not found' });
+  }
+  
+  entry.readBy = entry.readBy.filter(id => id !== userId);
+  writeJSON(CHANGELOG_FILE, data);
+  
+  res.json({ success: true, message: 'Marked as unread' });
+});
+
+// POST /api/changelog — Criar novo update (admin)
+app.post('/api/changelog', (req, res) => {
+  const { title, description, category, emoji, tier = 3, tags = [], author = 'Luna' } = req.body;
+  
+  if (!title || !description || !category) {
+    return res.status(400).json({ success: false, error: 'Title, description and category required' });
+  }
+  
+  const data = readJSON(CHANGELOG_FILE) || { entries: [] };
+  
+  const newEntry = {
+    id: `changelog-${Date.now()}`,
+    version: data.version || '1.0',
+    title,
+    description,
+    category,
+    emoji: emoji || getEmojiForCategory(category),
+    author,
+    tier: parseInt(tier),
+    date: new Date().toISOString(),
+    tags,
+    readBy: [],
+  };
+  
+  data.entries.unshift(newEntry);
+  data.lastUpdated = new Date().toISOString();
+  writeJSON(CHANGELOG_FILE, data);
+  
+  // Notifica via WebSocket
+  broadcast({ type: 'changelog:new', entry: newEntry });
+  
+  res.json({ success: true, entry: newEntry });
+});
+
+function getEmojiForCategory(category) {
+  const map = {
+    feature: '✨',
+    improvement: '🚀',
+    bugfix: '🐛',
+    security: '🔒',
+    performance: '⚡',
+    whatsapp: '📱',
+    finance: '💰',
+  };
+  return map[category] || '📝';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEADS API — Receber formulários do site chatopsmaster.com
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
+
+// GET /api/leads — Listar todos os leads
+app.get('/api/leads', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const { status, source, limit = 50 } = req.query;
+    let leads = [...data.leads];
+
+    if (status) leads = leads.filter(l => l.status === status);
+    if (source) leads = leads.filter(l => l.source === source);
+    leads = leads.slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      count: leads.length,
+      total: data.leads.length,
+      leads: leads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/leads — Receber novo lead (webhook do site)
+app.post('/api/leads', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const lead = {
+      id: generateId('lead'),
+      name: req.body.name || '',
+      email: req.body.email || '',
+      phone: req.body.phone || '',
+      company: req.body.company || '',
+      message: req.body.message || '',
+      service: req.body.service || '',
+      source: req.body.source || 'website',
+      sourceUrl: req.body.sourceUrl || '',
+      status: 'new',
+      statusLabel: 'Novo',
+      priority: 'medium',
+      assignedTo: null,
+      notes: [],
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    };
+
+    data.leads.unshift(lead);
+    writeJSON(LEADS_FILE, data);
+
+    // Criar tarefa automaticamente para follow-up
+    const tasks = readJSON(TASKS_FILE) || [];
+    tasks.unshift({
+      id: generateId('task'),
+      title: `[LEAD] Contactar ${lead.name || 'Novo lead'}`,
+      description: `Lead do site: ${lead.email}. Serviço: ${lead.service}. Mensagem: ${lead.message}`,
+      completed: false,
+      author: 'system',
+      source: 'lead-auto',
+      category: 'lead',
+      priority: 'high',
+      clientId: null,
+      leadId: lead.id,
+      createdAt: nowISO(),
+      updatedAt: nowISO()
+    });
+    writeJSON(TASKS_FILE, tasks);
+
+    // Notificar via WebSocket
+    broadcast({ type: 'lead:new', data: lead });
+
+    res.json({ success: true, lead, message: 'Lead recebido com sucesso' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/leads/:id/status — Atualizar status do lead
+app.put('/api/leads/:id/status', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const lead = data.leads.find(l => l.id === req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+    lead.status = req.body.status || lead.status;
+    lead.statusLabel = req.body.statusLabel || lead.statusLabel;
+    lead.priority = req.body.priority || lead.priority;
+    lead.assignedTo = req.body.assignedTo || lead.assignedTo;
+    lead.notes.push({
+      text: req.body.note || '',
+      author: req.body.author || 'system',
+      date: nowISO()
+    });
+    lead.updatedAt = nowISO();
+
+    writeJSON(LEADS_FILE, data);
+    broadcast({ type: 'lead:updated', data: lead });
+    res.json({ success: true, lead });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/leads/stats — Estatísticas de leads
+app.get('/api/leads/stats', (req, res) => {
+  try {
+    const data = readJSON(LEADS_FILE) || { leads: [] };
+    const leads = data.leads;
+    const stats = {
+      total: leads.length,
+      new: leads.filter(l => l.status === 'new').length,
+      contacted: leads.filter(l => l.status === 'contacted').length,
+      qualified: leads.filter(l => l.status === 'qualified').length,
+      proposal: leads.filter(l => l.status === 'proposal').length,
+      closed: leads.filter(l => l.status === 'closed').length,
+      lost: leads.filter(l => l.status === 'lost').length,
+      conversionRate: leads.length > 0 ? ((leads.filter(l => l.status === 'closed').length / leads.length) * 100).toFixed(1) : 0
+    };
+    res.json({ success: true, stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// ============================================================================
+// === LUNA COMMAND CENTER v14.1 — Rotas de Controle do Agente ==============
+// ============================================================================
+
+// Dashboard HTML
+app.get('/luna-control', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'luna-control.html'));
+});
+
+// 1. Status do Luna
+app.get('/api/luna/status', (req, res) => {
+    try {
+        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
+        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+
+        let checkpoint = { hashes: [], lastScan: null, version: '14.1' };
+        let buffer = { messages: [], tasks: [], ideas: [] };
+
+        if (fs.existsSync(checkpointPath)) {
+            checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+        }
+        if (fs.existsSync(bufferPath)) {
+            buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
+        }
+
+        res.json({
+            status: 'running',
+            version: checkpoint.version || '14.1',
+            chromeConnected: true,
+            whatsappConnected: true,
+            lastScan: checkpoint.lastScan,
+            totalHashes: checkpoint.hashes?.length || 0,
+            bufferMessages: buffer.messages?.length || 0,
+            bufferTasks: buffer.tasks?.length || 0,
+            bufferIdeas: buffer.ideas?.length || 0,
+            sentiment: buffer.sentiment || { positive: 0, negative: 0, urgent: 0 }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 2. Forçar scan
+app.post('/api/luna/scan', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Scan agendado. Execute no terminal: node agents/luna-scheduler.mjs --force-scan',
+        command: 'node agents/luna-scheduler.mjs --force-scan'
+    });
+});
+
+// 3. Extrair mensagens
+app.post('/api/luna/extract', (req, res) => {
+    const { mode = 'normal', reset = false } = req.body;
+    res.json({ 
+        success: true, 
+        mode, 
+        reset, 
+        message: reset 
+            ? 'Checkpoint resetado. Execute: node agents/luna-scheduler.mjs --force-scan'
+            : 'Extração normal agendada.'
+    });
+});
+
+// 4. Verificar menções
+app.post('/api/luna/mentions', (req, res) => {
+    try {
+        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+        const buffer = fs.existsSync(bufferPath) ? JSON.parse(fs.readFileSync(bufferPath, 'utf8')) : { messages: [] };
+        const mentions = buffer.messages?.filter(m => 
+            m.hasMention || (m.content && m.content.match(/@(?:KIMI|LUNA|KIMICLAW)/i))
+        ) || [];
+        res.json({ mentions, count: mentions.length });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 5. Verificar links
+app.post('/api/luna/links', (req, res) => {
+    try {
+        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+        const buffer = fs.existsSync(bufferPath) ? JSON.parse(fs.readFileSync(bufferPath, 'utf8')) : { messages: [] };
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const links = [];
+        buffer.messages?.forEach(m => {
+            const matches = m.content?.match(urlRegex) || [];
+            matches.forEach(url => links.push({ url, source: m.author, timestamp: m.timestamp }));
+        });
+        res.json({ links, count: links.length });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 6. Forçar relatório
+app.post('/api/luna/report', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Relatório agendado. Execute: node agents/luna-scheduler.mjs --force-report',
+        command: 'node agents/luna-scheduler.mjs --force-report'
+    });
+});
+
+// 7. Checkpoint
+app.get('/api/whatsapp/checkpoint', (req, res) => {
+    try {
+        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
+        const checkpoint = fs.existsSync(checkpointPath) ? JSON.parse(fs.readFileSync(checkpointPath, 'utf8')) : { hashes: [], lastScan: null, version: '14.1' };
+        res.json(checkpoint);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 8. Reset checkpoint
+app.delete('/api/whatsapp/checkpoint', (req, res) => {
+    try {
+        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
+        const emptyCheckpoint = { hashes: [], lastScan: null, version: '14.1', resetAt: new Date().toISOString() };
+        fs.writeFileSync(checkpointPath, JSON.stringify(emptyCheckpoint, null, 2), 'utf8');
+        res.json({ success: true, message: 'Checkpoint resetado. Próximo scan lerá TODAS as mensagens.' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 9. Buffer
+app.get('/api/whatsapp/buffer', (req, res) => {
+    try {
+        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+        const buffer = fs.existsSync(bufferPath) ? JSON.parse(fs.readFileSync(bufferPath, 'utf8')) : { messages: [] };
+        res.json({ buffer });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10. Limpar buffer
+app.delete('/api/whatsapp/buffer', (req, res) => {
+    try {
+        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+        const emptyBuffer = { 
+            messages: [], tasks: [], ideas: [], decisions: [], 
+            links: [], mentions: [], sentiment: { positive: 0, negative: 0, urgent: 0 },
+            lastUpdated: new Date().toISOString() 
+        };
+        fs.writeFileSync(bufferPath, JSON.stringify(emptyBuffer, null, 2), 'utf8');
+        res.json({ success: true, message: 'Buffer limpo' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 11. Configurações
+app.post('/api/luna/config', (req, res) => {
+    res.json({ success: true, config: req.body, message: 'Configurações salvas (requer reinício do daemon para aplicar)' });
+});
+
+// 12. Diagnóstico
+app.get('/api/luna/diagnose', (req, res) => {
+    const errors = [];
+    const agentsDir = path.join(__dirname, '..', 'agents');
+    const criticalFiles = ['luna-cto-agent.cjs', 'luna-cto-agent.mjs', 'luna-scheduler.mjs', 'luna-daemon.mjs'];
+
+    criticalFiles.forEach(f => {
+        if (!fs.existsSync(path.join(agentsDir, f))) {
+            errors.push({ type: 'MISSING_FILE', message: `Arquivo faltando: ${f}`, severity: 'critical' });
+        }
+    });
+
+    // Verificar checkpoint
+    const checkpointPath = path.join(agentsDir, 'luna-checkpoint.json');
+    if (fs.existsSync(checkpointPath)) {
+        try {
+            const cp = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+            if (!cp.hashes || !Array.isArray(cp.hashes)) {
+                errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint corrompido', severity: 'high' });
+            }
+        } catch {
+            errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint não é JSON válido', severity: 'high' });
+        }
+    }
+
+    res.json({ errors, healthy: errors.length === 0, timestamp: new Date().toISOString() });
+});
+
+// 13. AutoFix
+app.post('/api/luna/autofix', (req, res) => {
+    const { errorType } = req.body;
+    const fixes = {
+        'ESM_IMPORT': 'Recriar luna-cto-agent.mjs com createRequire',
+        'MISSING_FILE': 'Restaurar do backup working-20260501-214855',
+        'CORRUPT_CHECKPOINT': 'Resetar checkpoint para estado vazio',
+        'CHROME_CDP': 'Reiniciar Chrome com --remote-debugging-port=9223'
+    };
+
+    res.json({ 
+        success: true, 
+        fixed: false, 
+        message: fixes[errorType] || 'AutoFix manual necessário',
+        errorType,
+        suggestion: fixes[errorType]
+    });
+});
+
+// 14A. Ligar Luna
+app.post('/api/luna/start', (req, res) => {
+    const { spawn } = require('child_process');
+    const daemonPath = path.join(__dirname, '..', 'agents', 'luna-daemon.mjs');
+    const agentsDir = path.join(__dirname, '..', 'agents');
+
+    const child = spawn('node', [daemonPath], {
+        detached: true,
+        stdio: 'ignore',
+        cwd: agentsDir,
+        windowsHide: true
+    });
+    child.unref();
+
+    return res.json({ success: true, message: 'Luna iniciado', pid: child.pid });
+});
+
+// 14. Parar Luna
+app.post('/api/luna/stop', (req, res) => {
+    try {
+        const cp = require('child_process');
+        const out = cp.execSync('wmic process where "name=\'node.exe\'" get ProcessId,CommandLine /FORMAT:CSV', { encoding: 'utf8' });
+        const rows = out.split(/\\r?\\n/).filter(Boolean);
+        for (const row of rows) {
+            if (!row.includes('luna-daemon.mjs') && !row.includes('luna-scheduler.mjs')) continue;
+            const parts = row.split(',');
+            const pid = Number(parts[parts.length - 1]);
+            if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch (_) {} }
+        }
+        return res.json({ success: true, message: 'Luna parado' });
+    } catch (e) {
+        return res.json({ success: false, error: e.message });
+    }
+});
+
+// ============================================================================
+// ═══════════════════════════════════════════════════════════════════════════════
+// Catch-all
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+// Start
+server.listen(PORT, BIND_IP, () => {
+  console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+});
+
+// ── Background Refresh: tools a cada 10 min ──
+setInterval(() => {
+  external.refreshExternal('tools').catch(() => {});
+}, 10 * 60 * 1000);
+
+

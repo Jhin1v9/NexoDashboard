@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Github, Globe, FolderOpen, Plus, ArrowUpRight,
@@ -213,3 +213,4 @@ export default function PaymentCard({ payment, onAddTransaction, onClick }) {
     </motion.div>
   )
 }
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Bell, BellOff, BellRing } from 'lucide-react'
 import useNotifications from '../hooks/useNotifications'
 
@@ -53,3 +53,4 @@ export default function PushNotificationButton() {
     </div>
   )
 }
+

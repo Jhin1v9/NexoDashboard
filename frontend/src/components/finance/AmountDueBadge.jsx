@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import { AlertCircle } from 'lucide-react'
 
 /**
@@ -34,3 +34,4 @@ export default function AmountDueBadge({ amount, currency = 'EUR', isSevere = fa
     </motion.div>
   )
 }
+

@@ -1,4 +1,4 @@
-// NEXO DIGITAL — Componentes Financeiros
+﻿// NEXO DIGITAL — Componentes Financeiros
 // Exportações centralizadas para todos os componentes do módulo financeiro
 
 export { default as PaymentCard } from './PaymentCard'
@@ -13,3 +13,4 @@ export { default as CashFlowProjection } from './CashFlowProjection'
 export { default as AlertBanner } from './AlertBanner'
 export { default as AmountDueBadge } from './AmountDueBadge'
 export { default as TransactionRow } from './TransactionRow'
+

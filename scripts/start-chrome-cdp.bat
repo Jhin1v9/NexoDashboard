@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 :: Chrome CDP para Luna Agent — NUNCA reinicie o Chrome PWA original!
 :: Este script lança uma segunda instância do Chrome com perfil COPIADO

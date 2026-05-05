@@ -18,6 +18,7 @@ console.log('║  NEXO WhatsApp Scheduler v9.0                                  
 console.log('║  Checkpoint Inteligente — Só reporta novidades                      ║');
 console.log('║  Intervalo: 30 minutos                                              ║');
 console.log('║  Destino: Abner (34685093192)                                       ║');
+console.log('║  Usa o agente v9.0 (nexo-whatsapp-agent-v9.mjs)                      ║');
 console.log('╚══════════════════════════════════════════════════════════════════════╝');
 
 async function scheduledRun() {

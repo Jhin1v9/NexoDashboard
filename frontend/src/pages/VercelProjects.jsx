@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Triangle, ExternalLink, Globe, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 import useRealtime from '../hooks/useRealtime'
@@ -68,3 +68,4 @@ export default function VercelProjects() {
     </div>
   )
 }
+

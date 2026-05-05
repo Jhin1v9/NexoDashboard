@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Cache Manager Assíncrono para dados externos (GitHub, Vercel, CLI Tools)
  * Usa spawn com timeout + file-based persistence
  */
@@ -92,3 +92,4 @@ class CacheManager {
 }
 
 module.exports = CacheManager;
+

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area
 } from 'recharts'
@@ -94,3 +94,4 @@ export default function CashFlowProjection({ projection = [], currency = 'EUR' }
     </motion.div>
   )
 }
+

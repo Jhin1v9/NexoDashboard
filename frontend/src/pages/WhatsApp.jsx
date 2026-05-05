@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
@@ -704,3 +704,4 @@ export default function WhatsApp() {
     </div>
   )
 }
+

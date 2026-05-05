@@ -8,7 +8,7 @@ echo.
 
 cd /d "C:\Users\Administrator\Documents\NEXO DIGITAL\01_ATIVOS\NEXO_DASHBOARD_PRO\backend"
 
-set PORT=3456
+set PORT=3457
 set BIND_IP=127.0.0.1
 set NEXO_BASE_PATH=C:\Users\Administrator\Documents\NEXO DIGITAL
 

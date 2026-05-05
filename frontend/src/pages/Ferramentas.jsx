@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Wrench, Check, X, Terminal } from 'lucide-react'
 import axios from 'axios'
 
@@ -78,3 +78,4 @@ export default function Ferramentas() {
     </div>
   )
 }
+

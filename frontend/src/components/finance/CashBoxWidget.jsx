@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import { Wallet, TrendingUp, TrendingDown, BarChart3, ArrowRight } from 'lucide-react'
 
 /**
@@ -139,3 +139,4 @@ export default function CashBoxWidget({ cashBox, onViewProjection }) {
     </motion.div>
   )
 }
+

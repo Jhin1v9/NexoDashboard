@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, DollarSign, Calendar, FileText, Repeat, Tag, Users, CheckSquare } from 'lucide-react'
 
@@ -362,3 +362,4 @@ export default function AddExpenseModal({ onClose, onSaved }) {
     </motion.div>
   )
 }
+

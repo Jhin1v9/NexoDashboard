@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Zap, Server, Brain, Code, Megaphone, MoreHorizontal, Trash2 } from 'lucide-react'
 import axios from 'axios'
@@ -189,3 +189,4 @@ export default function QuickExpenseFab({ onAdded }) {
     </>
   )
 }
+

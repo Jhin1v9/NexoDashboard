@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Users, CheckSquare, AlertTriangle, TrendingUp, TrendingDown,
@@ -13,6 +13,8 @@ import HealthTimeline from '../components/charts/HealthTimeline'
 import PortfolioRadar from '../components/charts/PortfolioRadar'
 import BugVelocity from '../components/charts/BugVelocity'
 import ClientBurnup from '../components/charts/ClientBurnup'
+import StackStatusPanel from '../components/StackStatus'
+import AutoFixPanel from '../components/AutoFixPanel'
 
 // ── Components ─────────────────────────────────────────────────────────────
 
@@ -192,7 +194,25 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* Stats Grid */}
+      
+      {/* Botao Scan Manual */}
+      <div className="flex gap-3 mb-4">
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/scan-now', { method: 'POST' });
+              const data = await res.json();
+              alert(data.message || 'Scan iniciado!');
+            } catch (e) {
+              alert('Erro: ' + e.message);
+            }
+          }}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+        >
+          ?? Forcar Scan
+        </button>
+      </div>
+{/\* Stats Grid \*/}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Clientes" value={clients.length} color="#6366f1" 
           onClick={() => navigate('/clientes')} />
@@ -200,6 +220,12 @@ export default function Dashboard() {
           onClick={() => navigate('/tarefas')} />
         <StatCard icon={TrendingUp} label="Health" value={`${avgHealth}%`} color="#22c55e" />
         <StatCard icon={AlertTriangle} label="Alertas" value={predictions.length} color="#ef4444" />
+      </div>
+
+      {/* Stack Status + Auto Fix */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StackStatusPanel />
+        <AutoFixPanel />
       </div>
 
       {/* WhatsApp Agent + Reminders Row */}
@@ -332,3 +358,8 @@ export default function Dashboard() {
     </div>
   )
 }
+
+
+
+
+

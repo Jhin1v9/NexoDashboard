@@ -1,0 +1,1138 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌙 LUNA COMMAND CENTER v14.1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        luna: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                            950: '#082f49',
+                        },
+                        dark: {
+                            900: '#0a0f1c',
+                            800: '#111827',
+                            700: '#1f2937',
+                            600: '#374151',
+                            500: '#4b5563',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0a0f1c; }
+        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.1); }
+        .glass-strong { background: rgba(17, 24, 39, 0.9); backdrop-filter: blur(16px); border: 1px solid rgba(56, 189, 248, 0.15); }
+        .neon-glow { box-shadow: 0 0 20px rgba(14, 165, 233, 0.15), 0 0 40px rgba(14, 165, 233, 0.05); }
+        .neon-text { text-shadow: 0 0 10px rgba(14, 165, 233, 0.5); }
+        .pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .status-online { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-offline { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        .status-warning { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+        .metric-card { transition: all 0.3s ease; }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(14, 165, 233, 0.15); }
+        .log-entry { animation: slideIn 0.3s ease; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .brain-wave { animation: brainWave 3s ease-in-out infinite; }
+        @keyframes brainWave {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+    <!-- TOP BAR -->
+    <header class="glass-strong sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <div class="w-10 h-10 rounded-xl bg-luna-600 flex items-center justify-center neon-glow">
+                        <i data-lucide="moon" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div id="luna-status-indicator" class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full status-online border-2 border-dark-900"></div>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight flex items-center gap-2">
+                        <span class="neon-text text-luna-400">LUNA</span>
+                        <span class="text-gray-400 text-sm font-medium">COMMAND CENTER</span>
+                        <span class="px-2 py-0.5 rounded-md bg-luna-900/50 text-luna-300 text-xs font-mono border border-luna-700/30">v14.1 OMNIA</span>
+                    </h1>
+                    <p class="text-xs text-gray-500 font-mono" id="system-uptime">⏱️ Uptime: --</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- AutoFix Toggle -->
+                <button id="autofix-btn" onclick="toggleAutoFix()" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-700/50 border border-red-500/20 hover:border-red-500/50 transition-all text-sm">
+                    <i data-lucide="shield-alert" class="w-4 h-4 text-red-400"></i>
+                    <span class="text-red-300 font-medium">AutoFix</span>
+                    <span id="autofix-status" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                </button>
+
+                <!-- Emergency Stop -->
+                <button onclick="emergencyStop()" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 hover:bg-red-900/50 hover:border-red-500/60 transition-all text-sm group">
+                    <i data-lucide="octagon" class="w-4 h-4 text-red-400 group-hover:text-red-300"></i>
+                    <span class="text-red-300 font-medium">PARAR</span>
+                </button>
+
+                <!-- Connection Status -->
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-700/50 border border-gray-700/30 text-xs font-mono">
+                    <span id="ws-status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                    <span id="ws-status-text" class="text-gray-400">WS: --</span>
+                </div>
+
+                <div class="text-right">
+                    <p class="text-xs text-gray-500" id="current-time">--:--:--</p>
+                    <p class="text-[10px] text-gray-600 font-mono">PORT 3456</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-[1600px] mx-auto p-4 grid grid-cols-12 gap-4">
+
+        <!-- LEFT SIDEBAR - CONTROLES RÁPIDOS -->
+        <aside class="col-span-12 lg:col-span-3 space-y-4">
+
+            <!-- PAINEL DE AÇÕES IMEDIATAS -->
+            <div class="glass rounded-2xl p-4 neon-glow">
+                <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    Ações Imediatas
+                </h2>
+                <div class="space-y-2">
+                    <button onclick="forceScan()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-luna-600/20 border border-luna-500/30 hover:bg-luna-600/30 hover:border-luna-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-luna-500/20 flex items-center justify-center group-hover:bg-luna-500/30">
+                            <i data-lucide="scan" class="w-4 h-4 text-luna-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-luna-200">🔍 Scan Agora</p>
+                            <p class="text-[10px] text-gray-500">Ler mensagens novas</p>
+                        </div>
+                    </button>
+
+                    <button onclick="forceExtractAll()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/30 hover:border-purple-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30">
+                            <i data-lucide="database" class="w-4 h-4 text-purple-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-purple-200">📦 Extrair TUDO</p>
+                            <p class="text-[10px] text-gray-500">Reset + scan completo</p>
+                        </div>
+                    </button>
+
+                    <button onclick="forceExtractNormal()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 hover:border-emerald-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30">
+                            <i data-lucide="filter" class="w-4 h-4 text-emerald-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-emerald-200">🔎 Extrair Normal</p>
+                            <p class="text-[10px] text-gray-500">Apenas mensagens novas</p>
+                        </div>
+                    </button>
+
+                    <button onclick="checkMentions()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-600/20 border border-amber-500/30 hover:bg-amber-600/30 hover:border-amber-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center group-hover:bg-amber-500/30">
+                            <i data-lucide="at-sign" class="w-4 h-4 text-amber-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-amber-200">📢 Verificar Menções</p>
+                            <p class="text-[10px] text-gray-500">@KIMI @LUNA @KIMICLAW</p>
+                        </div>
+                    </button>
+
+                    <button onclick="checkLinks()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-cyan-600/20 border border-cyan-500/30 hover:bg-cyan-600/30 hover:border-cyan-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30">
+                            <i data-lucide="link" class="w-4 h-4 text-cyan-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-cyan-200">🔗 Verificar Links</p>
+                            <p class="text-[10px] text-gray-500">URLs compartilhadas</p>
+                        </div>
+                    </button>
+
+                    <button onclick="forceReport()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600/30 hover:border-rose-400/50 transition-all group">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center group-hover:bg-rose-500/30">
+                            <i data-lucide="file-text" class="w-4 h-4 text-rose-400"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-rose-200">📊 Forçar Relatório</p>
+                            <p class="text-[10px] text-gray-500">Enviar resumo no grupo</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONFIGURAÇÕES DO AGENTE -->
+            <div class="glass rounded-2xl p-4">
+                <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    Configurações
+                </h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-gray-500 mb-1 block">Intervalo Scan (min)</label>
+                        <input type="range" id="scan-interval" min="1" max="60" value="10" 
+                            class="w-full h-1 bg-dark-600 rounded-lg appearance-none cursor-pointer accent-luna-500"
+                            oninput="updateConfig('scanInterval', this.value)">
+                        <div class="flex justify-between text-[10px] text-gray-600 mt-1">
+                            <span>1min</span>
+                            <span id="scan-interval-val" class="text-luna-400 font-mono">10</span>
+                            <span>60min</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-500 mb-1 block">Intervalo Relatório (min)</label>
+                        <input type="range" id="report-interval" min="5" max="120" value="30" 
+                            class="w-full h-1 bg-dark-600 rounded-lg appearance-none cursor-pointer accent-luna-500"
+                            oninput="updateConfig('reportInterval', this.value)">
+                        <div class="flex justify-between text-[10px] text-gray-600 mt-1">
+                            <span>5min</span>
+                            <span id="report-interval-val" class="text-luna-400 font-mono">30</span>
+                            <span>120min</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between py-2 border-t border-gray-800">
+                        <span class="text-xs text-gray-400">Modo Silencioso</span>
+                        <button id="silent-mode" onclick="toggleSilentMode()" class="w-10 h-5 rounded-full bg-gray-700 relative transition-all">
+                            <span class="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-gray-400 transition-all" id="silent-toggle"></span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between py-2 border-t border-gray-800">
+                        <span class="text-xs text-gray-400">Responder Menções</span>
+                        <button id="auto-mention" onclick="toggleAutoMention()" class="w-10 h-5 rounded-full bg-luna-600 relative transition-all">
+                            <span class="absolute right-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-all" id="mention-toggle"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER - MENTE DO AGENTE & STATUS -->
+        <main class="col-span-12 lg:col-span-6 space-y-4">
+
+            <!-- STATUS PRINCIPAL -->
+            <div class="glass rounded-2xl p-5 neon-glow">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="activity" class="w-4 h-4"></i>
+                        Status do Sistema
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span id="luna-state-badge" class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono border border-emerald-500/30">
+                            ● OPERACIONAL
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="metric-card glass rounded-xl p-3 border border-luna-500/10">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="message-square" class="w-3.5 h-3.5 text-luna-400"></i>
+                            <span class="text-[10px] text-gray-500 uppercase">Msgs Processadas</span>
+                        </div>
+                        <p class="text-2xl font-bold text-white font-mono" id="stat-messages">--</p>
+                        <p class="text-[10px] text-gray-600 mt-1" id="stat-messages-new">+0 novas</p>
+                    </div>
+
+                    <div class="metric-card glass rounded-xl p-3 border border-purple-500/10">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="check-square" class="w-3.5 h-3.5 text-purple-400"></i>
+                            <span class="text-[10px] text-gray-500 uppercase">Tarefas</span>
+                        </div>
+                        <p class="text-2xl font-bold text-white font-mono" id="stat-tasks">--</p>
+                        <p class="text-[10px] text-gray-600 mt-1" id="stat-tasks-urgent">0 urgentes</p>
+                    </div>
+
+                    <div class="metric-card glass rounded-xl p-3 border border-amber-500/10">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i>
+                            <span class="text-[10px] text-gray-500 uppercase">Ideias</span>
+                        </div>
+                        <p class="text-2xl font-bold text-white font-mono" id="stat-ideas">--</p>
+                        <p class="text-[10px] text-gray-600 mt-1">capturadas</p>
+                    </div>
+
+                    <div class="metric-card glass rounded-xl p-3 border border-rose-500/10">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="at-sign" class="w-3.5 h-3.5 text-rose-400"></i>
+                            <span class="text-[10px] text-gray-500 uppercase">Menções</span>
+                        </div>
+                        <p class="text-2xl font-bold text-white font-mono" id="stat-mentions">--</p>
+                        <p class="text-[10px] text-gray-600 mt-1" id="stat-mentions-pending">0 pendentes</p>
+                    </div>
+                </div>
+
+                <!-- BARRA DE PROGRESSO DO SCAN -->
+                <div class="mt-4 p-3 rounded-xl bg-dark-800/50 border border-gray-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-400 flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin" id="scan-spinner" style="display:none"></i>
+                            <span id="scan-status-text">Último scan: --</span>
+                        </span>
+                        <span class="text-[10px] text-gray-600 font-mono" id="scan-next">Próximo: --</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-dark-700 rounded-full overflow-hidden">
+                        <div id="scan-progress" class="h-full bg-luna-500 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MENTE DO AGENTE - THOUGHT STREAM -->
+            <div class="glass rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="brain" class="w-4 h-4"></i>
+                        Mente do Agente
+                        <span class="brain-wave text-[10px] text-luna-500 font-mono">● THINKING</span>
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearThoughts()" class="p-1.5 rounded-lg hover:bg-dark-700 text-gray-500 hover:text-gray-300 transition-all">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="pauseThoughts()" class="p-1.5 rounded-lg hover:bg-dark-700 text-gray-500 hover:text-gray-300 transition-all">
+                            <i data-lucide="pause" class="w-3.5 h-3.5" id="thoughts-pause-icon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="thought-stream" class="space-y-2 max-h-64 overflow-y-auto scroll-hide pr-1">
+                    <div class="p-3 rounded-xl bg-dark-800/50 border border-gray-800/50 text-center text-gray-600 text-sm">
+                        <div class="flex items-center justify-center gap-2 mb-2">
+                            <div class="typing-dot w-2 h-2 rounded-full bg-luna-400"></div>
+                            <div class="typing-dot w-2 h-2 rounded-full bg-luna-400"></div>
+                            <div class="typing-dot w-2 h-2 rounded-full bg-luna-400"></div>
+                        </div>
+                        Aguardando atividade do Luna...
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUFFER DE MENSAGENS -->
+            <div class="glass rounded-2xl p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="inbox" class="w-4 h-4"></i>
+                        Buffer de Mensagens
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-gray-500 font-mono" id="buffer-count">0 msgs</span>
+                        <button onclick="clearBuffer()" class="px-2 py-1 rounded-lg bg-red-900/20 text-red-400 text-[10px] hover:bg-red-900/40 transition-all">
+                            Limpar
+                        </button>
+                    </div>
+                </div>
+                <div id="message-buffer" class="space-y-2 max-h-48 overflow-y-auto scroll-hide pr-1">
+                    <p class="text-center text-gray-600 text-sm py-4">Buffer vazio</p>
+                </div>
+            </div>
+
+            <!-- ANÁLISE DE SENTIMENTO -->
+            <div class="glass rounded-2xl p-5">
+                <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    Análise de Sentimento
+                </h2>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <p class="text-2xl font-bold text-emerald-400 font-mono" id="sentiment-positive">0</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Positivo</p>
+                    </div>
+                    <div class="text-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <p class="text-2xl font-bold text-rose-400 font-mono" id="sentiment-negative">0</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Negativo</p>
+                    </div>
+                    <div class="text-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <p class="text-2xl font-bold text-amber-400 font-mono" id="sentiment-urgent">0</p>
+                        <p class="text-[10px] text-gray-500 mt-1">Urgente</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT SIDEBAR - LOGS & DIAGNÓSTICO -->
+        <aside class="col-span-12 lg:col-span-3 space-y-4">
+
+            <!-- LOGS EM TEMPO REAL -->
+            <div class="glass rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="terminal" class="w-4 h-4"></i>
+                        Logs ao Vivo
+                    </h2>
+                    <div class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-luna-500 animate-pulse"></span>
+                        <span class="text-[10px] text-gray-500 font-mono">LIVE</span>
+                    </div>
+                </div>
+                <div id="log-stream" class="space-y-1 max-h-72 overflow-y-auto scroll-hide font-mono text-[11px] pr-1">
+                    <div class="p-2 rounded-lg bg-dark-800/30 text-gray-600 text-center text-[10px]">
+                        Conectando ao stream de logs...
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHECKPOINT STATUS -->
+            <div class="glass rounded-2xl p-4">
+                <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    Checkpoint
+                </h2>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center py-1.5 border-b border-gray-800">
+                        <span class="text-xs text-gray-500">Hashes Conhecidos</span>
+                        <span class="text-xs font-mono text-luna-300" id="checkpoint-hashes">--</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-gray-800">
+                        <span class="text-xs text-gray-500">Último Scan</span>
+                        <span class="text-xs font-mono text-gray-400" id="checkpoint-last">--</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-gray-800">
+                        <span class="text-xs text-gray-500">Versão</span>
+                        <span class="text-xs font-mono text-gray-400" id="checkpoint-version">--</span>
+                    </div>
+                    <button onclick="resetCheckpoint()" class="w-full mt-2 py-2 rounded-lg bg-red-900/20 border border-red-500/20 text-red-400 text-xs hover:bg-red-900/30 transition-all">
+                        🔄 Resetar Checkpoint
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONEXÕES -->
+            <div class="glass rounded-2xl p-4">
+                <h2 class="text-sm font-bold text-luna-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i data-lucide="plug" class="w-4 h-4"></i>
+                    Conexões
+                </h2>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                        <div class="flex items-center gap-2">
+                            <span id="conn-backend-dot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                            <span class="text-xs text-gray-400">Backend API</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-gray-600" id="conn-backend">:3456</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                        <div class="flex items-center gap-2">
+                            <span id="conn-chrome-dot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                            <span class="text-xs text-gray-400">Chrome CDP</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-gray-600" id="conn-chrome">:9223</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                        <div class="flex items-center gap-2">
+                            <span id="conn-ws-dot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                            <span class="text-xs text-gray-400">WebSocket</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-gray-600" id="conn-ws">:3456/ws</span>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                        <div class="flex items-center gap-2">
+                            <span id="conn-whatsapp-dot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                            <span class="text-xs text-gray-400">WhatsApp Web</span>
+                        </div>
+                        <span class="text-[10px] font-mono text-gray-600" id="conn-whatsapp">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AUTOFix PAINEL -->
+            <div id="autofix-panel" class="glass rounded-2xl p-4 border border-red-500/20 hidden">
+                <h2 class="text-sm font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i data-lucide="wrench" class="w-4 h-4"></i>
+                    AutoFix Ativo
+                </h2>
+                <div id="autofix-log" class="space-y-1 max-h-32 overflow-y-auto font-mono text-[10px] text-red-300">
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // ============================================
+        // CONFIGURAÇÃO
+        // ============================================
+        const API_BASE = 'http://127.0.0.1:3456';
+        let ws = null;
+        let reconnectAttempts = 0;
+        let isThoughtsPaused = false;
+        let autoFixEnabled = false;
+        let lastScanTime = null;
+
+        // ============================================
+        // INICIALIZAÇÃO
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            startClock();
+            connectWebSocket();
+            fetchStatus();
+            fetchCheckpoint();
+            fetchBuffer();
+
+            // Atualizações periódicas
+            setInterval(fetchStatus, 5000);
+            setInterval(fetchCheckpoint, 10000);
+            setInterval(fetchBuffer, 3000);
+            setInterval(updateScanProgress, 1000);
+        });
+
+        // ============================================
+        // WEBSOCKET
+        // ============================================
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(`ws://127.0.0.1:3456`);
+
+                ws.onopen = () => {
+                    updateWSStatus('connected');
+                    reconnectAttempts = 0;
+                    addLog('🟢 WebSocket conectado', 'success');
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleWebSocketMessage(data);
+                    } catch (e) {
+                        addLog('📨 WS: ' + event.data, 'info');
+                    }
+                };
+
+                ws.onclose = () => {
+                    updateWSStatus('disconnected');
+                    addLog('🔴 WebSocket desconectado', 'error');
+                    reconnectWebSocket();
+                };
+
+                ws.onerror = (err) => {
+                    updateWSStatus('error');
+                    addLog('⚠️ Erro WebSocket', 'warning');
+                };
+            } catch (e) {
+                updateWSStatus('error');
+            }
+        }
+
+        function reconnectWebSocket() {
+            reconnectAttempts++;
+            const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
+            addLog(`🔄 Reconectando em ${delay/1000}s (tentativa ${reconnectAttempts})`, 'info');
+            setTimeout(connectWebSocket, delay);
+        }
+
+        function handleWebSocketMessage(data) {
+            if (data.type === 'luna_thought') {
+                addThought(data.thought, data.timestamp);
+            } else if (data.type === 'luna_log') {
+                addLog(data.message, data.level || 'info');
+            } else if (data.type === 'scan_complete') {
+                addThought(`✅ Scan completo: ${data.messagesProcessed} mensagens processadas`, new Date().toISOString());
+                showToast('Scan completo!', 'success');
+            } else if (data.type === 'mention_detected') {
+                addThought(`📢 Menção detectada: ${data.mention} por ${data.author}`, new Date().toISOString());
+                showToast(`Menção: ${data.mention}`, 'warning');
+            }
+        }
+
+        // ============================================
+        // API CALLS
+        // ============================================
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (body) options.body = JSON.stringify(body);
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (e) {
+                addLog(`❌ API Error: ${e.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function fetchStatus() {
+            const data = await apiCall('/api/state');
+            if (!data) return;
+
+            // Atualizar métricas
+            document.getElementById('stat-messages').textContent = data.whatsapp?.totalMessages || 0;
+            document.getElementById('stat-messages-new').textContent = `+${data.whatsapp?.newMessages || 0} novas`;
+            document.getElementById('stat-tasks').textContent = data.whatsapp?.tasks?.length || 0;
+            document.getElementById('stat-tasks-urgent').textContent = `${data.whatsapp?.urgentTasks || 0} urgentes`;
+            document.getElementById('stat-ideas').textContent = data.whatsapp?.ideas?.length || 0;
+            document.getElementById('stat-mentions').textContent = data.whatsapp?.mentions?.length || 0;
+            document.getElementById('stat-mentions-pending').textContent = `${data.whatsapp?.pendingMentions || 0} pendentes`;
+
+            // Sentimento
+            document.getElementById('sentiment-positive').textContent = data.whatsapp?.sentiment?.positive || 0;
+            document.getElementById('sentiment-negative').textContent = data.whatsapp?.sentiment?.negative || 0;
+            document.getElementById('sentiment-urgent').textContent = data.whatsapp?.sentiment?.urgent || 0;
+
+            // Status do Luna
+            const isRunning = data.luna?.status === 'running';
+            const badge = document.getElementById('luna-state-badge');
+            const indicator = document.getElementById('luna-status-indicator');
+
+            if (isRunning) {
+                badge.className = 'px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono border border-emerald-500/30';
+                badge.innerHTML = '● OPERACIONAL';
+                indicator.className = 'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full status-online border-2 border-dark-900';
+            } else {
+                badge.className = 'px-3 py-1 rounded-full bg-red-500/20 text-red-300 text-xs font-mono border border-red-500/30';
+                badge.innerHTML = '● OFFLINE';
+                indicator.className = 'absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full status-offline border-2 border-dark-900';
+            }
+
+            // Uptime
+            if (data.system?.uptime) {
+                document.getElementById('system-uptime').textContent = `⏱️ Uptime: ${formatUptime(data.system.uptime)}`;
+            }
+
+            // Conexões
+            updateConnectionStatus('conn-backend', data.system?.backendRunning);
+            updateConnectionStatus('conn-chrome', data.luna?.chromeConnected);
+            updateConnectionStatus('conn-ws', ws?.readyState === WebSocket.OPEN);
+            updateConnectionStatus('conn-whatsapp', data.luna?.whatsappConnected);
+        }
+
+        async function fetchCheckpoint() {
+            const data = await apiCall('/api/whatsapp/checkpoint');
+            if (!data) return;
+
+            document.getElementById('checkpoint-hashes').textContent = data.hashes?.length || 0;
+            document.getElementById('checkpoint-last').textContent = data.lastScan ? formatTime(new Date(data.lastScan)) : 'Nunca';
+            document.getElementById('checkpoint-version').textContent = data.version || 'unknown';
+
+            if (data.lastScan) {
+                lastScanTime = new Date(data.lastScan);
+            }
+        }
+
+        async function fetchBuffer() {
+            const data = await apiCall('/api/whatsapp/buffer');
+            if (!data) return;
+
+            const buffer = data.buffer || data;
+            const messages = buffer.messages || [];
+
+            document.getElementById('buffer-count').textContent = `${messages.length} msgs`;
+
+            const container = document.getElementById('message-buffer');
+            if (messages.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-600 text-sm py-4">Buffer vazio</p>';
+                return;
+            }
+
+            container.innerHTML = messages.slice(-10).reverse().map(msg => `
+                <div class="log-entry p-2 rounded-lg bg-dark-800/40 border border-gray-800/50 text-xs">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <span class="text-luna-400 font-mono text-[10px]">${formatTime(new Date(msg.timestamp))}</span>
+                        <span class="text-gray-500">•</span>
+                        <span class="text-gray-300 font-medium">${msg.author || 'Unknown'}</span>
+                        ${msg.hasMention ? '<span class="px-1 rounded bg-rose-500/20 text-rose-300 text-[9px]">@</span>' : ''}
+                        ${msg.isTask ? '<span class="px-1 rounded bg-purple-500/20 text-purple-300 text-[9px]">TASK</span>' : ''}
+                    </div>
+                    <p class="text-gray-400 line-clamp-2">${msg.content || msg.body || '(sem conteúdo)'}</p>
+                </div>
+            `).join('');
+        }
+
+        // ============================================
+        // AÇÕES DO USUÁRIO
+        // ============================================
+        async function forceScan() {
+            addThought('🔍 Solicitando scan imediato...', new Date().toISOString());
+            const result = await apiCall('/api/luna/scan', 'POST');
+            if (result?.success) {
+                showToast('Scan iniciado!', 'success');
+                document.getElementById('scan-spinner').style.display = 'inline';
+            } else {
+                showToast('Falha ao iniciar scan', 'error');
+            }
+        }
+
+        async function forceExtractAll() {
+            if (!confirm('⚠️ Isso vai resetar o checkpoint e ler TODAS as mensagens novamente. Continuar?')) return;
+
+            addThought('📦 Resetando checkpoint e extraindo TUDO...', new Date().toISOString());
+            const result = await apiCall('/api/luna/extract', 'POST', { mode: 'full', reset: true });
+            if (result?.success) {
+                showToast('Extração completa iniciada!', 'success');
+            } else {
+                showToast('Falha na extração', 'error');
+            }
+        }
+
+        async function forceExtractNormal() {
+            addThought('🔎 Extraindo mensagens novas...', new Date().toISOString());
+            const result = await apiCall('/api/luna/extract', 'POST', { mode: 'normal' });
+            if (result?.success) {
+                showToast('Extração normal iniciada!', 'success');
+            } else {
+                showToast('Falha na extração', 'error');
+            }
+        }
+
+        async function checkMentions() {
+            addThought('📢 Verificando menções...', new Date().toISOString());
+            const result = await apiCall('/api/luna/mentions', 'POST');
+            if (result?.mentions?.length > 0) {
+                showToast(`${result.mentions.length} menções encontradas!`, 'warning');
+            } else {
+                showToast('Nenhuma menção nova', 'info');
+            }
+        }
+
+        async function checkLinks() {
+            addThought('🔗 Verificando links...', new Date().toISOString());
+            const result = await apiCall('/api/luna/links', 'POST');
+            if (result?.links?.length > 0) {
+                showToast(`${result.links.length} links encontrados!`, 'info');
+            } else {
+                showToast('Nenhum link novo', 'info');
+            }
+        }
+
+        async function forceReport() {
+            addThought('📊 Gerando relatório...', new Date().toISOString());
+            const result = await apiCall('/api/luna/report', 'POST');
+            if (result?.success) {
+                showToast('Relatório enviado no WhatsApp!', 'success');
+            } else {
+                showToast('Falha ao enviar relatório', 'error');
+            }
+        }
+
+        async function resetCheckpoint() {
+            if (!confirm('⚠️ Resetar checkpoint? O Luna vai ler TODAS as mensagens novamente.')) return;
+
+            const result = await apiCall('/api/whatsapp/checkpoint', 'DELETE');
+            if (result?.success) {
+                showToast('Checkpoint resetado!', 'success');
+                fetchCheckpoint();
+            }
+        }
+
+        async function emergencyStop() {
+            if (!confirm('🛑 PARAR TUDO? Isso vai encerrar o Luna Daemon imediatamente.')) return;
+
+            const result = await apiCall('/api/luna/stop', 'POST');
+            if (result?.success) {
+                showToast('🛑 Luna parado!', 'error');
+                document.getElementById('luna-state-badge').innerHTML = '● PARADO';
+                document.getElementById('luna-state-badge').className = 'px-3 py-1 rounded-full bg-red-500/20 text-red-300 text-xs font-mono border border-red-500/30';
+            }
+        }
+
+        // ============================================
+        // CONFIGURAÇÕES
+        // ============================================
+        function updateConfig(key, value) {
+            document.getElementById(`${key}-val`).textContent = value;
+            apiCall('/api/luna/config', 'POST', { [key]: parseInt(value) });
+            addThought(`⚙️ Configuração atualizada: ${key} = ${value}`, new Date().toISOString());
+        }
+
+        function toggleSilentMode() {
+            const btn = document.getElementById('silent-mode');
+            const toggle = document.getElementById('silent-toggle');
+            const isActive = toggle.classList.contains('right-0.5');
+
+            if (isActive) {
+                toggle.classList.remove('right-0.5');
+                toggle.classList.add('left-0.5');
+                toggle.classList.remove('bg-white');
+                toggle.classList.add('bg-gray-400');
+                btn.classList.remove('bg-luna-600');
+                btn.classList.add('bg-gray-700');
+            } else {
+                toggle.classList.remove('left-0.5');
+                toggle.classList.add('right-0.5');
+                toggle.classList.remove('bg-gray-400');
+                toggle.classList.add('bg-white');
+                btn.classList.remove('bg-gray-700');
+                btn.classList.add('bg-luna-600');
+            }
+
+            apiCall('/api/luna/config', 'POST', { silentMode: !isActive });
+        }
+
+        function toggleAutoMention() {
+            const btn = document.getElementById('auto-mention');
+            const toggle = document.getElementById('mention-toggle');
+            const isActive = toggle.classList.contains('right-0.5');
+
+            if (isActive) {
+                toggle.classList.remove('right-0.5');
+                toggle.classList.add('left-0.5');
+                btn.classList.remove('bg-luna-600');
+                btn.classList.add('bg-gray-700');
+            } else {
+                toggle.classList.remove('left-0.5');
+                toggle.classList.add('right-0.5');
+                btn.classList.remove('bg-gray-700');
+                btn.classList.add('bg-luna-600');
+            }
+
+            apiCall('/api/luna/config', 'POST', { autoMention: !isActive });
+        }
+
+        // ============================================
+        // AUTOFIX
+        // ============================================
+        function toggleAutoFix() {
+            autoFixEnabled = !autoFixEnabled;
+            const status = document.getElementById('autofix-status');
+            const panel = document.getElementById('autofix-panel');
+
+            if (autoFixEnabled) {
+                status.classList.remove('bg-gray-600');
+                status.classList.add('bg-red-500', 'animate-pulse');
+                panel.classList.remove('hidden');
+                addLog('🔧 AutoFix ATIVADO - Monitorando erros...', 'warning');
+                startAutoFixMonitor();
+            } else {
+                status.classList.remove('bg-red-500', 'animate-pulse');
+                status.classList.add('bg-gray-600');
+                panel.classList.add('hidden');
+                addLog('🔧 AutoFix DESATIVADO', 'info');
+            }
+        }
+
+        function startAutoFixMonitor() {
+            if (!autoFixEnabled) return;
+
+            // Simulação de monitoramento (em produção, verificaria logs de erro)
+            setInterval(() => {
+                if (!autoFixEnabled) return;
+
+                // Verificar se há erros no Luna
+                checkForErrors().then(errors => {
+                    if (errors.length > 0) {
+                        const log = document.getElementById('autofix-log');
+                        errors.forEach(err => {
+                            const entry = document.createElement('div');
+                            entry.className = 'p-1.5 rounded bg-red-900/20 border border-red-500/10';
+                            entry.innerHTML = `
+                                <span class="text-red-400">[${new Date().toLocaleTimeString()}]</span>
+                                <span class="text-gray-400"> ${err.message}</span>
+                                <button onclick="attemptFix('${err.type}')" class="ml-2 px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 text-[9px]">
+                                    🔧 Fix
+                                </button>
+                            `;
+                            log.appendChild(entry);
+                            log.scrollTop = log.scrollHeight;
+                        });
+                    }
+                });
+            }, 10000);
+        }
+
+        async function checkForErrors() {
+            const data = await apiCall('/api/luna/diagnose');
+            return data?.errors || [];
+        }
+
+        async function attemptFix(errorType) {
+            addLog(`🔧 Tentando corrigir: ${errorType}...`, 'warning');
+            const result = await apiCall('/api/luna/autofix', 'POST', { errorType });
+
+            if (result?.success) {
+                showToast(`✅ ${errorType} corrigido!`, 'success');
+                addLog(`✅ ${errorType} corrigido automaticamente`, 'success');
+            } else {
+                showToast(`❌ Falha ao corrigir ${errorType}`, 'error');
+                addLog(`❌ Falha ao corrigir ${errorType}: ${result?.error}`, 'error');
+            }
+        }
+
+        // ============================================
+        // THOUGHT STREAM
+        // ============================================
+        function addThought(text, timestamp) {
+            if (isThoughtsPaused) return;
+
+            const container = document.getElementById('thought-stream');
+            const time = timestamp ? formatTime(new Date(timestamp)) : formatTime(new Date());
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry p-3 rounded-xl bg-dark-800/40 border border-luna-500/10';
+            entry.innerHTML = `
+                <div class="flex items-start gap-2">
+                    <span class="text-luna-400 font-mono text-[10px] mt-0.5">${time}</span>
+                    <p class="text-sm text-gray-300 leading-relaxed">${text}</p>
+                </div>
+            `;
+
+            // Remove o placeholder se existir
+            if (container.children.length === 1 && container.children[0].querySelector('.typing-dot')) {
+                container.innerHTML = '';
+            }
+
+            container.insertBefore(entry, container.firstChild);
+
+            // Limita a 50 entradas
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearThoughts() {
+            document.getElementById('thought-stream').innerHTML = `
+                <div class="p-3 rounded-xl bg-dark-800/50 border border-gray-800/50 text-center text-gray-600 text-sm">
+                    Mente limpa. Aguardando novos pensamentos...
+                </div>
+            `;
+        }
+
+        function pauseThoughts() {
+            isThoughtsPaused = !isThoughtsPaused;
+            const icon = document.getElementById('thoughts-pause-icon');
+            if (isThoughtsPaused) {
+                icon.setAttribute('data-lucide', 'play');
+                addThought('⏸️ Stream de pensamentos pausado', new Date().toISOString());
+            } else {
+                icon.setAttribute('data-lucide', 'pause');
+                addThought('▶️ Stream de pensamentos retomado', new Date().toISOString());
+            }
+            lucide.createIcons();
+        }
+
+        function clearBuffer() {
+            apiCall('/api/whatsapp/buffer', 'DELETE');
+            document.getElementById('message-buffer').innerHTML = '<p class="text-center text-gray-600 text-sm py-4">Buffer limpo</p>';
+            document.getElementById('buffer-count').textContent = '0 msgs';
+            showToast('Buffer limpo!', 'info');
+        }
+
+        // ============================================
+        // LOGS
+        // ============================================
+        function addLog(message, level = 'info') {
+            const container = document.getElementById('log-stream');
+            const time = new Date().toLocaleTimeString('pt-BR');
+
+            const colors = {
+                info: 'text-gray-400',
+                success: 'text-emerald-400',
+                warning: 'text-amber-400',
+                error: 'text-red-400'
+            };
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry p-1.5 rounded ${level === 'error' ? 'bg-red-900/10' : level === 'warning' ? 'bg-amber-900/10' : 'bg-dark-800/20'}`;
+            entry.innerHTML = `
+                <span class="text-gray-600 text-[10px] font-mono">${time}</span>
+                <span class="${colors[level] || colors.info}">${message}</span>
+            `;
+
+            container.insertBefore(entry, container.firstChild);
+
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // ============================================
+        // UTILITÁRIOS
+        // ============================================
+        function updateWSStatus(status) {
+            const dot = document.getElementById('ws-status-dot');
+            const text = document.getElementById('ws-status-text');
+
+            const states = {
+                connected: { color: 'bg-emerald-500', text: 'WS: OK' },
+                disconnected: { color: 'bg-red-500', text: 'WS: OFF' },
+                error: { color: 'bg-yellow-500', text: 'WS: ERR' }
+            };
+
+            const state = states[status] || states.error;
+            dot.className = `w-2 h-2 rounded-full ${state.color}`;
+            text.textContent = state.text;
+            text.className = `text-xs font-mono ${status === 'connected' ? 'text-emerald-400' : 'text-gray-400'}`;
+        }
+
+        function updateConnectionStatus(id, isConnected) {
+            const dot = document.getElementById(`${id}-dot`);
+            if (isConnected) {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-red-500';
+            }
+        }
+
+        function updateScanProgress() {
+            if (!lastScanTime) return;
+
+            const now = new Date();
+            const interval = 10 * 60 * 1000; // 10 minutos
+            const elapsed = now - lastScanTime;
+            const progress = Math.min(100, (elapsed / interval) * 100);
+
+            document.getElementById('scan-progress').style.width = `${progress}%`;
+            document.getElementById('scan-status-text').textContent = `Último scan: ${formatTime(lastScanTime)}`;
+
+            const nextScan = new Date(lastScanTime.getTime() + interval);
+            const remaining = Math.max(0, nextScan - now);
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            document.getElementById('scan-next').textContent = `Próximo: ${minutes}m ${seconds}s`;
+        }
+
+        function formatTime(date) {
+            if (!date || isNaN(date)) return '--:--';
+            return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            if (days > 0) return `${days}d ${hours}h ${mins}m`;
+            if (hours > 0) return `${hours}h ${mins}m`;
+            return `${mins}m`;
+        }
+
+        function startClock() {
+            setInterval(() => {
+                document.getElementById('current-time').textContent = new Date().toLocaleTimeString('pt-BR');
+            }, 1000);
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+
+            const colors = {
+                info: 'bg-luna-600 border-luna-400',
+                success: 'bg-emerald-600 border-emerald-400',
+                warning: 'bg-amber-600 border-amber-400',
+                error: 'bg-red-600 border-red-400'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${colors[type]} text-white px-4 py-3 rounded-xl border shadow-lg flex items-center gap-2 transform translate-x-full transition-transform duration-300`;
+            toast.innerHTML = `
+                <span class="text-sm font-medium">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Fallback para APIs que podem não existir ainda
+        window.addEventListener('error', (e) => {
+            addLog(`💥 JS Error: ${e.message}`, 'error');
+        });
+    </script>
+<script>(function(){
+  const LS_KEY='luna_engine_state';
+  let poll=null;
+  const state={on:(localStorage.getItem(LS_KEY)||'on')==='on'};
+
+  const log=(...a)=>console.log('[LUNA-CTRL]',...a);
+  async function api(url,opts={}){
+    log('fetch',url,opts);
+    let r; try { r=await fetch(url,opts); } catch(e){ const ws=document.getElementById('ws-status-text'); if(ws) ws.textContent='Backend desconectado'; throw e; }
+    const t=await r.text();
+    let d; try{d=JSON.parse(t)}catch{d={raw:t}};
+    log('resp',url,r.status,d);
+    if(!r.ok) throw new Error((d&&d.error)||('HTTP '+r.status));
+    return d;
+  }
+
+  function setStatus(on){
+    const ws=document.getElementById('ws-status-text');
+    const dot=document.getElementById('ws-status-dot');
+    if(ws) ws.textContent=on?'● OPERACIONAL':'● OFFLINE';
+    if(dot){dot.classList.remove('bg-green-500','bg-red-500','bg-yellow-500');dot.classList.add(on?'bg-green-500':'bg-red-500');}
+  }
+
+  async function refresh(){
+    if(!state.on){ setStatus(false); return; }
+    try{
+      const s=await api('/api/luna/status');
+      setStatus(s.status==='running');
+    }catch(e){ setStatus(false); const ws=document.getElementById('ws-status-text'); if(ws) ws.textContent='Backend desconectado'; }
+  }
+
+  function runPolling(){ if(poll) clearInterval(poll); refresh(); poll=setInterval(refresh,3000); }
+
+  async function startEngine(){ await api('/api/luna/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); state.on=true; localStorage.setItem(LS_KEY,'on'); runPolling(); }
+  async function stopEngine(){ await api('/api/luna/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); state.on=false; localStorage.setItem(LS_KEY,'off'); if(poll){clearInterval(poll);poll=null;} setStatus(false); }
+  async function restartEngine(){ await stopEngine(); setTimeout(startEngine,1200); }
+
+  function mount(){
+    const host=document.querySelector('header .flex.items-center.gap-3');
+    if(!host || document.getElementById('btn-engine-on')) return;
+    const mk=(id,txt,cls,fn)=>{const b=document.createElement('button');b.id=id;b.className=cls;b.textContent=txt;b.onclick=fn;return b;};
+    host.prepend(mk('btn-engine-off','DESLIGAR ENGINE','flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-300 text-sm',stopEngine));
+    host.prepend(mk('btn-engine-restart','REINICIAR ENGINE','flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-900/30 border border-amber-500/30 text-amber-300 text-sm',restartEngine));
+    host.prepend(mk('btn-engine-on','LIGAR ENGINE','flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-900/30 border border-emerald-500/30 text-emerald-300 text-sm',startEngine));
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{ mount(); if(state.on) runPolling(); else setStatus(false); });
+})();
+</script>
+</body>
+</html>
+
+
+
+

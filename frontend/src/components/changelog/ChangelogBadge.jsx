@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Bell, BellRing, X, CheckCheck, Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -244,3 +244,4 @@ export default function ChangelogBadge({
     </div>
   );
 }
+

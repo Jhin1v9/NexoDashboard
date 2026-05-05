@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowDownLeft, ArrowUpRight, Clock, Filter, Calendar,
@@ -24,6 +24,15 @@ const CATEGORY_CONFIG = {
   marketing: { label: 'Marketing', color: '#ff6b81' },
   others: { label: 'Outros', color: '#95afc0' }
 }
+
+const amountValue = (amount) => {
+  if (typeof amount === 'number') return amount
+  if (typeof amount === 'string') return Number(amount) || 0
+  return Number(amount?.value) || 0
+}
+
+const entryDescription = (entry) =>
+  entry.description || entry.source || entry.name || 'Lancamento pendente'
 
 export default function StatementSection() {
   const { data: statementData, loading, refetch } = useRealtime('/api/cash-box/statement', 30000)
@@ -51,16 +60,16 @@ export default function StatementSection() {
     if (dateTo) result = result.filter(e => e.date <= dateTo)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      result = result.filter(e => e.description?.toLowerCase().includes(q) || e.note?.toLowerCase().includes(q))
+      result = result.filter(e => entryDescription(e).toLowerCase().includes(q) || e.note?.toLowerCase().includes(q))
     }
     return result
   }, [entries, filterType, filterCategory, dateFrom, dateTo, searchQuery])
 
   const stats = useMemo(() => {
-    const income = filtered.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0)
-    const expense = filtered.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0)
-    const pendingIn = filtered.filter(e => e.type === 'expected_income').reduce((s, e) => s + e.amount, 0)
-    const pendingOut = filtered.filter(e => e.type === 'expected_expense').reduce((s, e) => s + e.amount, 0)
+    const income = filtered.filter(e => e.type === 'income').reduce((s, e) => s + amountValue(e.amount), 0)
+    const expense = filtered.filter(e => e.type === 'expense').reduce((s, e) => s + amountValue(e.amount), 0)
+    const pendingIn = filtered.filter(e => e.type === 'expected_income').reduce((s, e) => s + amountValue(e.amount), 0)
+    const pendingOut = filtered.filter(e => e.type === 'expected_expense').reduce((s, e) => s + amountValue(e.amount), 0)
     return { income, expense, pendingIn, pendingOut, net: income - expense }
   }, [filtered])
 
@@ -202,7 +211,7 @@ export default function StatementSection() {
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{entry.description}</span>
+                  <span className="text-sm font-medium truncate">{entryDescription(entry)}</span>
                   {isPending && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-warning/20 text-nexo-warning">Previsto</span>}
                   {entry.status === 'completed' && <CheckCircle2 size={12} className="text-nexo-success shrink-0" />}
                 </div>
@@ -219,7 +228,7 @@ export default function StatementSection() {
               
               <div className="text-right shrink-0">
                 <div className={`text-sm font-bold ${entry.type === 'income' || entry.type === 'expected_income' ? 'text-nexo-success' : 'text-nexo-danger'}`}>
-                  {entry.type === 'income' || entry.type === 'expected_income' ? '+' : '-'}{fmt(entry.amount)}
+                  {entry.type === 'income' || entry.type === 'expected_income' ? '+' : '-'}{fmt(amountValue(entry.amount))}
                 </div>
                 {entry.displayBalance !== null && entry.displayBalance !== undefined && (
                   <div className="text-[11px] text-nexo-muted">
@@ -281,11 +290,11 @@ function generatePrintHTML(entries, stats, currency) {
       ${entries.map(e => `
         <tr class="${e.status !== 'completed' ? 'pending' : ''}">
           <td>${fmtDate(e.date)}</td>
-          <td>${e.description}</td>
+          <td>${entryDescription(e)}</td>
           <td>${e.category || '-'}</td>
           <td>${e.status === 'completed' ? '✓ Concluído' : e.status === 'pending' ? '⏳ Pendente' : '🔄 Recorrente'}</td>
           <td class="${e.type === 'income' || e.type === 'expected_income' ? 'income' : 'expense'}">
-            ${e.type === 'income' || e.type === 'expected_income' ? '+' : '-'}${fmt(e.amount)}
+            ${e.type === 'income' || e.type === 'expected_income' ? '+' : '-'}${fmt(amountValue(e.amount))}
           </td>
           <td>${e.displayBalance !== null ? fmt(e.displayBalance) : '-'}</td>
         </tr>
@@ -348,8 +357,8 @@ function generateTicketHTML(entries, stats, currency) {
   
   ${entries.slice(0, 20).map(e => `
     <div class="line">
-      <span>${fmtDate(e.date)} ${e.description.substring(0, 15)}</span>
-      <span>${e.type === 'income' ? '+' : '-'}${fmt(e.amount)}</span>
+      <span>${fmtDate(e.date)} ${entryDescription(e).substring(0, 15)}</span>
+      <span>${e.type === 'income' ? '+' : '-'}${fmt(amountValue(e.amount))}</span>
     </div>
   `).join('')}
   
@@ -359,3 +368,4 @@ function generateTicketHTML(entries, stats, currency) {
 </body>
 </html>`
 }
+

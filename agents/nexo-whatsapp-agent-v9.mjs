@@ -29,8 +29,18 @@ const CONFIG = {
   
   // Grupos monitorados
   GROUPS: [
-    { name: '🏆Production - 2026🙏', short: 'Production', type: 'internal' },
-    { name: 'Paulo (web)', short: 'Paulo', type: 'client' }
+    {
+      name: '🏆Production - 2026🙏',
+      short: 'Production',
+      aliases: ['Production 2026', 'Production - 2026', 'Production 2026🙏'],
+      type: 'internal'
+    },
+    {
+      name: 'Paulo (web)',
+      short: 'Paulo',
+      aliases: ['Paulo web', 'Paulo (web)'],
+      type: 'client'
+    }
   ],
   
   // Chat pessoal do Abner — verificar ordens/comandos
@@ -154,6 +164,8 @@ async function connectWhatsApp() {
     waPage = await context.newPage();
     await waPage.goto('https://web.whatsapp.com', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waPage.waitForTimeout(5000);
+  } else {
+    console.log('[CDP] ✅ Sessão WhatsApp existente encontrada. Reutilizando WhatsApp Web aberto.');
   }
   
   // Verifica se está logado
@@ -175,29 +187,85 @@ async function connectWhatsApp() {
   return { browser, page: waPage };
 }
 
+function normalizeSearchText(text) {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\p{Extended_Pictographic}/gu, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildGroupSearchTerms(groupConfig) {
+  const terms = new Set();
+  if (groupConfig.name) terms.add(normalizeSearchText(groupConfig.name));
+  if (groupConfig.short) terms.add(normalizeSearchText(groupConfig.short));
+  if (groupConfig.aliases) {
+    groupConfig.aliases.forEach(alias => terms.add(normalizeSearchText(alias)));
+  }
+  if (groupConfig.name) terms.add(normalizeSearchText(groupConfig.name.replace(/[^a-z0-9]/gi, ' ')));
+  if (groupConfig.short) terms.add(normalizeSearchText(groupConfig.short.replace(/[^a-z0-9]/gi, ' ')));
+  return [...terms].filter(Boolean);
+}
+
+function getWhatsAppSearchSelectors() {
+  return [
+    '[data-testid="chat-list-search"]',
+    'div[contenteditable="true"][data-tab="3"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'input[placeholder*="Search"]',
+    'input[placeholder*="Pesquisar"]',
+    'input[aria-label*="Search"]',
+    'input[aria-label*="Pesquisar"]'
+  ];
+}
+
+async function findWhatsAppSearchInput(page) {
+  const selectors = getWhatsAppSearchSelectors();
+  for (const selector of selectors) {
+    const input = await page.$(selector);
+    if (input) return input;
+  }
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXTRAÇÃO DE MENSAGENS COM SCROLL INFINITO
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function openGroup(page, groupConfig) {
   const { name, short } = groupConfig;
-  console.log(`\n[Grupo] Procurando: ${name}`);
+  const terms = buildGroupSearchTerms(groupConfig);
+  const searchTerm = short || name;
+  console.log(`\n[Grupo] Procurando: ${name} | termos: ${terms.join(', ')}`);
   
-  // Estratégia: JavaScript injection direto
   try {
-    const found = await page.evaluate((searchTerm) => {
-      const items = document.querySelectorAll('[data-testid="chat-list-item"]');
+    const found = await page.evaluate((terms) => {
+      const normalize = (value) => {
+        return (value || '')
+          .toLowerCase()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\p{Extended_Pictographic}/gu, ' ')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+      const items = document.querySelectorAll('[data-testid="chat-list-item"], [role="row"], [role="option"], div[role="button"]');
       for (const item of items) {
-        if (item.textContent.includes(searchTerm) || 
-            item.textContent.includes('Production') || 
-            item.textContent.includes('2026') || 
-            item.textContent.includes('Paulo')) {
-          item.click();
-          return true;
+        const text = normalize(item.textContent || '');
+        if (!text) continue;
+        for (const term of terms) {
+          if (term && text.includes(term)) {
+            item.click();
+            return true;
+          }
         }
       }
       return false;
-    }, short);
+    }, terms);
     
     if (found) {
       await page.waitForTimeout(2000);
@@ -205,9 +273,58 @@ async function openGroup(page, groupConfig) {
       return true;
     }
   } catch (e) {
-    console.log(`[Grupo] Erro: ${e.message}`);
+    console.log(`[Grupo] Erro na busca inicial do grupo: ${e.message}`);
   }
-  
+
+  try {
+    const searchInput = await findWhatsAppSearchInput(page);
+    if (searchInput) {
+      await searchInput.click({ timeout: 3000 }).catch(() => {});
+      await searchInput.focus();
+      await page.keyboard.down('Control');
+      await page.keyboard.press('KeyA');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Backspace');
+      await page.waitForTimeout(200);
+      await page.keyboard.type(searchTerm, { delay: 50 });
+      await page.waitForTimeout(2000);
+
+      const clicked = await page.evaluate((terms) => {
+        const normalize = (value) => {
+          return (value || '')
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\p{Extended_Pictographic}/gu, ' ')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        };
+        const items = document.querySelectorAll('[data-testid="chat-list-item"], [role="row"], [role="option"], div[role="button"]');
+        for (const item of items) {
+          const text = normalize(item.textContent || '');
+          if (!text) continue;
+          for (const term of terms) {
+            if (term && text.includes(term)) {
+              item.click();
+              return true;
+            }
+          }
+        }
+        return false;
+      }, terms);
+      if (clicked) {
+        await page.waitForTimeout(2000);
+        console.log(`[Grupo] ✅ Aberto via busca: ${name}`);
+        return true;
+      }
+    } else {
+      console.log('[Grupo] ⚠️  Search input do WhatsApp não encontrado.');
+    }
+  } catch (e) {
+    console.log(`[Grupo] Erro na busca avançada: ${e.message}`);
+  }
+
   console.log(`[Grupo] ❌ Não encontrado: ${name}`);
   return false;
 }
@@ -586,6 +703,12 @@ export async function runAgent() {
     // TODO: Implementar leitura de comandos do chat pessoal
     
     // 3. Processa cada grupo
+    const diagnostics = {
+      expectedGroups: CONFIG.GROUPS.map(g => g.name),
+      openedGroups: [],
+      missingGroups: []
+    };
+
     const allMessages = [];
     const allNewMessages = [];
     const allTasks = [];
@@ -594,7 +717,11 @@ export async function runAgent() {
     
     for (const groupConfig of CONFIG.GROUPS) {
       const opened = await openGroup(page, groupConfig);
-      if (!opened) continue;
+      if (!opened) {
+        diagnostics.missingGroups.push(groupConfig.name);
+        continue;
+      }
+      diagnostics.openedGroups.push(groupConfig.name);
       
       const messages = await extractMessages(page, groupConfig.name);
       allMessages.push(...messages);
@@ -628,6 +755,10 @@ export async function runAgent() {
     checkpoint.lastRun = nowISO();
     checkpoint.totalMessagesSeen = checkpoint.knownMessageHashes.length;
     saveCheckpoint(checkpoint);
+
+    console.log('\n[Diagnóstico] Grupos esperados:', diagnostics.expectedGroups.join(', '));
+    console.log('[Diagnóstico] Grupos abertos:', diagnostics.openedGroups.join(', ') || 'nenhum');
+    console.log('[Diagnóstico] Grupos não encontrados:', diagnostics.missingGroups.join(', ') || 'nenhum');
     
     // 5. Só gera relatório se houver NOVIDADES
     const hasNews = allNewMessages.length > 0 || allTasks.length > 0 || allIdeas.length > 0 || allDecisions.length > 0;
@@ -726,7 +857,7 @@ export async function runAgent() {
 // Se executado diretamente
 const modulePath = decodeURIComponent(import.meta.url.replace('file:///', '').replace(/\//g, '\\'));
 const scriptPath = process.argv[1];
-const isMainModule = modulePath.toLowerCase() === scriptPath.toLowerCase();
+const isMainModule = !scriptPath || modulePath.toLowerCase() === scriptPath.toLowerCase();
 if (isMainModule) {
   runAgent().then(() => process.exit(process.exitCode || 0)).catch(() => process.exit(1));
 }

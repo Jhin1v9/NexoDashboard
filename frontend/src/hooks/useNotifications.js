@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 
 export default function useNotifications() {
   const [permission, setPermission] = useState('default')
@@ -44,3 +44,4 @@ export default function useNotifications() {
 
   return { supported, permission, requestPermission, notify }
 }
+

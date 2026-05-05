@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search, ArrowUpDown, Rocket } from 'lucide-react'
 import useRealtime from '../hooks/useRealtime'
@@ -77,3 +77,4 @@ export default function Projetos() {
     </div>
   )
 }
+

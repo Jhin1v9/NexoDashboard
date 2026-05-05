@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Wallet, TrendingUp, TrendingDown, AlertTriangle,
@@ -21,6 +21,12 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
+const projectionMonths = (projection) => {
+  if (Array.isArray(projection?.months)) return projection.months
+  if (Array.isArray(projection?.projection)) return projection.projection
+  return []
+}
+
 export default function Caixa() {
   const { data: cashBox, loading: loadingCash, error: errorCash } = useRealtime('/api/cash-box', 30000)
   const { data: projection, loading: loadingProj, error: errorProj } = useRealtime('/api/cash-box/projection', 30000)
@@ -35,10 +41,9 @@ export default function Caixa() {
   const outgoing = cashBox?.outgoingExpenses || []
 
   const projectionData = useMemo(() => {
-    if (!projection?.months) return []
-    return projection.months.map(m => ({
-      name: m.label,
-      saldo: m.balance,
+    return projectionMonths(projection).map(m => ({
+      name: m.label || m.monthLabel,
+      saldo: m.balance ?? m.projectedBalance ?? 0,
       eventos: m.events?.length || 0
     }))
   }, [projection])
@@ -176,11 +181,11 @@ export default function Caixa() {
         )}
 
         {/* Eventos anotados */}
-        {projection?.months?.some(m => m.events?.length > 0) && (
+        {projectionMonths(projection).some(m => m.events?.length > 0) && (
           <div className="mt-4 space-y-2">
-            {projection.months.filter(m => m.events?.length > 0).map(m => (
-              <div key={m.label} className="text-xs">
-                <span className="text-nexo-muted font-medium">{m.label}:</span>
+            {projectionMonths(projection).filter(m => m.events?.length > 0).map(m => (
+              <div key={m.label || m.monthLabel} className="text-xs">
+                <span className="text-nexo-muted font-medium">{m.label || m.monthLabel}:</span>
                 {m.events.map((ev, i) => (
                   <span key={i} className="ml-2" style={{ color: ev.type === 'income' ? '#2ed573' : '#ff4757' }}>
                     {ev.type === 'income' ? <ArrowUpRight size={10} className="inline" /> : <ArrowDownRight size={10} className="inline" />}
@@ -290,3 +295,4 @@ export default function Caixa() {
     </div>
   )
 }
+

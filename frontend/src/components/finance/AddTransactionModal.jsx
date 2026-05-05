@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CreditCard, Calendar, DollarSign, FileText, User } from 'lucide-react'
 
@@ -223,3 +223,4 @@ export default function AddTransactionModal({ paymentId, phases, onClose, onSave
     </motion.div>
   )
 }
+

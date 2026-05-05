@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   FileText, Eye, CheckCircle, Clock, AlertCircle,
@@ -255,3 +255,4 @@ export default function Orcamentos() {
     </div>
   )
 }
+

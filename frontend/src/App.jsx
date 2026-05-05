@@ -13,6 +13,10 @@ import GitHub from './pages/GitHub'
 import VercelProjects from './pages/VercelProjects'
 import Ferramentas from './pages/Ferramentas'
 import Financeiro from './pages/Financeiro'
+import ReceitaDetalhe from './pages/ReceitaDetalhe'
+import Caixa from './pages/Caixa'
+import Gastos from './pages/Gastos'
+import MeusGastos from './pages/MeusGastos'
 import Orcamentos from './pages/Orcamentos'
 import Operacoes from './pages/Operacoes'
 import Changelog from './pages/Changelog'
@@ -41,6 +45,12 @@ function App() {
             <Route path="/vercel" element={<VercelProjects />} />
             <Route path="/ferramentas" element={<Ferramentas />} />
             <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/financeiro/receitas/:id" element={<ReceitaDetalhe />} />
+            <Route path="/financeiro/caixa" element={<Caixa />} />
+            <Route path="/caixa" element={<Caixa />} />
+            <Route path="/financeiro/gastos" element={<Gastos />} />
+            <Route path="/gastos" element={<Gastos />} />
+            <Route path="/financeiro/gastos/meus" element={<MeusGastos />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </main>

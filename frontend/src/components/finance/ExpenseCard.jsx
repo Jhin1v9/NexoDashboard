@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Pencil, Power, Ban, CreditCard } from 'lucide-react'
 import ExpenseCategoryBadge from './ExpenseCategoryBadge'
@@ -174,3 +174,4 @@ export default function ExpenseCard({
     </motion.div>
   )
 }
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ExternalServices - Wrapper cacheado para CLI tools externos
  * Todas as operações usam spawn com timeout + fallback para cache
  */
@@ -211,3 +211,4 @@ class ExternalServices {
 }
 
 module.exports = ExternalServices;
+

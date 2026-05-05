@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import {
   CreditCard, Banknote, Wallet, Smartphone, Clock
 } from 'lucide-react'
@@ -96,3 +96,4 @@ export default function TransactionRow({ transaction, index = 0 }) {
     </motion.div>
   )
 }
+

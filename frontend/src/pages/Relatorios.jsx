@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FileText, Calendar, Eye, Download, RefreshCw, 
@@ -264,3 +264,4 @@ export default function Relatorios() {
     </div>
   )
 }
+

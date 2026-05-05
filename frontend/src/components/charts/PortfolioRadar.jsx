@@ -1,4 +1,4 @@
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
+﻿import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
 
 const data = [
   { subject: 'Código', A: 80, fullMark: 100 },
@@ -27,3 +27,4 @@ export default function PortfolioRadar() {
     </div>
   )
 }
+

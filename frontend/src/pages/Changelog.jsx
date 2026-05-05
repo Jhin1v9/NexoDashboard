@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText,
@@ -244,3 +244,4 @@ export default function Changelog() {
     </div>
   );
 }
+

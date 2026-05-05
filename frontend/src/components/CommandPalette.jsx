@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, LayoutDashboard, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, FileText, DollarSign } from 'lucide-react'
 
@@ -67,3 +67,4 @@ export default function CommandPalette({ open, onClose }) {
     </div>
   )
 }
+
