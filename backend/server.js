@@ -34,8 +34,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Helpers ---
 const readJSON = (file) => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch { return null; }
+  try {
+    let raw = fs.readFileSync(file, 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
+    return JSON.parse(raw);
+  } catch { return null; }
 };
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
