@@ -672,10 +672,40 @@ class LunaAgent {
       if (isMention) {
         log.info(`MENCAO de ${msg.pushname || msg.from}: ${(msg.body || '').slice(0, 80)}`);
         await this.handleMention(msg);
+        return;
       }
 
       if (body.startsWith('/')) {
         await this.handleCommand(msg);
+        return;
+      }
+
+      try {
+        const classification = await this.brain.classify({
+          body: msg.body || '',
+          text: msg.body || '',
+          author: msg.author || msg.pushname || msg.from,
+          from: msg.from,
+          timestamp: msg.timestamp || new Date().toISOString(),
+          id: messageId
+        }, this.threadHistory || []);
+
+        const classified = {
+          id: messageId,
+          body: msg.body || '',
+          text: msg.body || '',
+          author: msg.author || msg.pushname || msg.from,
+          from: msg.from,
+          timestamp: msg.timestamp || new Date().toISOString(),
+          classification
+        };
+
+        this.updateBufferFromClassified([classified]);
+        await this.saveToHistory([classified]);
+        this.cp.save();
+        log.info(`[LIVE] Mensagem classificada em tempo real: ${classification.category}`);
+      } catch (error) {
+        log.warn(`[LIVE] Falha ao classificar mensagem em tempo real: ${error.message}`);
       }
     });
 
@@ -686,6 +716,108 @@ class LunaAgent {
     return readyPromise;
   }
 
+  cleanMentionText(body = '') {
+    return body.replace(/@luna|@kimi|@kimiclaw/gi, '').trim();
+  }
+
+  buildContextGreeting(authorName) {
+    const buffer = this.cp.buffer || {};
+    const tasks = buffer.newTasks?.length || 0;
+    const leads = buffer.newLeads?.length || 0;
+    const finance = buffer.newFinance?.length || 0;
+
+    if (tasks === 0 && leads === 0 && finance === 0) {
+      return `Oi, chefe!\n\nTa limpo aqui por enquanto. Quer que eu faca uma varredura focada no grupo?`;
+    }
+
+    return `Oi, chefe!\n\nTo vendo ${tasks} tarefa(s), ${leads} lead(s) e ${finance} sinal(is) financeiro(s) no radar.\nBora resolver alguma coisa?`;
+  }
+
+  extractCompletedObject(text = '') {
+    return text
+      .replace(/@luna|@kimi|@kimiclaw/gi, '')
+      .replace(/\b(consegui|fiz|terminei|consertei|corrigi|resolvi|subi|publiquei|enviei|mandei|atualizei)\b/gi, '')
+      .replace(/\b(a|o|os|as|um|uma)\b\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  parseMentionWorkItems(body = '', authorName = 'time') {
+    if (!this.cp.buffer.newTasks) this.cp.buffer.newTasks = [];
+    if (!this.cp.buffer.newLeads) this.cp.buffer.newLeads = [];
+
+    const lines = body.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const tasks = [];
+    const leads = [];
+    let leadMode = false;
+
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (/clientes?|leads?|potentes/.test(lower)) {
+        leadMode = true;
+        continue;
+      }
+
+      const item = line.replace(/^[-*•]\s*/, '').trim();
+      if (!item || /@luna|anota|tarefas?:/i.test(item)) continue;
+
+      if (leadMode || /cliente|onadance|reformas|mapio|ccb|gesse|lucas|jess/i.test(item)) {
+        leads.push(item);
+      } else {
+        tasks.push(item);
+      }
+    }
+
+    const time = new Date().toISOString();
+    for (const task of tasks) {
+      this.cp.buffer.newTasks.push({ body: task, author: authorName, priority: /progreso|andamento/i.test(task) ? 'P2' : 'P1', time });
+    }
+    for (const lead of leads) {
+      this.cp.buffer.newLeads.push({ name: lead.split(/[-,]/)[0].trim(), context: lead, author: authorName, time, status: 'novo', priority: 'P1' });
+    }
+    if (tasks.length || leads.length) this.cp.save();
+
+    return { tasks, leads };
+  }
+
+  buildHumanMentionReply(body = '', authorName = 'chefe') {
+    const clean = this.cleanMentionText(body);
+    const lower = clean.toLowerCase();
+    const hasUrl = /https?:\/\/[^\s]+/i.test(clean);
+    const isGreeting = /^(oi|ola|olá|opa|e ai|e aí|bom dia|boa tarde|boa noite)[!.\s]*$/i.test(clean);
+    const looksLikeList = /anota|tarefas?:|clientes?|potentes|^- /im.test(clean) && clean.split(/\r?\n/).length > 2;
+    const completed = /\b(consegui|fiz|terminei|consertei|corrigi|resolvi|subi|publiquei|atualizei)\b/i.test(clean);
+    const ambiguousPc = /\bpc\b/i.test(clean) && clean.split(/\s+/).length <= 5;
+
+    if (isGreeting || !clean) {
+      return this.buildContextGreeting(authorName);
+    }
+
+    if (looksLikeList) {
+      const parsed = this.parseMentionWorkItems(clean, authorName);
+      const inProgress = parsed.tasks.filter(t => /progreso|andamento|em progresso/i.test(t)).length;
+      const pending = Math.max(parsed.tasks.length - inProgress, 0);
+      return `Anotado, chefe!\n\n${parsed.tasks.length} tarefa(s) + ${parsed.leads.length} lead(s) no radar.\n${inProgress} em andamento, ${pending} pendente(s).\n\nQuer que eu marque alguma como P1?`;
+    }
+
+    if (completed) {
+      const object = this.extractCompletedObject(clean) || clean;
+      return `Boa, ${authorName.split(' ')[0]}!\n\nAnoto '${object}' como tarefa concluida?`;
+    }
+
+    if (ambiguousPc) {
+      return `Anotado! '${clean}'.\n\nSo pra confirmar: e aquele PC que estragou e precisa arrumar, ou e outra coisa? Me explica que eu deixo certinho.`;
+    }
+
+    if (hasUrl) {
+      const url = clean.match(/https?:\/\/[^\s]+/i)?.[0] || 'link';
+      const source = /instagram/i.test(url) ? 'Instagram' : 'link';
+      return `Link do ${source} anotado!\n\nVou tentar enriquecer com titulo quando der. Se nao rolar, ele ja fica salvo mesmo assim.\n\nQuer que eu avise se alguem comentar sobre isso depois?`;
+    }
+
+    return null;
+  }
+
   async handleMention(msg) {
     const body = msg.body || '';
     if (!body.trim()) { log.warn('Mencao vazia ignorada'); return; }
@@ -694,13 +826,21 @@ class LunaAgent {
 
     try {
       const author = resolveAuthor(msg.author || msg.pushname || msg.from);
+      const authorName = author.name || msg.pushname || msg.from || 'chefe';
+      const humanReply = this.buildHumanMentionReply(body, authorName);
+      if (humanReply) {
+        await msg.reply(humanReply);
+        log.success('Resposta humana de cenario enviada!');
+        return;
+      }
+
       const buffer = this.cp.buffer || {};
       const context = {
         urgency: 'normal',
         sentiment: 'neutral',
         topic: 'general',
         userMood: 'neutral',
-        authorName: author.name || msg.pushname || msg.from,
+        authorName,
         authorRole: author.role || null,
         bufferSummary: {
           tasks: buffer.newTasks?.length || 0,
@@ -793,6 +933,9 @@ class LunaAgent {
     };
 
     const buildCreativeFallback = (section, lastItem) => {
+      if (section === 'tarefas' && !lastItem) {
+        return `Eita, ta limpo aqui!\n\nNenhuma tarefa no radar agora.\nQuer que eu faca uma varredura focada pra pegar o que ta rolando no grupo?`;
+      }
       const fallbackText = lastItem
         ? `Nada novo em ${section} no ultimo scan.\nUltimo registro: "${truncate(lastItem.body || lastItem.text || lastItem.context || '', 90)}" por ${lastItem.author || lastItem.sender || 'time'} (${relativeTime(lastItem.time || lastItem.timestamp)}).`
         : `Sem novidades em ${section} por enquanto.\nSinal bom: o fluxo esta limpo. Se quiser, eu faco uma varredura focada agora.`;
@@ -1270,6 +1413,7 @@ class LunaAgent {
         case 'tarefaPendente':
           this.cp.buffer.newTasks.push({
             body: text,
+            object: c.object || null,
             author: authorName,
             priority: c.priority,
             time

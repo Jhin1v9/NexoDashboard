@@ -168,7 +168,7 @@ class SmartClassifier {
     this.patterns = {
       // TAREFAS REALIZADAS (alta confiança)
       tarefaRealizada: {
-        regex: /\b(subi|fiz|pronto|terminado|deploy|enviei|mandei|atualizei|corrigido?|fix|resolvido|concluido|done|finished|complete|merged|push|commit|build ok|ta funcionando|funcionou|deployado|publicado|online|live|ativo)\b/gi,
+        regex: /\b(consegui|consertei|corrigi|resolvi|subi|fiz|pronto|terminado|deploy|enviei|mandei|atualizei|corrigido?|fix|resolvido|concluido|done|finished|complete|merged|push|commit|build ok|ta funcionando|funcionou|deployado|publicado|online|live|ativo)\b/gi,
         weight: 85,
         category: 'tarefaRealizada',
         icon: '✅',
@@ -428,6 +428,7 @@ class SmartClassifier {
       // Conteúdo
       text: rawText,
       cleanText: this.cleanText(text),
+      object: this.extractActionObject(rawText, primaryMatch),
       timestamp: timestamp,
 
       // Métricas
@@ -449,6 +450,19 @@ class SmartClassifier {
         authorBonus: author.isFounder ? 10 : 0
       }
     };
+  }
+
+  extractActionObject(rawText = '', primaryMatch = null) {
+    if (!primaryMatch || primaryMatch.category !== 'tarefaRealizada') return null;
+
+    const object = rawText
+      .replace(/@luna|@kimi|@kimiclaw/gi, '')
+      .replace(/\b(consegui|fiz|terminei|finalizei|consertei|corrigi|resolvi|subi|publiquei|enviei|mandei|atualizei|dei deploy|deployei|mergei|commitei)\b/gi, '')
+      .replace(/\b(a|o|os|as|um|uma)\b\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return object || null;
   }
 
   // ============================================
@@ -490,8 +504,15 @@ class SmartClassifier {
     const technicalTask = /\b(bug|bugs|codigo|código|site|deploy|build|corrigir|consertar|implementar|pendente|pendentes)\b/i.test(text);
     const paymentContext = /\b(pagou|pago|pagamento|fatura|dinheiro|transferencia|transferiu|pix|deposito|recebi|recebemos|cobrar|devendo|atrasado|caixa|eur|euro|€)\b/i.test(text);
     const hasUrl = /https?:\/\/[^\s]+/i.test(text);
+    const completedContext = /^\s*(consegui|consertei|corrigi|resolvi|fiz|terminei|finalizei|subi|publiquei|atualizei)\b/i.test(text) && !/\b(ver se|tentar|tento|consigo|pendente|pendentes|precisa|precisamos|falta)\b/i.test(text.replace(/^\s*consegui\b/i, ''));
 
-    if (technicalTask) {
+    if (completedContext) {
+      normalized = normalized.filter(s => !['tarefaPendente', 'bug'].includes(s.pattern));
+      const done = normalized.find(s => s.pattern === 'tarefaRealizada');
+      if (done) done.score = Math.max(done.score, 130);
+    }
+
+    if (technicalTask && !completedContext) {
       normalized = normalized.filter(s => s.pattern !== 'financeiroPendente');
       const existingTask = normalized.find(s => s.category === 'tarefaPendente');
       if (existingTask) existingTask.score = Math.max(existingTask.score, 115);
