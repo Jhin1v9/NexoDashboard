@@ -12,7 +12,7 @@ class LunaBrain {
       host: 'http://localhost:11434',
       systemPrompt: this.getBasePersonality(),
       temperature: 0.7,
-      maxTokens: 2048
+      maxTokens: 200
     };
 
     // ============================================
@@ -202,6 +202,8 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     this.activePersonality = 'default';
     this.conversationHistory = [];
     this.gemmaHasWarmedUp = false;
+    this.gemmaFailureCount = 0;
+    this.gemmaDisabledUntil = 0;
     this.emotionalState = {
       happiness: 70,
       excitement: 60,
@@ -214,8 +216,10 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
   }
 
   recoverAfterSuccessfulScan() {
-    this.emotionalState.energy = Math.min(100, Math.max(30, this.emotionalState.energy + 5));
+    this.emotionalState.energy = Math.min(100, Math.max(30, this.emotionalState.energy + 10));
     this.emotionalState.calmness = Math.min(100, this.emotionalState.calmness + 2);
+    this.emotionalState.happiness = Math.min(90, Math.max(65, this.emotionalState.happiness - 1));
+    console.log(`[LUNA MOOD] 😊${this.emotionalState.happiness} ⚡${this.emotionalState.energy} 💙${this.emotionalState.calmness} 🎉${this.emotionalState.excitement} (recuperou energia pos-scan)`);
   }
 
   // ============================================
@@ -312,10 +316,73 @@ EXEMPLOS DE TOM:
   // ============================================
   // GEMMA 2B CLASSIFICATION
   // ============================================
+  async checkOllamaHealth() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    try {
+      const res = await fetch(`${this.ollamaConfig.host}/api/tags`, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async warmUpGemma() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`${this.ollamaConfig.host}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.ollamaConfig.model,
+          prompt: 'oi',
+          options: { num_predict: 8 },
+          stream: false
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`Ollama error: ${response.status}`);
+      this.gemmaHasWarmedUp = true;
+      this.gemmaFailureCount = 0;
+      this.gemmaDisabledUntil = 0;
+      console.log('[BUGFIX] [GEMMA] Ollama aquecido');
+      return true;
+    } catch (error) {
+      this.gemmaFailureCount += 1;
+      console.warn(`[BUGFIX] [GEMMA] Ollama nao respondeu ao warm-up: ${error.message}`);
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async gemmaClassify(msg, regexResult, threadHistory) {
     const startedAt = Date.now();
     const controller = new AbortController();
-    const timeoutMs = this.gemmaHasWarmedUp ? 5000 : 10000;
+    if (Date.now() < this.gemmaDisabledUntil) {
+      console.warn('[GEMMA] Desativado temporariamente, usando regex');
+      return null;
+    }
+
+    const healthy = await this.checkOllamaHealth();
+    if (!healthy) {
+      this.gemmaFailureCount += 1;
+      if (this.gemmaFailureCount >= 5) {
+        this.gemmaDisabledUntil = Date.now() + 60 * 60 * 1000;
+        console.warn('[BUGFIX] [GEMMA] 5 falhas seguidas, desativado por 1h');
+      } else {
+        console.warn('[GEMMA] Ollama offline, usando regex');
+      }
+      return null;
+    }
+
+    const timeoutMs = 15000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
@@ -333,7 +400,8 @@ EXEMPLOS DE TOM:
           system: personality.systemPrompt,
           prompt: prompt,
           temperature: this.ollamaConfig.temperature,
-          max_tokens: this.ollamaConfig.maxTokens,
+          max_tokens: Math.min(this.ollamaConfig.maxTokens || 200, 200),
+          options: { num_predict: 200 },
           stream: false
         }),
         signal: controller.signal
@@ -344,6 +412,8 @@ EXEMPLOS DE TOM:
       const data = await response.json();
       const result = this.parseGemmaResponse(data.response);
       this.gemmaHasWarmedUp = true;
+      this.gemmaFailureCount = 0;
+      this.gemmaDisabledUntil = 0;
       const confidence = result?.confidence ?? regexResult?.confidence ?? 0;
       console.log(`[GEMMA] Classificacao levou ${Date.now() - startedAt}ms, confianca ${confidence}`);
       return result;
@@ -352,6 +422,11 @@ EXEMPLOS DE TOM:
         console.warn(`[GEMMA] Timeout ${timeoutMs}ms, fallback para regex`);
       } else {
         console.error('[GEMMA] Erro:', error.message);
+      }
+      this.gemmaFailureCount += 1;
+      if (this.gemmaFailureCount >= 5) {
+        this.gemmaDisabledUntil = Date.now() + 60 * 60 * 1000;
+        console.warn('[BUGFIX] [GEMMA] 5 falhas seguidas, desativado por 1h');
       }
       this.gemmaHasWarmedUp = true;
       return null; // Fallback para regex
@@ -533,25 +608,34 @@ RESPONDE EN JSON:
   // ATUALIZAÇÃO DE ESTADO EMOCIONAL DA LUNA
   // ============================================
   updateEmotionalState(classification) {
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
     // Luna "absorve" energia da conversa
-    if (classification.priority === 'P0') {
-      this.emotionalState.energy = Math.min(100, this.emotionalState.energy + 10);
-      this.emotionalState.excitement = Math.min(100, this.emotionalState.excitement + 15);
-    } else if (classification.category === 'tarefaRealizada') {
-      this.emotionalState.happiness = Math.min(100, this.emotionalState.happiness + 30);
-      this.emotionalState.energy = Math.min(100, this.emotionalState.energy + 5);
+    if (classification.category === 'tarefaRealizada') {
+      this.emotionalState.happiness = clamp(this.emotionalState.happiness + 10, 40, 95);
+      this.emotionalState.energy = clamp(this.emotionalState.energy + 15, 30, 100);
+      this.emotionalState.excitement = clamp(this.emotionalState.excitement + 8, 10, 100);
+    } else if (classification.category === 'lead' && classification.priority === 'P0') {
+      this.emotionalState.energy = clamp(this.emotionalState.energy + 5, 30, 100);
+      this.emotionalState.excitement = clamp(this.emotionalState.excitement + 10, 10, 100);
+    } else if (classification.priority === 'P0') {
+      this.emotionalState.energy = clamp(this.emotionalState.energy + 4, 30, 100);
+      this.emotionalState.excitement = clamp(this.emotionalState.excitement + 8, 10, 100);
     } else if (classification.category === 'feedbackPositivo') {
-      this.emotionalState.happiness = Math.min(100, this.emotionalState.happiness + 25);
-    } else if (classification.category === 'feedbackNegativo') {
-      this.emotionalState.happiness = Math.max(0, this.emotionalState.happiness - 15);
-      this.emotionalState.calmness = Math.max(0, this.emotionalState.calmness - 10);
+      this.emotionalState.happiness = clamp(this.emotionalState.happiness + 8, 40, 95);
+    } else if (classification.category === 'feedbackNegativo' || classification.category === 'bug') {
+      this.emotionalState.happiness = clamp(this.emotionalState.happiness - 10, 40, 95);
+      this.emotionalState.calmness = clamp(this.emotionalState.calmness - 8, 30, 100);
     }
 
     // Decaimento natural de energia
-    this.emotionalState.energy = Math.max(30, this.emotionalState.energy - 2);
-    this.emotionalState.excitement = Math.max(10, this.emotionalState.excitement - 3);
+    this.emotionalState.energy = clamp(this.emotionalState.energy - 2, 30, 100);
+    this.emotionalState.excitement = clamp(this.emotionalState.excitement - 3, 10, 100);
+    this.emotionalState.happiness = clamp(this.emotionalState.happiness, 40, 95);
+    this.emotionalState.calmness = clamp(this.emotionalState.calmness, 30, 100);
 
-    console.log(`[LUNA MOOD] 😊${this.emotionalState.happiness} ⚡${this.emotionalState.energy} 💙${this.emotionalState.calmness} 🎉${this.emotionalState.excitement}`);
+    const note = this.emotionalState.energy <= 30 ? ' (cansada, poucas msgs)' : '';
+    console.log(`[LUNA MOOD] 😊${this.emotionalState.happiness} ⚡${this.emotionalState.energy} 💙${this.emotionalState.calmness} 🎉${this.emotionalState.excitement}${note}`);
   }
 
   // ============================================

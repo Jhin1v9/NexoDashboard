@@ -194,7 +194,7 @@ class CheckpointManager {
   load(file, def) {
     try {
       if (fs.existsSync(file)) {
-        const d = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const d = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
         if (typeof d.silenceCount !== 'number' || isNaN(d.silenceCount)) d.silenceCount = 0;
         if (typeof d.fullExtractDone !== 'boolean') d.fullExtractDone = false;
         return d;
@@ -209,6 +209,19 @@ class CheckpointManager {
       fs.writeFileSync(CONFIG.BUFFER_FILE, JSON.stringify(this.buffer, null, 2));
     } catch (e) {
       log.error(`Save checkpoint: ${e.message}`);
+    }
+  }
+
+  reloadBuffer() {
+    this.buffer = this.load(CONFIG.BUFFER_FILE, this.buffer || {});
+    return this.buffer;
+  }
+
+  saveBuffer() {
+    try {
+      fs.writeFileSync(CONFIG.BUFFER_FILE, JSON.stringify(this.buffer, null, 2));
+    } catch (e) {
+      log.error(`Save buffer: ${e.message}`);
     }
   }
 
@@ -646,6 +659,10 @@ class LunaAgent {
             await this.runFullExtract();
           }
 
+          if (this.brain?.warmUpGemma) {
+            await this.brain.warmUpGemma();
+          }
+
           const result = await this.startMonitoring({ schedule: schedule && !once });
           if (once) { log.info('Modo once: mantendo sessao aberta.'); }
           resolve(result);
@@ -886,6 +903,9 @@ class LunaAgent {
   }
 
   async handleCommand(msg) {
+    this.cp.reloadBuffer();
+    log.info('[BUGFIX] Buffer persistente recarregado antes do comando');
+
     const raw = (msg.body || '').trim();
     const cmd = raw.toLowerCase();
     const buffer = this.cp.buffer || {};
@@ -1300,6 +1320,7 @@ class LunaAgent {
       await this.saveToHistory(allClassified);
       this.cp.markFullExtractDone();
       this.cp.save();
+      log.info('[BUGFIX] Buffer persistente atualizado pela extracao completa');
 
       log.extraordinary('=== EXTRACAO COMPLETA FINALIZADA ===');
 
@@ -1360,6 +1381,8 @@ class LunaAgent {
 
         this.updateBufferFromClassified(classified);
         await this.saveToHistory(classified);
+        this.cp.saveBuffer();
+        log.info('[BUGFIX] Buffer persistente atualizado pelo scan incremental');
 
         await this.notifyOps({
           messages: newMessages,
@@ -1548,18 +1571,10 @@ class LunaAgent {
       log.success('Relatorio inteligente enviado!');
     }
 
-    this.cp.buffer.newMessages = [];
-    this.cp.buffer.newTasks = [];
-    this.cp.buffer.newIdeas = [];
-    this.cp.buffer.newLinks = [];
-    this.cp.buffer.newDecisions = [];
-    this.cp.buffer.newMentions = [];
-    this.cp.buffer.newNews = [];
-    this.cp.buffer.newLeads = [];
-    this.cp.buffer.newFinance = [];
     this.cp.checkpoint.silenceCount = 0;
     this.cp.checkpoint.lastReport = new Date().toISOString();
     this.cp.save();
+    log.info('[BUGFIX] Relatorio enviado sem limpar buffer persistente');
   }
 
   async forceReport(to) {
