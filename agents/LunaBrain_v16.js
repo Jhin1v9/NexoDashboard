@@ -251,7 +251,7 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     const timestamp = msg.time || msg.timestamp || new Date().toISOString();
 
     // 1. REGEX LAYER (rápido, 10ms)
-    const regexResult = this.classifier.classify(msg);
+    const regexResult = await this.classifier.classify(msg);
 
     // 2. DECIDIR SE PRECISA DA GEMMA 2B
     const needsGemma = this.shouldUseGemma(regexResult, text, threadHistory);
@@ -265,13 +265,8 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     // 4. MERGE RESULTS
     const finalResult = this.mergeResults(regexResult, gemmaResult);
 
-    // 5. APLICAR PERSONALIDADE AO RESULTADO
-    finalResult.lunaPersonality = this.selectPersonality({
-      urgency: finalResult.priority === 'P0' ? 'critical' : 'normal',
-      sentiment: finalResult.metrics?.sentiment || 'neutral',
-      topic: finalResult.category,
-      userMood: this.detectUserMood(threadHistory)
-    });
+    // 5. PERSONALIDADE: apenas metadados, nao afeta classificacao
+    finalResult.lunaPersonality = 'default';
 
     // 6. ATUALIZAR ESTADO EMOCIONAL DA LUNA
     this.updateEmotionalState(finalResult);
@@ -283,6 +278,10 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
   // GEMMA 2B CLASSIFICATION
   // ============================================
   async gemmaClassify(msg, regexResult, threadHistory) {
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
     try {
       const personality = this.personalities[this.activePersonality];
 
@@ -300,16 +299,26 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
           temperature: this.ollamaConfig.temperature,
           max_tokens: this.ollamaConfig.maxTokens,
           stream: false
-        })
+        }),
+        signal: controller.signal
       });
 
       if (!response.ok) throw new Error(`Ollama error: ${response.status}`);
 
       const data = await response.json();
-      return this.parseGemmaResponse(data.response);
+      const result = this.parseGemmaResponse(data.response);
+      const confidence = result?.confidence ?? regexResult?.confidence ?? 0;
+      console.log(`[GEMMA] Classificacao levou ${Date.now() - startedAt}ms, confianca ${confidence}`);
+      return result;
     } catch (error) {
-      console.error('[GEMMA] Erro:', error.message);
+      if (error.name === 'AbortError') {
+        console.warn('[GEMMA] Timeout, fallback para regex');
+      } else {
+        console.error('[GEMMA] Erro:', error.message);
+      }
       return null; // Fallback para regex
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -359,15 +368,34 @@ RESPONDE EN JSON:
   }
 
   parseGemmaResponse(responseText) {
+    if (!responseText) return null;
+    const raw = responseText.trim();
+
+    // ESTRATEGIA 1: JSON puro direto
     try {
-      // Extrair JSON da resposta
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(raw);
+      if (parsed.category || parsed.confidence !== undefined) return parsed;
+    } catch (e) {}
+
+    // ESTRATEGIA 2: JSON dentro de markdown code block
+    try {
+      const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        const parsed = JSON.parse(codeBlockMatch[1].trim());
+        if (parsed.category || parsed.confidence !== undefined) return parsed;
       }
-    } catch (e) {
-      console.error('[GEMMA] Erro ao parsear JSON:', e.message);
-    }
+    } catch (e) {}
+
+    // ESTRATEGIA 3: JSON embutido em texto
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.category || parsed.confidence !== undefined) return parsed;
+      }
+    } catch (e) {}
+
+    console.error('[GEMMA] Nao conseguiu extrair JSON de:', raw.slice(0, 200));
     return null;
   }
 

@@ -4,7 +4,31 @@ const path = require('path');
 // ============================================
 // AUTHOR RESOLVER v16.0 (movido de luna-cto-agent.cjs)
 // ============================================
+function resolveAuthorAlias(value) {
+  const raw = (value || '').toString().trim();
+  const key = raw.toLowerCase();
+  const aliases = {
+    abner: { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    'abner gabriel': { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    nonoke: { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },
+    enoque: { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },
+    'e.g.santos': { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },
+    elias: { id: 'nexo-elias-001', name: 'Elias Mendes', fullName: 'Elias Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    'elias mendes': { id: 'nexo-elias-001', name: 'Elias Mendes', fullName: 'Elias Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    paulo: { id: 'paulo-santafe', name: 'Paulo (Web)', fullName: 'Paulo', role: 'Cliente', isNexo: false },
+    superclim: { id: 'SUPERCLIM', name: 'Superclim.es', fullName: 'Superclim.es', role: 'Cliente', isNexo: false },
+    nexo: { id: 'NEXO-DIGITAL', name: 'NEXO Digital', fullName: 'NEXO Digital', role: 'Empresa', isNexo: true }
+  };
+
+  if (!aliases[key]) return null;
+  return { ...aliases[key], isAdmin: false, confidence: 0.9, alias: raw };
+}
+
 function resolveAuthor(phoneId) {
+  const alias = resolveAuthorAlias(phoneId);
+  if (alias) return alias;
+  const phone = (phoneId || '').toString();
+
   if (!global.SCHEMAS || !global.SCHEMAS.contacts || !global.SCHEMAS.contacts.contacts) {
     return {
       id: null,
@@ -18,8 +42,8 @@ function resolveAuthor(phoneId) {
 
   const contacts = global.SCHEMAS.contacts.contacts;
   
-  if (contacts[phoneId]) {
-    const c = contacts[phoneId];
+  if (contacts[phone]) {
+    const c = contacts[phone];
     return {
       id: c.id,
       name: c.displayName || c.name || c.shortName,
@@ -32,7 +56,7 @@ function resolveAuthor(phoneId) {
     };
   }
 
-  const normalized = phoneId.replace('@c.us', '').replace('+', '');
+  const normalized = phone.replace('@c.us', '').replace('+', '');
   for (const [key, c] of Object.entries(contacts)) {
     const keyNorm = key.replace('@c.us', '').replace('+', '');
     if (keyNorm === normalized) {
@@ -66,6 +90,9 @@ function resolveAuthor(phoneId) {
     }
   }
 
+  const schemaAlias = resolveAuthorAlias(normalized);
+  if (schemaAlias) return schemaAlias;
+
   return {
     id: null,
     name: "Desconhecido",
@@ -73,7 +100,7 @@ function resolveAuthor(phoneId) {
     role: null,
     isNexo: false,
     confidence: 0,
-    unknownPhone: phoneId
+    unknownPhone: phone
   };
 }
 
@@ -331,7 +358,7 @@ class SmartClassifier {
   // ============================================
   // MÉTODO PRINCIPAL: classify()
   // ============================================
-  classify(msg) {
+  async classify(msg) {
     const text = (msg.text || msg.body || '').toLowerCase();
     const rawText = msg.text || msg.body || '';
     const author = resolveAuthor(msg.author || msg.from);
@@ -341,7 +368,7 @@ class SmartClassifier {
     const scores = this.calculateScores(text);
 
     // 2. DETECÇÃO DE ENTIDADES (clientes, projetos, membros)
-    const entities = this.detectEntities(text);
+    const entities = await this.detectEntities(text);
 
     // 3. DETECÇÃO DE VALOR MONETÁRIO
     const financial = this.extractFinancial(text);
@@ -379,6 +406,7 @@ class SmartClassifier {
         emails: entities.emails,
         phones: entities.phones
       },
+      urls: entities.urls.map(link => link.url || link),
 
       // Dados de negócio
       business: {
@@ -392,8 +420,10 @@ class SmartClassifier {
         financialValue: financial.value,
         financialCurrency: financial.currency,
         isNewLead: entities.isNewLead,
-        leadScore: entities.leadScore
+        leadScore: entities.leadScore,
+        lead: entities.lead
       },
+      possibleNewClient: entities.lead?.name || null,
 
       // Conteúdo
       text: rawText,
@@ -458,7 +488,7 @@ class SmartClassifier {
   // ============================================
   // DETECÇÃO DE ENTIDADES
   // ============================================
-  detectEntities(text) {
+  async detectEntities(text) {
     const result = {
       clients: [],
       projects: [],
@@ -468,7 +498,8 @@ class SmartClassifier {
       phones: [],
       bonus: 0,
       isNewLead: false,
-      leadScore: 0
+      leadScore: 0,
+      lead: null
     };
 
     // Detectar clientes
@@ -497,7 +528,12 @@ class SmartClassifier {
 
     // Detectar URLs
     const urlMatches = text.match(/(https?:\/\/[^\s]+)/gi);
-    if (urlMatches) result.urls = urlMatches;
+    if (urlMatches) {
+      result.urls = await Promise.all(
+        [...new Set(urlMatches.map(url => url.replace(/[.,;!?)]$/, '')))]
+          .map(url => this.fetchLinkContext(url))
+      );
+    }
 
     // Detectar emails
     const emailMatches = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi);
@@ -510,8 +546,83 @@ class SmartClassifier {
     // Calcular lead score
     result.leadScore = this.calculateLeadScore(text);
     result.isNewLead = result.leadScore >= 40 && result.clients.length === 0;
+    if (result.isNewLead) {
+      result.lead = this.buildLeadObject(text, result.leadScore, result.members);
+    }
 
     return result;
+  }
+
+  async fetchLinkContext(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'NEXO-Luna/16.0' }
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const type = this.detectLinkType(url, contentType);
+      let title = this.defaultLinkTitle(url, type);
+
+      if (contentType.includes('text/html')) {
+        const html = await response.text();
+        const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (titleMatch) title = titleMatch[1].replace(/\s+/g, ' ').trim().slice(0, 120);
+      }
+
+      return { url, title, type, fetchedAt: new Date().toISOString() };
+    } catch (e) {
+      return {
+        url,
+        title: 'Titulo nao disponivel',
+        type: this.detectLinkType(url, ''),
+        fetchedAt: new Date().toISOString(),
+        error: e.name === 'AbortError' ? 'timeout' : e.message
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  detectLinkType(url, contentType = '') {
+    const lower = (url || '').toLowerCase();
+    if (contentType.includes('pdf') || lower.endsWith('.pdf')) return 'PDF';
+    if (lower.includes('instagram.com')) return 'Instagram';
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'YouTube';
+    if (lower.includes('drive.google.com')) return 'Google Drive';
+    return 'Site';
+  }
+
+  defaultLinkTitle(url, type) {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      return `${type}: ${host}`;
+    } catch {
+      return 'Titulo nao disponivel';
+    }
+  }
+
+  buildLeadObject(text, score, members = []) {
+    const temperature = score >= 70 ? 'quente' : score >= 50 ? 'morno' : 'frio';
+    const nameMatch = text.match(/\b(?:sou|me chamo|meu nome e|aqui e)\s+([a-zA-ZÀ-ÿ]{2,}(?:\s+[a-zA-ZÀ-ÿ]{2,})?)/i);
+    const rawName = nameMatch ? nameMatch[1].trim() : '';
+    const name = rawName
+      .split(/\s+/)
+      .filter(part => !/^(quero|preciso|gostaria|busco|orcamento|orçamento|presupuesto)$/i.test(part))
+      .join(' ');
+
+    return {
+      name: name || 'Lead nao identificado',
+      context: text.slice(0, 240),
+      temperature,
+      detectedBy: members[0]?.name || null,
+      detectedAt: new Date().toISOString(),
+      status: 'novo',
+      priority: temperature === 'quente' ? 'P0' : temperature === 'morno' ? 'P1' : 'P2'
+    };
   }
 
   // ============================================
@@ -729,4 +840,14 @@ class SmartClassifier {
   }
 }
 
-module.exports = { SmartClassifier, resolveAuthor };
+function deduplicateMessages(messages) {
+  const seen = new Set();
+  return messages.filter(m => {
+    const key = `${m.id || m.text || ''}:${m.author || ''}:${m.timestamp || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+module.exports = { SmartClassifier, resolveAuthor, deduplicateMessages };

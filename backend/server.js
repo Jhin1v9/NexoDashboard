@@ -294,18 +294,30 @@ app.post('/api/whatsapp', (req, res) => {
 const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
 const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
 const REPORTS_DIR = path.join(DATA_DIR, 'reports');
+const WHATSAPP_HISTORY_FILE = path.join(DATA_DIR, 'whatsapp-history.json');
 
 // Ensure reports dir exists
 if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
 if (!fs.existsSync(REPORT_HISTORY_FILE)) writeJSON(REPORT_HISTORY_FILE, { reports: [] });
+if (!fs.existsSync(WHATSAPP_HISTORY_FILE)) writeJSON(WHATSAPP_HISTORY_FILE, []);
 
 // Serve report files statically
 app.use('/reports', express.static(REPORTS_DIR));
 
 app.get('/api/whatsapp-agent', (req, res) => {
-  const data = readJSON(AGENT_DATA_FILE);
-  if (!data) return res.status(404).json({ error: 'Agent data not found. Run: node agents/nexo-whatsapp-agent-v8.mjs' });
-  res.json(data);
+  try {
+    const data = readJSON(AGENT_DATA_FILE);
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: 'Agent data not found',
+        hint: 'Run: node agents/luna-cto-agent.cjs'
+      });
+    }
+    res.json({ success: true, data, timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 app.get('/api/whatsapp-agent/status', (req, res) => {
@@ -315,6 +327,140 @@ app.get('/api/whatsapp-agent/status', (req, res) => {
     lastUpdate: data?.updatedAt || null,
     stats: data?.stats || null
   });
+});
+
+function readWhatsappHistory() {
+  if (!fs.existsSync(WHATSAPP_HISTORY_FILE)) writeJSON(WHATSAPP_HISTORY_FILE, []);
+  const parsed = readJSON(WHATSAPP_HISTORY_FILE);
+  return Array.isArray(parsed) ? parsed : (parsed?.messages || []);
+}
+
+function writeWhatsappHistory(history) {
+  writeJSON(WHATSAPP_HISTORY_FILE, Array.isArray(history) ? history : []);
+}
+
+function classificationCategory(classification) {
+  if (!classification) return 'unknown';
+  if (typeof classification === 'string') return classification;
+  return classification.category || classification.label || 'unknown';
+}
+
+app.get('/api/whatsapp/history', (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 50));
+    const chat = (req.query.chat || '').toString().trim().toLowerCase();
+    let messages = readWhatsappHistory();
+
+    if (chat) {
+      messages = messages.filter(m => (m.chat || '').toLowerCase().includes(chat));
+    }
+
+    messages = messages
+      .slice()
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, limit);
+
+    res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/classifications/review', (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
+    const messages = readWhatsappHistory()
+      .filter(m => m.classification && m.reviewed !== true)
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, limit)
+      .map(m => ({
+        id: m.id,
+        text: m.text,
+        author: m.author,
+        chat: m.chat,
+        timestamp: m.timestamp,
+        classification: m.classification
+      }));
+
+    res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/classifications/:id/correct', (req, res) => {
+  try {
+    const { correctCategory, notes } = req.body || {};
+    if (!correctCategory || typeof correctCategory !== 'string') {
+      return res.status(400).json({ success: false, error: 'correctCategory is required' });
+    }
+
+    const history = readWhatsappHistory();
+    const index = history.findIndex(m => m.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ success: false, error: 'classification not found' });
+    }
+
+    const previousCategory = classificationCategory(history[index].classification);
+    history[index] = {
+      ...history[index],
+      reviewed: true,
+      correctedCategory: correctCategory,
+      reviewedAt: new Date().toISOString(),
+      notes: notes || null
+    };
+    writeWhatsappHistory(history);
+
+    let learningApplied = false;
+    try {
+      const { SmartClassifier } = require('../agents/SmartClassifier_v16.js');
+      const classifier = new SmartClassifier();
+      classifier.learnFromCorrection(req.params.id, correctCategory, previousCategory);
+      learningApplied = true;
+    } catch (learningError) {
+      console.warn('[CLASSIFICATIONS] Learning fallback:', learningError.message);
+    }
+
+    res.json({
+      success: true,
+      id: req.params.id,
+      previousCategory,
+      correctCategory,
+      learningApplied,
+      message: 'Classification corrected'
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/classifications/stats', (req, res) => {
+  try {
+    const history = readWhatsappHistory().filter(m => m.classification);
+    const byCategory = {};
+    let reviewed = 0;
+    let corrected = 0;
+
+    for (const item of history) {
+      const category = item.correctedCategory || classificationCategory(item.classification);
+      byCategory[category] = (byCategory[category] || 0) + 1;
+      if (item.reviewed === true) reviewed++;
+      if (item.correctedCategory && item.correctedCategory !== item.classification?.category) corrected++;
+    }
+
+    res.json({
+      success: true,
+      totalClassified: history.length,
+      byCategory,
+      reviewed,
+      pendingReview: Math.max(0, history.length - reviewed),
+      corrected,
+      correctionRate: reviewed ? corrected / reviewed : 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // Trigger manual refresh of WhatsApp agent
@@ -2484,9 +2630,5 @@ server.listen(PORT, BIND_IP, () => {
 setInterval(() => {
   external.refreshExternal('tools').catch(() => {});
 }, 10 * 60 * 1000);
-
-
-
-
 
 

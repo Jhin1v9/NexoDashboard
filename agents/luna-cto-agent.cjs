@@ -1,5 +1,5 @@
 // ============================================================
-// LUNA v15.1 "VISION EXTRACTOR" — CORRIGIDO
+// LUNA v15.1 "VISION EXTRACTOR" â€” CORRIGIDO
 // Sem erros de sintaxe, sem fechar shell, keep-alive ativo
 // ============================================================
 
@@ -11,18 +11,18 @@ const crypto = require('crypto');
 const { LunaBrain } = require('./LunaBrain_v16.js');
 const { SmartClassifier, resolveAuthor } = require('./SmartClassifier_v16.js');
 
-// Playwright importado no topo (não dinamicamente)
+// Playwright importado no topo (nÃ£o dinamicamente)
 let chromium = null;
 try {
   chromium = require('playwright').chromium;
 } catch (e) {
-  console.error('❌ Playwright não instalado! Execute: npm install playwright');
+  console.error('âŒ Playwright nÃ£o instalado! Execute: npm install playwright');
   console.error(e.message);
-}   // ← fecha o catch (linha 20)
+}   // â† fecha o catch (linha 20)
 
 // ============================================
-// LUNA v16.0 — SCHEMA LOADER
-// Colar aqui: entre o catch e a CONFIGURAÇÃO
+// LUNA v16.0 â€” SCHEMA LOADER
+// Colar aqui: entre o catch e a CONFIGURAÃ‡ÃƒO
 // ============================================
 
 const SCHEMA_BASE = path.join(__dirname, '..', 'backend', 'data');
@@ -39,16 +39,15 @@ function loadSchema(schemaName) {
     if (fs.existsSync(configPath)) {
       return JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
-    console.warn(`[SCHEMA] ⚠️  Schema não encontrado: ${schemaName}`);
+    console.warn(`[SCHEMA] âš ï¸  Schema nÃ£o encontrado: ${schemaName}`);
     return null;
   } catch (err) {
-    console.error(`[SCHEMA] ❌ Erro ao carregar ${schemaName}:`, err.message);
+    console.error(`[SCHEMA] âŒ Erro ao carregar ${schemaName}:`, err.message);
     return null;
   }
 }
-
 function loadAllSchemas() {
-  console.log('[SCHEMA] 🔄 Carregando schemas v16.0...');
+  console.log('[SCHEMA] ðŸ”„ Carregando schemas v16.0...');
   
   SCHEMAS = {
     contacts: loadSchema('contacts-map'),
@@ -64,16 +63,18 @@ function loadAllSchemas() {
   };
   
   const loaded = Object.entries(SCHEMAS).filter(([k, v]) => v !== null).length;
-  console.log(`[SCHEMA] ✅ ${loaded}/10 schemas carregados`);
+  console.log(`[SCHEMA] âœ… ${loaded}/10 schemas carregados`);
   
   return SCHEMAS;
 }
-
 // Carregar no startup
 SCHEMAS = loadAllSchemas();
 
-// =====================================================  ← (linha 21 original)
-// CONFIGURAÇÃO v15.1
+// Exportar para acesso global
+global.SCHEMAS = SCHEMAS;
+
+// =====================================================  â† (linha 21 original)
+// CONFIGURAÃ‡ÃƒO v15.1
 // =====================================================
 
 const isAuthorizedChat = (name) => {
@@ -98,7 +99,7 @@ const CONFIG = {
   REPORT_INTERVAL: 30 * 60 * 1000,
   MAX_SILENCE_REPORTS: 1,
   MAX_SCROLLS: 50,
-  CDP_PORT: 9222,
+  CDP_PORT: 9223,
   CDP_TIMEOUT: 30000,
   SCROLL_WAIT: 300,
   SCROLL_STABLE_TIME: 5000,
@@ -106,6 +107,7 @@ const CONFIG = {
   CHECKPOINT_FILE: path.join(__dirname, '../backend/data/luna-checkpoint.json'),
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
   OUTPUT_FILE: path.join(__dirname, '../backend/data/whatsapp-agent-data.json'),
+  WHATSAPP_HISTORY_FILE: path.join(__dirname, '../backend/data/whatsapp-history.json'),
   FULL_EXTRACT_FILE: path.join(__dirname, '../backend/data/full-extract.json'),
   NEWS_FILE: path.join(__dirname, '../backend/data/nexo-news.json'),
   REPORTS_DIR: path.join(__dirname, '../backend/data/reports'),
@@ -113,13 +115,13 @@ const CONFIG = {
   DEBUG_DIR: path.join(__dirname, '../ARTIFACTS/debug')
 };
 
-// Criar diretórios
+// Criar diretÃ³rios
 [CONFIG.REPORTS_DIR, CONFIG.ARTIFACTS_DIR, CONFIG.DEBUG_DIR, SESSION_DATA_PATH].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
 
 // ============================================================
-// KEEP-ALIVE — Não deixa o shell fechar
+// KEEP-ALIVE â€” NÃ£o deixa o shell fechar
 // ============================================================
 process.on('uncaughtException', (err) => {
   console.error('[KEEP-ALIVE] Uncaught Exception:', err.message);
@@ -156,7 +158,7 @@ class Logger {
   scan(m) { this._w('SCAN', m); }
   extract(m) { this._w('EXTRACT', m); }
   playwright(m) { this._w('PLAYWRIGHT', m); }
-  extraordinary(m) { console.log(`✨ ${m} ✨`); this._w('EXTRAORDINARY', m); }
+  extraordinary(m) { console.log(`âœ¨ ${m} âœ¨`); this._w('EXTRAORDINARY', m); }
   getEvents() { return this.events; }
 }
 const log = new Logger();
@@ -184,6 +186,7 @@ class CheckpointManager {
       newMentions: [],
       newNews: [],
       newLeads: [],
+      newFinance: [],
       lastBufferUpdate: null
     });
   }
@@ -235,7 +238,7 @@ class CheckpointManager {
 
   resetForFullExtract() {
     this.checkpoint.fullExtractDone = false;
-    log.info('Checkpoint resetado para extração completa');
+    log.info('Checkpoint resetado para extraÃ§Ã£o completa');
   }
 }
 
@@ -251,7 +254,7 @@ class PlaywrightExtractor {
 
   async connect() {
     if (!chromium) {
-      log.error('Playwright não disponível. Instale com: npm install playwright');
+      log.error('Playwright nÃ£o disponÃ­vel. Instale com: npm install playwright');
       return false;
     }
 
@@ -320,7 +323,7 @@ class PlaywrightExtractor {
           return element;
         }
       } catch (e) {
-        log.warn(`Estratégia ${strategy.type} falhou para ${chatName}`);
+        log.warn(`EstratÃ©gia ${strategy.type} falhou para ${chatName}`);
       }
     }
 
@@ -400,7 +403,7 @@ class PlaywrightExtractor {
       }
       
       const totalUnique = allMessagesMap.size;
-      log.playwright(`Scroll ${scrollCount+1}/${CONFIG.MAX_SCROLLS} — ${currentMessages.length} visiveis | ${addedCount} novas | Total: ${totalUnique}`);
+      log.playwright(`Scroll ${scrollCount+1}/${CONFIG.MAX_SCROLLS} â€” ${currentMessages.length} visiveis | ${addedCount} novas | Total: ${totalUnique}`);
       
       if (totalUnique === lastCount) {
         stableCount++;
@@ -492,7 +495,7 @@ class PlaywrightExtractor {
   }
 }
 // DEPRECATED: resolveAuthor() movido para SmartClassifier_v16.js
-// Importação: const { resolveAuthor } = require('./SmartClassifier_v16.js');
+// ImportaÃ§Ã£o: const { resolveAuthor } = require('./SmartClassifier_v16.js');
 // ============================================================
 // ANALISADOR DE LINKS v15.1
 // ============================================================
@@ -584,7 +587,7 @@ class LinkAnalyzer {
 }
 
 // ============================================================
-// MAIN AGENT — v15.1
+// MAIN AGENT â€” v15.1
 // ============================================================
 class LunaAgent {
   constructor() {
@@ -600,7 +603,12 @@ class LunaAgent {
     this.lastReport = null;
     this.reportGroup = null;
     this.running = false;
+    this.threadHistory = [];
     this.fullExtractRunning = false;
+    if (!fs.existsSync(CONFIG.WHATSAPP_HISTORY_FILE)) {
+      fs.writeFileSync(CONFIG.WHATSAPP_HISTORY_FILE, '[]', 'utf8');
+      log.info('[HISTORY] whatsapp-history.json criado');
+    }
   }
 
   async init(options = {}) {
@@ -651,7 +659,7 @@ class LunaAgent {
       if (msg.fromMe && !msg.body.startsWith('/')) return;
 
       const body = (msg.body || '').toLowerCase();
-      const isMention = /@luna|@kimi|@kimiclaw/.test(body);
+      const isMention = /@luna|@kimi|@kimiclaw/i.test(body);
 
       if (isMention) {
         log.info(`MENCAO de ${msg.pushname || msg.from}: ${(msg.body || '').slice(0, 80)}`);
@@ -672,103 +680,382 @@ class LunaAgent {
 
   async handleMention(msg) {
     const body = msg.body || '';
-    const lowerBody = body.toLowerCase();
+    if (!body.trim()) { log.warn('Mencao vazia ignorada'); return; }
 
-    let response = '';
-    const buffer = this.cp.buffer;
-    const pendingTasks = buffer.newTasks?.length || 0;
-    const newLinks = buffer.newLinks?.length || 0;
-    const newIdeas = buffer.newIdeas?.length || 0;
-
-    if (/status|projeto|andamento|fase|como ta|como esta/.test(lowerBody)) {
-      response = `📊 *STATUS ATUAL*\n\n`;
-      response += `📝 Tarefas pendentes: ${pendingTasks}\n`;
-      response += `💡 Ideias novas: ${newIdeas}\n`;
-      response += `🔗 Links novos: ${newLinks}\n\n`;
-
-      if (pendingTasks > 0) {
-        const topTask = buffer.newTasks[0];
-        response += `⚡ Prioridade: ${(topTask.body || topTask.text || '').slice(0, 60)}...\n\n`;
-      }
-
-      response += `Quer que eu gere um relatorio completo? Use /relatorio`;
-    }
-    else if (/cliente|santafe|paulo|superclim|sorveteria/.test(lowerBody)) {
-      const clientMentions = buffer.newMessages?.filter(m => 
-        /santafe|paulo|superclim|sorveteria/.test((m.body || m.text || '').toLowerCase())
-      ) || [];
-
-      response = `👤 *CLIENTES*\n\n`;
-      response += `Mencionados recentemente: ${clientMentions.length}x\n\n`;
-
-      if (clientMentions.length === 0) {
-        response += `Nenhum cliente mencionado recentemente. Alguma noticia?`;
-      } else {
-        response += `Ultima mencao: ${(clientMentions[clientMentions.length - 1].body || '').slice(0, 80)}...`;
-      }
-    }
-    else if (/dinheiro|pagamento|fatura|caixa|financeiro|pago|nao pagou/.test(lowerBody)) {
-      const financeMsgs = buffer.newMessages?.filter(m =>
-        /pagou|fatura|caixa|dinheiro|custo|preco/.test((m.body || m.text || '').toLowerCase())
-      ) || [];
-
-      response = `💰 *FINANCAS*\n\n`;
-      if (financeMsgs.length > 0) {
-        response += `Encontrei ${financeMsgs.length} mencao(oes) financeira(s).\n`;
-        response += `Ultima: ${(financeMsgs[financeMsgs.length - 1].body || '').slice(0, 80)}...\n\n`;
-      } else {
-        response += `Nenhuma atualizacao financeira recente.\n`;
-        response += `O caixa esta atualizado? Tem alguma fatura pendente?\n\n`;
-      }
-      response += `Use /relatorio para ver detalhes.`;
-    }
-    else {
-      response = `🌙 Oi! Vi que me mencionou.\n\n`;
-      response += `Atualmente no dashboard:\n`;
-      response += `• ${pendingTasks} tarefas pendentes\n`;
-      response += `• ${newIdeas} ideias para explorar\n`;
-      response += `• ${newLinks} links para revisar\n\n`;
-      response += `O que voce precisa? Posso:\n`;
-      response += `/status — Projetos\n`;
-      response += `/relatorio — Relatorio completo\n`;
-      response += `/tarefas — Ver tarefas\n`;
-      response += `Ou me pergunte sobre clientes, financas, ou links!`;
-    }
+    log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
     try {
-      await msg.reply(response);
-      log.success('Resposta inteligente enviada!');
+      const context = {
+        urgency: 'normal',
+        sentiment: 'neutral',
+        topic: 'general',
+        userMood: 'neutral',
+        authorName: msg.pushname || msg.from
+      };
+
+      const response = await this.brain.generateResponse(body, context);
+
+      if (response && response.text) {
+        await msg.reply(response.text);
+        log.success('Resposta IA enviada!');
+      } else {
+        await msg.reply(
+          `🌙 *Luna aqui.*\n\n` +
+          `Vi ${this.cp.buffer.newTasks?.length || 0} tarefa(s), ` +
+          `${this.cp.buffer.newLinks?.length || 0} link(s), ` +
+          `${this.cp.buffer.newLeads?.length || 0} lead(s) e ` +
+          `${this.cp.buffer.newFinance?.length || 0} sinal(is) financeiro(s) no buffer.\n\n` +
+          `Me diz o foco: execucao, cliente, financeiro ou relatorio?`
+        );
+      }
     } catch (err) {
-      log.error(`Falha ao responder: ${err.message}`);
+      log.error(`Falha IA: ${err.message}`);
+      await msg.reply(
+        `🌙 *Luna em fallback contextual.*\n\n` +
+        `A IA falhou agora, mas o buffer segue vivo:\n` +
+        `• ${this.cp.buffer.newTasks?.length || 0} tarefas\n` +
+        `• ${this.cp.buffer.newIdeas?.length || 0} ideias\n` +
+        `• ${this.cp.buffer.newLinks?.length || 0} links\n` +
+        `• ${this.cp.buffer.newLeads?.length || 0} leads\n\n` +
+        `Pode mandar /status, /stats ou /relatorio que eu organizo.`
+      );
     }
   }
 
   async handleCommand(msg) {
-    const cmd = msg.body.toLowerCase();
+    const raw = (msg.body || '').trim();
+    const cmd = raw.toLowerCase();
+    const buffer = this.cp.buffer || {};
+    const dashboardUrl = CONFIG.DASHBOARD_URL || 'https://nexo-digital.app/dashboard';
+
+    const truncate = (text, max = 80) => {
+      const t = (text || '').toString().trim();
+      if (!t) return '(sem texto)';
+      return t.length > max ? `${t.slice(0, max - 3)}...` : t;
+    };
+
+    const relativeTime = (ts) => {
+      if (!ts) return 'agora';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return 'agora';
+      const delta = Date.now() - d.getTime();
+      const min = Math.floor(delta / 60000);
+      if (min < 1) return 'agora';
+      if (min < 60) return `ha ${min} min`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `ha ${hr}h`;
+      const day = Math.floor(hr / 24);
+      return `ha ${day}d`;
+    };
+
+    const formatPriority = (p) => {
+      const v = (p || 'P2').toString().toUpperCase();
+      if (v === 'P0' || v === 'HIGH') return 'P0';
+      if (v === 'P1' || v === 'MEDIUM') return 'P1';
+      return 'P2';
+    };
+
+    const extractSearchArg = (full, prefix) => {
+      const p = (prefix || '').toLowerCase();
+      const c = (full || '').trim();
+      if (!c.toLowerCase().startsWith(p)) return '';
+      return c.slice(prefix.length).trim();
+    };
+
+    const extractNumberArg = (full, prefix, def = 10, min = 1, max = 50) => {
+      const arg = extractSearchArg(full, prefix);
+      const n = parseInt(arg, 10);
+      if (!Number.isFinite(n)) return def;
+      return Math.max(min, Math.min(max, n));
+    };
+
+    const buildCreativeFallback = (section, lastItem) => {
+      const fallbackText = lastItem
+        ? `Nada novo em ${section} no ultimo scan.\nUltimo registro: "${truncate(lastItem.body || lastItem.text || lastItem.context || '', 90)}" por ${lastItem.author || lastItem.sender || 'time'} (${relativeTime(lastItem.time || lastItem.timestamp)}).`
+        : `Sem novidades em ${section} por enquanto.\nSinal bom: o fluxo esta limpo. Se quiser, eu faco uma varredura focada agora.`;
+      return `${fallbackText}\n\nQuer que eu transforme isso em uma acao objetiva para o time?`;
+    };
+
+    const safeList = (arr) => (Array.isArray(arr) ? arr : []);
+    const ideas = safeList(buffer.newIdeas);
+    const links = safeList(buffer.newLinks);
+    const leads = safeList(buffer.newLeads);
+    const news = safeList(buffer.newNews);
+    const tasks = safeList(buffer.newTasks);
+    const decisions = safeList(buffer.newDecisions);
+    const messages = safeList(buffer.newMessages);
 
     if (cmd === '/status') {
-      const buffer = this.cp.buffer;
-      await msg.reply(`📊 *STATUS NEXO*\n\n🟢 Projetos ativos: ${buffer.newTasks?.length || 0}\n💡 Ideias: ${buffer.newIdeas?.length || 0}\n🔗 Links: ${buffer.newLinks?.length || 0}\n📰 News: ${buffer.newNews?.length || 0}\n🎣 Leads: ${buffer.newLeads?.length || 0}\n\n🤖 Luna v15.1`);
+      await msg.reply(
+        `📊 *STATUS NEXO*\n\n` +
+        `🟢 Projetos ativos: ${tasks.length}\n` +
+        `💡 Ideias: ${ideas.length}\n` +
+        `🔗 Links: ${links.length}\n` +
+        `📰 News: ${news.length}\n` +
+        `🎣 Leads: ${leads.length}\n\n` +
+        `🤖 Luna v16.0 | NEXO Status`
+      );
     }
-    else if (cmd === '/relatorio') {
+    else if (cmd === '/relatorio' || cmd === '/reporte') {
       await msg.reply('📊 Gerando relatorio inteligente...');
       await this.forceReport(msg.from);
     }
-    else if (cmd === '/tarefas') {
-      const tasks = this.cp.buffer.newTasks || [];
-      const list = tasks.length > 0 ? tasks.slice(0, 5).map(t => `• [${t.priority || 'P2'}] ${(t.body || t.text || '').slice(0, 50)}`).join('\n') : 'Nenhuma tarefa pendente.';
-      await msg.reply(`📝 *TAREFAS*\n\n${list}\n\n🤖 Luna v15.1`);
+    else if (cmd === '/tarefas' || cmd === '/tareas') {
+      const list = tasks.length > 0
+        ? tasks.slice(0, 5).map(t => `• [${formatPriority(t.priority)}] ${truncate(t.body || t.text, 64)} (por ${t.author || 'time'})`).join('\n')
+        : buildCreativeFallback('tarefas', null);
+      await msg.reply(`📝 *TAREFAS NEXO*\n\n${list}\n\n🤖 Luna v16.0 | Tarefas`);
     }
-    else if (cmd === '/extrair') {
+    else if (cmd === '/extrair' || cmd === '/extraer') {
       await msg.reply('🔄 Iniciando extracao completa...');
       await this.runFullExtract();
       await msg.reply('✅ Extracao completa finalizada!');
     }
-    else if (cmd === '/ajuda') {
-      await msg.reply('🌙 *AJUDA LUNA v15.1*\n\n/status — Projetos\n/relatorio — Relatorio\n/tarefas — Tarefas\n/extrair — Extrair tudo\n/ajuda — Este menu\n\nMencione @Luna para falar! Posso responder sobre clientes, financas, links e status.');
+    else if (cmd === '/ajuda' || cmd === '/ayuda' || cmd === '/comandos') {
+      await msg.reply(
+        `🎮 *COMANDOS NEXO*\n\n` +
+        `📊 VISAO GERAL:\n/status, /dashboard\n\n` +
+        `🧠 INTELIGENCIA:\n/ideas, /links, /leads, /news, /buscar, /ultimas\n\n` +
+        `💰 NEGOCIOS:\n/financeiro, /decisoes\n\n` +
+        `📈 ANALYTICS:\n/stats, /sentimento, /estado\n\n` +
+        `❓ AJUDA:\n/ajuda, /ayuda, /sobre, /relatorio, /tarefas\n\n` +
+        `💡 Pro tip: mencione @Luna para conversa natural em contexto.\n\n` +
+        `🤖 Luna v16.0 | NEXO Command Center`
+      );
+    }
+    else if (cmd === '/ideas') {
+      const body = ideas.length > 0
+        ? ideas.slice(0, 3).map((i, idx) => (
+          `${idx + 1}️⃣ ${i.author || 'Time'}: "${truncate(i.body || i.text, 72)}"\n` +
+          `   → Categoria: ideiaNova | Prioridade: P2`
+        )).join('\n\n')
+        : buildCreativeFallback('ideas', ideas[ideas.length - 1] || messages[messages.length - 1]);
+      await msg.reply(
+        `🧠 *LABORATORIO NEXO*\n\n` +
+        `${ideas.length} ideia(s) em ebuliacao:\n\n${body}\n\n` +
+        `🎯 Sugestao: quer que eu converta a melhor ideia em tarefa P1 agora?\n\n` +
+        `🔬 Luna v16.0 | Laboratorio NEXO`
+      );
+    }
+    else if (cmd === '/links') {
+      const body = links.length > 0
+        ? links.slice(0, 3).map((l, idx) => (
+          `${idx + 1}️⃣ ${truncate(l.title || l.url, 58)}\n` +
+          `   🏷️ Tipo: ${l.type || 'link'}\n` +
+          `   👤 Compartilhado por: ${l.author || 'Time'}\n` +
+          `   💬 Contexto: "${truncate(l.context || l.text, 72)}"\n` +
+          `   🎯 Relevancia: ${/cliente|orcamento|projeto/i.test((l.context || '')) ? 'Alta' : 'Media'}`
+        )).join('\n\n')
+        : buildCreativeFallback('links', links[links.length - 1] || messages[messages.length - 1]);
+      await msg.reply(
+        `🌐 *NEXO INTELLIGENCE*\n\n` +
+        `📎 ${links.length} link(s) detectado(s):\n\n${body}\n\n` +
+        `🕵️ Quer que eu detalhe um link especifico em resumo executivo?\n\n` +
+        `🌐 Luna v16.0 | NEXO Intelligence`
+      );
+    }
+    else if (cmd === '/leads') {
+      const heat = (txt) => /quero|contratar|fechar|urgente|proposal|proposta/i.test(txt || '') ? 'QUENTE' : (/saber|talvez|depois/i.test(txt || '') ? 'FRIO' : 'MORNO');
+      const body = leads.length > 0
+        ? leads.slice(0, 3).map((l) => {
+          const h = heat(l.context || l.body || '');
+          const icon = h === 'QUENTE' ? '🔥' : (h === 'MORNO' ? '🟠' : '❄️');
+          return `${icon} ${h}: ${l.name || 'Lead sem nome'}\n` +
+            `   💬 Contexto: "${truncate(l.context || l.body, 80)}"\n` +
+            `   👤 Detectado por: ${l.author || 'Time'}\n` +
+            `   ⏰ ${relativeTime(l.time || l.timestamp)}\n` +
+            `   🎯 Acao: ${h === 'QUENTE' ? 'Responder em ate 1h' : 'Nutrir e acompanhar'}`;
+        }).join('\n\n')
+        : buildCreativeFallback('leads', leads[leads.length - 1] || messages[messages.length - 1]);
+      const hot = leads.filter(l => heat(l.context || l.body || '') === 'QUENTE').length;
+      const warm = leads.filter(l => heat(l.context || l.body || '') === 'MORNO').length;
+      const cold = Math.max(0, leads.length - hot - warm);
+      await msg.reply(
+        `🎯 *PIPELINE NEXO*\n\n${body}\n\n` +
+        `📊 Pipeline: ${hot} quente | ${warm} morno | ${cold} frio\n\n` +
+        `🤖 Luna v16.0 | Pipeline NEXO`
+      );
+    }
+    else if (cmd === '/news') {
+      const body = news.length > 0
+        ? news.slice(0, 3).map((n, idx) => (
+          `${idx + 1}️⃣ ${n.author || 'Time'} compartilhou:\n` +
+          `   "${truncate(n.body || n.text, 90)}"\n` +
+          `   🏷️ Categoria: NEWS\n` +
+          `   💡 Insight: pode virar tarefa se conectarmos com projeto ativo`
+        )).join('\n\n')
+        : buildCreativeFallback('news', news[news.length - 1] || messages[messages.length - 1]);
+      await msg.reply(
+        `📡 *NEXO NEWS*\n\n${body}\n\n` +
+        `🤔 Quer que eu converta alguma noticia em acao rastreavel?\n\n` +
+        `📡 Luna v16.0 | NEXO News`
+      );
+    }
+    else if (cmd === '/estado') {
+      const es = (this.brain && this.brain.emotionalState) || {};
+      const personality = (this.brain && this.brain.activePersonality) || 'default';
+      const felicidade = Math.round((es.happiness || 0.7) * 100);
+      const energia = Math.round((es.energy || 0.8) * 100);
+      const calma = Math.round((es.calm || 0.6) * 100);
+      const excitacao = Math.round((es.excitement || 0.85) * 100);
+      await msg.reply(
+        `🌙 *ESTADO DA LUNA*\n\n` +
+        `🎭 Personalidade ativa: ${personality}\n\n` +
+        `😊 Felicidade: ${felicidade}%\n` +
+        `⚡ Energia: ${energia}%\n` +
+        `💙 Calma: ${calma}%\n` +
+        `🎉 Excitacao: ${excitacao}%\n\n` +
+        `🎯 Mood atual: "Foco total em gerar clareza e acao para a NEXO."\n\n` +
+        `🌙 Luna v16.0 | Sentient Mode`
+      );
+    }
+    else if (cmd === '/dashboard') {
+      await msg.reply(
+        `📊 *CENTRAL NEXO*\n\n` +
+        `🌐 Dashboard online:\n${dashboardUrl}\n\n` +
+        `📈 Status em tempo real:\n` +
+        `• 🟢 WhatsApp: Online\n` +
+        `• 🟢 Playwright: Conectado (CDP ${CONFIG.CDP_PORT})\n` +
+        `• 🟢 Scan: operacional\n` +
+        `• 📨 Mensagens no buffer: ${messages.length}\n\n` +
+        `⚡ Dica: use /stats para analytics detalhado.\n\n` +
+        `📊 Luna v16.0 | Central NEXO`
+      );
+    }
+    else if (cmd === '/financeiro') {
+      const financePool = [...messages, ...tasks].filter(x => /pag|fatura|caixa|orcamento|€|euro|cobrar|pendente/i.test((x.body || x.text || x.context || '').toLowerCase()));
+      const paid = financePool.filter(x => /pagou|pago|recebido|confirmado/i.test((x.body || x.text || '').toLowerCase()));
+      const pending = financePool.filter(x => /nao pag|pendente|cobrar|aguardando/i.test((x.body || x.text || '').toLowerCase()));
+      const body = financePool.length > 0
+        ? financePool.slice(0, 3).map((f) => {
+          const txt = (f.body || f.text || '').toLowerCase();
+          const status = /pagou|pago|recebido|confirmado/.test(txt) ? '🟢 Receita confirmada' : '🔴 Acao necessaria';
+          return `• ${truncate(f.body || f.text || f.context, 88)}\n` +
+            `  👤 ${f.author || 'Time'} | ${relativeTime(f.time || f.timestamp)}\n` +
+            `  ${status}`;
+        }).join('\n\n')
+        : buildCreativeFallback('financeiro', financePool[financePool.length - 1] || messages[messages.length - 1]);
+      await msg.reply(
+        `💰 *NEXO FINANCEIRO*\n\n${body}\n\n` +
+        `💵 Resumo: ${paid.length} pago | ${pending.length} pendente\n` +
+        `🎯 Acao sugerida: priorizar follow-up nos pendentes de hoje.\n\n` +
+        `💰 Luna v16.0 | NEXO Financeiro`
+      );
+    }
+    else if (cmd === '/decisoes') {
+      const body = decisions.length > 0
+        ? decisions.slice(0, 4).map((d, idx) => (
+          `${idx + 1}️⃣ ${d.author || 'Time'}: "${truncate(d.body || d.text, 84)}"\n` +
+          `   ⏰ ${relativeTime(d.time || d.timestamp)}\n` +
+          `   ✅ Status: decisao ativa\n` +
+          `   🎯 Impacto: alinhamento de execucao`
+        )).join('\n\n')
+        : buildCreativeFallback('decisoes', decisions[decisions.length - 1] || messages[messages.length - 1]);
+      await msg.reply(
+        `⚖️ *ACORDOS NEXO*\n\n${body}\n\n` +
+        `⚠️ Alerta: toda decisao forte deve virar tarefa rastreavel.\n\n` +
+        `⚖️ Luna v16.0 | Acordos NEXO`
+      );
+    }
+    else if (cmd.startsWith('/buscar')) {
+      const term = extractSearchArg(raw, '/buscar').toLowerCase();
+      if (!term) {
+        await msg.reply(
+          `🔍 *NEXO SEARCH*\n\nUso: /buscar [termo]\nExemplo: /buscar santafe\n\n` +
+          `🤖 Luna v16.0 | NEXO Search`
+        );
+        return;
+      }
+      const pool = [...messages, ...tasks, ...ideas, ...news, ...decisions];
+      const hits = pool.filter(i => {
+        const text = `${i.body || ''} ${i.text || ''} ${i.context || ''} ${i.author || ''}`.toLowerCase();
+        return text.includes(term);
+      }).slice(0, 5);
+      const body = hits.length > 0
+        ? hits.map((h, idx) => (
+          `${idx + 1}️⃣ ${h.author || 'Time'} — ${relativeTime(h.time || h.timestamp)}\n` +
+          `   "...${truncate(h.body || h.text || h.context, 80)}..."\n` +
+          `   🏷️ Categoria: ${h.category || 'registro'}`
+        )).join('\n\n')
+        : `Nenhum match exato para "${term}".\nMas eu posso tentar sinonimos ou busca por autor.`;
+      await msg.reply(
+        `🔍 *NEXO SEARCH: "${term}"*\n\n${body}\n\n` +
+        `💡 Dica: use /ultimas 20 para varredura cronologica.\n\n` +
+        `🔍 Luna v16.0 | NEXO Search`
+      );
+    }
+    else if (cmd.startsWith('/ultimas')) {
+      const n = extractNumberArg(raw, '/ultimas', 10, 1, 50);
+      const timeline = [...messages, ...tasks, ...ideas, ...news, ...decisions]
+        .sort((a, b) => new Date(b.time || b.timestamp || 0) - new Date(a.time || a.timestamp || 0))
+        .slice(0, n);
+      const body = timeline.length > 0
+        ? timeline.map((t) => (
+          `🕐 ${relativeTime(t.time || t.timestamp)} — ${t.author || 'Time'}:\n` +
+          `   "${truncate(t.body || t.text || t.context, 82)}"\n` +
+          `   🏷️ ${t.category || 'registro'} | ⚡ ${formatPriority(t.priority)}`
+        )).join('\n\n')
+        : buildCreativeFallback('timeline', messages[messages.length - 1]);
+      await msg.reply(
+        `📨 *TIMELINE NEXO — Ultimas ${n}*\n\n${body}\n\n` +
+        `📊 Resumo: ${timeline.length} item(ns) no recorte.\n\n` +
+        `📨 Luna v16.0 | Timeline NEXO`
+      );
+    }
+    else if (cmd === '/stats') {
+      const total = messages.length + tasks.length + ideas.length + links.length + leads.length + news.length + decisions.length;
+      const participants = new Set([...messages, ...tasks, ...ideas, ...news, ...decisions].map(x => x.author).filter(Boolean));
+      await msg.reply(
+        `📊 *NEXO ANALYTICS*\n\n` +
+        `💬 Mensagens: ${messages.length}\n` +
+        `👥 Participantes ativos: ${participants.size}\n` +
+        `🟢 Tarefas: ${tasks.length}\n` +
+        `💡 Ideias: ${ideas.length}\n` +
+        `🔗 Links: ${links.length}\n` +
+        `🎣 Leads: ${leads.length}\n` +
+        `💰 Financeiro (sinais): ${[...messages, ...tasks].filter(x => /pag|fatura|caixa|orcamento/i.test((x.body || x.text || '').toLowerCase())).length}\n` +
+        `⚖️ Decisoes: ${decisions.length}\n\n` +
+        `🏆 Volume total no buffer: ${total}\n` +
+        `🎯 Acao sugerida: atacar primeiro tarefas P0/P1.\n\n` +
+        `📊 Luna v16.0 | NEXO Analytics`
+      );
+    }
+    else if (cmd === '/sentimento') {
+      const pool = [...messages, ...tasks, ...ideas, ...news].slice(-50);
+      const pos = pool.filter(x => /show|perfeito|gostei|otimo|boa|top|excelente/.test((x.body || x.text || '').toLowerCase())).length;
+      const neg = pool.filter(x => /bug|problema|ruim|atraso|erro|falha|critico/.test((x.body || x.text || '').toLowerCase())).length;
+      const neu = Math.max(0, pool.length - pos - neg);
+      const pct = (n) => pool.length ? Math.round((n / pool.length) * 100) : 0;
+      await msg.reply(
+        `💭 *PULSE NEXO — Sentimento do Grupo*\n\n` +
+        `😊 Positivo: ${pct(pos)}%\n` +
+        `😐 Neutro: ${pct(neu)}%\n` +
+        `😟 Negativo: ${pct(neg)}%\n\n` +
+        `🎯 Insight: ${neg > pos ? 'ha tensao operacional em alguns pontos.' : 'clima geral esta construtivo e produtivo.'}\n` +
+        `💡 Sugestao: celebrar entregas rapidas para manter moral alta.\n\n` +
+        `💭 Luna v16.0 | Pulse NEXO`
+      );
+    }
+    else if (cmd === '/sobre') {
+      const uptimeH = Math.floor(process.uptime() / 3600);
+      const processed = this.cp?.checkpoint?.processedCount || 0;
+      await msg.reply(
+        `🌙 *IDENTIDADE LUNA*\n\n` +
+        `🎭 Nome: Luna\n` +
+        `🧠 Cerebro: Gemma2B (Ollama local)\n` +
+        `👁️ Visao: Playwright CDP + Chrome\n` +
+        `💬 Voz: whatsapp-web.js\n` +
+        `🏠 Casa: NEXO Digital\n\n` +
+        `📊 Stats vitais:\n` +
+        `• Uptime: ${uptimeH}h\n` +
+        `• Mensagens processadas: ${processed}\n` +
+        `• Classificacoes em buffer: ${messages.length + tasks.length + ideas.length + news.length}\n` +
+        `• Aprendizados: em evolucao continua\n\n` +
+        `💬 "Nao sou perfeita. Sou progressiva, analitica e obcecada em gerar clareza para a NEXO."\n\n` +
+        `🌙 Luna v16.0 | NEXO Intelligence`
+      );
     }
   }
-
   async runFullExtract() {
     if (this.fullExtractRunning) {
       log.warn('Extracao completa ja rodando!');
@@ -824,6 +1111,7 @@ class LunaAgent {
       log.success(`Extracao completa salva: ${allMessages.length} mensagens, ${linkResults.length} links`);
 
       this.updateBufferFromClassified(allClassified);
+      await this.saveToHistory(allClassified);
       this.cp.markFullExtractDone();
       this.cp.save();
 
@@ -885,6 +1173,7 @@ class LunaAgent {
         )));
 
         this.updateBufferFromClassified(classified);
+        await this.saveToHistory(classified);
 
         await this.notifyOps({
           messages: newMessages,
@@ -923,35 +1212,49 @@ class LunaAgent {
     if (!this.cp.buffer.newLinks) this.cp.buffer.newLinks = [];
     if (!this.cp.buffer.newLeads) this.cp.buffer.newLeads = [];
     if (!this.cp.buffer.newNews) this.cp.buffer.newNews = [];
+    if (!this.cp.buffer.newFinance) this.cp.buffer.newFinance = [];
     for (const item of classified) {
       const c = item.classification;
+      if (!c) continue;
+      const text = item.text || item.body || '';
+      const authorName = resolveAuthor(item.author || item.from).name;
+      const time = item.timestamp || new Date().toISOString();
+      const financeMatch = /(pagou|pago|pagamento|fatura|caixa|orcamento|orçamento|cobrar|pendente|euro|eur|€)/i.test(text);
 
       switch (c.category) {
         case 'tarefaRealizada':
         case 'tarefaPendente':
           this.cp.buffer.newTasks.push({
-            body: item.text,
-            author: item.author,
+            body: text,
+            author: authorName,
             priority: c.priority,
-            time: item.timestamp
+            time
           });
           break;
         case 'ideiaNova':
-          this.cp.buffer.newIdeas.push({ body: item.text, author: item.author, time: item.timestamp });
+          this.cp.buffer.newIdeas.push({ body: text, author: authorName, time });
           break;
         case 'decisao':
-          this.cp.buffer.newDecisions.push({ body: item.text, author: item.author, time: item.timestamp });
+          this.cp.buffer.newDecisions.push({ body: text, author: authorName, time });
           break;
         case 'link':
-          this.cp.buffer.newLinks.push({ url: c.urls[0], context: item.text, author: item.author, time: item.timestamp });
+          this.cp.buffer.newLinks.push({ url: c.urls?.[0] || c.entities?.urls?.[0]?.url, context: text, title: c.entities?.urls?.[0]?.title, type: c.entities?.urls?.[0]?.type, author: authorName, time });
           break;
         case 'lead':
-          this.cp.buffer.newLeads.push({ name: c.possibleNewClient, context: item.text, author: item.author, time: item.timestamp });
+          this.cp.buffer.newLeads.push({ ...(c.business?.lead || {}), name: c.possibleNewClient || c.business?.lead?.name || 'Lead nao identificado', context: text, author: authorName, time });
+          break;
+        case 'financeiroPagamento':
+        case 'financeiroPendente':
+          this.cp.buffer.newFinance.push({ body: text, author: authorName, time, category: c.category, priority: c.priority, value: c.business?.financialValue || null });
           break;
         case 'noticia':
         default:
-          this.cp.buffer.newNews.push({ body: item.text, author: item.author, time: item.timestamp, chat: item.chatName });
+          this.cp.buffer.newNews.push({ body: text, author: authorName, time, chat: item.chatName });
           break;
+      }
+
+      if (financeMatch && !['financeiroPagamento', 'financeiroPendente'].includes(c.category)) {
+        this.cp.buffer.newFinance.push({ body: text, author: authorName, time, category: c.category, priority: c.priority || 'P2', value: c.business?.financialValue || null });
       }
     }
 
@@ -996,45 +1299,55 @@ class LunaAgent {
                    buffer.newTasks?.length > 0 || 
                    buffer.newIdeas?.length > 0 ||
                    buffer.newLinks?.length > 0 ||
-                   buffer.newLeads?.length > 0;
+                   buffer.newLeads?.length > 0 ||
+                   buffer.newFinance?.length > 0;
 
     if (!hasNews) {
       this.cp.checkpoint.silenceCount = (this.cp.checkpoint.silenceCount || 0) + 1;
 
       if (this.cp.checkpoint.silenceCount === 1 && this.reportGroup) {
-        await this.reportGroup.sendMessage(`🌙 *LUNA REPORT*\n\n🔇 Sem novidades nos ultimos 30 minutos.\n\n🤖 Luna v15.1`);
+        await this.reportGroup.sendMessage(`🌙 *LUNA REPORT*\n\n🔇 Sem novidades nos ultimos 30 minutos.\n\n🤖 Luna v16.0`);
       }
       return;
     }
 
-    let report = `🌙 *LUNA REPORT INTELIGENTE*\n\n`;
-    report += `📊 *O QUE VI:*\n`;
-    report += `• ${buffer.newMessages?.length || 0} mensagens novas\n`;
-    report += `• ${buffer.newTasks?.length || 0} tarefas\n`;
-    report += `• ${buffer.newIdeas?.length || 0} ideias\n`;
-    report += `• ${buffer.newLinks?.length || 0} links\n`;
-    report += `• ${buffer.newLeads?.length || 0} possiveis clientes\n`;
-    report += `• ${buffer.newNews?.length || 0} noticias\n\n`;
+    let report = `ðŸŒ™ *LUNA REPORT INTELIGENTE*\n\n`;
+    report += `ðŸ“Š *O QUE VI:*\n`;
+    report += `â€¢ ${buffer.newMessages?.length || 0} mensagens novas\n`;
+    report += `â€¢ ${buffer.newTasks?.length || 0} tarefas\n`;
+    report += `â€¢ ${buffer.newIdeas?.length || 0} ideias\n`;
+    report += `â€¢ ${buffer.newLinks?.length || 0} links\n`;
+    report += `â€¢ ${buffer.newLeads?.length || 0} possiveis clientes\n`;
+    report += `â€¢ ${buffer.newNews?.length || 0} noticias\n`;
+    report += `â€¢ ${buffer.newFinance?.length || 0} sinais financeiros\n\n`;
 
-    report += `❓ *O QUE NAO VI:*\n`;
+    report += `â“ *O QUE NAO VI:*\n`;
     const clientMentions = buffer.newMessages?.filter(m => /santafe|paulo|superclim/.test((m.body || '').toLowerCase())) || [];
     if (clientMentions.length === 0) {
-      report += `• Nenhuma mencao a clientes principais. E o Santafe? Alguma noticia?\n`;
+      report += `â€¢ Nenhuma mencao a clientes principais. E o Santafe? Alguma noticia?\n`;
     }
     if ((buffer.newMessages?.filter(m => /pagou|fatura|caixa/.test((m.body || '').toLowerCase())) || []).length === 0) {
-      report += `• Nenhuma atualizacao financeira. O caixa esta atualizado?\n`;
+      report += `â€¢ Nenhuma atualizacao financeira. O caixa esta atualizado?\n`;
     }
     report += `\n`;
 
     if (buffer.newLeads?.length > 0) {
-      report += `🎣 *POSSIVEIS CLIENTES:*\n`;
+      report += `ðŸŽ£ *POSSIVEIS CLIENTES:*\n`;
       for (const lead of buffer.newLeads.slice(0, 3)) {
-        report += `• ${lead.name || 'Nao identificado'}: ${(lead.context || '').slice(0, 60)}...\n`;
+        report += `â€¢ ${lead.name || 'Nao identificado'}: ${(lead.context || '').slice(0, 60)}...\n`;
       }
       report += `\n`;
     }
 
-    report += `🤖 Luna v15.1 | ${new Date().toLocaleString('pt-BR')}`;
+    if (buffer.newFinance?.length > 0) {
+      report += `💰 *SINAIS FINANCEIROS:*\n`;
+      for (const item of buffer.newFinance.slice(0, 3)) {
+        report += `• ${(item.body || '').slice(0, 70)}... (${item.author || 'time'})\n`;
+      }
+      report += `\n`;
+    }
+
+    report += `🤖 Luna v16.0 | ${new Date().toLocaleString('pt-BR')}`;
 
     if (this.reportGroup) {
       await this.reportGroup.sendMessage(report);
@@ -1049,16 +1362,73 @@ class LunaAgent {
     this.cp.buffer.newMentions = [];
     this.cp.buffer.newNews = [];
     this.cp.buffer.newLeads = [];
+    this.cp.buffer.newFinance = [];
     this.cp.checkpoint.silenceCount = 0;
     this.cp.checkpoint.lastReport = new Date().toISOString();
     this.cp.save();
   }
 
   async forceReport(to) {
+    const originalGroup = this.reportGroup;
+    if (to) {
+      const chats = await this.client.getChats();
+      this.reportGroup = chats.find(c => c.id?._serialized === to || c.from === to);
+    }
     await this.sendScheduledReport();
+    this.reportGroup = originalGroup;
+  }
+
+  async saveToHistory(messages) {
+    try {
+      const historyPath = CONFIG.WHATSAPP_HISTORY_FILE;
+      let history = [];
+      if (fs.existsSync(historyPath)) {
+        const raw = fs.readFileSync(historyPath, 'utf8').replace(/^\uFEFF/, '');
+        const parsed = raw.trim() ? JSON.parse(raw) : [];
+        history = Array.isArray(parsed) ? parsed : (parsed.messages || []);
+      } else {
+        fs.writeFileSync(historyPath, '[]', 'utf8');
+      }
+
+      const aliasMap = {
+        'Abner': 'Abner Gabriel',
+        'Nonoke': 'Enoque G. Santos',
+        'Elias': 'Elias Mendes',
+        'abner': 'Abner Gabriel',
+        'nonoke': 'Enoque G. Santos',
+        'enoque': 'Enoque G. Santos',
+        'elias': 'Elias Mendes'
+      };
+
+      const seen = new Set(history.map(m => m.id).filter(Boolean));
+      for (const msg of messages) {
+        const authorName = msg.author || 'Desconhecido';
+        const resolvedName = aliasMap[authorName] || authorName;
+        const id = msg.id || crypto.createHash('md5').update(`${authorName}:${msg.text || msg.body || ''}:${msg.timestamp || ''}`).digest('hex');
+        if (seen.has(id)) continue;
+        seen.add(id);
+        history.push({
+          id,
+          author: resolvedName,
+          originalAuthor: authorName,
+          text: msg.text || msg.body || '',
+          chat: msg.chatName || '',
+          timestamp: msg.timestamp || new Date().toISOString(),
+          classification: msg.classification || null
+        });
+      }
+
+      if (history.length > 5000) history = history.slice(-5000);
+
+      fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+      log.info(`[HISTORY] ${messages.length} msgs processadas (total: ${history.length})`);
+    } catch (e) {
+      log.error(`Erro ao salvar historico: ${e.message}`);
+    }
   }
 
   async notifyOps(data) {
+    log.info(`[NOTIFY] Enviando ${data.newCount || 0} novas mensagens para ops`);
     try {
       const payload = {
         source: 'luna-whatsapp',
@@ -1082,7 +1452,7 @@ class LunaAgent {
 }
 
 // ============================================================
-// EXECUCAO — KEEP-ALIVE ATIVO
+// EXECUCAO â€” KEEP-ALIVE ATIVO
 // ============================================================
 async function runAgent(options = {}) {
   const agent = new LunaAgent();

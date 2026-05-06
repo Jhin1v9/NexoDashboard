@@ -51,16 +51,16 @@ function saveReport(reportObj) {
   writeJson(REPORT_HISTORY_FILE, data);
 }
 
-async function runScan() {
+async function runScan(options = {}) {
   log('SCAN iniciado');
-  const result = await runAgent(false);
+  const result = await runAgent({ once: true, schedule: false, ...options });
   log(`SCAN concluido: status=${result?.status || 'ok'}`);
   return result;
 }
 
-async function runReport() {
+async function runReport(options = {}) {
   log('REPORT iniciado');
-  const result = await runAgent(true);
+  const result = await runAgent({ once: true, schedule: false, fullExtract: false, ...options });
   const buffer = buildBufferFromAgentResult(result || {});
   const checkpoint = result?.checkpoint || {};
   const generated = reportEngine.generateReport(buffer, checkpoint, {});
