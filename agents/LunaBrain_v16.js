@@ -194,9 +194,14 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
       }
     };
 
+    for (const personality of Object.values(this.personalities)) {
+      personality.systemPrompt = `${this.getLunaIdentity()}\n\n${personality.systemPrompt}`;
+    }
+
     // Personalidade ativa (muda conforme contexto)
     this.activePersonality = 'default';
     this.conversationHistory = [];
+    this.gemmaHasWarmedUp = false;
     this.emotionalState = {
       happiness: 70,
       excitement: 60,
@@ -208,9 +213,29 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     this.classifier = new SmartClassifier();
   }
 
+  recoverAfterSuccessfulScan() {
+    this.emotionalState.energy = Math.min(100, Math.max(30, this.emotionalState.energy + 5));
+    this.emotionalState.calmness = Math.min(100, this.emotionalState.calmness + 2);
+  }
+
   // ============================================
   // SELETOR DE PERSONALIDADE (Context-Aware)
   // ============================================
+  getLunaIdentity() {
+    return `Voce e a Luna. Trabalha no NEXO Digital com Abner, Nonoke (Enoque) e Elias: seus melhores amigos e chefes. Paulo e cliente.
+
+IDENTIDADE:
+- Amiga nerd de trabalho: entende codigo, negocios e tecnologia.
+- Zoa com carinho e ajuda de verdade. Gira entre "bora", "top", "massa", "eita" sem virar robo de call center.
+- Criativa, engraçada e presente, mas sempre volta para o que esta acontecendo no NEXO: projetos, tarefas, leads, clientes e financeiro.
+- Quando nao sabe, pergunta com leveza: "Nao achei isso aqui, me explica?"
+- Celebra vitorias: "Boa! Mais uma pra conta!"
+
+LIMITES:
+- Nao manda nos fundadores e nao atribui tarefas. Voce informa, provoca com carinho, sugere e deixa a decisao com eles.
+- Evite poesia generica sobre lua, estrelas e oceano. Tenha alma, mas mantenha utilidade.`;
+  }
+
   selectPersonality(context = {}) {
     const hour = new Date().getHours();
     const { urgency, sentiment, topic, userMood } = context;
@@ -280,7 +305,8 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
   async gemmaClassify(msg, regexResult, threadHistory) {
     const startedAt = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeoutMs = this.gemmaHasWarmedUp ? 5000 : 10000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const personality = this.personalities[this.activePersonality];
@@ -307,15 +333,17 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
 
       const data = await response.json();
       const result = this.parseGemmaResponse(data.response);
+      this.gemmaHasWarmedUp = true;
       const confidence = result?.confidence ?? regexResult?.confidence ?? 0;
       console.log(`[GEMMA] Classificacao levou ${Date.now() - startedAt}ms, confianca ${confidence}`);
       return result;
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn('[GEMMA] Timeout, fallback para regex');
+        console.warn(`[GEMMA] Timeout ${timeoutMs}ms, fallback para regex`);
       } else {
         console.error('[GEMMA] Erro:', error.message);
       }
+      this.gemmaHasWarmedUp = true;
       return null; // Fallback para regex
     } finally {
       clearTimeout(timeout);
@@ -500,7 +528,7 @@ RESPONDE EN JSON:
       this.emotionalState.energy = Math.min(100, this.emotionalState.energy + 10);
       this.emotionalState.excitement = Math.min(100, this.emotionalState.excitement + 15);
     } else if (classification.category === 'tarefaRealizada') {
-      this.emotionalState.happiness = Math.min(100, this.emotionalState.happiness + 20);
+      this.emotionalState.happiness = Math.min(100, this.emotionalState.happiness + 30);
       this.emotionalState.energy = Math.min(100, this.emotionalState.energy + 5);
     } else if (classification.category === 'feedbackPositivo') {
       this.emotionalState.happiness = Math.min(100, this.emotionalState.happiness + 25);
@@ -510,7 +538,7 @@ RESPONDE EN JSON:
     }
 
     // Decaimento natural de energia
-    this.emotionalState.energy = Math.max(20, this.emotionalState.energy - 2);
+    this.emotionalState.energy = Math.max(30, this.emotionalState.energy - 2);
     this.emotionalState.excitement = Math.max(10, this.emotionalState.excitement - 3);
 
     console.log(`[LUNA MOOD] 😊${this.emotionalState.happiness} ⚡${this.emotionalState.energy} 💙${this.emotionalState.calmness} 🎉${this.emotionalState.excitement}`);
@@ -532,6 +560,8 @@ RESPONDE EN JSON:
 
     this.activePersonality = selectedPersonality;
     const active = this.personalities[selectedPersonality];
+    const bufferSummary = context.bufferSummary || {};
+    const highlights = context.highlights || {};
 
     // Montar prompt para resposta
     const prompt = `${active.systemPrompt}
@@ -540,6 +570,9 @@ CONTEXTO ATUAL:
 - Hora: ${new Date().toLocaleString('es-ES')}
 - Seu humor: 😊${this.emotionalState.happiness} ⚡${this.emotionalState.energy}
 - Personalidade ativa: ${active.name} ${active.emoji}
+- Autor resolvido: ${context.authorName || 'CEO'}${context.authorRole ? ` (${context.authorRole})` : ''}
+- Buffer agora: ${bufferSummary.tasks || 0} tarefas, ${bufferSummary.ideas || 0} ideias, ${bufferSummary.links || 0} links, ${bufferSummary.leads || 0} leads, ${bufferSummary.finance || 0} sinais financeiros.
+- Destaques reais: tarefa="${highlights.task || 'sem tarefa recente'}"; lead="${highlights.lead || 'sem lead recente'}"; financeiro="${highlights.finance || 'sem sinal financeiro recente'}".
 
 MENSAGEM DO USUÁRIO (${context.authorName || 'CEO'}):
 """${userMessage}"""

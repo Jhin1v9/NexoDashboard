@@ -178,7 +178,7 @@ class SmartClassifier {
 
       // TAREFAS PENDENTES (alta confiança)
       tarefaPendente: {
-        regex: /\b(precisamos|falta|urgente|fazer|implementar|criar|build|desenvolver|corrigir|arrumar|consertar|pendente|todo|falta fazer|tem que|devemos|vamos|precisa|necessario|obrigatorio|deadline|prazo|entrega|terminar|concluir|finalizar)\b/gi,
+        regex: /\b(precisamos|falta|urgente|fazer|implementar|criar|build|desenvolver|corrigir|arrumar|consertar|pendente|pendentes|todo|falta fazer|tem que|devemos|vamos|precisa|necessario|obrigatorio|deadline|prazo|entrega|terminar|concluir|finalizar)\b/gi,
         weight: 80,
         category: 'tarefaPendente',
         icon: '📋',
@@ -248,7 +248,7 @@ class SmartClassifier {
 
       // FINANCEIRO — PENDENTE/ATRASADO
       financeiroPendente: {
-        regex: /\b(nao pagou|pendente|atrasado|devendo|falta pagar|nao recebi|ainda nao pagou|esta devendo|fatura atrasada|conta atrasada|nao transferiu|esperando pagamento)\b/gi,
+        regex: /\b(n[aã]o pagou|fatura pendente|dinheiro pendente|pagamento pendente|atrasado|devendo|falta pagar|n[aã]o recebi|ainda n[aã]o pagou|esta devendo|fatura atrasada|conta atrasada|n[aã]o transferiu|esperando pagamento)\b/gi,
         weight: 95,
         category: 'financeiro',
         icon: '⚠️',
@@ -365,7 +365,7 @@ class SmartClassifier {
     const timestamp = msg.time || msg.timestamp || new Date().toISOString();
 
     // 1. SCORING POR PATTERN
-    const scores = this.calculateScores(text);
+    const scores = this.normalizeScores(this.calculateScores(text), text);
 
     // 2. DETECÇÃO DE ENTIDADES (clientes, projetos, membros)
     const entities = await this.detectEntities(text);
@@ -483,6 +483,45 @@ class SmartClassifier {
 
     // Ordenar por score decrescente
     return scores.sort((a, b) => b.score - a.score);
+  }
+
+  normalizeScores(scores, text) {
+    let normalized = [...scores];
+    const technicalTask = /\b(bug|bugs|codigo|código|site|deploy|build|corrigir|consertar|implementar|pendente|pendentes)\b/i.test(text);
+    const paymentContext = /\b(pagou|pago|pagamento|fatura|dinheiro|transferencia|transferiu|pix|deposito|recebi|recebemos|cobrar|devendo|atrasado|caixa|eur|euro|€)\b/i.test(text);
+    const hasUrl = /https?:\/\/[^\s]+/i.test(text);
+
+    if (technicalTask) {
+      normalized = normalized.filter(s => s.pattern !== 'financeiroPendente');
+      const existingTask = normalized.find(s => s.category === 'tarefaPendente');
+      if (existingTask) existingTask.score = Math.max(existingTask.score, 115);
+    }
+
+    if (!paymentContext) {
+      normalized = normalized.filter(s => !['financeiroPendente', 'financeiroPagamento'].includes(s.pattern));
+    }
+
+    if (/\bmandei\s+o?\s*banco\b/i.test(text) && !paymentContext) {
+      normalized = normalized.filter(s => s.pattern !== 'tarefaRealizada');
+    }
+
+    if (/^\s*(que tal|e se|poderiamos|poderíamos|seria bom|seria legal|tive uma ideia|pensando aqui)\b/i.test(text)) {
+      normalized = normalized.filter(s => s.pattern !== 'tarefaPendente');
+      const idea = normalized.find(s => s.pattern === 'ideiaNova');
+      if (idea) idea.score = Math.max(idea.score, 125);
+    }
+
+    if (/^\s*(vamos|bora|fechado|combinado)\b/i.test(text)) {
+      const decision = normalized.find(s => s.pattern === 'decisao');
+      if (decision) decision.score = Math.max(decision.score, 120);
+    }
+
+    if (hasUrl) {
+      const link = normalized.find(s => s.pattern === 'linkCompartilhado');
+      if (link) link.score = Math.max(link.score, 130);
+    }
+
+    return normalized.sort((a, b) => b.score - a.score);
   }
 
   // ============================================

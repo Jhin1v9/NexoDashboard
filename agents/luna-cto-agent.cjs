@@ -382,8 +382,8 @@ class PlaywrightExtractor {
             let author = 'Desconhecido';
             const preText = el.getAttribute('data-pre-plain-text');
             if (preText) {
-              const match = preText.match(/\[(.*?)\]/);
-              if (match) author = match[1];
+              const match = preText.match(/\]\s*([^:]+):/);
+              if (match) author = match[1].trim();
             }
             const timeEl = el.querySelector('[data-testid="msg-meta"], .msg-time');
             const time = timeEl ? timeEl.innerText : '';
@@ -452,8 +452,8 @@ class PlaywrightExtractor {
           let author = 'Desconhecido';
           const preText = el.getAttribute('data-pre-plain-text');
           if (preText) {
-            const match = preText.match(/\[(.*?)\]/);
-            if (match) author = match[1];
+            const match = preText.match(/\]\s*([^:]+):/);
+            if (match) author = match[1].trim();
           }
           const timeEl = el.querySelector('[data-testid="msg-meta"], .msg-time');
           const time = timeEl ? timeEl.innerText : '';
@@ -605,6 +605,7 @@ class LunaAgent {
     this.running = false;
     this.threadHistory = [];
     this.fullExtractRunning = false;
+    this.processedMessageIds = new Set();
     if (!fs.existsSync(CONFIG.WHATSAPP_HISTORY_FILE)) {
       fs.writeFileSync(CONFIG.WHATSAPP_HISTORY_FILE, '[]', 'utf8');
       log.info('[HISTORY] whatsapp-history.json criado');
@@ -661,6 +662,13 @@ class LunaAgent {
       const body = (msg.body || '').toLowerCase();
       const isMention = /@luna|@kimi|@kimiclaw/i.test(body);
 
+      const messageId = msg.id?._serialized || msg.id || `${msg.from}:${msg.timestamp}:${msg.body}`;
+      if (this.processedMessageIds.has(messageId)) return;
+      this.processedMessageIds.add(messageId);
+      if (this.processedMessageIds.size > 500) {
+        this.processedMessageIds = new Set(Array.from(this.processedMessageIds).slice(-250));
+      }
+
       if (isMention) {
         log.info(`MENCAO de ${msg.pushname || msg.from}: ${(msg.body || '').slice(0, 80)}`);
         await this.handleMention(msg);
@@ -685,12 +693,27 @@ class LunaAgent {
     log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
     try {
+      const author = resolveAuthor(msg.author || msg.pushname || msg.from);
+      const buffer = this.cp.buffer || {};
       const context = {
         urgency: 'normal',
         sentiment: 'neutral',
         topic: 'general',
         userMood: 'neutral',
-        authorName: msg.pushname || msg.from
+        authorName: author.name || msg.pushname || msg.from,
+        authorRole: author.role || null,
+        bufferSummary: {
+          tasks: buffer.newTasks?.length || 0,
+          ideas: buffer.newIdeas?.length || 0,
+          links: buffer.newLinks?.length || 0,
+          leads: buffer.newLeads?.length || 0,
+          finance: buffer.newFinance?.length || 0
+        },
+        highlights: {
+          task: buffer.newTasks?.[0]?.body || null,
+          lead: buffer.newLeads?.[0]?.context || null,
+          finance: buffer.newFinance?.[0]?.body || null
+        }
       };
 
       const response = await this.brain.generateResponse(body, context);
@@ -813,14 +836,34 @@ class LunaAgent {
     }
     else if (cmd === '/ajuda' || cmd === '/ayuda' || cmd === '/comandos') {
       await msg.reply(
-        `🎮 *COMANDOS NEXO*\n\n` +
-        `📊 VISAO GERAL:\n/status, /dashboard\n\n` +
-        `🧠 INTELIGENCIA:\n/ideas, /links, /leads, /news, /buscar, /ultimas\n\n` +
-        `💰 NEGOCIOS:\n/financeiro, /decisoes\n\n` +
-        `📈 ANALYTICS:\n/stats, /sentimento, /estado\n\n` +
-        `❓ AJUDA:\n/ajuda, /ayuda, /sobre, /relatorio, /tarefas\n\n` +
-        `💡 Pro tip: mencione @Luna para conversa natural em contexto.\n\n` +
-        `🤖 Luna v16.0 | NEXO Command Center`
+        `🌙 *E aí, chefes! Sou a Luna, sua parceira no NEXO.*\n\n` +
+        `📊 *VISÃO GERAL:*\n` +
+        `/status — Projetos e tarefas\n` +
+        `/dashboard — Central NEXO\n` +
+        `/relatorio — Report inteligente\n` +
+        `/tarefas — Tarefas pendentes\n\n` +
+        `🧠 *INTELIGÊNCIA:*\n` +
+        `/ideas — Ideias do time\n` +
+        `/links — Links analisados\n` +
+        `/leads — Oportunidades\n` +
+        `/news — Notícias do grupo\n\n` +
+        `💰 *NEGÓCIOS:*\n` +
+        `/financeiro — Movimentações\n` +
+        `/decisoes — Acordos do time\n\n` +
+        `🔍 *BUSCA:*\n` +
+        `/buscar [termo] — Procurar no histórico\n` +
+        `/ultimas [N] — Últimas mensagens\n\n` +
+        `📈 *ANALYTICS:*\n` +
+        `/stats — Estatísticas do grupo\n` +
+        `/sentimento — Como o time tá\n` +
+        `/estado — Meu mood atual\n\n` +
+        `❓ *SOBRE MIM:*\n` +
+        `/ajuda — Este menu\n` +
+        `/ayuda — Alias, porque somos internacionais\n` +
+        `/comandos — Command Center\n` +
+        `/sobre — Quem sou eu\n\n` +
+        `💬 *Mencione @Luna pra conversar!*\n` +
+        `🤖 *Luna v16.1 | NEXO Digital*`
       );
     }
     else if (cmd === '/ideas') {
@@ -1188,6 +1231,7 @@ class LunaAgent {
       }
 
       this.cp.checkpoint.lastScan = new Date().toISOString();
+      if (this.brain?.recoverAfterSuccessfulScan) this.brain.recoverAfterSuccessfulScan();
       this.cp.save();
 
       return {
@@ -1294,6 +1338,12 @@ class LunaAgent {
   }
 
   async sendScheduledReport() {
+    try {
+      await this.runOnce();
+    } catch (error) {
+      log.warn(`[REPORT] Nao consegui atualizar o buffer antes do relatorio: ${error.message}`);
+    }
+
     const buffer = this.cp.buffer;
     const hasNews = buffer.newMessages?.length > 0 || 
                    buffer.newTasks?.length > 0 || 
@@ -1402,8 +1452,9 @@ class LunaAgent {
 
       const seen = new Set(history.map(m => m.id).filter(Boolean));
       for (const msg of messages) {
-        const authorName = msg.author || 'Desconhecido';
-        const resolvedName = aliasMap[authorName] || authorName;
+        const authorName = msg.author || msg.authorName || msg.pushname || msg.from || 'Desconhecido';
+        const resolved = resolveAuthor(authorName);
+        const resolvedName = resolved.confidence > 0 ? resolved.name : (aliasMap[authorName] || authorName);
         const id = msg.id || crypto.createHash('md5').update(`${authorName}:${msg.text || msg.body || ''}:${msg.timestamp || ''}`).digest('hex');
         if (seen.has(id)) continue;
         seen.add(id);
