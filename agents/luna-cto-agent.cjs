@@ -187,6 +187,7 @@ class CheckpointManager {
       newNews: [],
       newLeads: [],
       newFinance: [],
+      newTasksDone: [],
       lastBufferUpdate: null
     });
   }
@@ -619,6 +620,7 @@ class LunaAgent {
     this.threadHistory = [];
     this.fullExtractRunning = false;
     this.processedMessageIds = new Set();
+    this.pendingQuestion = null;
     if (!fs.existsSync(CONFIG.WHATSAPP_HISTORY_FILE)) {
       fs.writeFileSync(CONFIG.WHATSAPP_HISTORY_FILE, '[]', 'utf8');
       log.info('[HISTORY] whatsapp-history.json criado');
@@ -674,10 +676,17 @@ class LunaAgent {
 
         this.client.on('message_create', async (msg) => {
       
-      if (msg.fromMe && !msg.body.startsWith('/')) return;
+      const rawBody = msg.body || '';
+      const body = rawBody.toLowerCase();
+      const isMention = /@luna|@kimi|@kimiclaw/i.test(rawBody);
+      const isCommand = rawBody.trim().startsWith('/');
+      const hasPendingAnswer = Boolean(this.getPendingMatch(msg));
 
-      const body = (msg.body || '').toLowerCase();
-      const isMention = /@luna|@kimi|@kimiclaw/i.test(body);
+      if (msg.fromMe && isMention) {
+        log.info('[MENCAO] fromMe detectou @luna');
+      }
+
+      if (msg.fromMe && !isCommand && !isMention && !hasPendingAnswer) return;
 
       const messageId = msg.id?._serialized || msg.id || `${msg.from}:${msg.timestamp}:${msg.body}`;
       if (this.processedMessageIds.has(messageId)) return;
@@ -686,13 +695,15 @@ class LunaAgent {
         this.processedMessageIds = new Set(Array.from(this.processedMessageIds).slice(-250));
       }
 
+      if (await this.handlePendingAnswer(msg)) return;
+
       if (isMention) {
         log.info(`MENCAO de ${msg.pushname || msg.from}: ${(msg.body || '').slice(0, 80)}`);
         await this.handleMention(msg);
         return;
       }
 
-      if (body.startsWith('/')) {
+      if (isCommand) {
         await this.handleCommand(msg);
         return;
       }
@@ -721,6 +732,14 @@ class LunaAgent {
         await this.saveToHistory([classified]);
         this.cp.save();
         log.info(`[LIVE] Mensagem classificada em tempo real: ${classification.category}`);
+
+        if (classification.category === 'tarefaRealizada' && classification.object) {
+          const actor = this.getMessageActor(msg);
+          const isKnownTask = this.hasSimilarOpenTask(classification.object);
+          this.askTaskDoneConfirmation(msg, classification.object, actor.name, isKnownTask);
+          const qualifier = isKnownTask ? 'como concluida' : 'como nova tarefa concluida';
+          await msg.reply(`Boa, ${actor.name.split(' ')[0]}!\n\nAnoto '${classification.object}' ${qualifier}?`);
+        }
       } catch (error) {
         log.warn(`[LIVE] Falha ao classificar mensagem em tempo real: ${error.message}`);
       }
@@ -751,12 +770,122 @@ class LunaAgent {
   }
 
   extractCompletedObject(text = '') {
-    return text
+    const clean = text.replace(/@luna|@kimi|@kimiclaw/gi, '').trim();
+    const actionMatch = clean.match(/\b(consegui|terminei|fiz|subi|pronto|acabei|finalizei|consertei|corrigi|resolvi|publiquei|atualizei|enviei|mandei)\s+(?:de\s+)?(.+)/i);
+    if (actionMatch) {
+      const verb = actionMatch[1].toLowerCase();
+      let object = actionMatch[2].replace(/^(o|a|os|as|um|uma)\s+/i, '').trim();
+      if (verb === 'subi') object = `subir ${object}`;
+      return object || clean;
+    }
+
+    return clean
       .replace(/@luna|@kimi|@kimiclaw/gi, '')
       .replace(/\b(consegui|fiz|terminei|consertei|corrigi|resolvi|subi|publiquei|enviei|mandei|atualizei)\b/gi, '')
+      .replace(/^(o|a|os|as|um|uma)\s+/i, '')
       .replace(/\b(a|o|os|as|um|uma)\b\s*$/i, '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  getMessageActor(msg = {}) {
+    const raw = msg.author || msg.pushname || msg.from || 'time';
+    const resolved = resolveAuthor(raw);
+    return {
+      key: msg.author || msg.from || raw,
+      name: resolved.name || msg.pushname || raw,
+      chatId: msg.from
+    };
+  }
+
+  isYesAnswer(text = '') {
+    const answer = text.trim().toLowerCase();
+    return ['sim', 'yes', 'ok', 'beleza', 'pode', 'anota', 'marca', 'feito', 'claro', 'pode ser'].some(w => answer.includes(w));
+  }
+
+  isNoAnswer(text = '') {
+    const answer = text.trim().toLowerCase();
+    return ['não', 'nao', 'no', 'nope', 'deixa', 'não precisa', 'nao precisa', 'deixa quieto'].some(w => answer.includes(w));
+  }
+
+  getPendingMatch(msg = {}) {
+    if (!this.pendingQuestion || this.pendingQuestion.expiresAt <= Date.now()) {
+      this.pendingQuestion = null;
+      return null;
+    }
+
+    const actor = this.getMessageActor(msg);
+    const sameChat = this.pendingQuestion.chatId === actor.chatId;
+    const samePerson = this.pendingQuestion.askedTo === actor.key || this.pendingQuestion.askedToName === actor.name;
+    return sameChat && samePerson ? this.pendingQuestion : null;
+  }
+
+  saveBufferToFile() {
+    this.cp.saveBuffer ? this.cp.saveBuffer() : this.cp.save();
+  }
+
+  async executePendingAction(question, confirmed) {
+    if (!confirmed || !question) return;
+
+    if (question.type === 'confirmTaskDone') {
+      if (!this.cp.buffer.newTasksDone) this.cp.buffer.newTasksDone = [];
+      this.cp.buffer.newTasksDone.push({
+        text: question.data.taskText,
+        author: question.data.author,
+        completedAt: new Date().toISOString(),
+        source: 'implicit_detected'
+      });
+      this.saveBufferToFile();
+      log.info(`[DIALOG] Tarefa concluida anotada: ${question.data.taskText}`);
+    }
+  }
+
+  async handlePendingAnswer(msg) {
+    const pending = this.getPendingMatch(msg);
+    if (!pending) return false;
+
+    const answer = msg.body || '';
+    if (this.isYesAnswer(answer)) {
+      await this.executePendingAction(pending, true);
+      await msg.reply(`Feito! ${pending.data.taskText} anotado como concluido.`);
+      this.pendingQuestion = null;
+      return true;
+    }
+
+    if (this.isNoAnswer(answer)) {
+      await msg.reply('Beleza, deixa quieto entao!');
+      this.pendingQuestion = null;
+      return true;
+    }
+
+    return false;
+  }
+
+  askTaskDoneConfirmation(msg, taskText, authorName, isKnownTask = false) {
+    const actor = this.getMessageActor(msg);
+    this.pendingQuestion = {
+      type: 'confirmTaskDone',
+      data: {
+        taskText,
+        author: authorName,
+        category: 'tarefaRealizada',
+        isKnownTask
+      },
+      timestamp: Date.now(),
+      askedTo: actor.key,
+      askedToName: actor.name,
+      chatId: actor.chatId,
+      expiresAt: Date.now() + 120000
+    };
+  }
+
+  hasSimilarOpenTask(taskText = '') {
+    const needle = taskText.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    if (!needle) return false;
+    return (this.cp.buffer.newTasks || []).some(task => {
+      const hay = (task.body || task.text || '').toLowerCase().replace(/[^\w\s]/g, '');
+      return hay.includes(needle) || needle.includes(hay.slice(0, 40).trim());
+    });
   }
 
   parseMentionWorkItems(body = '', authorName = 'time') {
@@ -777,6 +906,7 @@ class LunaAgent {
 
       const item = line.replace(/^[-*•]\s*/, '').trim();
       if (!item || /@luna|anota|tarefas?:/i.test(item)) continue;
+      if (/^vamos preparar/i.test(item)) continue;
 
       if (leadMode || /cliente|onadance|reformas|mapio|ccb|gesse|lucas|jess/i.test(item)) {
         leads.push(item);
@@ -842,10 +972,16 @@ class LunaAgent {
     log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
     try {
+      if (await this.handlePendingAnswer(msg)) return;
+
       const author = resolveAuthor(msg.author || msg.pushname || msg.from);
       const authorName = author.name || msg.pushname || msg.from || 'chefe';
       const humanReply = this.buildHumanMentionReply(body, authorName);
       if (humanReply) {
+        if (/\b(consegui|fiz|terminei|finalizei|consertei|corrigi|resolvi|subi|publiquei|atualizei)\b/i.test(this.cleanMentionText(body))) {
+          const taskText = this.extractCompletedObject(body) || this.cleanMentionText(body);
+          this.askTaskDoneConfirmation(msg, taskText, authorName, this.hasSimilarOpenTask(taskText));
+        }
         await msg.reply(humanReply);
         log.success('Resposta humana de cenario enviada!');
         return;
@@ -905,6 +1041,8 @@ class LunaAgent {
   async handleCommand(msg) {
     this.cp.reloadBuffer();
     log.info('[BUGFIX] Buffer persistente recarregado antes do comando');
+
+    if (await this.handlePendingAnswer(msg)) return;
 
     const raw = (msg.body || '').trim();
     const cmd = raw.toLowerCase();
@@ -968,6 +1106,7 @@ class LunaAgent {
     const leads = safeList(buffer.newLeads);
     const news = safeList(buffer.newNews);
     const tasks = safeList(buffer.newTasks);
+    const tasksDone = safeList(buffer.newTasksDone);
     const decisions = safeList(buffer.newDecisions);
     const messages = safeList(buffer.newMessages);
 
@@ -985,6 +1124,12 @@ class LunaAgent {
     else if (cmd === '/relatorio' || cmd === '/reporte') {
       await msg.reply('📊 Gerando relatorio inteligente...');
       await this.forceReport(msg.from);
+    }
+    else if (cmd === '/tarefas feitas' || cmd === '/tareas hechas') {
+      const list = tasksDone.length > 0
+        ? tasksDone.slice(0, 10).map(t => `• ${truncate(t.text || t.body, 70)} (por ${t.author || 'time'}, ${relativeTime(t.completedAt || t.time)})`).join('\n')
+        : `Ainda nao tenho tarefas concluidas confirmadas.\n\nQuando alguem disser "sim" depois da minha pergunta, eu salvo aqui certinho.`;
+      await msg.reply(`✅ *TAREFAS FEITAS*\n\n${list}\n\n🤖 Luna v16.2 | Feitas`);
     }
     else if (cmd === '/tarefas' || cmd === '/tareas') {
       const list = tasks.length > 0
@@ -1004,7 +1149,8 @@ class LunaAgent {
         `/status — Projetos e tarefas\n` +
         `/dashboard — Central NEXO\n` +
         `/relatorio — Report inteligente\n` +
-        `/tarefas — Tarefas pendentes\n\n` +
+        `/tarefas — Tarefas pendentes\n` +
+        `/tarefas feitas — Concluidas confirmadas\n\n` +
         `🧠 *INTELIGÊNCIA:*\n` +
         `/ideas — Ideias do time\n` +
         `/links — Links analisados\n` +
@@ -1423,6 +1569,7 @@ class LunaAgent {
     if (!this.cp.buffer.newLeads) this.cp.buffer.newLeads = [];
     if (!this.cp.buffer.newNews) this.cp.buffer.newNews = [];
     if (!this.cp.buffer.newFinance) this.cp.buffer.newFinance = [];
+    if (!this.cp.buffer.newTasksDone) this.cp.buffer.newTasksDone = [];
     for (const item of classified) {
       const c = item.classification;
       if (!c) continue;

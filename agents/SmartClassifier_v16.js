@@ -168,7 +168,7 @@ class SmartClassifier {
     this.patterns = {
       // TAREFAS REALIZADAS (alta confiança)
       tarefaRealizada: {
-        regex: /\b(consegui|consertei|corrigi|resolvi|subi|fiz|pronto|terminado|deploy|enviei|mandei|atualizei|corrigido?|fix|resolvido|concluido|done|finished|complete|merged|push|commit|build ok|ta funcionando|funcionou|deployado|publicado|online|live|ativo)\b/gi,
+        regex: /\b(consegui|consertei|corrigi|resolvi|subi|fiz|terminei|acabei|finalizei|pronto|terminado|deploy|enviei|mandei|atualizei|corrigido?|fix|resolvido|concluido|done|finished|complete|merged|push|commit|build ok|ta funcionando|funcionou|deployado|publicado|online|live|ativo)\b/gi,
         weight: 85,
         category: 'tarefaRealizada',
         icon: '✅',
@@ -455,9 +455,20 @@ class SmartClassifier {
   extractActionObject(rawText = '', primaryMatch = null) {
     if (!primaryMatch || primaryMatch.category !== 'tarefaRealizada') return null;
 
-    const object = rawText
+    const clean = rawText.replace(/@luna|@kimi|@kimiclaw/gi, '').trim();
+    const actionMatch = clean.match(/\b(consegui|terminei|fiz|subi|pronto|acabei|finalizei|consertei|corrigi|resolvi|publiquei|atualizei|enviei|mandei)\s+(?:de\s+)?(.+)/i);
+
+    if (actionMatch) {
+      const verb = actionMatch[1].toLowerCase();
+      let object = actionMatch[2].replace(/^(o|a|os|as|um|uma)\s+/i, '').trim();
+      if (verb === 'subi') object = `subir ${object}`;
+      return object || null;
+    }
+
+    const object = clean
       .replace(/@luna|@kimi|@kimiclaw/gi, '')
       .replace(/\b(consegui|fiz|terminei|finalizei|consertei|corrigi|resolvi|subi|publiquei|enviei|mandei|atualizei|dei deploy|deployei|mergei|commitei)\b/gi, '')
+      .replace(/^(o|a|os|as|um|uma)\s+/i, '')
       .replace(/\b(a|o|os|as|um|uma)\b\s*$/i, '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -504,7 +515,7 @@ class SmartClassifier {
     const technicalTask = /\b(bug|bugs|codigo|código|site|deploy|build|corrigir|consertar|implementar|pendente|pendentes)\b/i.test(text);
     const paymentContext = /\b(pagou|pago|pagamento|fatura|dinheiro|transferencia|transferiu|pix|deposito|recebi|recebemos|cobrar|devendo|atrasado|caixa|eur|euro|€)\b/i.test(text);
     const hasUrl = /https?:\/\/[^\s]+/i.test(text);
-    const completedContext = /^\s*(consegui|consertei|corrigi|resolvi|fiz|terminei|finalizei|subi|publiquei|atualizei)\b/i.test(text) && !/\b(ver se|tentar|tento|consigo|pendente|pendentes|precisa|precisamos|falta)\b/i.test(text.replace(/^\s*consegui\b/i, ''));
+    const completedContext = /^\s*(consegui|consertei|corrigi|resolvi|fiz|terminei|acabei|finalizei|subi|publiquei|atualizei)\b/i.test(text) && !/\b(ver se|tentar|tento|consigo|pendente|pendentes|precisa|precisamos|falta)\b/i.test(text.replace(/^\s*consegui\b/i, ''));
 
     if (completedContext) {
       normalized = normalized.filter(s => !['tarefaPendente', 'bug'].includes(s.pattern));
