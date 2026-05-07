@@ -7,13 +7,19 @@ class LunaBrain {
     // Hybrid: Regex Blindado + Gemma 2B + Context Scoring
     // ============================================
 
-    this.ollamaConfig = ollamaConfig || {
-      model: 'gemma2:2b',
+    this.ollamaConfig = {
+      model: process.env.LUNA_GEMMA_MODEL || process.env.LUNA_LLM_MODEL || 'qwen2.5:7b',
       host: 'http://localhost:11434',
       systemPrompt: this.getBasePersonality(),
       temperature: 0.7,
-      maxTokens: 200
+      maxTokens: 200,
+      healthTimeoutMs: Number(process.env.LUNA_GEMMA_HEALTH_TIMEOUT_MS || 5000),
+      warmupTimeoutMs: Number(process.env.LUNA_GEMMA_WARMUP_TIMEOUT_MS || 300000),
+      classifyTimeoutMs: Number(process.env.LUNA_GEMMA_CLASSIFY_TIMEOUT_MS || 180000),
+      responseTimeoutMs: Number(process.env.LUNA_GEMMA_RESPONSE_TIMEOUT_MS || 300000)
     };
+    this.ollamaConfig = { ...this.ollamaConfig, ...(ollamaConfig || {}) };
+    if (process.env.LUNA_GEMMA_MODEL) this.ollamaConfig.model = process.env.LUNA_GEMMA_MODEL;
 
     // ============================================
     // PERSONALIDADES DA LUNA
@@ -204,6 +210,7 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     this.gemmaHasWarmedUp = false;
     this.gemmaFailureCount = 0;
     this.gemmaDisabledUntil = 0;
+    this.modelResolved = false;
     this.emotionalState = {
       happiness: 70,
       excitement: 60,
@@ -326,7 +333,7 @@ NUNCA RESPONDA ASSIM:
   // ============================================
   async checkOllamaHealth() {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), this.ollamaConfig.healthTimeoutMs);
     try {
       const res = await fetch(`${this.ollamaConfig.host}/api/tags`, {
         method: 'GET',
@@ -340,9 +347,53 @@ NUNCA RESPONDA ASSIM:
     }
   }
 
-  async warmUpGemma() {
+  async resolveBestGemmaModel() {
+    if (this.modelResolved) return this.ollamaConfig.model;
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), this.ollamaConfig.healthTimeoutMs);
+    try {
+      const res = await fetch(`${this.ollamaConfig.host}/api/tags`, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error(`Ollama tags error: ${res.status}`);
+      const data = await res.json();
+      const installed = (data.models || []).map(model => model.name || model.model).filter(Boolean);
+      const preferred = [
+        process.env.LUNA_GEMMA_MODEL,
+        process.env.LUNA_LLM_MODEL,
+        this.ollamaConfig.model,
+        'qwen2.5:7b',
+        'qwen:7b',
+        'gemma2:9b',
+        'gemma:7b',
+        'gemma2:2b'
+      ].filter(Boolean);
+      const selected = preferred.find(model => installed.includes(model));
+      if (selected && selected !== this.ollamaConfig.model) {
+        console.log(`[LLM] Modelo ajustado para instalado: ${selected}`);
+        this.ollamaConfig.model = selected;
+      }
+      if (!selected) {
+        console.warn(`[LLM] Nenhum LLM preferido instalado. Instalados: ${installed.join(', ') || 'nenhum'}`);
+      } else {
+        console.log(`[LLM] Usando modelo: ${this.ollamaConfig.model}`);
+      }
+      this.modelResolved = true;
+      return this.ollamaConfig.model;
+    } catch (error) {
+      console.warn(`[LLM] Nao consegui listar modelos Ollama: ${error.message}`);
+      return this.ollamaConfig.model;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async warmUpGemma() {
+    await this.resolveBestGemmaModel();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.ollamaConfig.warmupTimeoutMs);
     try {
       const response = await fetch(`${this.ollamaConfig.host}/api/generate`, {
         method: 'POST',
@@ -350,7 +401,7 @@ NUNCA RESPONDA ASSIM:
         body: JSON.stringify({
           model: this.ollamaConfig.model,
           prompt: 'oi',
-          options: { num_predict: 8 },
+          options: { num_predict: 8, num_ctx: 2048 },
           stream: false
         }),
         signal: controller.signal
@@ -359,11 +410,11 @@ NUNCA RESPONDA ASSIM:
       this.gemmaHasWarmedUp = true;
       this.gemmaFailureCount = 0;
       this.gemmaDisabledUntil = 0;
-      console.log('[BUGFIX] [GEMMA] Ollama aquecido');
+      console.log(`[BUGFIX] [LLM] Ollama aquecido com ${this.ollamaConfig.model}`);
       return true;
     } catch (error) {
       this.gemmaFailureCount += 1;
-      console.warn(`[BUGFIX] [GEMMA] Ollama nao respondeu ao warm-up: ${error.message}`);
+      console.warn(`[BUGFIX] [LLM] Ollama nao respondeu ao warm-up: ${error.message}`);
       return false;
     } finally {
       clearTimeout(timeout);
@@ -374,23 +425,24 @@ NUNCA RESPONDA ASSIM:
     const startedAt = Date.now();
     const controller = new AbortController();
     if (Date.now() < this.gemmaDisabledUntil) {
-      console.warn('[GEMMA] Desativado temporariamente, usando regex');
+      console.warn('[LLM] Desativado temporariamente, usando regex');
       return null;
     }
 
+    await this.resolveBestGemmaModel();
     const healthy = await this.checkOllamaHealth();
     if (!healthy) {
       this.gemmaFailureCount += 1;
       if (this.gemmaFailureCount >= 5) {
-        this.gemmaDisabledUntil = Date.now() + 60 * 60 * 1000;
-        console.warn('[BUGFIX] [GEMMA] 5 falhas seguidas, desativado por 1h');
+        this.gemmaDisabledUntil = Date.now() + 5 * 60 * 1000;
+        console.warn('[BUGFIX] [LLM] 5 falhas seguidas, pausa por 5min');
       } else {
-        console.warn('[GEMMA] Ollama offline, usando regex');
+        console.warn('[LLM] Ollama offline, usando regex');
       }
       return null;
     }
 
-    const timeoutMs = 15000;
+    const timeoutMs = this.ollamaConfig.classifyTimeoutMs;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
@@ -408,8 +460,11 @@ NUNCA RESPONDA ASSIM:
           system: personality.systemPrompt,
           prompt: prompt,
           temperature: this.ollamaConfig.temperature,
-          max_tokens: Math.min(this.ollamaConfig.maxTokens || 200, 200),
-          options: { num_predict: 200 },
+          options: {
+            temperature: this.ollamaConfig.temperature,
+            num_predict: Math.min(this.ollamaConfig.maxTokens || 200, 200),
+            num_ctx: 4096
+          },
           stream: false
         }),
         signal: controller.signal
@@ -423,18 +478,18 @@ NUNCA RESPONDA ASSIM:
       this.gemmaFailureCount = 0;
       this.gemmaDisabledUntil = 0;
       const confidence = result?.confidence ?? regexResult?.confidence ?? 0;
-      console.log(`[GEMMA] Classificacao levou ${Date.now() - startedAt}ms, confianca ${confidence}`);
+      console.log(`[LLM] Classificacao levou ${Date.now() - startedAt}ms, confianca ${confidence}`);
       return result;
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn(`[GEMMA] Timeout ${timeoutMs}ms, fallback para regex`);
+        console.warn(`[LLM] Timeout ${timeoutMs}ms, fallback para regex`);
       } else {
-        console.error('[GEMMA] Erro:', error.message);
+        console.error('[LLM] Erro:', error.message);
       }
       this.gemmaFailureCount += 1;
       if (this.gemmaFailureCount >= 5) {
-        this.gemmaDisabledUntil = Date.now() + 60 * 60 * 1000;
-        console.warn('[BUGFIX] [GEMMA] 5 falhas seguidas, desativado por 1h');
+        this.gemmaDisabledUntil = Date.now() + 5 * 60 * 1000;
+        console.warn('[BUGFIX] [LLM] 5 falhas seguidas, pausa por 5min');
       }
       this.gemmaHasWarmedUp = true;
       return null; // Fallback para regex
@@ -516,7 +571,7 @@ RESPONDE EN JSON:
       }
     } catch (e) {}
 
-    console.error('[GEMMA] Nao conseguiu extrair JSON de:', raw.slice(0, 200));
+    console.error('[LLM] Nao conseguiu extrair JSON de:', raw.slice(0, 200));
     return null;
   }
 
@@ -650,6 +705,7 @@ RESPONDE EN JSON:
   // GERAR RESPOSTA DA LUNA (para interações)
   // ============================================
   async generateResponse(userMessage, context = {}) {
+    await this.resolveBestGemmaModel();
     const personality = this.personalities[this.activePersonality];
 
     // Seletor de personalidade baseado no contexto
@@ -691,17 +747,24 @@ INSTRUÇÕES:
 
 RESPOSTA:`;
 
+    let timeout;
     try {
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), this.ollamaConfig.responseTimeoutMs);
       const response = await fetch(`${this.ollamaConfig.host}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: this.ollamaConfig.model,
           prompt: prompt,
-          temperature: active.energy > 80 ? 0.9 : 0.6,
-          max_tokens: 500,
+          options: {
+            temperature: active.energy > 80 ? 0.9 : 0.6,
+            num_predict: 500,
+            num_ctx: 4096
+          },
           stream: false
-        })
+        }),
+        signal: controller.signal
       });
 
       if (!response.ok) throw new Error(`Ollama error: ${response.status}`);
@@ -728,6 +791,8 @@ RESPOSTA:`;
         emoji: active.emoji,
         emotionalState: { ...this.emotionalState }
       };
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 

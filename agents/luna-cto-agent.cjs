@@ -627,8 +627,8 @@ class LunaAgent {
   constructor() {
     this.cp = new CheckpointManager();
     this.brain = new LunaBrain({
-      model: 'gemma2:2b',
-      host: 'http://localhost:11434'
+      model: process.env.LUNA_GEMMA_MODEL || process.env.LUNA_LLM_MODEL || 'qwen2.5:7b',
+      host: process.env.OLLAMA_HOST || 'http://localhost:11434'
     });
     this.linkAnalyzer = new LinkAnalyzer();
     this.extractor = new PlaywrightExtractor();
