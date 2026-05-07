@@ -1,0 +1,215 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_GATEKEEPER",
+    "lastUpdated": "2026-05-05T10:02:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Configuração mestre dos grupos WhatsApp. Define quem a Luna pode ouvir, onde pode falar, e onde NUNCA deve enviar mensagens."
+  },
+  "_meta": {
+    "company": "NEXO DIGITAL",
+    "totalGroups": 2,
+    "monitoredGroups": 2,
+    "nexoOnlyGroups": 1,
+    "clientGroups": 1,
+    "note": "REGRA ABSOLUTA: Luna NUNCA envia mensagens em grupo de cliente. Apenas no Production."
+  },
+  "groups": {
+    "🏆Production - 2026🙏🏻@g.us": {
+      "id": "nexo-production-2026",
+      "displayName": "Nexo Pro - 2026",
+      "originalName": "🏆Production - 2026🙏🏻",
+      "type": "internal",
+      "isNexoOnly": true,
+      "memberIds": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal",
+        "nexo-elias-empresarial"
+      ],
+      "purpose": "Coordenação de projetos NEXO DIGITAL. Único grupo onde Luna pode falar livremente.",
+      "communicationRules": {
+        "lunaCanListen": true,
+        "lunaCanSpeak": true,
+        "lunaCanSendReports": true,
+        "lunaCanSendDashboard": true,
+        "lunaCanReplyToMentions": true,
+        "lunaCanExecuteCommands": true,
+        "humanOnly": false,
+        "note": "✅ GRUPO OFICIAL DA NEXO. Luna tem permissão total aqui."
+      },
+      "monitoring": {
+        "enabled": true,
+        "scanInterval": 600000,
+        "reportInterval": 1800000,
+        "autoReport": true,
+        "dashboardSendEnabled": true,
+        "dashboardSendCooldown": "daily",
+        "classifyMessages": true,
+        "detectLeads": true,
+        "detectTasks": true,
+        "detectDecisions": true,
+        "detectLinks": true,
+        "detectFeedback": true,
+        "maxMessagesPerScan": 100,
+        "scrollTimeout": 30000
+      },
+      "classificationDefaults": {
+        "defaultCategory": "internal",
+        "autoTagNexoMentions": true,
+        "autoTagSuperclimMentions": false,
+        "autoTagClientMentions": true,
+        "priorityBoostForP0": true
+      },
+      "reportFormat": {
+        "type": "full",
+        "includeDashboard": true,
+        "includeStats": true,
+        "includeSentiment": true,
+        "includeLinks": true,
+        "includeLeads": true,
+        "includeTasks": true,
+        "includeNews": true,
+        "caption": "🌙 LUNA REPORT — {timestamp}"
+      },
+      "editableFields": [
+        "monitoring.scanInterval",
+        "monitoring.reportInterval",
+        "monitoring.autoReport",
+        "monitoring.dashboardSendEnabled",
+        "classificationDefaults",
+        "reportFormat"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": [],
+      "tags": [
+        "internal",
+        "nexo-only",
+        "luna-active",
+        "reports-enabled",
+        "primary"
+      ]
+    },
+    "Paulo (Web🎯🙌🏻)@g.us": {
+      "id": "nexo-cliente-paulo",
+      "displayName": "Paulo (Web)",
+      "originalName": "Paulo (Web🎯🙌🏻)",
+      "type": "client",
+      "isNexoOnly": false,
+      "clientId": "paulo-santafe",
+      "projectId": "SANTAFE-CONSTRUCCIONES",
+      "memberIds": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal",
+        "nexo-elias-empresarial",
+        "client-paulo"
+      ],
+      "purpose": "Comunicação com cliente Paulo (SantaFe Construcciones). HUMANIZADO APENAS.",
+      "communicationRules": {
+        "lunaCanListen": true,
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanSendDashboard": false,
+        "lunaCanReplyToMentions": false,
+        "lunaCanExecuteCommands": false,
+        "humanOnly": true,
+        "note": "🚫 PROIBIDO: Luna NUNCA envia mensagens neste grupo. Apenas escuta e classifica internamente. Tratamento 100% humanizado com o cliente."
+      },
+      "monitoring": {
+        "enabled": true,
+        "scanInterval": 600000,
+        "reportInterval": 3600000,
+        "autoReport": false,
+        "dashboardSendEnabled": false,
+        "dashboardSendCooldown": "never",
+        "classifyMessages": true,
+        "detectLeads": false,
+        "detectTasks": true,
+        "detectDecisions": false,
+        "detectLinks": true,
+        "detectFeedback": true,
+        "maxMessagesPerScan": 50,
+        "scrollTimeout": 30000
+      },
+      "classificationDefaults": {
+        "defaultCategory": "cliente",
+        "autoTagNexoMentions": false,
+        "autoTagSuperclimMentions": false,
+        "autoTagClientMentions": true,
+        "priorityBoostForP0": false
+      },
+      "reportFormat": {
+        "type": "none",
+        "includeDashboard": false,
+        "includeStats": false,
+        "includeSentiment": false,
+        "includeLinks": false,
+        "includeLeads": false,
+        "includeTasks": false,
+        "includeNews": false,
+        "caption": null
+      },
+      "editableFields": [
+        "monitoring.scanInterval",
+        "monitoring.classifyMessages",
+        "monitoring.detectTasks",
+        "classificationDefaults"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": [],
+      "tags": [
+        "client",
+        "paulo",
+        "santafe",
+        "human-only",
+        "luna-silent",
+        "no-reports"
+      ]
+    }
+  },
+  "globalRules": {
+    "description": "Regras que se aplicam a TODOS os grupos, independente de config individual.",
+    "rules": [
+      {
+        "id": "rule-001",
+        "name": "NUNCA falar em grupo de cliente",
+        "condition": "group.type == 'client'",
+        "action": "block",
+        "severity": "critical",
+        "message": "🚫 BLOQUEADO: Tentativa de envio em grupo de cliente. Luna NUNCA fala com clientes diretamente.",
+        "logLevel": "error",
+        "alertAdmins": true
+      },
+      {
+        "id": "rule-002",
+        "name": "Reports SÓ no Production",
+        "condition": "report.destination != 'nexo-production-2026'",
+        "action": "redirect",
+        "severity": "warning",
+        "message": "⚠️ REDIRECIONADO: Report destinado a grupo não-autorizado. Enviando para Production.",
+        "logLevel": "warn",
+        "alertAdmins": false
+      },
+      {
+        "id": "rule-003",
+        "name": "Mensagens de sistema só no internal",
+        "condition": "message.type == 'system' AND group.type != 'internal'",
+        "action": "block",
+        "severity": "high",
+        "message": "🚫 BLOQUEADO: Mensagem de sistema em grupo não-interno.",
+        "logLevel": "error",
+        "alertAdmins": true
+      }
+    ]
+  },
+  "crossReferences": {
+    "contactsMap": "backend/data/schema/contacts-map.json",
+    "clientsRegistry": "backend/data/schema/clients-registry.json",
+    "projectsRegistry": "backend/data/schema/projects-registry.json"
+  }
+}

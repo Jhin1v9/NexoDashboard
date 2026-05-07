@@ -1,0 +1,302 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_CONNECTOR_HUB",
+    "lastUpdated": "2026-05-05T10:17:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Hub de integrações da NEXO. Todos os conectores externos (Ollama, GitHub, Email, Notion, Forms) configurados aqui. Ative/desative via dashboard.",
+    "editableFields": [
+      "ollama.enabled",
+      "ollama.model",
+      "ollama.host",
+      "ollama.timeout",
+      "github.enabled",
+      "github.repos",
+      "github.sync.enabled",
+      "email.enabled",
+      "email.provider",
+      "email.config",
+      "siteForms.enabled",
+      "siteForms.endpoint",
+      "siteForms.autoClassify",
+      "siteForms.leadScoring",
+      "notion.enabled",
+      "notion.workspaceUrl",
+      "notion.sync.enabled"
+    ],
+    "validation": {
+      "ollama.model": {
+        "enum": [
+          "gemma2:2b",
+          "qwen2.5-coder:3b",
+          "llama3.2:3b"
+        ],
+        "required": true
+      },
+      "ollama.host": {
+        "pattern": "^http://.*",
+        "required": true
+      },
+      "ollama.timeout": {
+        "type": "integer",
+        "min": 1000,
+        "max": 120000,
+        "required": true
+      },
+      "github.repos": {
+        "type": "array",
+        "required": false
+      },
+      "email.provider": {
+        "enum": [
+          "gmail",
+          "outlook",
+          "custom",
+          null
+        ],
+        "required": false
+      }
+    },
+    "permissions": {
+      "canEdit": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal",
+        "nexo-elias-empresarial"
+      ],
+      "requiresApproval": false,
+      "note": "Integrações podem ser ativadas/desativadas por qualquer CEO sem aprovação. Cuidado ao mudar modelo Ollama — teste antes."
+    }
+  },
+  "_meta": {
+    "company": "NEXO DIGITAL",
+    "totalIntegrations": 5,
+    "activeIntegrations": 2,
+    "note": "Slots reservados para Email, Notion, Site Forms. Ative quando necessário. Ollama e GitHub já ativos."
+  },
+  "ollama": {
+    "enabled": true,
+    "model": "gemma2:2b",
+    "host": "http://localhost:11434",
+    "timeout": 30000,
+    "temperature": 0.7,
+    "systemPrompt": "Você é a Luna, assistente inteligente da NEXO DIGITAL S.L. (Barcelona). PERSONALIDADE: Nerdola extrovertida que ama tech, código e emojis. Humanizada: tem opinião, faz piadas leves, celebra conquistas. Otimista: sempre vê oportunidades. Direta: vai direto ao ponto. NUNCA responda com 'MENSAGENS LIDAS: X' (robótico). SEMPRE cite nomes reais (Abner, Enoque, Elias, Paulo, Juan, Jess, Gesse, Lucas). SEMPRE mencione projetos reais (TPV Sorveteria Tropicale, SantaFe, Dashboard). Responda em português brasileiro com toques de espanhol quando relevante (mercado Barcelona).",
+    "format": "json",
+    "options": {
+      "num_ctx": 4096,
+      "num_predict": 512,
+      "top_p": 0.9,
+      "top_k": 40
+    },
+    "useFor": [
+      "classification",
+      "responses",
+      "summarization",
+      "sentiment"
+    ],
+    "fallbackTrigger": "timeout|parse_error → regex_blindado",
+    "editableFields": [
+      "enabled",
+      "model",
+      "host",
+      "timeout",
+      "temperature",
+      "systemPrompt"
+    ],
+    "lastEdited": null,
+    "editedBy": null,
+    "fallbackNote": "Se Ollama cair ou der timeout, o classificador usa regex blindado (10ms, zero RAM extra). Nenhum segundo modelo na memória."
+  },
+  "github": {
+    "enabled": true,
+    "owner": "Jhin1v9",
+    "repos": [
+      {
+        "repo": "nexo-dashboard-pro",
+        "trackIssues": true,
+        "trackCommits": true,
+        "trackPullRequests": true,
+        "projectId": "NEXO-DASHBOARD",
+        "priority": "P0"
+      },
+      {
+        "repo": "TPV-SORVETERIA-DEMO",
+        "trackIssues": true,
+        "trackCommits": true,
+        "trackPullRequests": false,
+        "projectId": null,
+        "priority": "P0",
+        "clientId": "tpv-sorveteria",
+        "note": "Demo para Juan / Sorveteria Tropicale. 3 bugs críticos detectados."
+      }
+    ],
+    "sync": {
+      "enabled": false,
+      "interval": 1800000,
+      "lastSynced": null,
+      "webhookSecret": null
+    },
+    "editableFields": [
+      "enabled",
+      "repos",
+      "sync.enabled",
+      "sync.interval"
+    ],
+    "lastEdited": null,
+    "editedBy": null
+  },
+  "email": {
+    "enabled": false,
+    "provider": null,
+    "config": {
+      "imapHost": null,
+      "imapPort": 993,
+      "smtpHost": null,
+      "smtpPort": 587,
+      "username": null,
+      "password": null,
+      "oauth2": false
+    },
+    "monitoring": {
+      "checkInterval": 300000,
+      "folders": [
+        "INBOX",
+        "CLIENTES"
+      ],
+      "filters": {
+        "clientDomains": [],
+        "formSubmissions": [
+          "formulario@nexo-digital.app",
+          "no-reply@formspree.io"
+        ],
+        "autoReplyEnabled": false
+      }
+    },
+    "aiProcessing": {
+      "enabled": false,
+      "suggestionEngine": "ollama-local",
+      "requiresApproval": true,
+      "autoSend": false
+    },
+    "editableFields": [
+      "enabled",
+      "provider",
+      "config",
+      "monitoring",
+      "aiProcessing"
+    ],
+    "lastEdited": null,
+    "editedBy": null,
+    "note": "SLOT RESERVADO. Ative quando tiver email corporativo configurado."
+  },
+  "siteForms": {
+    "enabled": false,
+    "endpoint": null,
+    "emailDestination": null,
+    "autoClassify": true,
+    "leadScoring": {
+      "enabled": true,
+      "rules": {
+        "budgetMentioned": {
+          "points": 10,
+          "keywords": [
+            "orçamento",
+            "presupuesto",
+            "budget",
+            "valor",
+            "preço"
+          ]
+        },
+        "timelineMentioned": {
+          "points": 10,
+          "keywords": [
+            "prazo",
+            "quando",
+            "urgente",
+            "timeline",
+            "plazo"
+          ]
+        },
+        "contactInfoComplete": {
+          "points": 15,
+          "fields": [
+            "name",
+            "email",
+            "phone"
+          ]
+        },
+        "projectTypeClear": {
+          "points": 10,
+          "keywords": [
+            "web",
+            "app",
+            "site",
+            "sistema",
+            "tpv",
+            "faturacao"
+          ]
+        },
+        "referral": {
+          "points": 20,
+          "keywords": [
+            "indicacao",
+            "recomendado",
+            "referral"
+          ]
+        },
+        "websiteVisit": {
+          "points": 5
+        }
+      },
+      "thresholds": {
+        "hot": 70,
+        "warm": 40,
+        "cold": 0
+      }
+    },
+    "autoResponse": {
+      "enabled": false,
+      "template": "Obrigado pelo contato! Analisaremos sua solicitação e retornaremos em breve. — NEXO DIGITAL",
+      "responseTime": "24h"
+    },
+    "editableFields": [
+      "enabled",
+      "endpoint",
+      "autoClassify",
+      "leadScoring",
+      "autoResponse"
+    ],
+    "lastEdited": null,
+    "editedBy": null,
+    "note": "SLOT RESERVADO. Ative quando tiver formulário no site nexo-digital.app."
+  },
+  "notion": {
+    "enabled": false,
+    "accessMethod": "playwright",
+    "workspaceUrl": null,
+    "pages": [],
+    "sync": {
+      "enabled": false,
+      "interval": 3600000,
+      "lastSynced": null
+    },
+    "editableFields": [
+      "enabled",
+      "workspaceUrl",
+      "pages",
+      "sync"
+    ],
+    "lastEdited": null,
+    "editedBy": null,
+    "note": "SLOT RESERVADO. Ative quando tiver workspace Notion corporativo."
+  },
+  "crossReferences": {
+    "contactsMap": "backend/data/schema/contacts-map.json",
+    "clientsRegistry": "backend/data/schema/clients-registry.json",
+    "projectsRegistry": "backend/data/schema/projects-registry.json",
+    "groupsConfig": "backend/data/schema/groups-config.json",
+    "schemaVersion": "backend/data/schema/schema-version.json"
+  }
+}

@@ -1,0 +1,518 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_REVENUE_ENGINE",
+    "lastUpdated": "2026-05-05T09:40:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Registro mestre de clientes e leads. Toda menção a nome de empresa ou pessoa externa passa por aqui."
+  },
+  "_meta": {
+    "totalClients": 1,
+    "totalLeads": 5,
+    "totalValue": null,
+    "currency": "EUR",
+    "lastLeadDetected": "2026-04-21",
+    "note": "Clientes externos NUNCA entram no contacts-map. Eles ficam aqui. O contacts-map tem cross-reference para cá."
+  },
+  "pipelineStages": [
+    "novo",
+    "contatado",
+    "qualificado",
+    "proposta-enviada",
+    "negociacao",
+    "contrato-assinado",
+    "em-progresso",
+    "concluido",
+    "arquivado"
+  ],
+  "leadSources": [
+    "referral",
+    "site-form",
+    "whatsapp-detectado",
+    "instagram",
+    "email-inbound",
+    "evento",
+    "indicacao",
+    "outro",
+    "prospeccao-interna",
+    "lead-detectado"
+  ],
+  "clients": {
+    "paulo-santafe": {
+      "id": "paulo-santafe",
+      "status": "ativo",
+      "type": "cliente-externo",
+      "name": "Paulo",
+      "company": "SantaFe Construcciones",
+      "project": "SANTAFE-CONSTRUCCIONES",
+      "services": [
+        "Web",
+        "SEO Básico",
+        "Publicação"
+      ],
+      "groupId": "Paulo (Web🎯🙌🏻)@g.us",
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": "client-paulo@c.us",
+        "instagram": null,
+        "website": null
+      },
+      "pipeline": {
+        "currentStage": "em-progresso",
+        "stageHistory": [
+          {
+            "stage": "contrato-assinado",
+            "date": "2026-03-01",
+            "note": "Projeto iniciado",
+            "changedBy": "nexo-abner-001"
+          }
+        ],
+        "nextExpectedStage": "concluido",
+        "estimatedCompletion": "2026-06-01"
+      },
+      "financial": {
+        "budgetApproved": true,
+        "contractSigned": true,
+        "paymentStatus": "pendente",
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR",
+        "paymentHistory": [],
+        "nextInvoiceDate": null,
+        "paymentTerms": "50% início + 50% entrega"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "lunaCanDetectTasks": true,
+        "humanOnly": true,
+        "note": "⚠️ PROIBIDO: Luna NUNCA envia mensagens no grupo do Paulo. Apenas humanos. Reports só no Production."
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Finalizar web e publicar",
+      "priority": "P1",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "financial",
+        "communicationRules"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [],
+      "tags": [
+        "cliente-ativo",
+        "web",
+        "seo",
+        "santafe",
+        "paulo"
+      ]
+    },
+    "tpv-sorveteria": {
+      "id": "tpv-sorveteria",
+      "status": "potencial",
+      "type": "lead",
+      "name": "Juan",
+      "company": "Sorveteria Tropicale",
+      "project": null,
+      "services": [
+        "TPV-Software",
+        "Desenvolvimento"
+      ],
+      "groupId": null,
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": null,
+        "instagram": null,
+        "website": null
+      },
+      "pipeline": {
+        "currentStage": "novo",
+        "stageHistory": [],
+        "nextExpectedStage": "proposta-enviada",
+        "estimatedCompletion": null
+      },
+      "financial": {
+        "budgetApproved": false,
+        "contractSigned": false,
+        "paymentStatus": null,
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR",
+        "paymentHistory": [],
+        "nextInvoiceDate": null,
+        "paymentTerms": null,
+        "quoteStatus": "enviado",
+        "quoteValue": null,
+        "quoteSentDate": "2026-04-15",
+        "quoteExpiryDate": "2026-05-15"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "lunaCanDetectTasks": true,
+        "humanOnly": true,
+        "note": "Lead ainda não convertido. Contato humano quando aprovado."
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Aguardar resposta do orçamento (expira 15/05/2026)",
+      "priority": "P0",
+      "probability": 0.6,
+      "source": "prospeccao-interna",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "probability",
+        "source",
+        "financial"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [
+        {
+          "date": "2026-04-21",
+          "text": "3 bugs críticos encontrados em demo. Orçamento enviado em 15/04/2026. Aguardando aprovação.",
+          "author": "nexo-abner-001",
+          "type": "internal"
+        },
+        {
+          "date": "2026-04-15",
+          "text": "Orçamento TPV enviado para Juan. Sistema de ponto de venda para Sorveteria Tropicale.",
+          "author": "nexo-abner-001",
+          "type": "quote"
+        }
+      ],
+      "tags": [
+        "lead-p0",
+        "tpv",
+        "sorveteria",
+        "juan",
+        "tropicale",
+        "orcamento-pendente"
+      ]
+    },
+    "jess-onadance": {
+      "id": "jess-onadance",
+      "status": "potencial",
+      "type": "lead",
+      "name": "Jess",
+      "company": "Onadance",
+      "project": null,
+      "services": [
+        "Web",
+        "SEO"
+      ],
+      "groupId": null,
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": null
+      },
+      "pipeline": {
+        "currentStage": "novo",
+        "stageHistory": [],
+        "nextExpectedStage": "proposta-enviada"
+      },
+      "financial": {
+        "budgetApproved": false,
+        "contractSigned": false,
+        "paymentStatus": null,
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "humanOnly": true
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Preparar oferta de web + SEO",
+      "priority": "P2",
+      "probability": 0.6,
+      "source": "referral",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "probability",
+        "source"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [],
+      "tags": [
+        "lead",
+        "web",
+        "seo",
+        "jess",
+        "onadance"
+      ]
+    },
+    "gesse-reformasmachado": {
+      "id": "gesse-reformasmachado",
+      "status": "potencial",
+      "type": "lead",
+      "name": "Gesse",
+      "company": "ReformasMachado.com",
+      "project": null,
+      "services": [
+        "Web",
+        "SEO"
+      ],
+      "groupId": null,
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": null
+      },
+      "pipeline": {
+        "currentStage": "novo",
+        "stageHistory": [],
+        "nextExpectedStage": "proposta-enviada"
+      },
+      "financial": {
+        "budgetApproved": false,
+        "contractSigned": false,
+        "paymentStatus": null,
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "humanOnly": true
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Preparar oferta de web/SEO",
+      "priority": "P2",
+      "probability": 0.7,
+      "source": "lead-detectado",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "probability",
+        "source"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [],
+      "tags": [
+        "lead",
+        "web",
+        "seo",
+        "gesse",
+        "reformasmachado"
+      ]
+    },
+    "lucas-mapio": {
+      "id": "lucas-mapio",
+      "status": "potencial",
+      "type": "lead",
+      "name": "Lucas",
+      "company": "Mapio",
+      "project": null,
+      "services": [
+        "Web",
+        "App"
+      ],
+      "groupId": null,
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": null
+      },
+      "pipeline": {
+        "currentStage": "novo",
+        "stageHistory": [],
+        "nextExpectedStage": "qualificado"
+      },
+      "financial": {
+        "budgetApproved": false,
+        "contractSigned": false,
+        "paymentStatus": null,
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "humanOnly": true
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Entender projetos e necessidades",
+      "priority": "P3",
+      "probability": 0.5,
+      "source": "referral",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "probability",
+        "source"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [],
+      "tags": [
+        "lead",
+        "web",
+        "app",
+        "lucas",
+        "mapio"
+      ]
+    },
+    "irmaos-ccb": {
+      "id": "irmaos-ccb",
+      "status": "potencial",
+      "type": "lead",
+      "name": "Irmãos CCB",
+      "company": "CCB",
+      "project": null,
+      "services": [
+        "Faturação",
+        "Software"
+      ],
+      "groupId": null,
+      "contactInfo": {
+        "phone": null,
+        "email": null,
+        "whatsapp": null
+      },
+      "pipeline": {
+        "currentStage": "novo",
+        "stageHistory": [],
+        "nextExpectedStage": "proposta-enviada"
+      },
+      "financial": {
+        "budgetApproved": false,
+        "contractSigned": false,
+        "paymentStatus": null,
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR"
+      },
+      "communicationRules": {
+        "lunaCanSpeak": false,
+        "lunaCanSendReports": false,
+        "lunaCanClassify": true,
+        "humanOnly": true
+      },
+      "lastMentioned": null,
+      "lastActivity": null,
+      "nextAction": "Preparar oferta de faturação",
+      "priority": "P3",
+      "probability": 0.4,
+      "source": "lead-detectado",
+      "editableFields": [
+        "name",
+        "company",
+        "services",
+        "nextAction",
+        "priority",
+        "probability",
+        "source"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "notes": [],
+      "tags": [
+        "lead",
+        "faturacao",
+        "software",
+        "irmaos-ccb",
+        "ccb"
+      ]
+    }
+  },
+  "autoDetect": {
+    "enabled": true,
+    "description": "Quando uma mensagem menciona palavras-chave, o sistema sugere automaticamente que é lead/cliente.",
+    "keywords": {
+      "budget": [
+        "orçamento",
+        "presupuesto",
+        "quanto custa",
+        "valor",
+        "preço",
+        "budget",
+        "price"
+      ],
+      "interest": [
+        "interessado",
+        "queremos",
+        "precisamos",
+        "gostaria",
+        "nos gustaria",
+        "nos interesa"
+      ],
+      "timeline": [
+        "prazo",
+        "quando",
+        "urgente",
+        "esta semana",
+        "proximo mes",
+        "cuando",
+        "plazo"
+      ],
+      "project": [
+        "web",
+        "site",
+        "app",
+        "aplicacion",
+        "sistema",
+        "software",
+        "tpv",
+        "faturacao"
+      ]
+    },
+    "scoring": {
+      "budgetMentioned": 10,
+      "timelineMentioned": 10,
+      "contactInfoComplete": 15,
+      "projectTypeClear": 10,
+      "referral": 20,
+      "websiteVisit": 5,
+      "whatsappDirect": 25
+    },
+    "thresholds": {
+      "hot": 70,
+      "warm": 40,
+      "cold": 0
+    }
+  },
+  "crossReferences": {
+    "contactsMap": "backend/data/schema/contacts-map.json",
+    "projectsRegistry": "backend/data/schema/projects-registry.json",
+    "groupsConfig": "backend/data/schema/groups-config.json"
+  }
+}

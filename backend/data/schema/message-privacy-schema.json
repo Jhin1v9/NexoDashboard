@@ -1,0 +1,53 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "lastUpdated": "2026-05-04T19:50:00Z"
+  },
+  "privacy": {
+    "containsSensitiveData": {
+      "type": "boolean",
+      "default": false
+    },
+    "sensitiveType": {
+      "type": "string",
+      "enum": [
+        "financial",
+        "personal",
+        "health",
+        "legal",
+        "none"
+      ],
+      "default": "none"
+    },
+    "encryptionLevel": {
+      "type": "string",
+      "enum": [
+        "none",
+        "partial",
+        "full"
+      ],
+      "default": "none"
+    },
+    "retentionDays": {
+      "type": "number",
+      "default": 365
+    },
+    "gdprCompliant": {
+      "type": "boolean",
+      "default": true
+    },
+    "canShareExternally": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowedViewers": {
+      "type": "array",
+      "items": "string",
+      "default": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-001"
+      ]
+    }
+  }
+}

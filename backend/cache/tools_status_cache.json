@@ -2,28 +2,30 @@
   "data": [
     {
       "name": "Node.js",
-      "version": "v24.13.0",
+      "version": "v24.15.0",
       "ok": true
     },
     {
       "name": "npm",
-      "version": "11.6.2",
+      "version": "11.12.1",
       "ok": true
     },
     {
       "name": "Git",
-      "version": "git version 2.53.0.windows.2",
+      "version": "git version 2.43.0",
       "ok": true
     },
     {
       "name": "GitHub CLI",
-      "version": "gh version 2.92.0 (2026-04-28)",
-      "ok": true
+      "version": null,
+      "ok": false,
+      "error": "exit_code"
     },
     {
       "name": "Vercel CLI",
-      "version": "52.0.0",
-      "ok": true
+      "version": null,
+      "ok": false,
+      "error": "exit_code"
     },
     {
       "name": "Supabase CLI",
@@ -32,6 +34,6 @@
       "error": "exit_code"
     }
   ],
-  "ts": 1778095823034,
+  "ts": 1778155328536,
   "ttl": 600000
 }

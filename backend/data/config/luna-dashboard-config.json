@@ -1,0 +1,291 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_VISUAL_ENGINE",
+    "lastUpdated": "2026-05-05T10:27:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Configuração visual e de envio do dashboard Luna. Cores, resolução, comandos WhatsApp, seções e controle de envio automático.",
+    "editableFields": [
+      "screenshot.resolution",
+      "screenshot.quality",
+      "screenshot.darkMode",
+      "sendControl.enabled",
+      "sendControl.autoSend",
+      "sendControl.autoSendInterval",
+      "sendControl.cooldownAfterSend",
+      "theme.primary",
+      "theme.secondary",
+      "theme.accent",
+      "sections.kpis.enabled",
+      "sections.tasksBoard.enabled",
+      "sections.leadsPipeline.enabled",
+      "sections.clientsStatus.enabled",
+      "sections.projectsProgress.enabled",
+      "sections.linksIntelligence.enabled",
+      "sections.activityTimeline.enabled",
+      "sections.alertsActions.enabled",
+      "sections.newsEngine.enabled"
+    ],
+    "validation": {
+      "screenshot.resolution.width": {
+        "type": "integer",
+        "min": 800,
+        "max": 3840,
+        "required": true
+      },
+      "screenshot.resolution.height": {
+        "type": "integer",
+        "min": 600,
+        "max": 2160,
+        "required": true
+      },
+      "screenshot.quality": {
+        "type": "integer",
+        "min": 50,
+        "max": 100,
+        "required": true
+      },
+      "theme.primary": {
+        "pattern": "^#[0-9A-Fa-f]{6}$",
+        "required": true
+      },
+      "sendControl.autoSendInterval": {
+        "type": "integer",
+        "min": 300000,
+        "max": 86400000,
+        "required": true
+      }
+    },
+    "permissions": {
+      "canEdit": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal",
+        "nexo-elias-empresarial"
+      ],
+      "requiresApproval": false,
+      "note": "Configurações visuais podem ser alteradas por qualquer CEO sem aprovação."
+    }
+  },
+  "_meta": {
+    "company": "NEXO DIGITAL",
+    "themeName": "NEXO Dark",
+    "resolution": "1920x1080 @ 1.5x",
+    "totalSections": 10,
+    "activeSections": 10,
+    "note": "Dashboard visual enviado como screenshot PNG no grupo Production via WhatsApp."
+  },
+  "screenshot": {
+    "resolution": {
+      "width": 1920,
+      "height": 1080,
+      "deviceScaleFactor": 1.5,
+      "type": "desktop"
+    },
+    "quality": 90,
+    "format": "png",
+    "fullPage": false,
+    "darkMode": true,
+    "viewport": {
+      "isMobile": false,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    },
+    "playwrightOptions": {
+      "waitUntil": "networkidle",
+      "timeout": 30000,
+      "injectDarkMode": true,
+      "hideScrollbars": true,
+      "captureBeyondViewport": false
+    }
+  },
+  "sendControl": {
+    "enabled": true,
+    "autoSend": true,
+    "autoSendInterval": 1800000,
+    "cooldownAfterSend": 86400000,
+    "lastSent": null,
+    "nextScheduled": null,
+    "manualOverride": false,
+    "maxRetries": 3,
+    "retryDelay": 5000,
+    "commands": {
+      "sendNow": "/dashboard",
+      "disableAuto": "/dashboard-off",
+      "enableAuto": "/dashboard-on",
+      "status": "/dashboard-status",
+      "forceNow": "/dashboard agora"
+    },
+    "rules": {
+      "sendIfBufferEmpty": false,
+      "sendIfNoNews": false,
+      "minimumMessagesForReport": 1,
+      "skipIfGroupInactive": true,
+      "groupInactiveThreshold": 3600000
+    }
+  },
+  "theme": {
+    "name": "NEXO Dark",
+    "primary": "#00D4FF",
+    "secondary": "#0A1628",
+    "accent": "#FF6B35",
+    "success": "#00C853",
+    "warning": "#FFB300",
+    "danger": "#FF1744",
+    "info": "#2979FF",
+    "background": "#0D1117",
+    "surface": "#161B22",
+    "surfaceElevated": "#1C2128",
+    "textPrimary": "#E6EDF3",
+    "textSecondary": "#8B949E",
+    "textMuted": "#6E7681",
+    "border": "#30363D",
+    "borderLight": "#21262D",
+    "gradient": "linear-gradient(135deg, #00D4FF 0%, #0A1628 100%)",
+    "gradientAccent": "linear-gradient(90deg, #FF6B35 0%, #FFB300 100%)",
+    "fontFamily": "'Inter', 'Segoe UI', system-ui, sans-serif",
+    "fontMono": "'JetBrains Mono', 'Fira Code', monospace",
+    "borderRadius": "12px",
+    "shadow": "0 8px 32px rgba(0, 212, 255, 0.15)",
+    "shadowElevated": "0 16px 48px rgba(0, 212, 255, 0.25)"
+  },
+  "sections": {
+    "kpis": {
+      "enabled": true,
+      "order": 1,
+      "title": "📊 KPIs do Dia",
+      "icon": "📈",
+      "description": "Total de mensagens, tarefas pendentes, leads ativos, links analisados",
+      "metrics": [
+        "totalMessages",
+        "pendingTasks",
+        "activeLeads",
+        "linksAnalyzed",
+        "bugsDetected"
+      ]
+    },
+    "teamRadar": {
+      "enabled": true,
+      "order": 2,
+      "title": "👥 Team Radar",
+      "icon": "🎯",
+      "description": "Quem falou quanto, última atividade, streak de contribuição",
+      "metrics": [
+        "messagesPerMember",
+        "lastActivity",
+        "contributionStreak"
+      ]
+    },
+    "tasksBoard": {
+      "enabled": true,
+      "order": 3,
+      "title": "📋 Tarefas Board",
+      "icon": "✅",
+      "description": "Kanban: A Fazer → Em Progresso → Concluído",
+      "columns": [
+        "a-fazer",
+        "em-progresso",
+        "concluido",
+        "arquivado"
+      ]
+    },
+    "leadsPipeline": {
+      "enabled": true,
+      "order": 4,
+      "title": "🎯 Leads Pipeline",
+      "icon": "🎣",
+      "description": "Jess, Gesse, Lucas, CCB, Juan (Sorveteria Tropicale) com probabilidade",
+      "stages": [
+        "novo",
+        "contatado",
+        "qualificado",
+        "proposta-enviada",
+        "negociacao"
+      ]
+    },
+    "linksIntelligence": {
+      "enabled": true,
+      "order": 5,
+      "title": "🔗 Links Intelligence",
+      "icon": "🌐",
+      "description": "Cards com preview: título, descrição, tipo (Instagram, GitHub, Demo)",
+      "maxLinks": 10,
+      "fetchMetadata": true
+    },
+    "clientsStatus": {
+      "enabled": true,
+      "order": 6,
+      "title": "👤 Clientes Status",
+      "icon": "💼",
+      "description": "Paulo (SantaFe) + status de pagamento, última menção, próxima ação",
+      "showFinancial": true,
+      "showPipeline": true
+    },
+    "projectsProgress": {
+      "enabled": true,
+      "order": 7,
+      "title": "🚀 Projetos Progress",
+      "icon": "📊",
+      "description": "SantaFe, Dashboard (NEXO) com milestones e % concluído",
+      "showMilestones": true,
+      "showBugs": true
+    },
+    "activityTimeline": {
+      "enabled": true,
+      "order": 8,
+      "title": "⏱️ Activity Timeline",
+      "icon": "📅",
+      "description": "Timeline visual das últimas 24h: mensagens, decisões, links",
+      "hoursBack": 24,
+      "granularity": "hour"
+    },
+    "alertsActions": {
+      "enabled": true,
+      "order": 9,
+      "title": "🚨 Alertas & Ações",
+      "icon": "⚡",
+      "description": "P0s, deadlines, follow-ups pendentes, orçamentos expirando",
+      "alertTypes": [
+        "P0",
+        "deadline",
+        "follow-up",
+        "quote-expiry",
+        "bug-critical"
+      ],
+      "maxAlerts": 5
+    },
+    "newsEngine": {
+      "enabled": true,
+      "order": 10,
+      "title": "📰 News Engine",
+      "icon": "📡",
+      "description": "Notícias não categorizadas com relevância e contexto",
+      "maxNews": 8,
+      "minRelevance": 0.3
+    }
+  },
+  "reportFormat": {
+    "header": {
+      "showLogo": true,
+      "showDate": true,
+      "showTime": true,
+      "title": "🌙 LUNA REPORT",
+      "subtitle": "NEXO DIGITAL — Barcelona"
+    },
+    "footer": {
+      "showVersion": true,
+      "showTimestamp": true,
+      "text": "Luna v16.0 | NEXO DIGITAL S.L. | Barcelona, Espanha"
+    },
+    "caption": "🌙 LUNA REPORT — {timestamp} | {totalMessages} msgs | {pendingTasks} tarefas | {activeLeads} leads"
+  },
+  "crossReferences": {
+    "contactsMap": "backend/data/schema/contacts-map.json",
+    "clientsRegistry": "backend/data/schema/clients-registry.json",
+    "projectsRegistry": "backend/data/schema/projects-registry.json",
+    "groupsConfig": "backend/data/schema/groups-config.json",
+    "integrationsConfig": "backend/data/config/integrations-config.json",
+    "schemaVersion": "backend/data/schema/schema-version.json"
+  }
+}
