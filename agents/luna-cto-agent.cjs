@@ -115,6 +115,26 @@ const CONFIG = {
   DEBUG_DIR: path.join(__dirname, '../ARTIFACTS/debug')
 };
 
+function resolveChromeExecutable() {
+  const candidates = [
+    process.env.LUNA_CHROME_PATH,
+    process.env.CHROME_PATH,
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/opt/google/chrome/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/snap/bin/chromium',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  ].filter(Boolean);
+
+  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+}
+
+const CHROME_EXECUTABLE = resolveChromeExecutable();
+
 // Criar diretÃ³rios
 [CONFIG.REPORTS_DIR, CONFIG.ARTIFACTS_DIR, CONFIG.DEBUG_DIR, SESSION_DATA_PATH].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
@@ -639,15 +659,40 @@ class LunaAgent {
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--no-first-run',
+          '--no-default-browser-check',
           `--remote-debugging-port=${CONFIG.CDP_PORT}`
         ],
-        executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe'
+        ...(CHROME_EXECUTABLE ? { executablePath: CHROME_EXECUTABLE } : {})
       }
     });
+
+    const shutdown = async (signal) => {
+      log.warn(`[SHUTDOWN] ${signal} recebido. Salvando sessao WhatsApp antes de sair...`);
+      try {
+        if (this.client) await this.client.destroy();
+        log.success('[SHUTDOWN] Sessao WhatsApp persistida.');
+      } catch (e) {
+        log.warn(`[SHUTDOWN] Falha ao destruir client: ${e.message}`);
+      } finally {
+        process.exit(0);
+      }
+    };
+    process.once('SIGINT', () => shutdown('SIGINT'));
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
 
     this.client.on('qr', (qr) => {
       log.warn('QR Code! Escaneie:');
       qrcode.generate(qr, { small: true });
+    });
+
+    this.client.on('authenticated', () => {
+      log.success(`[AUTH] WhatsApp autenticado. Sessao salva em: ${SESSION_DATA_PATH}`);
+    });
+
+    this.client.on('loading_screen', (percent, message) => {
+      log.info(`[LOADING] WhatsApp ${percent}% - ${message || ''}`);
     });
 
     const readyPromise = new Promise((resolve, reject) => {
@@ -746,9 +791,23 @@ class LunaAgent {
     });
 
     this.client.on('auth_failure', (msg) => log.error(`Auth: ${msg}`));
-    this.client.on('disconnected', (reason) => { log.warn(`Desconectado: ${reason}`); this.ready = false; });
+    this.client.on('disconnected', (reason) => {
+      log.warn(`Desconectado: ${reason}`);
+      this.ready = false;
+    });
 
-    await this.client.initialize();
+    try {
+      await this.client.initialize();
+    } catch (e) {
+      const transient = /Execution context was destroyed|Target closed|Protocol error/i.test(e.message || '');
+      if (!transient) throw e;
+      log.warn(`[INIT] Chrome/WhatsApp recarregou durante boot (${e.message}). Tentando reaproveitar sessao salva em 5s...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      try {
+        if (this.client) await this.client.destroy();
+      } catch (_) {}
+      return this.init(options);
+    }
     return readyPromise;
   }
 
@@ -1826,8 +1885,8 @@ function diagnose() {
     outputFile: CONFIG.OUTPUT_FILE,
     reportsDir: CONFIG.REPORTS_DIR,
     artifactsDir: CONFIG.ARTIFACTS_DIR,
-    chromePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
-    chromeExists: fs.existsSync('C:/Program Files/Google/Chrome/Application/chrome.exe')
+    chromePath: CHROME_EXECUTABLE,
+    chromeExists: Boolean(CHROME_EXECUTABLE)
   };
   console.log(JSON.stringify(checks, null, 2));
   return checks;
