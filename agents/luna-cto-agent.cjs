@@ -434,15 +434,51 @@ class PlaywrightExtractor {
             const textEl = el.querySelector('.selectable-text, .copyable-text, [dir="ltr"]');
             const text = textEl ? textEl.innerText : '';
             let author = 'Desconhecido';
+            let authorPhone = null;
+            
+            // Estratégia 1: data-pre-plain-text [hora] Nome: 
             const preText = el.getAttribute('data-pre-plain-text');
             if (preText) {
               const match = preText.match(/\]\s*([^:]+):/);
               if (match) author = match[1].trim();
             }
+            
+            // Estratégia 2: data-id contém número de telefone (formato WhatsApp Web)
+            // Ex: false_34689135159@c.us_3EB0... ou true_34685093192@c.us_...
+            if (author === 'Desconhecido') {
+              const dataId = el.getAttribute('data-id') || '';
+              const phoneMatch = dataId.match(/_(\d+)(@c\.us|@lid)/);
+              if (phoneMatch) {
+                authorPhone = phoneMatch[1] + phoneMatch[2];
+                author = authorPhone;
+              }
+            }
+            
+            // Estratégia 3: elemento irmão com classe de nome de contato
+            if (author === 'Desconhecido') {
+              const nameEl = el.querySelector('[data-testid="msg-meta"] span[title], .message-author, [dir="auto"][class*="copyable-text"]');
+              if (nameEl && nameEl.title) {
+                author = nameEl.title.trim();
+              }
+            }
+            
+            // Estratégia 4: container pai tem atributo com número
+            if (author === 'Desconhecido') {
+              const container = el.closest('[data-id]') || el.parentElement;
+              if (container) {
+                const containerId = container.getAttribute('data-id') || '';
+                const phoneMatch = containerId.match(/_(\d+)(@c\.us|@lid)/);
+                if (phoneMatch) {
+                  authorPhone = phoneMatch[1] + phoneMatch[2];
+                  author = authorPhone;
+                }
+              }
+            }
+            
             const timeEl = el.querySelector('[data-testid="msg-meta"], .msg-time');
             const time = timeEl ? timeEl.innerText : '';
-            const id = el.getAttribute('data-id') || (text + author + time).slice(0, 50);
-            if (text || id) msgs.push({ id, author, text, time });
+            const id = el.getAttribute('data-id') || Array.from(text + author + time).slice(0, 50).join('');
+            if (text || id) msgs.push({ id, author, text, time, authorPhone });
           } catch (e) {}
         });
         return msgs;
@@ -504,15 +540,50 @@ class PlaywrightExtractor {
           const textEl = el.querySelector('.selectable-text, .copyable-text, [dir="ltr"]');
           const text = textEl ? textEl.innerText : '';
           let author = 'Desconhecido';
+          let authorPhone = null;
+          
+          // Estratégia 1: data-pre-plain-text [hora] Nome: 
           const preText = el.getAttribute('data-pre-plain-text');
           if (preText) {
             const match = preText.match(/\]\s*([^:]+):/);
             if (match) author = match[1].trim();
           }
+          
+          // Estratégia 2: data-id contém número de telefone
+          if (author === 'Desconhecido') {
+            const dataId = el.getAttribute('data-id') || '';
+            const phoneMatch = dataId.match(/_(\d+)(@c\.us|@lid)/);
+            if (phoneMatch) {
+              authorPhone = phoneMatch[1] + phoneMatch[2];
+              author = authorPhone;
+            }
+          }
+          
+          // Estratégia 3: elemento com title do contato
+          if (author === 'Desconhecido') {
+            const nameEl = el.querySelector('[data-testid="msg-meta"] span[title], .message-author');
+            if (nameEl && nameEl.title) {
+              author = nameEl.title.trim();
+            }
+          }
+          
+          // Estratégia 4: container pai
+          if (author === 'Desconhecido') {
+            const container = el.closest('[data-id]') || el.parentElement;
+            if (container) {
+              const containerId = container.getAttribute('data-id') || '';
+              const phoneMatch = containerId.match(/_(\d+)(@c\.us|@lid)/);
+              if (phoneMatch) {
+                authorPhone = phoneMatch[1] + phoneMatch[2];
+                author = authorPhone;
+              }
+            }
+          }
+          
           const timeEl = el.querySelector('[data-testid="msg-meta"], .msg-time');
           const time = timeEl ? timeEl.innerText : '';
-          const id = el.getAttribute('data-id') || (text + author + time).slice(0, 50);
-          if (text || id) msgs.push({ id, author, text, time });
+          const id = el.getAttribute('data-id') || Array.from(text + author + time).slice(0, 50).join('');
+          if (text || id) msgs.push({ id, author, text, time, authorPhone });
         } catch (e) {}
       });
       return msgs;
@@ -1868,11 +1939,12 @@ class LunaAgent {
 
       const seen = new Set(history.map(m => m.id).filter(Boolean));
       for (const msg of messages) {
-        const authorName = msg.authorName || msg.pushname || msg.author || msg.from || 'Desconhecido';
-        const resolved = resolveAuthor(authorName);
-        const resolvedName = resolved.confidence > 0 ? resolved.name : (aliasMap[authorName] || authorName);
+        // Prioridade: authorPhone (extraído do data-id do DOM) > author > from
+        const authorIdentifier = msg.authorPhone || msg.authorName || msg.pushname || msg.author || msg.from || 'Desconhecido';
+        const resolved = resolveAuthor(authorIdentifier);
+        const resolvedName = resolved.confidence > 0 ? resolved.name : (aliasMap[authorIdentifier] || authorIdentifier);
         const timestamp = normalizeWhatsAppTimestamp(msg.timestamp || msg.time);
-        const id = msg.id || crypto.createHash('md5').update(`${authorName}:${msg.text || msg.body || ''}:${timestamp}`).digest('hex');
+        const id = msg.id || crypto.createHash('md5').update(`${authorIdentifier}:${msg.text || msg.body || ''}:${timestamp}`).digest('hex');
         if (seen.has(id)) continue;
         seen.add(id);
         history.push({
@@ -1880,13 +1952,24 @@ class LunaAgent {
           author: resolvedName,
           authorName: resolvedName,
           authorRole: msg.authorRole || resolved.role || null,
-          originalAuthor: authorName,
-          authorId: msg.author || msg.from || null,
+          originalAuthor: authorIdentifier,
+          authorId: msg.authorPhone || msg.author || msg.from || null,
           text: msg.text || msg.body || '',
           body: msg.body || msg.text || '',
           chat: msg.chatName || '',
           timestamp,
-          classification: msg.classification || null
+          classification: msg.classification || null,
+          resolvedAuthor: resolved.confidence > 0 ? {
+            name: resolved.name,
+            shortName: resolved.shortName || resolved.name,
+            color: resolved.color || '#6B7280',
+            avatarEmoji: resolved.avatarEmoji || '👤',
+            role: resolved.role || 'member',
+            phone: resolved.phone || msg.authorPhone || msg.author || msg.from || null,
+            isNexo: resolved.isNexo || false,
+            isFounder: resolved.isFounder || false,
+            confidence: resolved.confidence
+          } : null
         });
       }
 

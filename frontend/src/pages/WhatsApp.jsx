@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import LinkHub from '../components/LinkHub'
 
 // ─── UTILITÁRIOS ───
 
@@ -39,11 +40,13 @@ function extractLinksFromMessages(messages) {
   return links
 }
 
-function normalizeAgentData(agentData, opsData, whatsappTasks) {
+function normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages = []) {
   // Dados do agente (whatsapp-agent-data.json)
   const messages = agentData?.messages || agentData?.recentMessages || agentData?.bufferedMessages || []
   // bufferedMessages pode ser número em versões antigas
-  const normalizedMessages = Array.isArray(messages) ? messages : []
+  const bufferedMessages = Array.isArray(messages) ? messages : []
+  // Fallback: se buffer vazio, usar histórico persistente
+  const normalizedMessages = bufferedMessages.length > 0 ? bufferedMessages : (Array.isArray(historyMessages) ? historyMessages : [])
   
   const tasks = agentData?.tasks || agentData?.bufferedTasks || []
   const normalizedTasks = Array.isArray(tasks) ? tasks : []
@@ -67,7 +70,9 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
   // Normalizar mensagens para o formato da UI
   const recentMessages = normalizedMessages.slice(0, 50).map((m, i) => ({
     id: m.id || `msg-${i}`,
-    sender: m.authorName || m.sender || m.author || 'Desconhecido',
+    sender: m.resolvedAuthor?.name || m.authorName || m.sender || m.author || 'Desconhecido',
+    senderColor: m.resolvedAuthor?.color || null,
+    senderEmoji: m.resolvedAuthor?.avatarEmoji || null,
     text: m.body || m.text || m.message || '(sem texto)',
     time: m.time || m.timestamp || '',
     group: m.group || 'Production',
@@ -112,7 +117,8 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
     totalLinks: allLinks.length,
     totalIgnored: ignoredMessages.length,
     activeGroups: 2,
-    participants: ['Abner', 'Nonoke', 'Elias', 'Paulo']
+    participants: ['Abner', 'Nonoke', 'Elias', 'Paulo'],
+    historyTotal: historyMessages.length
   }
   
   // Project progress (mock baseado nos projetos reais da NEXO)
@@ -197,11 +203,12 @@ const ProgressBar = ({ label, progress, status, health, type }) => {
 
 const TaskItem = ({ task, index }) => {
   const [expanded, setExpanded] = useState(false)
-  const priorityColors = {
-    high: 'bg-nexo-danger/20 text-nexo-danger border-nexo-danger/30',
-    medium: 'bg-nexo-warning/20 text-nexo-warning border-nexo-warning/30',
-    low: 'bg-nexo-info/20 text-nexo-info border-nexo-info/30'
+  const priorityConfig = {
+    high: { badge: 'bg-nexo-danger/20 text-nexo-danger border-nexo-danger/30', dot: 'bg-nexo-danger', label: '🔥 Alta' },
+    medium: { badge: 'bg-nexo-warning/20 text-nexo-warning border-nexo-warning/30', dot: 'bg-nexo-warning', label: '⚡ Média' },
+    low: { badge: 'bg-nexo-info/20 text-nexo-info border-nexo-info/30', dot: 'bg-nexo-info', label: '🟢 Baixa' }
   }
+  const p = priorityConfig[task.priority] || priorityConfig.medium
   
   return (
     <motion.div
@@ -211,12 +218,12 @@ const TaskItem = ({ task, index }) => {
       className="glass-card p-3 space-y-2"
     >
       <div className="flex items-start gap-3">
-        <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${task.priority === 'high' ? 'bg-nexo-danger' : 'bg-nexo-warning'}`} />
+        <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${p.dot}`} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{task.text}</p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${priorityColors[task.priority] || priorityColors.medium}`}>
-              {task.priority === 'high' ? '🔥 Alta' : '⚡ Média'}
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${p.badge}`}>
+              {p.label}
             </span>
             <span className="text-[10px] text-nexo-muted flex items-center gap-1">
               <Users size={10} /> {task.sender}
@@ -253,26 +260,32 @@ const TaskItem = ({ task, index }) => {
   )
 }
 
-const MessageBubble = ({ msg, index }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.03 }}
-    className="glass-card p-3 flex gap-3"
-  >
-    <div className="w-8 h-8 rounded-full bg-nexo-info/20 flex items-center justify-center flex-shrink-0">
-      <span className="text-xs font-bold text-nexo-info">{msg.sender?.[0]?.toUpperCase() || '?'}</span>
-    </div>
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2 mb-1 flex-wrap">
-        <span className="text-xs font-medium">{msg.sender}</span>
-        <span className="text-[10px] text-nexo-muted">{msg.time}</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-card text-nexo-muted">{msg.group}</span>
+const MessageBubble = ({ msg, index }) => {
+  const avatarBg = msg.senderColor ? msg.senderColor + '20' : 'rgba(108,92,231,0.2)'
+  const avatarText = msg.senderColor || '#6c5ce7'
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className="glass-card p-3 flex gap-3"
+    >
+      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: avatarBg }}>
+        <span className="text-xs font-bold" style={{ color: avatarText }}>
+          {msg.senderEmoji || msg.sender?.[0]?.toUpperCase() || '?'}
+        </span>
       </div>
-      <p className="text-sm text-nexo-text/90 line-clamp-2">{msg.text}</p>
-    </div>
-  </motion.div>
-)
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="text-xs font-medium">{msg.sender || 'Desconhecido'}</span>
+          <span className="text-[10px] text-nexo-muted">{msg.time}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-card text-nexo-muted">{msg.group}</span>
+        </div>
+        <p className="text-sm text-nexo-text/90 line-clamp-2">{msg.text}</p>
+      </div>
+    </motion.div>
+  )
+}
 
 const LinkPreview = ({ link, index }) => (
   <motion.a
@@ -309,6 +322,7 @@ export default function WhatsApp() {
   const [agentData, setAgentData] = useState(null)
   const [opsData, setOpsData] = useState(null)
   const [whatsappTasks, setWhatsappTasks] = useState([])
+  const [historyMessages, setHistoryMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -318,18 +332,19 @@ export default function WhatsApp() {
 
   const data = useMemo(() => {
     if (!agentData) return null
-    return normalizeAgentData(agentData, opsData, whatsappTasks)
-  }, [agentData, opsData, whatsappTasks])
+    return normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages)
+  }, [agentData, opsData, whatsappTasks, historyMessages])
 
   const fetchData = async () => {
     try {
       setLoading(true)
       
       // Buscar múltiplas fontes de dados em paralelo
-      const [agentRes, opsRes, tasksRes] = await Promise.allSettled([
+      const [agentRes, opsRes, tasksRes, historyRes] = await Promise.allSettled([
         axios.get('/api/whatsapp-agent'),
         axios.get('/api/ops'),
-        axios.get('/api/whatsapp')
+        axios.get('/api/whatsapp'),
+        axios.get('/api/whatsapp/history?limit=50')
       ])
       
       if (agentRes.status === 'fulfilled') {
@@ -343,6 +358,11 @@ export default function WhatsApp() {
       
       if (tasksRes.status === 'fulfilled') {
         setWhatsappTasks(tasksRes.value.data || [])
+      }
+
+      if (historyRes.status === 'fulfilled') {
+        const msgs = historyRes.value.data?.messages || []
+        setHistoryMessages(msgs)
       }
       
       if (agentRes.status === 'rejected') {
@@ -717,17 +737,8 @@ export default function WhatsApp() {
         )}
 
         {activeTab === 'links' && (
-          <motion.div key="links" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-            {links.map((link, i) => (
-              <LinkPreview key={i} link={link} index={i} />
-            ))}
-            {links.length === 0 && (
-              <div className="text-center text-nexo-muted py-12">
-                <Link2 size={48} className="mx-auto mb-4 opacity-30" />
-                <p>Nenhum link encontrado</p>
-                <p className="text-xs mt-2">Links são extraídos automaticamente das mensagens do WhatsApp.</p>
-              </div>
-            )}
+          <motion.div key="links" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <LinkHub />
           </motion.div>
         )}
       </AnimatePresence>

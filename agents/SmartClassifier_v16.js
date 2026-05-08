@@ -93,6 +93,51 @@ function resolveAuthor(phoneId) {
   const schemaAlias = resolveAuthorAlias(normalized);
   if (schemaAlias) return schemaAlias;
 
+  // 4. Match por nome nos contatos (para mensagens do Playwright que vêm só com nome)
+  const searchName = phone.toLowerCase().trim();
+  if (searchName && searchName !== 'desconhecido' && searchName !== '?' && searchName !== 'unknown') {
+    for (const [key, c] of Object.entries(contacts)) {
+      const names = [
+        (c.displayName || '').toLowerCase(),
+        (c.shortName || '').toLowerCase(),
+        (c.fullName || '').toLowerCase(),
+        (c.codename || '').toLowerCase()
+      ];
+      // Match exato
+      if (names.includes(searchName)) {
+        return {
+          id: c.id,
+          name: c.displayName || c.shortName || c.fullName || searchName,
+          fullName: c.fullName,
+          role: c.role,
+          isNexo: c.isNexo,
+          isFounder: c.isFounder,
+          isAdmin: c.isAdmin,
+          confidence: 0.85,
+          color: c.avatar?.color || '#6B7280',
+          avatarEmoji: c.avatarEmoji || '👤'
+        };
+      }
+      // Match parcial
+      for (const n of names) {
+        if (n && (n.includes(searchName) || searchName.includes(n))) {
+          return {
+            id: c.id,
+            name: c.displayName || c.shortName || c.fullName || searchName,
+            fullName: c.fullName,
+            role: c.role,
+            isNexo: c.isNexo,
+            isFounder: c.isFounder,
+            isAdmin: c.isAdmin,
+            confidence: 0.75,
+            color: c.avatar?.color || '#6B7280',
+            avatarEmoji: c.avatarEmoji || '👤'
+          };
+        }
+      }
+    }
+  }
+
   return {
     id: null,
     name: "Desconhecido",

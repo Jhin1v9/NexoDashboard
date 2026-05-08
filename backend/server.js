@@ -13,6 +13,9 @@ const ExternalServices = require('./external-services');
 const cache = new CacheManager(path.join(__dirname, 'cache'));
 const external = new ExternalServices(cache);
 
+// Link Hub v16.1 services
+const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -50,8 +53,13 @@ const CONFIG_DIR = path.join(__dirname, 'data', 'config');
 
 function loadSchema(filename) {
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(SCHEMA_DIR, filename), 'utf8'));
-    console.log(`[SCHEMA] Carregado: ${filename}`);
+    const filePath = path.join(SCHEMA_DIR, filename);
+    const data = readJSON(filePath);
+    if (data) {
+      console.log(`[SCHEMA] Carregado: ${filename}`);
+    } else {
+      console.error(`[SCHEMA] Erro ao carregar ${filename}: arquivo vazio ou inválido`);
+    }
     return data;
   } catch (e) {
     console.error(`[SCHEMA] Erro ao carregar ${filename}:`, e.message);
@@ -61,8 +69,13 @@ function loadSchema(filename) {
 
 function loadConfig(filename) {
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(CONFIG_DIR, filename), 'utf8'));
-    console.log(`[CONFIG] Carregado: ${filename}`);
+    const filePath = path.join(CONFIG_DIR, filename);
+    const data = readJSON(filePath);
+    if (data) {
+      console.log(`[CONFIG] Carregado: ${filename}`);
+    } else {
+      console.error(`[CONFIG] Erro ao carregar ${filename}: arquivo vazio ou inválido`);
+    }
     return data;
   } catch (e) {
     console.error(`[CONFIG] Erro ao carregar ${filename}:`, e.message);
@@ -336,17 +349,36 @@ app.get('/api/whatsapp-agent', (req, res) => {
   try {
     const data = readJSON(AGENT_DATA_FILE);
     const buffer = readLunaBuffer();
+    const history = readWhatsappHistory();
     const payload = data && !Array.isArray(data) ? data : {};
+    
+    // Calcular stats a partir do history.json em tempo real (não dos buffers voláteis)
+    const historyStats = history.reduce((acc, m) => {
+      const cat = m.classification?.category || 'unknown';
+      acc.byCategory[cat] = (acc.byCategory[cat] || 0) + 1;
+      acc.totalMessages++;
+      return acc;
+    }, { totalMessages: 0, byCategory: {} });
+    
     const stats = {
       ...(payload.stats || {}),
-      totalMessages: buffer.totalMessages,
-      totalTasks: buffer.totalTasks,
-      totalIdeas: buffer.totalIdeas,
-      totalDecisions: buffer.totalDecisions,
-      totalLinks: buffer.totalLinks,
-      totalLeads: buffer.totalLeads,
-      totalFinance: buffer.totalFinance,
-      totalIgnored: buffer.totalIgnored
+      totalMessages: historyStats.totalMessages,
+      totalTasks: historyStats.byCategory['tarefaPendente'] || 0,
+      totalIdeas: historyStats.byCategory['ideia'] || 0,
+      totalDecisions: historyStats.byCategory['decisao'] || 0,
+      totalLinks: historyStats.byCategory['link'] || 0,
+      totalLeads: historyStats.byCategory['lead'] || 0,
+      totalFinance: historyStats.byCategory['financeiro'] || 0,
+      totalIgnored: historyStats.byCategory['ignored'] || 0,
+      totalNews: historyStats.byCategory['noticia'] || 0,
+      totalUrgency: historyStats.byCategory['urgencia'] || 0,
+      historyTotal: history.length,
+      // Manter compatibilidade com buffers para itens ainda não no history
+      bufferTasks: buffer.newTasks?.length || 0,
+      bufferLinks: buffer.newLinks?.length || 0,
+      bufferIdeas: buffer.newIdeas?.length || 0,
+      bufferLeads: buffer.newLeads?.length || 0,
+      bufferFinance: buffer.newFinance?.length || 0
     };
     res.json({
       success: true,
@@ -364,9 +396,12 @@ app.get('/api/whatsapp-agent', (req, res) => {
 app.get('/api/whatsapp-agent/status', (req, res) => {
   const data = readJSON(AGENT_DATA_FILE);
   const buffer = readLunaBuffer();
+  const history = readWhatsappHistory();
+  const hasBufferActivity = (buffer.newTasks?.length || 0) + (buffer.newLinks?.length || 0) + (buffer.newLeads?.length || 0) > 0;
   res.json({
-    active: !!data || buffer.totalMessages + buffer.totalTasks + buffer.totalLeads + buffer.totalIgnored > 0,
+    active: !!data || hasBufferActivity || history.length > 0,
     lastUpdate: data?.updatedAt || buffer.lastBufferUpdate || null,
+    historyTotal: history.length,
     stats: data?.stats || buffer
   });
 });
@@ -387,6 +422,110 @@ function classificationCategory(classification) {
   return classification.category || classification.label || 'unknown';
 }
 
+// Resolve autor a partir do contacts-map.json v16.0
+function resolveAuthor(msg) {
+  try {
+    const contacts = schemas.contacts?.contacts || {};
+    const rawAuthor = msg.author || msg.originalAuthor || '';
+    const digits = rawAuthor.replace(/\D/g, '');
+
+    // 1. Match exato
+    if (contacts[rawAuthor]) {
+      const c = contacts[rawAuthor];
+      return {
+        name: c.displayName || c.shortName || c.fullName || rawAuthor,
+        shortName: c.shortName || c.displayName || rawAuthor,
+        color: c.avatar?.color || '#6B7280',
+        avatar: c.avatar?.url || null,
+        avatarEmoji: c.avatarEmoji || '👤',
+        role: c.role || 'member',
+        phone: c.phones?.primary || digits || rawAuthor
+      };
+    }
+
+    // 2. Match parcial (últimos 8 dígitos)
+    if (digits.length >= 8) {
+      const tail = digits.slice(-8);
+      for (const [key, c] of Object.entries(contacts)) {
+        const keyDigits = key.replace(/\D/g, '');
+        if (keyDigits.slice(-8) === tail) {
+          return {
+            name: c.displayName || c.shortName || c.fullName || rawAuthor,
+            shortName: c.shortName || c.displayName || rawAuthor,
+            color: c.avatar?.color || '#6B7280',
+            avatar: c.avatar?.url || null,
+            avatarEmoji: c.avatarEmoji || '👤',
+            role: c.role || 'member',
+            phone: c.phones?.primary || digits || rawAuthor
+          };
+        }
+      }
+    }
+
+    // 3. Match por nome (displayName, shortName, fullName) — para mensagens do Playwright que vêm só com nome
+    const searchName = (msg.authorName || msg.pushName || rawAuthor || '').toLowerCase().trim();
+    if (searchName && searchName !== 'desconhecido' && searchName !== '?') {
+      for (const [key, c] of Object.entries(contacts)) {
+        const names = [
+          (c.displayName || '').toLowerCase(),
+          (c.shortName || '').toLowerCase(),
+          (c.fullName || '').toLowerCase(),
+          (c.codename || '').toLowerCase()
+        ];
+        // Match exato do nome ou do alias
+        if (names.includes(searchName)) {
+          return {
+            name: c.displayName || c.shortName || c.fullName || searchName,
+            shortName: c.shortName || c.displayName || searchName,
+            color: c.avatar?.color || '#6B7280',
+            avatar: c.avatar?.url || null,
+            avatarEmoji: c.avatarEmoji || '👤',
+            role: c.role || 'member',
+            phone: c.phones?.primary || digits || rawAuthor
+          };
+        }
+        // Match parcial: se o nome de busca está contido em algum nome do contato
+        // ou vice-versa (ex: "Enoque" corresponde a "Enoque G Santos Clemente")
+        for (const n of names) {
+          if (n && (n.includes(searchName) || searchName.includes(n))) {
+            return {
+              name: c.displayName || c.shortName || c.fullName || searchName,
+              shortName: c.shortName || c.displayName || searchName,
+              color: c.avatar?.color || '#6B7280',
+              avatar: c.avatar?.url || null,
+              avatarEmoji: c.avatarEmoji || '👤',
+              role: c.role || 'member',
+              phone: c.phones?.primary || digits || rawAuthor
+            };
+          }
+        }
+      }
+    }
+
+    // 4. Fallback por nome conhecido
+    const fallbackName = msg.authorName || msg.pushName || msg.originalAuthor || msg.author || 'Desconhecido';
+    return {
+      name: fallbackName,
+      shortName: fallbackName,
+      color: '#6B7280',
+      avatar: null,
+      avatarEmoji: '👤',
+      role: 'member',
+      phone: digits || rawAuthor
+    };
+  } catch (e) {
+    return {
+      name: msg.authorName || msg.author || 'Desconhecido',
+      shortName: msg.authorName || msg.author || 'Desconhecido',
+      color: '#6B7280',
+      avatar: null,
+      avatarEmoji: '👤',
+      role: 'member',
+      phone: msg.author || ''
+    };
+  }
+}
+
 app.get('/api/whatsapp/history', (req, res) => {
   try {
     const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 50));
@@ -400,7 +539,12 @@ app.get('/api/whatsapp/history', (req, res) => {
     messages = messages
       .slice()
       .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-      .slice(0, limit);
+      .slice(0, limit)
+      .map(m => {
+        // Usa resolvedAuthor já salvo se válido; senão, resolve em tempo real
+        const hasValidResolved = m.resolvedAuthor && m.resolvedAuthor.name && m.resolvedAuthor.name !== 'Desconhecido';
+        return { ...m, resolvedAuthor: hasValidResolved ? m.resolvedAuthor : resolveAuthor(m) };
+      });
 
     res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
   } catch (e) {
@@ -1262,7 +1406,7 @@ app.get('/api/cash-box/statement', async (req, res) => {
       amount: h.amount,
       description: h.source,
       balanceAfter: h.balanceAfter,
-      category: h.type === 'income' ? 'receita' : 'despesa',
+      category: (h.type === 'income' || h.type === 'payment_received') ? 'receita' : 'despesa',
       status: 'completed',
       recordedBy: h.recordedBy,
       note: h.note || ''
@@ -1347,6 +1491,397 @@ app.get('/api/cash-box/statement', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// CRUD CAIXA v2.0 — Entradas Manuais
+// ============================================
+
+function generateId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+// POST /api/cash-box/entries — Criar entrada manual
+app.post('/api/cash-box/entries', async (req, res) => {
+  try {
+    const { type, amount, description, date, category, note, recordedBy } = req.body;
+    if (!type || amount === undefined) {
+      return res.status(400).json({ success: false, error: 'type and amount required' });
+    }
+    if (!['income', 'expense', 'adjustment', 'payment_received'].includes(type)) {
+      return res.status(400).json({ success: false, error: "type must be 'income', 'expense', 'adjustment', or 'payment_received'" });
+    }
+    const amountVal = parseFloat(amount);
+    if (isNaN(amountVal) || amountVal < 0) {
+      return res.status(400).json({ success: false, error: 'amount must be a positive number' });
+    }
+
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const oldBalance = parseFloat((cashBox.balance?.value || 0).toFixed(2));
+    const delta = (type === 'income' || type === 'payment_received') ? amountVal : -amountVal;
+    const newBalance = parseFloat((oldBalance + delta).toFixed(2));
+
+    const entry = {
+      id: generateId('etx'),
+      date: date || nowISO().slice(0, 10),
+      type,
+      amount: amountVal,
+      description: description || 'Entrada manual',
+      category: category || 'manual',
+      balanceAfter: newBalance,
+      recordedBy: recordedBy || 'system',
+      recordedAt: nowISO(),
+      note: note || '',
+      source: 'manual-entry',
+      isActive: true
+    };
+
+    cashBox.history.push(entry);
+    cashBox.balance = { value: newBalance, currency: cashBox.balance?.currency || 'EUR' };
+    cashBox.lastUpdated = nowISO();
+
+    // Audit
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({ action: 'entry_create', entryId: entry.id, timestamp: nowISO() });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, entry, newBalance });
+  } catch (err) {
+    console.error('[CASH-BOX] Error creating entry:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/cash-box/entries/:id
+app.get('/api/cash-box/entries/:id', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const entry = cashBox.history?.find(h => h.id === req.params.id);
+    if (!entry) return res.status(404).json({ success: false, error: 'Entry not found' });
+    res.json({ success: true, entry });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/cash-box/entries/:id — Editar entrada
+app.put('/api/cash-box/entries/:id', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const idx = cashBox.history?.findIndex(h => h.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Entry not found' });
+
+    const oldEntry = cashBox.history[idx];
+    const updated = { ...oldEntry, ...req.body, updatedAt: nowISO() };
+
+    // Se amount/type mudou, recalcular saldo desde o início
+    if (req.body.amount !== undefined || req.body.type !== undefined) {
+      cashBox.history[idx] = updated;
+      cashBox.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+      let runningBalance = 0;
+      cashBox.history.forEach(h => {
+        if (h.isActive === false) return;
+        const d = (h.type === 'income' || h.type === 'payment_received') ? h.amount : -h.amount;
+        runningBalance += d;
+        h.balanceAfter = parseFloat(runningBalance.toFixed(2));
+      });
+      cashBox.balance.value = parseFloat(runningBalance.toFixed(2));
+    } else {
+      cashBox.history[idx] = updated;
+    }
+
+    cashBox.lastUpdated = nowISO();
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({ action: 'entry_update', entryId: updated.id, timestamp: nowISO() });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, entry: updated, newBalance: cashBox.balance.value });
+  } catch (err) {
+    console.error('[CASH-BOX] Error updating entry:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/cash-box/entries/:id — Soft delete
+app.delete('/api/cash-box/entries/:id', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const idx = cashBox.history?.findIndex(h => h.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Entry not found' });
+
+    cashBox.history[idx] = {
+      ...cashBox.history[idx],
+      isActive: false,
+      deletedAt: nowISO(),
+      deletedBy: req.body.deletedBy || 'system'
+    };
+
+    // Recalcular saldo
+    cashBox.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let runningBalance = 0;
+    cashBox.history.forEach(h => {
+      if (h.isActive === false) return;
+      const d = (h.type === 'income' || h.type === 'payment_received') ? h.amount : -h.amount;
+      runningBalance += d;
+      h.balanceAfter = parseFloat(runningBalance.toFixed(2));
+    });
+    cashBox.balance.value = parseFloat(runningBalance.toFixed(2));
+    cashBox.lastUpdated = nowISO();
+
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({ action: 'entry_soft_delete', entryId: req.params.id, timestamp: nowISO() });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, removedId: req.params.id, newBalance: cashBox.balance.value });
+  } catch (err) {
+    console.error('[CASH-BOX] Error deleting entry:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/cash-box/reconcile — Recalcular saldo a partir do histórico
+app.post('/api/cash-box/reconcile', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [], balance: { value: 0, currency: 'EUR' } };
+    const sorted = [...(cashBox.history || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    let runningBalance = 0;
+    sorted.forEach(h => {
+      if (h.isActive === false) return;
+      const d = (h.type === 'income' || h.type === 'payment_received') ? h.amount : -h.amount;
+      runningBalance += d;
+      h.balanceAfter = parseFloat(runningBalance.toFixed(2));
+    });
+    cashBox.history = sorted;
+    const oldBalance = cashBox.balance.value;
+    cashBox.balance.value = parseFloat(runningBalance.toFixed(2));
+    cashBox.lastUpdated = nowISO();
+
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({ action: 'reconcile', oldBalance, newBalance: cashBox.balance.value, timestamp: nowISO() });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, oldBalance, newBalance: cashBox.balance.value, entryCount: sorted.filter(h => h.isActive !== false).length });
+  } catch (err) {
+    console.error('[CASH-BOX] Reconcile error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================
+// MODO PAGAMENTO RECEBIDO — Distribuição Automática
+// ============================================
+
+const PAYMENT_KEYWORDS = [
+  'pagamento', 'receber', 'cobrar', 'entrada', 'faturamento', 'fatura',
+  'invoice', 'receita', 'venda', 'cliente pagou', 'pago', 'transferência recebida',
+  'parcela', 'quota', 'honorarios', 'fee', 'comissao', 'pagou', 'deposito'
+];
+
+function detectPaymentKeywords(text = '') {
+  const lower = text.toLowerCase();
+  return PAYMENT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function createDefaultDistribution(totalAmount) {
+  const amount = parseFloat(totalAmount);
+  const perPerson = parseFloat((amount / 4).toFixed(2));
+  // Ajustar último para garantir soma exata
+  const remaining = parseFloat((amount - perPerson * 3).toFixed(2));
+  return {
+    totalAmount: amount,
+    splits: [
+      { recipientId: 'nexo-abner-001', name: 'Abner', percentage: 25, amount: perPerson, status: 'pending', paidAt: null, avatarEmoji: '🧠', color: '#6B7280' },
+      { recipientId: 'nexo-enoque-001', name: 'Enoque', percentage: 25, amount: perPerson, status: 'pending', paidAt: null, avatarEmoji: '⚡', color: '#6B7280' },
+      { recipientId: 'nexo-elias-pessoal', name: 'Elias', percentage: 25, amount: perPerson, status: 'pending', paidAt: null, avatarEmoji: '🎯', color: '#6B7280' },
+      { recipientId: 'nexo-digital', name: 'NEXO Digital (Reinvestimento)', percentage: 25, amount: remaining, status: 'pending', paidAt: null, avatarEmoji: '🏢', color: '#3742fa' }
+    ],
+    appliedAt: null,
+    appliedBy: null
+  };
+}
+
+// POST /api/cash-box/payments — Criar pagamento recebido com distribuição
+app.post('/api/cash-box/payments', async (req, res) => {
+  try {
+    const { amount, description, date, source, category, note, applyImmediately } = req.body;
+    if (amount === undefined || amount === '') {
+      return res.status(400).json({ success: false, error: 'amount required' });
+    }
+    const amountVal = parseFloat(amount);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      return res.status(400).json({ success: false, error: 'amount must be a positive number' });
+    }
+
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const oldBalance = parseFloat((cashBox.balance?.value || 0).toFixed(2));
+    const newBalance = parseFloat((oldBalance + amountVal).toFixed(2));
+
+    const entry = {
+      id: generateId('pay'),
+      date: date || nowISO().slice(0, 10),
+      type: 'payment_received',
+      amount: amountVal,
+      description: description || 'Pagamento recebido',
+      category: category || 'client-payment',
+      balanceAfter: newBalance,
+      source: source || 'client',
+      note: note || '',
+      recordedBy: req.body.recordedBy || 'system',
+      recordedAt: nowISO(),
+      isActive: true,
+      distribution: createDefaultDistribution(amountVal)
+    };
+
+    // Se applyImmediately, já aplica a distribuição
+    if (applyImmediately) {
+      entry.distribution.splits.forEach(split => {
+        split.status = 'applied';
+        split.appliedAt = nowISO();
+      });
+      entry.distribution.appliedAt = nowISO();
+      entry.distribution.appliedBy = req.body.recordedBy || 'system';
+
+      // Criar sub-entradas de saída para cada fundador (exceto NEXO Digital que fica no caixa)
+      entry.distribution.splits.forEach(split => {
+        if (split.recipientId === 'nexo-digital') return; // Reinvestimento fica no caixa
+        const payoutEntry = {
+          id: generateId('etx'),
+          date: entry.date,
+          type: 'expense',
+          amount: split.amount,
+          description: `Pagamento a ${split.name} — ${entry.description}`,
+          category: 'founder-payout',
+          balanceAfter: null, // será recalculado
+          source: `split-from-${entry.id}`,
+          note: `Distribuição de pagamento: ${split.percentage}% de €${amountVal}`,
+          recordedBy: req.body.recordedBy || 'system',
+          recordedAt: nowISO(),
+          isActive: true,
+          parentPaymentId: entry.id,
+          recipientId: split.recipientId
+        };
+        cashBox.history.push(payoutEntry);
+      });
+    }
+
+    cashBox.history.push(entry);
+
+    // Recalcular saldo
+    cashBox.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let runningBalance = 0;
+    cashBox.history.forEach(h => {
+      if (h.isActive === false) return;
+      const d = (h.type === 'income' || h.type === 'payment_received') ? h.amount : -h.amount;
+      runningBalance += d;
+      h.balanceAfter = parseFloat(runningBalance.toFixed(2));
+    });
+    cashBox.balance.value = parseFloat(runningBalance.toFixed(2));
+    cashBox.lastUpdated = nowISO();
+
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({
+      action: applyImmediately ? 'payment_created_and_applied' : 'payment_created',
+      entryId: entry.id,
+      amount: amountVal,
+      timestamp: nowISO()
+    });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, entry, newBalance: cashBox.balance.value, applied: !!applyImmediately });
+  } catch (err) {
+    console.error('[CASH-BOX] Error creating payment:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/cash-box/payments/:id/apply-distribution — Aplicar split
+app.post('/api/cash-box/payments/:id/apply-distribution', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const entry = cashBox.history?.find(h => h.id === req.params.id && h.type === 'payment_received');
+    if (!entry) return res.status(404).json({ success: false, error: 'Payment entry not found' });
+    if (entry.distribution?.appliedAt) {
+      return res.status(400).json({ success: false, error: 'Distribution already applied' });
+    }
+
+    entry.distribution.splits.forEach(split => {
+      split.status = 'applied';
+      split.appliedAt = nowISO();
+    });
+    entry.distribution.appliedAt = nowISO();
+    entry.distribution.appliedBy = req.body.appliedBy || 'system';
+
+    // Criar sub-entradas de saída para cada fundador (exceto NEXO Digital)
+    entry.distribution.splits.forEach(split => {
+      if (split.recipientId === 'nexo-digital') return;
+      const payoutEntry = {
+        id: generateId('etx'),
+        date: entry.date,
+        type: 'expense',
+        amount: split.amount,
+        description: `Pagamento a ${split.name} — ${entry.description}`,
+        category: 'founder-payout',
+        balanceAfter: null,
+        source: `split-from-${entry.id}`,
+        note: `Distribuição de pagamento: ${split.percentage}% de €${entry.amount}`,
+        recordedBy: req.body.appliedBy || 'system',
+        recordedAt: nowISO(),
+        isActive: true,
+        parentPaymentId: entry.id,
+        recipientId: split.recipientId
+      };
+      cashBox.history.push(payoutEntry);
+    });
+
+    // Recalcular saldo
+    cashBox.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let runningBalance = 0;
+    cashBox.history.forEach(h => {
+      if (h.isActive === false) return;
+      const d = (h.type === 'income' || h.type === 'payment_received') ? h.amount : -h.amount;
+      runningBalance += d;
+      h.balanceAfter = parseFloat(runningBalance.toFixed(2));
+    });
+    cashBox.balance.value = parseFloat(runningBalance.toFixed(2));
+    cashBox.lastUpdated = nowISO();
+
+    if (!cashBox.auditLog) cashBox.auditLog = [];
+    cashBox.auditLog.push({ action: 'distribution_applied', entryId: entry.id, timestamp: nowISO() });
+    if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
+    writeJSON(CASH_BOX_FILE, cashBox);
+    broadcast({ type: 'cashbox', data: cashBox });
+    res.json({ success: true, entry, newBalance: cashBox.balance.value });
+  } catch (err) {
+    console.error('[CASH-BOX] Error applying distribution:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/cash-box/payments/:id — Obter pagamento com distribuição
+app.get('/api/cash-box/payments/:id', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const entry = cashBox.history?.find(h => h.id === req.params.id && h.type === 'payment_received');
+    if (!entry) return res.status(404).json({ success: false, error: 'Payment not found' });
+    res.json({ success: true, entry });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1852,52 +2387,37 @@ app.delete('/api/transactions/:id', (req, res) => {
   res.json({ success: true, message: 'TransaÃ§Ã£o removida' });
 });
 
-// GET /api/finance/summary â€” Resumo financeiro completo
-app.get('/api/finance/summary', (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
-  const payments = readJSON(PAYMENTS_FILE) || [];
-  const expenses = readJSON(EXPENSES_FILE) || [];
-  
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const balance = totalIncome - totalExpense;
-  
-  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'waiting_quote')
-    .reduce((s, p) => s + (p.totalAmount?.value || 0), 0);
-  
-  res.json({
-    balance: { value: balance, currency: 'EUR' },
-    totalIncome: { value: totalIncome, currency: 'EUR' },
-    totalExpense: { value: totalExpense, currency: 'EUR' },
-    pendingPayments: { value: pendingPayments, currency: 'EUR' },
-    transactionCount: transactions.length,
-    lastUpdated: new Date().toISOString()
-  });
-});
+// [REMOVED] Rota duplicada /api/finance/summary (linha 1856)
+// A rota correta e completa está em ~1422 (inclui payments, expenses, alerts, overdue)
+// Removida em 2026-05-08 para evitar sobrescrita da versão completa.
 
 // FunÃ§Ã£o auxiliar: recalcula caixa baseado em transaÃ§Ãµes
 function updateCashBoxFromTransactions(transactions) {
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const balance = totalIncome - totalExpense;
-  
+  const balance = parseFloat((totalIncome - totalExpense).toFixed(2));
+
   const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+
+  // ATENÇÃO: NUNCA recriar history[] — ele contém entradas manuais, deduções automáticas,
+  // ajustes, e registros de payments/expenses. Apenas atualiza o saldo.
   cashBox.balance = { value: balance, currency: 'EUR' };
   cashBox.lastUpdated = new Date().toISOString();
-  
-  // Recria histÃ³rico a partir das transaÃ§Ãµes
-  cashBox.history = transactions.map(t => ({
-    id: t.id,
-    date: t.date,
-    type: t.type,
-    amount: t.amount,
-    source: t.description,
-    balanceAfter: t.type === 'income' ? balance : balance,
-    recordedBy: t.createdBy || 'system',
-    recordedAt: t.createdAt
-  })).sort((a, b) => new Date(b.date) - new Date(a.date));
-  
+
+  // Audit: registrar que houve recálculo automático (não destrutivo)
+  if (!cashBox.auditLog) cashBox.auditLog = [];
+  cashBox.auditLog.push({
+    action: 'auto_recalc_from_transactions',
+    newBalance: balance,
+    transactionCount: transactions.length,
+    timestamp: new Date().toISOString(),
+    source: 'updateCashBoxFromTransactions'
+  });
+  // Manter apenas últimos 50 audit entries
+  if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
+
   writeJSON(CASH_BOX_FILE, cashBox);
+  broadcast({ type: 'cashbox', data: cashBox });
 }
 
 
@@ -1906,6 +2426,10 @@ function updateCashBoxFromTransactions(transactions) {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const CHANGELOG_FILE = path.join(DATA_DIR, 'changelog.json');
+const LINKS_INDEX_FILE = path.join(DATA_DIR, 'links-index.json');
+if (!fs.existsSync(LINKS_INDEX_FILE)) {
+  writeJSON(LINKS_INDEX_FILE, { links: [], lastUpdated: new Date().toISOString() });
+}
 
 function ensureChangelog() {
   if (!fs.existsSync(CHANGELOG_FILE)) {
@@ -2276,11 +2800,12 @@ app.get('/luna-control', (req, res) => {
 // 1. Status do Luna
 app.get('/api/luna/status', (req, res) => {
     try {
-        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
-        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+        const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
+        const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
+        const history = readWhatsappHistory();
 
         let checkpoint = { hashes: [], lastScan: null, version: '14.1' };
-        let buffer = { messages: [], tasks: [], ideas: [] };
+        let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
 
         if (fs.existsSync(checkpointPath)) {
             checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
@@ -2289,16 +2814,27 @@ app.get('/api/luna/status', (req, res) => {
             buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
         }
 
+        // Verificar se o processo do agente está rodando
+        const { execSync } = require('child_process');
+        let isRunning = false;
+        try {
+            execSync('pgrep -f "luna-scheduler"', { stdio: 'ignore' });
+            isRunning = true;
+        } catch { /* não está rodando */ }
+
         res.json({
-            status: 'running',
-            version: checkpoint.version || '14.1',
-            chromeConnected: true,
-            whatsappConnected: true,
-            lastScan: checkpoint.lastScan,
+            status: isRunning ? 'running' : 'stopped',
+            version: checkpoint.version || '16.0',
+            chromeConnected: isRunning,
+            whatsappConnected: isRunning,
+            lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
             totalHashes: checkpoint.hashes?.length || 0,
-            bufferMessages: buffer.messages?.length || 0,
-            bufferTasks: buffer.tasks?.length || 0,
-            bufferIdeas: buffer.ideas?.length || 0,
+            historyTotal: history.length,
+            bufferMessages: buffer.newMessages?.length || 0,
+            bufferTasks: buffer.newTasks?.length || 0,
+            bufferIdeas: buffer.newIdeas?.length || 0,
+            bufferLinks: buffer.newLinks?.length || 0,
+            bufferLeads: buffer.newLeads?.length || 0,
             sentiment: buffer.sentiment || { positive: 0, negative: 0, urgent: 0 }
         });
     } catch (e) {
@@ -2685,6 +3221,266 @@ app.get('/api/nexo-state', (req, res) => {
         }
       }
     });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ============================================
+// LINK HUB API v2.0
+// ============================================
+
+// GET /api/links/preview — Preview individual de URL
+app.get('/api/links/preview', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ success: false, error: 'URL obrigatória' });
+    const preview = await fetchLinkPreview(url);
+    res.json({ success: true, preview });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/links — Lista todos os links enriquecidos, com filtros
+app.get('/api/links', async (req, res) => {
+  try {
+    const {
+      platform, category, search, author, chat, status,
+      sortBy, order, limit = 50, offset = 0, enriched = 'true'
+    } = req.query;
+
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    let links = [...(index.links || [])];
+
+    // Enriquecer links sem preview — background async para não bloquear HTTP response
+    if (enriched === 'true') {
+      const unenriched = links.filter(l => !l.preview || !l.enrichedAt);
+      const needsSave = unenriched.length > 0;
+      // Retorna imediatamente; enriquece em background
+      if (needsSave) {
+        setImmediate(async () => {
+          try {
+            const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+            let bgLinks = [...(index.links || [])];
+            for (const link of unenriched.slice(0, 5)) {
+              try {
+                const preview = await fetchLinkPreview(link.url);
+                const classification = classifyUrl(link.url);
+                const idx = bgLinks.findIndex(l => l.id === link.id || l.url === link.url);
+                if (idx !== -1) {
+                  bgLinks[idx] = { ...bgLinks[idx], preview, ...classification, enrichedAt: new Date().toISOString() };
+                }
+              } catch (previewErr) {
+                console.error('[LINKS] Preview failed for', link.url, previewErr.message);
+              }
+            }
+            writeJSON(LINKS_INDEX_FILE, { links: bgLinks, lastUpdated: new Date().toISOString() });
+            broadcast({ type: 'links:enriched', data: { count: unenriched.length } });
+          } catch (bgErr) {
+            console.error('[LINKS] Background enrichment error:', bgErr.message);
+          }
+        });
+      }
+    }
+
+    // Filtros
+    if (platform) links = links.filter(l => l.platform === platform.toLowerCase());
+    if (category) links = links.filter(l => l.category === category.toLowerCase());
+    if (author) links = links.filter(l => l.author?.toLowerCase().includes(author.toLowerCase()));
+    if (chat) links = links.filter(l => l.chat?.toLowerCase().includes(chat.toLowerCase()));
+    if (status === 'broken') links = links.filter(l => l.preview?.isBroken || l.preview?.isError);
+    else if (status === 'active') links = links.filter(l => !l.preview?.isBroken && !l.preview?.isError);
+    if (search) {
+      const q = search.toLowerCase();
+      links = links.filter(l =>
+        l.url?.toLowerCase().includes(q) ||
+        l.preview?.title?.toLowerCase().includes(q) ||
+        l.preview?.description?.toLowerCase().includes(q) ||
+        l.platformLabel?.toLowerCase().includes(q) ||
+        l.domain?.toLowerCase().includes(q)
+      );
+    }
+
+    // Ordenar
+    const sortField = sortBy || 'date';
+    const sortOrder = order === 'asc' ? 1 : -1;
+    links.sort((a, b) => {
+      if (sortField === 'date') return sortOrder * (new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      if (sortField === 'platform') return sortOrder * ((a.platformLabel || '') + '').localeCompare(b.platformLabel || '');
+      if (sortField === 'author') return sortOrder * ((a.author || '') + '').localeCompare(b.author || '');
+      return 0;
+    });
+
+    const total = links.length;
+    const paginated = links.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+
+    const stats = {
+      total,
+      byPlatform: {},
+      byCategory: {},
+      broken: links.filter(l => l.preview?.isBroken || l.preview?.isError).length,
+      active: links.filter(l => !l.preview?.isBroken && !l.preview?.isError).length
+    };
+    links.forEach(l => {
+      stats.byPlatform[l.platform] = (stats.byPlatform[l.platform] || 0) + 1;
+      stats.byCategory[l.category] = (stats.byCategory[l.category] || 0) + 1;
+    });
+
+    res.json({
+      success: true,
+      links: paginated,
+      pagination: { total, limit: parseInt(limit), offset: parseInt(offset), hasMore: parseInt(offset) + paginated.length < total },
+      stats,
+      filters: { platforms: Object.keys(stats.byPlatform), categories: Object.keys(stats.byCategory) }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/links/platforms
+app.get('/api/links/platforms', (req, res) => {
+  const { PLATFORM_PATTERNS } = require('./services/url-classifier');
+  const platforms = Object.entries(PLATFORM_PATTERNS)
+    .filter(([key]) => key !== 'default')
+    .map(([key, value]) => ({ id: key, label: value.label, color: value.color, icon: value.icon, category: value.category }));
+  res.json({ success: true, platforms });
+});
+
+// GET /api/links/stats
+app.get('/api/links/stats', async (req, res) => {
+  try {
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    const links = index.links || [];
+    res.json({
+      success: true,
+      total: links.length,
+      byPlatform: links.reduce((acc, l) => { acc[l.platform] = (acc[l.platform] || 0) + 1; return acc; }, {}),
+      byCategory: links.reduce((acc, l) => { acc[l.category] = (acc[l.category] || 0) + 1; return acc; }, {}),
+      broken: links.filter(l => l.preview?.isBroken).length,
+      needsEnrichment: links.filter(l => !l.enrichedAt).length,
+      lastUpdated: index.lastUpdated
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/links/enrich — Forçar enriquecimento
+app.post('/api/links/enrich', async (req, res) => {
+  try {
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    let links = index.links || [];
+    for (const link of links.slice(0, 20)) {
+      const preview = await fetchLinkPreview(link.url);
+      const classification = classifyUrl(link.url);
+      const idx = links.findIndex(l => l.id === link.id || l.url === link.url);
+      if (idx !== -1) {
+        links[idx] = { ...links[idx], preview, ...classification, enrichedAt: new Date().toISOString() };
+      }
+    }
+    writeJSON(LINKS_INDEX_FILE, { links, lastUpdated: new Date().toISOString() });
+    res.json({ success: true, enriched: links.length, message: `${links.length} links enriquecidos` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/links/sync — Sincronizar com luna-buffer.json
+app.post('/api/links/sync', (req, res) => {
+  try {
+    const bufferPath = path.join(DATA_DIR, 'luna-buffer.json');
+    const buffer = readJSON(bufferPath) || { links: [] };
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    const existingUrls = new Set(index.links.map(l => l.url));
+
+    let added = 0;
+    const allBufferLinks = [...(buffer.links || []), ...(buffer.newLinks || [])];
+    allBufferLinks.forEach(link => {
+      if (!existingUrls.has(link.url)) {
+        const classification = classifyUrl(link.url);
+        index.links.unshift({
+          id: link.id || `link-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          url: link.url,
+          author: link.author || 'Desconhecido',
+          timestamp: link.timestamp || new Date().toISOString(),
+          chat: link.chat || 'Desconhecido',
+          ...classification,
+          enrichedAt: null,
+          createdAt: new Date().toISOString()
+        });
+        added++;
+      }
+    });
+
+    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
+    broadcast({ type: 'links:sync', data: { added, total: index.links.length } });
+    res.json({ success: true, added, total: index.links.length, message: `${added} novos links sincronizados do buffer` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/links — Adicionar link manualmente
+app.post('/api/links', async (req, res) => {
+  try {
+    const { url, author, chat, notes } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'URL obrigatória' });
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    const exists = index.links.find(l => l.url === url);
+    if (exists) return res.status(409).json({ success: false, error: 'Link já existe', existing: exists });
+
+    const preview = await fetchLinkPreview(url);
+    const classification = classifyUrl(url);
+    const newLink = {
+      id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      url,
+      author: author || 'Desconhecido',
+      timestamp: new Date().toISOString(),
+      chat: chat || 'Desconhecido',
+      notes: notes || '',
+      manual: true,
+      preview,
+      ...classification,
+      enrichedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+
+    index.links.unshift(newLink);
+    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
+    broadcast({ type: 'links:new', data: newLink });
+    res.status(201).json({ success: true, link: newLink });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// DELETE /api/links/:id
+app.delete('/api/links/:id', (req, res) => {
+  try {
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    const link = index.links.find(l => l.id === req.params.id);
+    if (!link) return res.status(404).json({ success: false, error: 'Link não encontrado' });
+    index.links = index.links.filter(l => l.id !== req.params.id);
+    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
+    broadcast({ type: 'links:delete', data: { id: req.params.id } });
+    res.json({ success: true, deleted: link });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// PUT /api/links/:id
+app.put('/api/links/:id', (req, res) => {
+  try {
+    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
+    const idx = index.links.findIndex(l => l.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Link não encontrado' });
+    index.links[idx] = { ...index.links[idx], ...req.body, updatedAt: new Date().toISOString() };
+    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
+    broadcast({ type: 'links:update', data: index.links[idx] });
+    res.json({ success: true, link: index.links[idx] });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
