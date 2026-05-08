@@ -147,21 +147,26 @@ const ProgressBar = ({ value, max, color = '#6c5ce7' }) => {
 // ── Tab Sections ──────────────────────────────────────────────────────────
 
 function SummarySection({ summary, payments, expenses }) {
-  const totalExpected = summary?.totalExpected?.value ?? 3000
-  const totalReceived = summary?.totalReceived?.value ?? 1000
-  const totalPending = summary?.totalPending?.value ?? 2000
-  const cashBalance = summary?.cashBalance?.value ?? 380
+  const moneyValue = (value, fallback = 0) => {
+    if (typeof value === 'number') return value
+    if (value && typeof value.value === 'number') return value.value
+    return fallback
+  }
+  const totalExpected = moneyValue(summary?.totalExpected)
+  const totalReceived = moneyValue(summary?.totalReceived)
+  const totalPending = moneyValue(summary?.totalPending)
+  const cashBalance = moneyValue(summary?.cashBalance ?? summary?.balance ?? summary?.cashBoxBalance)
   const alerts = summary?.alerts ?? []
 
   // Derive from payments if summary missing
-  const derivedExpected = payments?.reduce((sum, p) => sum + (p.totalAmount?.value ?? 0), 0) || totalExpected
+  const derivedExpected = payments?.reduce((sum, p) => sum + (p.totalAmount?.value ?? 0), 0) ?? totalExpected
   const derivedReceived = payments?.reduce((sum, p) => {
     const txTotal = p.transactions?.reduce((t, tx) => t + (tx.amount?.value ?? 0), 0) ?? 0
     return sum + txTotal
-  }, 0) || totalReceived
-  const derivedPending = derivedExpected - derivedReceived || totalPending
+  }, 0) ?? totalReceived
+  const derivedPending = derivedExpected > 0 ? derivedExpected - derivedReceived : totalPending
 
-  const currency = summary?.totalExpected?.currency || 'EUR'
+  const currency = summary?.totalExpected?.currency || summary?.cashBalance?.currency || 'EUR'
   const fmt = (v) => `€ ${v.toLocaleString('pt-BR')}`
 
   return (

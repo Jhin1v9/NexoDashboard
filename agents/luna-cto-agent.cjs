@@ -11,6 +11,26 @@ const crypto = require('crypto');
 const { LunaBrain } = require('./LunaBrain_v16.js');
 const { SmartClassifier, resolveAuthor } = require('./SmartClassifier_v16.js');
 
+function normalizeWhatsAppTimestamp(value) {
+  if (!value) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number') {
+    const millis = value < 10000000000 ? value * 1000 : value;
+    return new Date(millis).toISOString();
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && /^\d+$/.test(String(value))) {
+    const millis = numeric < 10000000000 ? numeric * 1000 : numeric;
+    return new Date(millis).toISOString();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function isLidId(value = '') {
+  return /@lid$/i.test(String(value));
+}
+
 // Playwright importado no topo (nÃ£o dinamicamente)
 let chromium = null;
 try {
@@ -727,11 +747,10 @@ class LunaAgent {
       const isCommand = rawBody.trim().startsWith('/');
       const hasPendingAnswer = Boolean(this.getPendingMatch(msg));
 
-      if (msg.fromMe && isMention) {
-        log.info('[MENCAO] fromMe detectou @luna');
+      if (msg.fromMe) {
+        log.info('[SELF] Ignorando mensagem propria para evitar loop/classificacao duplicada');
+        return;
       }
-
-      if (msg.fromMe && !isCommand && !isMention && !hasPendingAnswer) return;
 
       const messageId = msg.id?._serialized || msg.id || `${msg.from}:${msg.timestamp}:${msg.body}`;
       if (this.processedMessageIds.has(messageId)) return;
@@ -754,12 +773,15 @@ class LunaAgent {
       }
 
       try {
+        const actor = this.getMessageActor(msg);
+        const timestamp = normalizeWhatsAppTimestamp(msg.timestamp);
         const classification = await this.brain.classify({
           body: msg.body || '',
           text: msg.body || '',
-          author: msg.author || msg.pushname || msg.from,
+          author: actor.key,
+          authorName: actor.name,
           from: msg.from,
-          timestamp: msg.timestamp || new Date().toISOString(),
+          timestamp,
           id: messageId
         }, this.threadHistory || []);
 
@@ -767,9 +789,11 @@ class LunaAgent {
           id: messageId,
           body: msg.body || '',
           text: msg.body || '',
-          author: msg.author || msg.pushname || msg.from,
+          author: actor.key,
+          authorName: actor.name,
+          authorRole: actor.role,
           from: msg.from,
-          timestamp: msg.timestamp || new Date().toISOString(),
+          timestamp,
           classification
         };
 
@@ -779,7 +803,6 @@ class LunaAgent {
         log.info(`[LIVE] Mensagem classificada em tempo real: ${classification.category}`);
 
         if (classification.category === 'tarefaRealizada' && classification.object) {
-          const actor = this.getMessageActor(msg);
           const isKnownTask = this.hasSimilarOpenTask(classification.object);
           this.askTaskDoneConfirmation(msg, classification.object, actor.name, isKnownTask);
           const qualifier = isKnownTask ? 'como concluida' : 'como nova tarefa concluida';
@@ -848,11 +871,16 @@ class LunaAgent {
   }
 
   getMessageActor(msg = {}) {
-    const raw = msg.author || msg.pushname || msg.from || 'time';
-    const resolved = resolveAuthor(raw);
+    const rawId = msg.author || msg.from || '';
+    const pushname = (msg.pushname || msg.notifyName || msg._data?.notifyName || '').trim();
+    const preferred = isLidId(rawId) && pushname ? pushname : (rawId || pushname || 'time');
+    const resolved = resolveAuthor(preferred);
+    const fallback = resolveAuthor(pushname);
+    const finalResolved = resolved.confidence > 0 ? resolved : fallback;
     return {
-      key: msg.author || msg.from || raw,
-      name: resolved.name || msg.pushname || raw,
+      key: rawId || pushname || preferred,
+      name: finalResolved.confidence > 0 ? finalResolved.name : (pushname || preferred),
+      role: finalResolved.role || null,
       chatId: msg.from
     };
   }
@@ -1116,7 +1144,7 @@ class LunaAgent {
 
     const relativeTime = (ts) => {
       if (!ts) return 'agora';
-      const d = new Date(ts);
+      const d = new Date(normalizeWhatsAppTimestamp(ts));
       if (Number.isNaN(d.getTime())) return 'agora';
       const delta = Date.now() - d.getTime();
       const min = Math.floor(delta / 60000);
@@ -1168,6 +1196,7 @@ class LunaAgent {
     const tasksDone = safeList(buffer.newTasksDone);
     const decisions = safeList(buffer.newDecisions);
     const messages = safeList(buffer.newMessages);
+    const ignored = safeList(buffer.ignoredMessages);
 
     if (cmd === '/status') {
       await msg.reply(
@@ -1215,6 +1244,7 @@ class LunaAgent {
         `/links — Links analisados\n` +
         `/leads — Oportunidades\n` +
         `/news — Notícias do grupo\n\n` +
+        `/ignoradas — Mensagens sem sinal NEXO\n\n` +
         `💰 *NEGÓCIOS:*\n` +
         `/financeiro — Movimentações\n` +
         `/decisoes — Acordos do time\n\n` +
@@ -1266,9 +1296,10 @@ class LunaAgent {
       );
     }
     else if (cmd === '/leads') {
-      const heat = (txt) => /quero|contratar|fechar|urgente|proposal|proposta/i.test(txt || '') ? 'QUENTE' : (/saber|talvez|depois/i.test(txt || '') ? 'FRIO' : 'MORNO');
-      const body = leads.length > 0
-        ? leads.slice(0, 3).map((l) => {
+      const validLeads = leads.filter(l => !/^(apd|apdd|a paz de deus|deus abencoe|boa tarde|bom dia|boa noite|oi|ola|irm[aã]o)\b/i.test((l.context || l.body || '').trim()));
+      const heat = (txt) => /quero|contratar|fechar|urgente|proposal|proposta|orcamento|orçamento|presupuesto/i.test(txt || '') ? 'QUENTE' : (/saber|talvez|depois|curiosidade/i.test(txt || '') ? 'FRIO' : 'MORNO');
+      const body = validLeads.length > 0
+        ? validLeads.slice(0, 3).map((l) => {
           const h = heat(l.context || l.body || '');
           const icon = h === 'QUENTE' ? '🔥' : (h === 'MORNO' ? '🟠' : '❄️');
           return `${icon} ${h}: ${l.name || 'Lead sem nome'}\n` +
@@ -1277,15 +1308,21 @@ class LunaAgent {
             `   ⏰ ${relativeTime(l.time || l.timestamp)}\n` +
             `   🎯 Acao: ${h === 'QUENTE' ? 'Responder em ate 1h' : 'Nutrir e acompanhar'}`;
         }).join('\n\n')
-        : buildCreativeFallback('leads', leads[leads.length - 1] || messages[messages.length - 1]);
-      const hot = leads.filter(l => heat(l.context || l.body || '') === 'QUENTE').length;
-      const warm = leads.filter(l => heat(l.context || l.body || '') === 'MORNO').length;
-      const cold = Math.max(0, leads.length - hot - warm);
+        : buildCreativeFallback('leads', validLeads[validLeads.length - 1] || messages[messages.length - 1]);
+      const hot = validLeads.filter(l => heat(l.context || l.body || '') === 'QUENTE').length;
+      const warm = validLeads.filter(l => heat(l.context || l.body || '') === 'MORNO').length;
+      const cold = Math.max(0, validLeads.length - hot - warm);
       await msg.reply(
         `🎯 *PIPELINE NEXO*\n\n${body}\n\n` +
         `📊 Pipeline: ${hot} quente | ${warm} morno | ${cold} frio\n\n` +
         `🤖 Luna v16.0 | Pipeline NEXO`
       );
+    }
+    else if (cmd === '/ignoradas' || cmd === '/ignorados') {
+      const body = ignored.length > 0
+        ? ignored.slice(-10).reverse().map(i => `• "${truncate(i.body || i.text, 70)}" — ${i.reason || 'Ignorada'} (${relativeTime(i.time || i.timestamp)})`).join('\n')
+        : 'Nenhuma mensagem ignorada registrada desde o ultimo reset.';
+      await msg.reply(`🚫 *MENSAGENS IGNORADAS*\n\n${body}\n\n🤖 Luna v16.1 | Filtro NEXO`);
     }
     else if (cmd === '/news') {
       const body = news.length > 0
@@ -1629,15 +1666,25 @@ class LunaAgent {
     if (!this.cp.buffer.newNews) this.cp.buffer.newNews = [];
     if (!this.cp.buffer.newFinance) this.cp.buffer.newFinance = [];
     if (!this.cp.buffer.newTasksDone) this.cp.buffer.newTasksDone = [];
+    if (!this.cp.buffer.ignoredMessages) this.cp.buffer.ignoredMessages = [];
     for (const item of classified) {
       const c = item.classification;
       if (!c) continue;
       const text = item.text || item.body || '';
-      const authorName = resolveAuthor(item.author || item.from).name;
-      const time = item.timestamp || new Date().toISOString();
+      const authorName = item.authorName || resolveAuthor(item.author || item.from).name;
+      const time = normalizeWhatsAppTimestamp(item.timestamp || item.time);
       const financeMatch = /(pagou|pago|pagamento|fatura|caixa|orcamento|orçamento|cobrar|pendente|euro|eur|€)/i.test(text);
 
       switch (c.category) {
+        case 'ignored':
+          this.cp.buffer.ignoredMessages.push({
+            body: text,
+            author: authorName,
+            time,
+            reason: c.ignoreReason || 'Mensagem ignorada',
+            category: 'ignored'
+          });
+          break;
         case 'tarefaRealizada':
         case 'tarefaPendente':
           this.cp.buffer.newTasks.push({
@@ -1658,7 +1705,11 @@ class LunaAgent {
           this.cp.buffer.newLinks.push({ url: c.urls?.[0] || c.entities?.urls?.[0]?.url, context: text, title: c.entities?.urls?.[0]?.title, type: c.entities?.urls?.[0]?.type, author: authorName, time });
           break;
         case 'lead':
-          this.cp.buffer.newLeads.push({ ...(c.business?.lead || {}), name: c.possibleNewClient || c.business?.lead?.name || 'Lead nao identificado', context: text, author: authorName, time });
+          if (c.business?.leadScore >= 40 && !c.ignored) {
+            this.cp.buffer.newLeads.push({ ...(c.business?.lead || {}), name: c.possibleNewClient || c.business?.lead?.name || 'Lead nao identificado', context: text, author: authorName, time });
+          } else {
+            this.cp.buffer.ignoredMessages.push({ body: text, author: authorName, time, reason: 'Lead sem intencao comercial suficiente', category: 'ignored' });
+          }
           break;
         case 'financeiroPagamento':
         case 'financeiroPendente':
@@ -1670,7 +1721,7 @@ class LunaAgent {
           break;
       }
 
-      if (financeMatch && !['financeiroPagamento', 'financeiroPendente'].includes(c.category)) {
+      if (financeMatch && c.category !== 'ignored' && !['financeiroPagamento', 'financeiroPendente'].includes(c.category)) {
         this.cp.buffer.newFinance.push({ body: text, author: authorName, time, category: c.category, priority: c.priority || 'P2', value: c.business?.financialValue || null });
       }
     }
@@ -1817,19 +1868,24 @@ class LunaAgent {
 
       const seen = new Set(history.map(m => m.id).filter(Boolean));
       for (const msg of messages) {
-        const authorName = msg.author || msg.authorName || msg.pushname || msg.from || 'Desconhecido';
+        const authorName = msg.authorName || msg.pushname || msg.author || msg.from || 'Desconhecido';
         const resolved = resolveAuthor(authorName);
         const resolvedName = resolved.confidence > 0 ? resolved.name : (aliasMap[authorName] || authorName);
-        const id = msg.id || crypto.createHash('md5').update(`${authorName}:${msg.text || msg.body || ''}:${msg.timestamp || ''}`).digest('hex');
+        const timestamp = normalizeWhatsAppTimestamp(msg.timestamp || msg.time);
+        const id = msg.id || crypto.createHash('md5').update(`${authorName}:${msg.text || msg.body || ''}:${timestamp}`).digest('hex');
         if (seen.has(id)) continue;
         seen.add(id);
         history.push({
           id,
           author: resolvedName,
+          authorName: resolvedName,
+          authorRole: msg.authorRole || resolved.role || null,
           originalAuthor: authorName,
+          authorId: msg.author || msg.from || null,
           text: msg.text || msg.body || '',
+          body: msg.body || msg.text || '',
           chat: msg.chatName || '',
-          timestamp: msg.timestamp || new Date().toISOString(),
+          timestamp,
           classification: msg.classification || null
         });
       }

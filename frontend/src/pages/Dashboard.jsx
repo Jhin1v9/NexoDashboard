@@ -96,14 +96,19 @@ export default function Dashboard() {
 
   const pendingTasks = tasks.filter(t => !t.completed).length
   const avgHealth = clients.length > 0 ? Math.round(clients.reduce((a, c) => a + c.health, 0) / clients.length) : 0
+  const moneyValue = (value, fallback = 0) => {
+    if (typeof value === 'number') return value
+    if (value && typeof value.value === 'number') return value.value
+    return fallback
+  }
 
   // Financial metrics — TODOS REATIVOS da API /api/finance/summary
-  const totalExpected = summary.totalExpected || 5850
-  const totalReceived = summary.totalReceived || 175
-  const totalPending = summary.totalPending || 5675
-  const cashBalance = summary.balance?.value ?? cashBox.balance?.value ?? 0
-  const monthlyExpenses = summary.totalExpense?.value ?? cashBox.monthlyExpenses?.value ?? 0
-  const totalIncome = summary.totalIncome?.value ?? 0
+  const totalExpected = moneyValue(summary.totalExpected)
+  const totalReceived = moneyValue(summary.totalReceived)
+  const totalPending = moneyValue(summary.totalPending)
+  const cashBalance = moneyValue(summary.cashBalance ?? summary.balance ?? summary.cashBoxBalance, moneyValue(cashBox.balance))
+  const monthlyExpenses = moneyValue(summary.monthlyExpenses ?? summary.totalExpense, moneyValue(cashBox.monthlyExpenses))
+  const totalIncome = moneyValue(summary.totalIncome, totalReceived)
 
   // Payment progress
   const paymentProgress = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0

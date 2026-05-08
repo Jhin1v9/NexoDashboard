@@ -17,7 +17,7 @@ function extractLinksFromMessages(messages) {
   const seen = new Set()
   
   for (const msg of messages) {
-    const text = msg.text || ''
+    const text = msg.body || msg.text || msg.message || ''
     const matches = text.match(urlRegex)
     if (matches) {
       for (const url of matches) {
@@ -28,7 +28,7 @@ function extractLinksFromMessages(messages) {
             url: cleanUrl,
             title: cleanUrl.replace(/^https?:\/\//, '').substring(0, 50),
             description: text.substring(0, 120),
-            sender: msg.sender || msg.author || 'Desconhecido',
+            sender: msg.authorName || msg.sender || msg.author || 'Desconhecido',
             group: msg.group || 'Production',
             time: msg.time || msg.timestamp || ''
           })
@@ -41,7 +41,7 @@ function extractLinksFromMessages(messages) {
 
 function normalizeAgentData(agentData, opsData, whatsappTasks) {
   // Dados do agente (whatsapp-agent-data.json)
-  const messages = agentData?.messages || agentData?.bufferedMessages || agentData?.recentMessages || []
+  const messages = agentData?.messages || agentData?.recentMessages || agentData?.bufferedMessages || []
   // bufferedMessages pode ser número em versões antigas
   const normalizedMessages = Array.isArray(messages) ? messages : []
   
@@ -54,7 +54,8 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
   const decisions = agentData?.decisions || []
   const normalizedDecisions = Array.isArray(decisions) ? decisions : []
   
-  const totalMessages = agentData?.totalMessages || agentData?.stats?.totalMessages || 0
+  const ignoredMessages = Array.isArray(agentData?.ignoredMessages) ? agentData.ignoredMessages : []
+  const totalMessages = agentData?.totalMessages || agentData?.stats?.totalMessages || normalizedMessages.length
   
   // Extrair links das mensagens
   const extractedLinks = extractLinksFromMessages(normalizedMessages)
@@ -66,11 +67,11 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
   // Normalizar mensagens para o formato da UI
   const recentMessages = normalizedMessages.slice(0, 50).map((m, i) => ({
     id: m.id || `msg-${i}`,
-    sender: m.sender || m.author || 'Desconhecido',
-    text: m.text || m.message || '(sem texto)',
+    sender: m.authorName || m.sender || m.author || 'Desconhecido',
+    text: m.body || m.text || m.message || '(sem texto)',
     time: m.time || m.timestamp || '',
     group: m.group || 'Production',
-    type: m.type || 'text'
+    type: m.type || m.classification?.category || 'text'
   }))
   
   // Normalizar tarefas
@@ -109,6 +110,7 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
     totalIdeas: normalizedIdeasList.length,
     totalDecisions: normalizedDecisions.length,
     totalLinks: allLinks.length,
+    totalIgnored: ignoredMessages.length,
     activeGroups: 2,
     participants: ['Abner', 'Nonoke', 'Elias', 'Paulo']
   }
@@ -129,7 +131,8 @@ function normalizeAgentData(agentData, opsData, whatsappTasks) {
     messages: recentMessages,
     groups,
     links: allLinks,
-    decisions: normalizedDecisions
+    decisions: normalizedDecisions,
+    ignoredMessages
   }
 }
 
@@ -408,12 +411,14 @@ export default function WhatsApp() {
   const messages = data?.messages || []
   const groups = data?.groups || []
   const links = data?.links || []
+  const ignoredMessages = data?.ignoredMessages || []
 
   const tabs = [
     { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
     { id: 'tasks', label: `Tarefas (${tasks.length})`, icon: CheckSquare },
     { id: 'projects', label: 'Projetos', icon: Target },
     { id: 'messages', label: `Mensagens (${messages.length})`, icon: MessageCircle },
+    { id: 'ignored', label: `Ignoradas (${ignoredMessages.length})`, icon: AlertCircle },
     { id: 'links', label: `Links (${links.length})`, icon: Link2 },
   ]
 
@@ -453,13 +458,14 @@ export default function WhatsApp() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard icon={MessageCircle} label="Mensagens" value={stats.totalMessages || 0} color="#22c55e" 
           subtext={groups.map(g => `${g.short}: ${g.messageCount}`).join(', ')} />
         <StatCard icon={CheckSquare} label="Tarefas" value={stats.totalTasks || 0} color="#f59e0b" 
           subtext={`${stats.highPriorityTasks || 0} alta prioridade`} />
         <StatCard icon={Lightbulb} label="Ideias" value={stats.totalIdeas || 0} color="#3b82f6" />
         <StatCard icon={Zap} label="Decisões" value={stats.totalDecisions || 0} color="#6366f1" />
+        <StatCard icon={AlertCircle} label="Ignoradas" value={stats.totalIgnored || ignoredMessages.length} color="#747d8c" />
       </div>
 
       {/* Tabs */}
@@ -681,6 +687,30 @@ export default function WhatsApp() {
                 <MessageCircle size={48} className="mx-auto mb-4 opacity-30" />
                 <p>Nenhuma mensagem recente</p>
                 <p className="text-xs mt-2">As mensagens aparecem quando o Luna faz scan com novidades.</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'ignored' && (
+          <motion.div key="ignored" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+            {ignoredMessages.slice().reverse().map((msg, i) => (
+              <div key={msg.id || i} className="glass-card p-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={16} className="text-nexo-muted mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-nexo-text">{msg.body || msg.text || '(sem texto)'}</p>
+                    <p className="text-xs text-nexo-muted mt-1">
+                      {msg.authorName || msg.author || 'Desconhecido'} • {msg.reason || 'Sem sinal NEXO'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {ignoredMessages.length === 0 && (
+              <div className="text-center text-nexo-muted py-12">
+                <AlertCircle size={48} className="mx-auto mb-4 opacity-30" />
+                <p>Nenhuma mensagem ignorada</p>
               </div>
             )}
           </motion.div>

@@ -104,6 +104,67 @@ function resolveAuthor(phoneId) {
   };
 }
 
+function normalizeTextForClassifier(text = '') {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildIgnoredClassification(rawText, author, timestamp, reason = 'Mensagem sem sinal NEXO') {
+  const text = rawText || '';
+  return {
+    category: 'ignored',
+    subCategories: [],
+    icon: '🚫',
+    label: 'Mensagem Ignorada',
+    priority: 'P3',
+    confidence: 1,
+    ignored: true,
+    ignoreReason: reason,
+    author,
+    entities: { clients: [], projects: [], members: [], urls: [], emails: [], phones: [] },
+    urls: [],
+    business: {
+      clientId: null,
+      clientName: null,
+      projectId: null,
+      projectName: null,
+      assignedTo: null,
+      assignedToName: null,
+      deadline: null,
+      financialValue: null,
+      financialCurrency: 'EUR',
+      isNewLead: false,
+      leadScore: 0,
+      lead: null
+    },
+    possibleNewClient: null,
+    text,
+    cleanText: normalizeTextForClassifier(text),
+    object: null,
+    timestamp,
+    metrics: {
+      wordCount: normalizeTextForClassifier(text).split(/\s+/).filter(Boolean).length,
+      hasQuestion: text.includes('?'),
+      hasActionItem: false,
+      requiresFollowUp: false,
+      urgencyScore: 0,
+      patternMatches: 0
+    },
+    scoring: {
+      totalScore: 0,
+      patternScores: [],
+      entityBonus: 0,
+      financialBonus: 0,
+      authorBonus: author?.isFounder ? 10 : 0
+    }
+  };
+}
+
 // ============================================
 // HELPERS BOM-SAFE
 // ============================================
@@ -363,6 +424,10 @@ class SmartClassifier {
     const rawText = msg.text || msg.body || '';
     const author = resolveAuthor(msg.author || msg.from);
     const timestamp = msg.time || msg.timestamp || new Date().toISOString();
+    const ignoredReason = this.getIgnoredReason(rawText);
+    if (ignoredReason) {
+      return buildIgnoredClassification(rawText, author, timestamp, ignoredReason);
+    }
 
     // 1. SCORING POR PATTERN
     const scores = this.normalizeScores(this.calculateScores(text), text);
@@ -384,6 +449,10 @@ class SmartClassifier {
 
     // 7. MONTAR RESULTADO
     const primaryMatch = scores.length > 0 ? scores[0] : null;
+
+    if (!primaryMatch && entities.leadScore < 40 && !financial.value && entities.urls.length === 0) {
+      return buildIgnoredClassification(rawText, author, timestamp, 'Sem intencao comercial, tarefa, link ou financeiro');
+    }
 
     return {
       // Categoria principal
@@ -553,7 +622,38 @@ class SmartClassifier {
       if (link) link.score = Math.max(link.score, 130);
     }
 
+    if (this.isSocialOnly(text)) {
+      normalized = normalized.filter(s => !['lead', 'decisao', 'feedbackPositivo', 'projeto'].includes(s.category));
+    }
+
     return normalized.sort((a, b) => b.score - a.score);
+  }
+
+  getIgnoredReason(rawText = '') {
+    const normalized = normalizeTextForClassifier(rawText);
+    if (!normalized) return 'Mensagem vazia';
+    if (/^(@luna|@kimi|@kimiclaw)?\s*$/.test(normalized)) return 'Mencao vazia';
+    if (this.isSocialOnly(normalized)) return 'Saudacao ou conversa social sem sinal NEXO';
+    if (normalized.length <= 2) return 'Mensagem curta demais';
+    return null;
+  }
+
+  isSocialOnly(text = '') {
+    const normalized = normalizeTextForClassifier(text)
+      .replace(/@luna|@kimi|@kimiclaw/g, '')
+      .trim();
+    if (!normalized) return true;
+
+    const businessSignal = /\b(site|app|aplicativo|sistema|dashboard|landing|tpv|seo|cliente|orcamento|presupuesto|proposta|contratar|contrato|pagamento|pago|pagar|fatura|caixa|valor|preco|custo|eur|euro|€|bug|deploy|commit|github|tarefa|pendente|corrigir|consertar|implementar|entregar|prazo|reuniao|briefing|projeto|nexo|superclim|santafe|tropicale|juan|paulo)\b/i.test(normalized);
+    if (businessSignal) return false;
+
+    const socialPatterns = [
+      /^(apd|apdd|a paz de deus|paz de deus|deus abencoe|boa tarde|bom dia|boa noite|oi|ola|olá|e ai|salve|fala|blz|beleza|tudo bem|td bem|como vai|meu irmao|irmao|querido|amem|amen)(\b|[\s!?.,])/i,
+      /\b(deus abencoe|a paz de deus|apdd|meu irmao|irmao tudo bem|espero que sim|multiplique e nao nos falte)\b/i
+    ];
+
+    const words = normalized.split(/\s+/).filter(Boolean);
+    return socialPatterns.some(pattern => pattern.test(normalized)) && words.length <= 28;
   }
 
   // ============================================
@@ -701,8 +801,14 @@ class SmartClassifier {
   // ============================================
   calculateLeadScore(text) {
     let score = 0;
+    const normalized = normalizeTextForClassifier(text);
+    if (this.isSocialOnly(normalized)) return 0;
+
+    const commercialIntent = /\b(contratar|fechar|orcamento|presupuesto|budget|cotacao|proposta|contrato|quanto custa|quanto cobra|qual o valor|preco|custo|site|app|aplicativo|sistema|dashboard|landing page|tpv|seo|projeto|cliente|briefing|prazo|quando entrega|quero o|preciso de um|preciso de uma|gostaria de um|gostaria de uma|faz site|faz app|faz sistema|trabalha com)\b/i.test(normalized);
+    if (!commercialIntent) return 0;
 
     const signals = [
+      { keywords: ['contratar', 'fechar', 'contrato', 'manda proposta', 'quero o site', 'quero o sistema', 'quero o app'], weight: 45 },
       { keywords: ['orcamento', 'presupuesto', 'budget', 'cotacao', 'proposta', 'valor', 'preco', 'custo'], weight: 25 },
       { keywords: ['prazo', 'quando', 'urgente', 'deadline', 'para quando', 'esta semana', 'proximo mes', 'amanha'], weight: 20 },
       { keywords: ['web', 'site', 'app', 'aplicativo', 'sistema', 'tpv', 'faturacao', 'seo', 'landing page', 'dashboard'], weight: 30 },
@@ -711,15 +817,15 @@ class SmartClassifier {
     ];
 
     for (const signal of signals) {
-      const matched = signal.keywords.filter(k => text.includes(k));
+      const matched = signal.keywords.filter(k => normalized.includes(k));
       if (matched.length > 0) {
         score += signal.weight;
       }
     }
 
     // Bônus por combinação
-    if (text.includes('orcamento') && text.includes('site')) score += 15;
-    if (text.includes('prazo') && text.includes('quanto')) score += 10;
+    if (normalized.includes('orcamento') && normalized.includes('site')) score += 15;
+    if (normalized.includes('prazo') && normalized.includes('quanto')) score += 10;
 
     return Math.min(score, 100);
   }
@@ -921,4 +1027,4 @@ function deduplicateMessages(messages) {
   });
 }
 
-module.exports = { SmartClassifier, resolveAuthor, deduplicateMessages };
+module.exports = { SmartClassifier, resolveAuthor, deduplicateMessages, normalizeTextForClassifier };

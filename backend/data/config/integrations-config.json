@@ -78,7 +78,7 @@
   },
   "ollama": {
     "enabled": true,
-    "model": "gemma2:2b",
+    "model": "qwen3:1.7b",
     "host": "http://localhost:11434",
     "timeout": 30000,
     "temperature": 0.7,

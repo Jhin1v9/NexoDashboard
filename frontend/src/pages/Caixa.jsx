@@ -30,6 +30,8 @@ const projectionMonths = (projection) => {
 export default function Caixa() {
   const { data: cashBox, loading: loadingCash, error: errorCash } = useRealtime('/api/cash-box', 30000)
   const { data: projection, loading: loadingProj, error: errorProj } = useRealtime('/api/cash-box/projection', 30000)
+  const [editValues, setEditValues] = useState({ balance: '', monthlyIncome: '', monthlyExpenses: '' })
+  const [saving, setSaving] = useState(false)
 
   const balance = cashBox?.balance?.value || 0
   const currency = cashBox?.balance?.currency || 'EUR'
@@ -64,6 +66,25 @@ export default function Caixa() {
   }, [historyData, projectionData])
 
   const isLow = balance < (monthlyExpenses * (cashBox?.settings?.lowBalanceMultiplier || 2))
+  const saveCashBox = async () => {
+    setSaving(true)
+    try {
+      const payload = {
+        balance: editValues.balance === '' ? balance : Number(editValues.balance),
+        monthlyIncome: editValues.monthlyIncome === '' ? monthlyIncome : Number(editValues.monthlyIncome),
+        monthlyExpenses: editValues.monthlyExpenses === '' ? monthlyExpenses : Number(editValues.monthlyExpenses),
+        currency
+      }
+      await fetch('/api/cash-box', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      setEditValues({ balance: '', monthlyIncome: '', monthlyExpenses: '' })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -97,6 +118,49 @@ export default function Caixa() {
               Caixa baixo
             </div>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <label className="text-xs text-nexo-muted">
+            Saldo editável
+            <input
+              type="number"
+              step="0.01"
+              value={editValues.balance}
+              onChange={e => setEditValues(v => ({ ...v, balance: e.target.value }))}
+              placeholder={String(balance)}
+              className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm text-nexo-text"
+            />
+          </label>
+          <label className="text-xs text-nexo-muted">
+            Receitas/mês
+            <input
+              type="number"
+              step="0.01"
+              value={editValues.monthlyIncome}
+              onChange={e => setEditValues(v => ({ ...v, monthlyIncome: e.target.value }))}
+              placeholder={String(monthlyIncome)}
+              className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm text-nexo-text"
+            />
+          </label>
+          <label className="text-xs text-nexo-muted">
+            Gastos/mês
+            <input
+              type="number"
+              step="0.01"
+              value={editValues.monthlyExpenses}
+              onChange={e => setEditValues(v => ({ ...v, monthlyExpenses: e.target.value }))}
+              placeholder={String(monthlyExpenses)}
+              className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm text-nexo-text"
+            />
+          </label>
+          <button
+            onClick={saveCashBox}
+            disabled={saving}
+            className="self-end h-10 rounded-md bg-nexo-info px-4 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saving ? 'Salvando...' : 'Salvar caixa'}
+          </button>
         </div>
 
         {/* Mini resumo */}

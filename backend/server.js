@@ -258,26 +258,54 @@ app.get('/api/predictions', (req, res) => {
   res.json(getPredictions(scanClients()));
 });
 
+function normalizeWhatsappBuffer(buffer = {}) {
+  const messages = buffer.messages || buffer.newMessages || [];
+  const tasks = buffer.tasks || buffer.newTasks || [];
+  const ideas = buffer.ideas || buffer.newIdeas || [];
+  const decisions = buffer.decisions || buffer.newDecisions || [];
+  const links = buffer.links || buffer.newLinks || [];
+  const leads = buffer.leads || buffer.newLeads || [];
+  const finance = buffer.finance || buffer.newFinance || [];
+  const ignoredMessages = buffer.ignoredMessages || [];
+
+  return {
+    messages,
+    recentMessages: messages.slice(-100).reverse(),
+    tasks,
+    ideas,
+    decisions,
+    links,
+    leads,
+    finance,
+    ignoredMessages,
+    mentions: buffer.mentions || buffer.newMentions || [],
+    totalMessages: messages.length,
+    totalTasks: tasks.length,
+    totalIdeas: ideas.length,
+    totalDecisions: decisions.length,
+    totalLinks: links.length,
+    totalLeads: leads.length,
+    totalFinance: finance.length,
+    totalIgnored: ignoredMessages.length,
+    totalNewMessages: messages.length,
+    lastBufferUpdate: buffer.lastBufferUpdate || buffer.lastUpdated || null,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function readLunaBuffer() {
+  const canonical = path.join(DATA_DIR, 'luna-buffer.json');
+  const legacy = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
+  const fallback = { newMessages: [], newTasks: [], newIdeas: [], newDecisions: [], newLinks: [], newLeads: [], newFinance: [], ignoredMessages: [] };
+  const data = readJSON(canonical) || readJSON(legacy) || fallback;
+  return normalizeWhatsappBuffer(data);
+}
+
 // WhatsApp tasks (legado)
-// FIX: /api/whatsapp agora retorna dados REAIS do luna-buffer.json
+// FIX: /api/whatsapp agora retorna dados REAIS do backend/data/luna-buffer.json
 app.get('/api/whatsapp', (req, res) => {
     try {
-        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
-        const buffer = fs.existsSync(bufferPath) ? JSON.parse(fs.readFileSync(bufferPath, 'utf8')) : { messages: [], tasks: [], ideas: [], decisions: [], links: [], mentions: [] };
-        
-        res.json({
-            messages: buffer.messages || [],
-            tasks: buffer.tasks || [],
-            ideas: buffer.ideas || [],
-            decisions: buffer.decisions || [],
-            links: buffer.links || [],
-            mentions: buffer.mentions || [],
-            totalMessages: (buffer.messages || []).length,
-            totalTasks: (buffer.tasks || []).length,
-            totalIdeas: (buffer.ideas || []).length,
-            totalDecisions: (buffer.decisions || []).length,
-            timestamp: new Date().toISOString()
-        });
+        res.json(readLunaBuffer());
     } catch (e) {
         // Fallback para legado se erro
         res.json(readJSON(WAPP_FILE) || []);
@@ -307,14 +335,27 @@ app.use('/reports', express.static(REPORTS_DIR));
 app.get('/api/whatsapp-agent', (req, res) => {
   try {
     const data = readJSON(AGENT_DATA_FILE);
-    if (!data) {
-      return res.status(404).json({
-        success: false,
-        error: 'Agent data not found',
-        hint: 'Run: node agents/luna-cto-agent.cjs'
-      });
-    }
-    res.json({ success: true, data, timestamp: new Date().toISOString() });
+    const buffer = readLunaBuffer();
+    const payload = data && !Array.isArray(data) ? data : {};
+    const stats = {
+      ...(payload.stats || {}),
+      totalMessages: buffer.totalMessages,
+      totalTasks: buffer.totalTasks,
+      totalIdeas: buffer.totalIdeas,
+      totalDecisions: buffer.totalDecisions,
+      totalLinks: buffer.totalLinks,
+      totalLeads: buffer.totalLeads,
+      totalFinance: buffer.totalFinance,
+      totalIgnored: buffer.totalIgnored
+    };
+    res.json({
+      success: true,
+      ...payload,
+      ...buffer,
+      stats,
+      data: { ...payload, ...buffer, stats },
+      timestamp: new Date().toISOString()
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -322,10 +363,11 @@ app.get('/api/whatsapp-agent', (req, res) => {
 
 app.get('/api/whatsapp-agent/status', (req, res) => {
   const data = readJSON(AGENT_DATA_FILE);
+  const buffer = readLunaBuffer();
   res.json({
-    active: !!data,
-    lastUpdate: data?.updatedAt || null,
-    stats: data?.stats || null
+    active: !!data || buffer.totalMessages + buffer.totalTasks + buffer.totalLeads + buffer.totalIgnored > 0,
+    lastUpdate: data?.updatedAt || buffer.lastBufferUpdate || null,
+    stats: data?.stats || buffer
   });
 });
 
@@ -1071,6 +1113,36 @@ app.get('/api/cash-box', async (req, res) => {
   }
 });
 
+// PUT editable cash box fields
+app.put('/api/cash-box', async (req, res) => {
+  try {
+    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [], settings: {} };
+    const next = { ...cashBox };
+    const currency = req.body.currency || cashBox.balance?.currency || 'EUR';
+
+    if (req.body.balance !== undefined) {
+      next.balance = { value: parseFloat(Number(req.body.balance || 0).toFixed(2)), currency };
+    }
+    if (req.body.monthlyIncome !== undefined) {
+      next.monthlyIncome = { value: parseFloat(Number(req.body.monthlyIncome || 0).toFixed(2)), currency };
+    }
+    if (req.body.monthlyExpenses !== undefined) {
+      next.monthlyExpenses = { value: parseFloat(Number(req.body.monthlyExpenses || 0).toFixed(2)), currency };
+    }
+    if (req.body.projectionMonths !== undefined) {
+      next.projectionMonths = Math.max(1, Math.min(24, parseInt(req.body.projectionMonths, 10) || 3));
+      next.settings = { ...(next.settings || {}), projectionMonths: next.projectionMonths };
+    }
+
+    next.lastUpdated = nowISO();
+    writeJSON(CASH_BOX_FILE, next);
+    broadcast({ type: 'cashbox', data: next });
+    res.json(next);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET cash box projection (6 meses)
 app.get('/api/cash-box/projection', async (req, res) => {
   try {
@@ -1386,8 +1458,12 @@ app.get('/api/finance/summary', async (req, res) => {
       totalReceived: parseFloat(totalReceived.toFixed(2)),
       totalPending: parseFloat(totalPending.toFixed(2)),
       cashBoxBalance: parseFloat((cashBox.balance ? (cashBox.balance.value || 0) : 0).toFixed(2)),
+      cashBalance: { value: parseFloat((cashBox.balance ? (cashBox.balance.value || 0) : 0).toFixed(2)), currency: cashBox.balance?.currency || 'EUR' },
+      balance: { value: parseFloat((cashBox.balance ? (cashBox.balance.value || 0) : 0).toFixed(2)), currency: cashBox.balance?.currency || 'EUR' },
       monthlyIncome: parseFloat((cashBox.monthlyIncome ? (cashBox.monthlyIncome.value || 0) : 0).toFixed(2)),
       monthlyExpenses: parseFloat(monthlyExpenses.toFixed(2)),
+      totalIncome: { value: parseFloat(totalReceived.toFixed(2)), currency: 'EUR' },
+      totalExpense: { value: parseFloat(monthlyExpenses.toFixed(2)), currency: 'EUR' },
       activeClients: payments.length,
       overduePayments,
       alerts: alerts.slice(0, 10)
@@ -2630,5 +2706,3 @@ server.listen(PORT, BIND_IP, () => {
 setInterval(() => {
   external.refreshExternal('tools').catch(() => {});
 }, 10 * 60 * 1000);
-
-
