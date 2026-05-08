@@ -1,0 +1,137 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "lastUpdated": "2026-05-04T19:50:00Z"
+  },
+  "commands": {
+    "/status": {
+      "description": "Resumo inteligente do estado atual (não genérico)",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": true,
+      "cooldown": 0
+    },
+    "/tarefas": {
+      "description": "Board de tarefas por projeto/pessoa",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/leads": {
+      "description": "Pipeline de possíveis clientes",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/clientes": {
+      "description": "Status de cada cliente ativo",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/links": {
+      "description": "Links analisados com preview",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/news": {
+      "description": "Notícias do dia com contexto",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/dashboard": {
+      "description": "Envia screenshot do dashboard visual",
+      "requiresAdmin": false,
+      "responseType": "image",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/dashboard-off": {
+      "description": "Pausa envio automático de dashboard por 24h",
+      "requiresAdmin": true,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/dashboard-on": {
+      "description": "Reativa envio automático de dashboard",
+      "requiresAdmin": true,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/dashboard-status": {
+      "description": "Mostra status do envio de dashboard",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/extrair": {
+      "description": "Força extração completa do histórico",
+      "requiresAdmin": true,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 300000
+    },
+    "/reclassificar": {
+      "description": "Reclassifica todas as mensagens com novo schema",
+      "requiresAdmin": true,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 600000
+    },
+    "/projeto": {
+      "description": "Detalhes de um projeto específico (uso: /projeto SANTAFE)",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0,
+      "requiresArgument": true
+    },
+    "/cliente": {
+      "description": "Detalhes de um cliente específico (uso: /cliente Paulo)",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0,
+      "requiresArgument": true
+    },
+    "/ajuda": {
+      "description": "Menu de comandos disponíveis",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/checkpoint": {
+      "description": "Mostra status do checkpoint (mensagens processadas)",
+      "requiresAdmin": false,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    },
+    "/buffer": {
+      "description": "Mostra conteúdo do buffer acumulativo",
+      "requiresAdmin": true,
+      "responseType": "text",
+      "aiGenerated": false,
+      "cooldown": 0
+    }
+  },
+  "aliases": {
+    "/s": "/status",
+    "/t": "/tarefas",
+    "/l": "/leads",
+    "/c": "/clientes",
+    "/d": "/dashboard",
+    "/h": "/ajuda"
+  }
+}

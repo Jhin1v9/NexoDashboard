@@ -1,0 +1,862 @@
+// ============================================================
+// LUNA CTO AGENT v10.2 → v11.1 PATCH
+// Mantém 100% da personalidade original
+// Adiciona: UI Map + Navegação Inteligente + Auto-Fix + Links + Prioridades
+// ============================================================
+// INSTRUÇÕES DE APLICAÇÃO:
+// 1. Faça backup do seu luna-cto-agent.mjs original
+// 2. Copie este arquivo para agents/luna-cto-agent.mjs
+// 3. Teste com: node luna-cto-agent.mjs --once
+// ============================================================
+
+import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.join(__dirname, '..');
+
+// ============================================================
+// CONFIGURAÇÃO ORIGINAL (mantida 100%)
+// ============================================================
+const CONFIG = {
+  CDP_URL: 'http://127.0.0.1:9223',
+  GROUPS: [
+    { name: '🏆Production - 2026🙏', short: 'Production', type: 'internal' },
+    { name: 'Paulo (web)', short: 'Paulo', type: 'client' }
+  ],
+  REPORT_DESTINATION: {
+    name: 'Production',
+    number: '34685093192',
+    groupName: '🏆Production - 2026🙏'
+  },
+  CHECKPOINT_FILE: path.join(projectRoot, 'backend/data/luna-checkpoint.json'),
+  BUFFER_FILE: path.join(projectRoot, 'backend/data/luna-buffer.json'),
+  OUTPUT_FILE: path.join(projectRoot, 'backend/data/whatsapp-agent-data.json'),
+  REPORTS_DIR: path.join(projectRoot, 'backend/data/reports'),
+  ARTIFACTS_DIR: path.join(projectRoot, 'ARTIFACTS'),
+  SCAN_INTERVAL: 10 * 60 * 1000,
+  REPORT_INTERVAL: 30 * 60 * 1000,
+  MAX_SILENCE_REPORTS: 1,
+  MAX_SCROLLS: 5
+};
+
+// ============================================================
+// WHATSAPP UI MAP v1.0 (NOVO - mas não muda personalidade)
+// ============================================================
+const UI_MAP = {
+  ESTADOS: {
+    LISTA_CHATS: 'lista_chats',
+    CHAT_ABIERTO: 'chat_abierto',
+    BUSQUEDA: 'busqueda',
+    CARGANDO: 'cargando',
+    ERROR: 'error'
+  },
+  SELECTORES: {
+    listaChats: '[data-testid="chat-list"]',
+    chatItem: '[data-testid="chat-list-item"]',
+    chatTitle: '[data-testid="chat-title"]',
+    chatAbierto: '[data-testid="conversation-panel-wrapper"]',
+    mensajesContainer: '[data-testid="conversation-panel-messages"]',
+    mensajeEntrada: '[data-testid="msg-container"] .message-in',
+    mensajeSalida: '[data-testid="msg-container"] .message-out',
+    textoMensaje: '[data-testid="msg-container"] .selectable-text',
+    barraBusqueda: '[data-testid="chat-list-search"]',
+    inputBusqueda: '[data-testid="chat-list-search"] input',
+    resultadoBusqueda: '[data-testid="chat-list-search-section"]',
+    btnAtras: '[data-testid="back"]',
+    btnMenu: '[data-testid="menu"]',
+    btnBuscar: '[data-testid="search"]'
+  }
+};
+
+// ============================================================
+// LOGGER (NOVO - mas mantém estilo original)
+// ============================================================
+class Logger {
+  constructor() {
+    this.logFile = path.join(CONFIG.ARTIFACTS_DIR, 'luna-v11.log');
+    if (!fs.existsSync(CONFIG.ARTIFACTS_DIR)) {
+      fs.mkdirSync(CONFIG.ARTIFACTS_DIR, { recursive: true });
+    }
+  }
+
+  _hora() {
+    return new Date().toISOString();
+  }
+
+  _gravar(nivel, msg) {
+    const linea = `[${nivel}] [${this._hora()}] ${msg}`;
+    console.log(linea);
+    fs.appendFileSync(this.logFile, linea + '\n');
+  }
+
+  info(msg) { this._gravar('INFO', msg); }
+  success(msg) { this._gravar('SUCCESS', msg); }
+  error(msg) { this._gravar('ERROR', msg); }
+  warn(msg) { this._gravar('WARN', msg); }
+  scan(msg) { this._gravar('SCAN', msg); }
+}
+
+const logger = new Logger();
+
+// ============================================================
+// WHATSAPP NAVIGATOR (NOVO - navegação inteligente)
+// ============================================================
+class WhatsAppNavigator {
+  constructor(page) {
+    this.page = page;
+    this.estadoActual = null;
+    this.ultimoGrupo = null;
+    this.intentos = 0;
+    this.maxIntentos = 3;
+  }
+
+  async detectarEstado() {
+    const { SELECTORES, ESTADOS } = UI_MAP;
+
+    const listaVisible = await this.page.isVisible(SELECTORES.listaChats).catch(() => false);
+    if (listaVisible) {
+      this.estadoActual = ESTADOS.LISTA_CHATS;
+      return ESTADOS.LISTA_CHATS;
+    }
+
+    const chatVisible = await this.page.isVisible(SELECTORES.chatAbierto).catch(() => false);
+    if (chatVisible) {
+      this.estadoActual = ESTADOS.CHAT_ABIERTO;
+      return ESTADOS.CHAT_ABIERTO;
+    }
+
+    const busquedaVisible = await this.page.isVisible(SELECTORES.barraBusqueda).catch(() => false);
+    if (busquedaVisible) {
+      this.estadoActual = ESTADOS.BUSQUEDA;
+      return ESTADOS.BUSQUEDA;
+    }
+
+    this.estadoActual = ESTADOS.ERROR;
+    return ESTADOS.ERROR;
+  }
+
+  async irParaLista() {
+    const estado = await this.detectarEstado();
+
+    if (estado === UI_MAP.ESTADOS.LISTA_CHATS) {
+      logger.info('NAV: Ya estamos en lista de chats');
+      return true;
+    }
+
+    if (estado === UI_MAP.ESTADOS.CHAT_ABIERTO) {
+      logger.info('NAV: Volviendo a lista...');
+
+      // Método 1: Click en botón atrás
+      const btnAtras = await this.page.$(UI_MAP.SELECTORES.btnAtras);
+      if (btnAtras) {
+        await btnAtras.click();
+        await this.page.waitForTimeout(1000);
+      }
+
+      // Método 2: Tecla Escape
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(500);
+
+      const nuevoEstado = await this.detectarEstado();
+      return nuevoEstado === UI_MAP.ESTADOS.LISTA_CHATS;
+    }
+
+    if (estado === UI_MAP.ESTADOS.BUSQUEDA) {
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(500);
+      return await this.irParaLista();
+    }
+
+    return false;
+  }
+
+  async abrirGrupo(nombreGrupo) {
+    this.intentos = 0;
+
+    while (this.intentos < this.maxIntentos) {
+      this.intentos++;
+      logger.scan(`Intento ${this.intentos}/${this.maxIntentos} para abrir: ${nombreGrupo}`);
+
+      // Garante que está na lista
+      const enLista = await this.irParaLista();
+      if (!enLista) {
+        logger.error('NAV: No podemos llegar a la lista');
+        return false;
+      }
+
+      // MÉTODO 1: Click directo
+      const exito1 = await this._clickDirecto(nombreGrupo);
+      if (exito1) {
+        this.ultimoGrupo = nombreGrupo;
+        return true;
+      }
+
+      // MÉTODO 2: Búsqueda
+      const exito2 = await this._buscarGrupo(nombreGrupo);
+      if (exito2) {
+        this.ultimoGrupo = nombreGrupo;
+        return true;
+      }
+
+      // MÉTODO 3: Scroll + click
+      const exito3 = await this._scrollYClick(nombreGrupo);
+      if (exito3) {
+        this.ultimoGrupo = nombreGrupo;
+        return true;
+      }
+
+      await this.page.waitForTimeout(2000);
+    }
+
+    logger.error(`NAV: Fallo total para abrir ${nombreGrupo}`);
+    return false;
+  }
+
+  async _clickDirecto(nombreGrupo) {
+    try {
+      // Selector por title
+      const selector = `[data-testid="chat-list-item"] [title="${nombreGrupo}"]`;
+      const elemento = await this.page.$(selector);
+
+      if (elemento) {
+        await elemento.click();
+        await this.page.waitForTimeout(1500);
+
+        const estado = await this.detectarEstado();
+        if (estado === UI_MAP.ESTADOS.CHAT_ABIERTO) {
+          logger.success('NAV: Click directo exitoso!');
+          return true;
+        }
+      }
+    } catch (e) {
+      logger.warn(`Click directo fallo: ${e.message}`);
+    }
+    return false;
+  }
+
+  async _buscarGrupo(nombreGrupo) {
+    try {
+      logger.info('NAV: Intentando busqueda...');
+
+      // Abre busqueda con Ctrl+F
+      await this.page.keyboard.press('Control+f');
+      await this.page.waitForTimeout(500);
+
+      // Escribe nombre
+      await this.page.fill(UI_MAP.SELECTORES.inputBusqueda, nombreGrupo);
+      await this.page.waitForTimeout(1000);
+
+      // Click en resultado
+      const resultado = await this.page.$(UI_MAP.SELECTORES.resultadoBusqueda);
+      if (resultado) {
+        await resultado.click();
+        await this.page.waitForTimeout(1500);
+
+        const estado = await this.detectarEstado();
+        if (estado === UI_MAP.ESTADOS.CHAT_ABIERTO) {
+          logger.success('NAV: Busqueda exitosa!');
+          return true;
+        }
+      }
+
+      // Limpia busqueda
+      await this.page.keyboard.press('Escape');
+    } catch (e) {
+      logger.warn(`Busqueda fallo: ${e.message}`);
+    }
+    return false;
+  }
+
+  async _scrollYClick(nombreGrupo) {
+    try {
+      logger.info('NAV: Intentando scroll + click...');
+
+      const container = await this.page.$(UI_MAP.SELECTORES.listaChats);
+      if (!container) return false;
+
+      for (let i = 0; i < 5; i++) {
+        await container.evaluate(el => el.scrollTop += 500);
+        await this.page.waitForTimeout(500);
+
+        const exito = await this._clickDirecto(nombreGrupo);
+        if (exito) return true;
+      }
+    } catch (e) {
+      logger.warn(`Scroll fallo: ${e.message}`);
+    }
+    return false;
+  }
+
+  async extraerMensajes(maxScrolls = CONFIG.MAX_SCROLLS) {
+    const estado = await this.detectarEstado();
+    if (estado !== UI_MAP.ESTADOS.CHAT_ABIERTO) {
+      logger.error('EXTRACT: No estamos en chat abierto');
+      return [];
+    }
+
+    const mensajes = [];
+    const vistos = new Set();
+
+    for (let scroll = 0; scroll < maxScrolls; scroll++) {
+      logger.scan(`Scroll ${scroll + 1}/${maxScrolls}`);
+
+      const nuevos = await this.page.evaluate((selectores) => {
+        const msgs = [];
+        document.querySelectorAll(selectores.mensajeEntrada + ', ' + selectores.mensajeSalida).forEach(el => {
+          const texto = el.querySelector(selectores.textoMensaje)?.innerText || '';
+          const horaEl = el.querySelector('[data-pre-plain-text]');
+          const hora = horaEl ? horaEl.getAttribute('data-pre-plain-text') : '';
+          const autor = hora.split(']')[1]?.trim() || 'Desconocido';
+
+          if (texto) {
+            msgs.push({
+              text: texto,
+              time: hora,
+              author: autor,
+              id: texto.slice(0, 50) + hora
+            });
+          }
+        });
+        return msgs;
+      }, UI_MAP.SELECTORES);
+
+      for (const msg of nuevos) {
+        if (!vistos.has(msg.id)) {
+          vistos.add(msg.id);
+          mensajes.push(msg);
+        }
+      }
+
+      // Scroll hacia arriba para cargar mas
+      await this.page.evaluate(() => {
+        const container = document.querySelector('[data-testid="conversation-panel-messages"]');
+        if (container) container.scrollTop = 0;
+      });
+
+      await this.page.waitForTimeout(1500);
+    }
+
+    logger.success(`EXTRACT: ${mensajes.length} mensajes unicos`);
+    return mensajes;
+  }
+}
+
+// ============================================================
+// AUTO-FIX (NOVO - mantém agente vivo)
+// ============================================================
+class AutoFixer {
+  async verificarServicios() {
+    const servicios = {
+      backend: { puerto: 3456, nombre: 'Backend API' },
+      frontend: { puerto: 3457, nombre: 'Frontend Vite' },
+      chrome: { puerto: 9223, nombre: 'Chrome CDP' }
+    };
+
+    const estado = {};
+
+    for (const [clave, config] of Object.entries(servicios)) {
+      try {
+        const net = await import('net');
+        const conectado = await new Promise((resolve) => {
+          const socket = net.createConnection(config.puerto, '127.0.0.1');
+          socket.on('connect', () => { socket.end(); resolve(true); });
+          socket.on('error', () => resolve(false));
+          socket.setTimeout(3000, () => { socket.destroy(); resolve(false); });
+        });
+
+        estado[clave] = conectado;
+
+        if (!conectado) {
+          logger.warn(`AUTO-FIX: ${config.nombre} caido!`);
+          await this._reiniciarServicio(clave, config);
+        } else {
+          logger.info(`AUTO-FIX: ${config.nombre} OK`);
+        }
+      } catch (e) {
+        estado[clave] = false;
+        logger.error(`AUTO-FIX: Error verificando ${config.nombre}: ${e.message}`);
+      }
+    }
+
+    return estado;
+  }
+
+  async _reiniciarServicio(clave, config) {
+    logger.warn(`AUTO-FIX: Reiniciando ${config.nombre}...`);
+
+    if (clave === 'chrome') {
+      // Reinicia Chrome CDP
+      const { spawn } = await import('child_process');
+      spawn('taskkill', ['/F', '/IM', 'chrome.exe']);
+
+      await new Promise(r => setTimeout(r, 3000));
+
+      spawn('"C:\Program Files\Google\Chrome\Application\chrome.exe"', [
+        '--remote-debugging-port=9223',
+        '--user-data-dir=C:\Users\Administrator\.luna-chrome-debug',
+        '--profile-directory=Luna',
+        '--no-first-run',
+        '--no-default-browser-check',
+        'https://web.whatsapp.com'
+      ], { shell: true, detached: true });
+
+      logger.success('AUTO-FIX: Chrome reiniciado');
+    }
+
+    // Para backend/frontend, solo loga (no puede reiniciarse a si mismo)
+    if (clave === 'backend' || clave === 'frontend') {
+      logger.warn(`AUTO-FIX: ${config.nombre} necesita reinicio manual`);
+    }
+  }
+}
+
+// ============================================================
+// INTELLIGENCE ANALYZER (mantido do original + melhorias)
+// ============================================================
+class IntelligenceAnalyzer {
+  analyze(messages) {
+    return {
+      tasks: this.detectTasks(messages),
+      ideas: this.detectIdeas(messages),
+      decisions: this.detectDecisions(messages),
+      links: this.extractLinks(messages),
+      mentions: this.detectMentions(messages)
+    };
+  }
+
+  detectTasks(messages) {
+    const patterns = [
+      /tarefa|task|todo|fazer|faz|precisa|necessario|urgente|prazo|deadline/i,
+      /@kimi|@luna|@abner|@todos|@equipe/i
+    ];
+
+    return messages.filter(m => 
+      patterns.some(p => p.test(m.text))
+    ).map(m => ({
+      ...m,
+      priority: this._getPriority(m.text),
+      type: 'task'
+    }));
+  }
+
+  _getPriority(text) {
+    if (/urgente|critico|p0|imediato|agora/i.test(text)) return 'P0';
+    if (/importante|p1|hoje|amanha/i.test(text)) return 'P1';
+    if (/normal|rotina|p2|proxima semana/i.test(text)) return 'P2';
+    return 'P3';
+  }
+
+  detectIdeas(messages) {
+    return messages.filter(m => 
+      /ideia|sugestao|proposta|que tal|poderiamos|seria bom/i.test(m.text)
+    ).map(m => ({ ...m, type: 'idea' }));
+  }
+
+  detectDecisions(messages) {
+    return messages.filter(m => 
+      /decidimos|vamos|ficou acordado|definido|aprovado|confirmado/i.test(m.text)
+    ).map(m => ({ ...m, type: 'decision' }));
+  }
+
+  extractLinks(messages) {
+    const linkRegex = /(https?:\/\/[^\s]+)/g;
+    const links = [];
+
+    messages.forEach(m => {
+      const found = m.text.match(linkRegex);
+      if (found) {
+        found.forEach(url => {
+          links.push({
+            url: url,
+            context: m.text.slice(0, 100),
+            author: m.author,
+            time: m.time
+          });
+        });
+      }
+    });
+
+    return [...new Map(links.map(l => [l.url, l])).values()];
+  }
+
+  detectMentions(messages) {
+    return messages.filter(m => 
+      /@kimi|@luna|@abner|@todos|@equipe|@equipo/i.test(m.text)
+    ).map(m => ({ ...m, type: 'mention' }));
+  }
+}
+
+// ============================================================
+// CHECKPOINT MANAGER (mantido do original)
+// ============================================================
+class CheckpointManager {
+  constructor() {
+    this.checkpoint = this.load();
+    this.buffer = this.loadBuffer();
+  }
+
+  load() {
+    try {
+      if (fs.existsSync(CONFIG.CHECKPOINT_FILE)) {
+        return JSON.parse(fs.readFileSync(CONFIG.CHECKPOINT_FILE, 'utf8'));
+      }
+    } catch (e) {
+      logger.error(`Checkpoint load error: ${e.message}`);
+    }
+    return {
+      lastScan: null,
+      knownMessageHashes: [],
+      processedCount: 0,
+      silenceCount: 0,
+      lastReport: null
+    };
+  }
+
+  loadBuffer() {
+    try {
+      if (fs.existsSync(CONFIG.BUFFER_FILE)) {
+        return JSON.parse(fs.readFileSync(CONFIG.BUFFER_FILE, 'utf8'));
+      }
+    } catch (e) {
+      logger.error(`Buffer load error: ${e.message}`);
+    }
+    return {
+      newMessages: [],
+      newTasks: [],
+      newIdeas: [],
+      newDecisions: [],
+      newLinks: [],
+      newMentions: [],
+      lastBufferUpdate: null
+    };
+  }
+
+  save() {
+    fs.writeFileSync(CONFIG.CHECKPOINT_FILE, JSON.stringify(this.checkpoint, null, 2));
+    fs.writeFileSync(CONFIG.BUFFER_FILE, JSON.stringify(this.buffer, null, 2));
+  }
+
+  hashMessage(msg) {
+    return `${msg.author}:${msg.text.slice(0, 50)}:${msg.time}`;
+  }
+
+  isNew(msg) {
+    const hash = this.hashMessage(msg);
+    return !this.checkpoint.knownMessageHashes.includes(hash);
+  }
+
+  markProcessed(msg) {
+    const hash = this.hashMessage(msg);
+    this.checkpoint.knownMessageHashes.push(hash);
+    this.checkpoint.processedCount++;
+  }
+}
+
+// ============================================================
+// REPORT GENERATOR (mantido do original + links)
+// ============================================================
+class ReportGenerator {
+  generate(data) {
+    return {
+      html: this.generateHTML(data),
+      txt: this.generateTXT(data)
+    };
+  }
+
+  generateHTML(data) {
+    const { messages, analysis, groups } = data;
+    const timestamp = new Date().toLocaleString('es-ES');
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>NEXO Report - ${timestamp}</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #0f172a; color: #e2e8f0; }
+    .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-number { font-size: 2em; font-weight: bold; color: #6366f1; }
+    .links-section { background: #1e293b; padding: 15px; border-radius: 8px; margin-top: 20px; }
+    .link-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #334155; }
+    .link-url { color: #60a5fa; text-decoration: none; word-break: break-all; }
+    .priority-p0 { color: #ef4444; font-weight: bold; }
+    .priority-p1 { color: #f59e0b; font-weight: bold; }
+    .priority-p2 { color: #22c55e; }
+    .priority-p3 { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 NEXO REPORT INTELIGENTE</h1>
+    <p>🕐 ${timestamp}</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-number">${messages.length}</div>
+      <div>Mensajes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">${analysis.tasks.length}</div>
+      <div>Tareas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">${analysis.ideas.length}</div>
+      <div>Ideas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">${analysis.decisions.length}</div>
+      <div>Decisiones</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">${analysis.links.length}</div>
+      <div>Links</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">${analysis.mentions.length}</div>
+      <div>Menciones</div>
+    </div>
+  </div>
+
+  ${analysis.links.length > 0 ? `
+  <div class="links-section">
+    <h2>🔗 LINKS EXTRAIDOS</h2>
+    ${analysis.links.map(l => `
+      <div class="link-item">
+        <span>🔗</span>
+        <a href="${l.url}" class="link-url" target="_blank">${l.url}</a>
+        <span style="color: #94a3b8; font-size: 0.9em;">(${l.author})</span>
+      </div>
+    `).join('')}
+  </div>
+  ` : ''}
+
+  ${analysis.tasks.length > 0 ? `
+  <div class="links-section">
+    <h2>📝 TAREAS DETECTADAS</h2>
+    ${analysis.tasks.map(t => `
+      <div class="link-item">
+        <span class="priority-${t.priority.toLowerCase()}">[${t.priority}]</span>
+        <span>${t.text.slice(0, 100)}</span>
+        <span style="color: #94a3b8; font-size: 0.9em;">(${t.author})</span>
+      </div>
+    `).join('')}
+  </div>
+  ` : ''}
+
+  <div style="margin-top: 30px; text-align: center; color: #64748b; font-size: 0.9em;">
+    🤖 Generado por Luna v11.1 | NEXO Digital
+  </div>
+</body>
+</html>`;
+  }
+
+  generateTXT(data) {
+    const { messages, analysis } = data;
+    const timestamp = new Date().toLocaleString('es-ES');
+
+    return `📊 *NEXO REPORT INTELIGENTE*
+🕐 ${timestamp}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• ${messages.length} mensajes
+• ${analysis.tasks.length} tareas (${analysis.tasks.filter(t => t.priority === 'P0').length} urgentes)
+• ${analysis.ideas.length} ideas
+• ${analysis.decisions.length} decisiones
+• ${analysis.links.length} links
+• ${analysis.mentions.length} menciones
+
+${analysis.links.length > 0 ? `
+🔗 *LINKS*
+${analysis.links.map(l => `• ${l.url}`).join('\n')}
+` : ''}
+
+${analysis.tasks.length > 0 ? `
+📝 *TAREAS*
+${analysis.tasks.map(t => `• [${t.priority}] ${t.text.slice(0, 80)} (${t.author})`).join('\n')}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 Luna v11.1 | NEXO Digital`;
+  }
+}
+
+// ============================================================
+// MAIN AGENT (mantido do original + melhorias)
+// ============================================================
+class LunaAgent {
+  constructor() {
+    this.checkpoint = new CheckpointManager();
+    this.analyzer = new IntelligenceAnalyzer();
+    this.reporter = new ReportGenerator();
+    this.autofix = new AutoFixer();
+    this.browser = null;
+    this.page = null;
+    this.navigator = null;
+  }
+
+  async init() {
+    logger.info('=== LUNA v11.1 INICIANDO ===');
+
+    // Auto-fix antes de iniciar
+    logger.info('Verificando servicios...');
+    await this.autofix.verificarServicios();
+
+    try {
+      this.browser = await chromium.connectOverCDP(CONFIG.CDP_URL);
+      const context = this.browser.contexts()[0];
+      this.page = context.pages()[0] || await context.newPage();
+      this.navigator = new WhatsAppNavigator(this.page);
+
+      logger.success('Conectado a Chrome CDP');
+      return true;
+    } catch (e) {
+      logger.error(`Fallo conexion: ${e.message}`);
+      return false;
+    }
+  }
+
+  async scanGroup(groupConfig) {
+    logger.scan(`Escaneando grupo: ${groupConfig.name}`);
+
+    // Navegação inteligente (NOVO)
+    const abierto = await this.navigator.abrirGrupo(groupConfig.name);
+    if (!abierto) {
+      logger.error(`No se pudo abrir ${groupConfig.name}`);
+      return [];
+    }
+
+    // Extração com scroll (melhorado)
+    const messages = await this.navigator.extraerMensajes(CONFIG.MAX_SCROLLS);
+
+    logger.success(`${messages.length} mensajes extraidos de ${groupConfig.name}`);
+    return messages;
+  }
+
+  async runOnce() {
+    const conectado = await this.init();
+    if (!conectado) {
+      logger.error('No conectado');
+      await this.shutdown();
+      return;
+    }
+
+    const allMessages = [];
+
+    for (const group of CONFIG.GROUPS) {
+      const msgs = await this.scanGroup(group);
+      allMessages.push(...msgs.map(m => ({ ...m, group: group.name })));
+    }
+
+    // Filtra novas
+    const nuevas = allMessages.filter(m => this.checkpoint.isNew(m));
+    logger.info(`Filtrado: ${allMessages.length} total, ${nuevas.length} nuevas`);
+
+    if (nuevas.length > 0) {
+      // Analisa
+      logger.info(`Analizando ${nuevas.length} mensajes...`);
+      const analysis = this.analyzer.analyze(nuevas);
+
+      logger.success('Analisis completo!');
+      logger.info(`  -> Tareas: ${analysis.tasks.length}`);
+      logger.info(`  -> Ideas: ${analysis.ideas.length}`);
+      logger.info(`  -> Decisiones: ${analysis.decisions.length}`);
+      logger.info(`  -> Links: ${analysis.links.length}`);
+      logger.info(`  -> Menciones: ${analysis.mentions.length}`);
+
+      // Marca como processadas
+      nuevas.forEach(m => this.checkpoint.markProcessed(m));
+
+      // Gera relatório
+      const report = this.reporter.generate({
+        messages: nuevas,
+        analysis,
+        groups: CONFIG.GROUPS
+      });
+
+      // Salva
+      const timestamp = Date.now();
+      fs.writeFileSync(
+        path.join(CONFIG.REPORTS_DIR, `report-${timestamp}.html`),
+        report.html
+      );
+      fs.writeFileSync(
+        path.join(CONFIG.REPORTS_DIR, `report-${timestamp}.txt`),
+        report.txt
+      );
+
+      // Atualiza buffer
+      this.checkpoint.buffer.newMessages.push(...nuevas);
+      this.checkpoint.buffer.newTasks.push(...analysis.tasks);
+      this.checkpoint.buffer.newIdeas.push(...analysis.ideas);
+      this.checkpoint.buffer.newDecisions.push(...analysis.decisions);
+      this.checkpoint.buffer.newLinks.push(...analysis.links);
+      this.checkpoint.buffer.newMentions.push(...analysis.mentions);
+      this.checkpoint.buffer.lastBufferUpdate = new Date().toISOString();
+
+      logger.success('Reportes generados!');
+      this.checkpoint.checkpoint.silenceCount = 0;
+    } else {
+      this.checkpoint.checkpoint.silenceCount++;
+      logger.info(`Sin novedades. Silencio #${this.checkpoint.checkpoint.silenceCount}`);
+    }
+
+    // Salva checkpoint
+    this.checkpoint.checkpoint.lastScan = new Date().toISOString();
+    this.checkpoint.save();
+
+    // Salva dados para dashboard
+    this.saveOutput(nuevas);
+
+    logger.success('Ciclo completo finalizado con exito!');
+    await this.shutdown();
+  }
+
+  saveOutput(messages) {
+    const output = {
+      messages: messages,
+      groups: CONFIG.GROUPS,
+      lastUpdated: new Date().toISOString(),
+      stats: {
+        total: messages.length,
+        tasks: messages.filter(m => m.type === 'task').length,
+        ideas: messages.filter(m => m.type === 'idea').length,
+        decisions: messages.filter(m => m.type === 'decision').length,
+        links: messages.filter(m => m.type === 'link').length
+      }
+    };
+    fs.writeFileSync(CONFIG.OUTPUT_FILE, JSON.stringify(output, null, 2));
+  }
+
+  async shutdown() {
+    if (this.browser) {
+      await this.browser.close();
+    }
+    logger.info('Finalizado');
+  }
+}
+
+// ============================================================
+// EXECUÇÃO
+// ============================================================
+const agent = new LunaAgent();
+
+// Cria diretórios se não existem
+if (!fs.existsSync(CONFIG.REPORTS_DIR)) fs.mkdirSync(CONFIG.REPORTS_DIR, { recursive: true });
+if (!fs.existsSync(CONFIG.ARTIFACTS_DIR)) fs.mkdirSync(CONFIG.ARTIFACTS_DIR, { recursive: true });
+
+// Verifica argumentos
+const args = process.argv.slice(2);
+if (args.includes('--once')) {
+  agent.runOnce();
+} else {
+  logger.info('Modo continuo: scan cada 10 minutos');
+  agent.runOnce();
+  setInterval(() => agent.runOnce(), CONFIG.SCAN_INTERVAL);
+}

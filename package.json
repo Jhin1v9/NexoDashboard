@@ -1,0 +1,16 @@
+{
+  "name": "luna-omnia-control",
+  "version": "13.2.1",
+  "type": "module",
+  "scripts": {
+    "start": "node agents/luna-cto-agent.mjs",
+    "once": "node agents/luna-cto-agent.mjs --once",
+    "diagnose": "node agents/luna-cto-agent.mjs --diagnose"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.52.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

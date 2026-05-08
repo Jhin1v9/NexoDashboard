@@ -1,0 +1,122 @@
+ atalhos mais comuns do editor.
+
+ Atalhos são escritos da seguinte forma: Sequências com teclas Ctrl são
+ apresentadas com um '^' (circunflexo) e podem ser executadas tanto com a
+ tecla Ctrl ou pressionando a tecla Esc duas vezes. Sequências com teclas
+ Meta são apresentadas com 'M-' e podem ser executadas com as teclas Alt,
+ Cmd ou Esc, dependendo da sua configuração de teclado.  Pressionar Esc
+ duas vezes e, então, digitar um número com três dígitos decimais de 000
+ até 255 fará inserir o caractere com o valor correspondente.  As
+ seguintes sequências estão disponíveis na janela de edição principal.
+ Teclas alternativas são mostradas em parênteses:
+
+^G     (F1)      Exibe este texto de ajuda
+^X     (F2)      Fecha o buffer atual / Sai do nano
+^O     (F3)      Escreve o buffer atual (ou a região marcada) no disco
+^R     (Ins)     Insere outro arquivo no buffer atual (ou em um novo buffer)
+
+^W     (F6)      Procura para frente por um texto ou uma expressão regular
+^\     (M-R)     Substitui um texto ou expressão regular
+^K     (F9)      Recorta a linha atual (ou região marcada) e guarda-a no
+		   buffer-de-transferência
+^U     (F10)     Cola o conteúdo do buffer-de-transferência na posição do cursor
+
+^T               Executa uma função ou um comando externo
+^J     (F4)      Justifica o parágrafo atual
+
+^C     (F11)     Mostra a posição do cursor
+^/     (M-G)     Vai para linha e coluna número
+
+M-U              Desfaz a última operação
+M-E              Refaz a última operação desfeita
+
+M-A    (^6)      Marca o texto iniciando na posição do cursor
+M-6    (M-^)     Copia a linha atual (ou região marcada) e armazena-a no
+		   buffer-de-transferência
+
+M-]              Vai para o fechamento do parênteses/colchetes/chaves
+
+^Q               Procura para trás por um texto ou uma expressão regular
+M-Q              Pesquisa a ocorrência anterior
+M-W              Pesquisa a próxima ocorrência
+
+^B     (◂)       Volta em um caractere
+^F     (▸)       Avança em um caractere
+^◂     (M-Space) Retrocede em uma palavra
+^▸     (^Space)  Avança em uma palavra
+^A     (Home)    Vai para o início da linha atual
+^E     (End)     Vai para o fim da linha atual
+
+^P     (▴)       Vai para a anterior linha
+^N     (▾)       Vai para a próxima linha
+M-▴    (M--)     Rola uma linha acima sem mover o cursor textualmente
+M-▾    (M-+)     Rola uma linha abaixo sem mover o cursor textualmente
+
+^▴     (M-7)     Vai para o bloco de texto anterior
+^▾     (M-8)     Vai para a próximo bloco de texto
+M-(    (M-9)     Vai para o início do parágrafo; depois para o parágrafo
+		   anterior
+M-)    (M-0)     Vai para o fim do parágrafo; depois para o próximo parágrafo
+
+^Y     (PgUp)    Vai uma tela acima
+^V     (PgDn)    Vai uma tela abaixo
+M-\    (^Home)   Vai para a primeira linha do arquivo
+M-/    (^End)    Vai para a última linha do arquivo
+
+M-◂    (M-,)     Troca para o buffer de arquivo anterior
+M-▸    (M-.)     Troca para o próximo buffer de arquivo
+
+^I     (Tab)     Insere uma tabulação na posição do cursor (ou recua linhas
+		   marcadas)
+^M     (Enter)   Insere quebra de linha na posição do cursor
+
+^H     (Bsp)     Apaga o caractere a esquerda do cursor
+^D     (Del)     Apaga o caractere sob o cursor
+
+M-Bsp  (Sh-^Del) Exclui para trás do cursor até o início da palavra
+^Del             Exclui para frente do cursor até início da próxima palavra
+M-T              Recortar do cursor até o fim do arquivo
+
+M-J              Justifica o arquivo inteiro
+M-D              Conta o número de linhas, palavras e caracteres
+M-V              Insere o próxima combinação de teclas literal
+
+M-}              Recua a linha atual (ou linhas marcadas)
+M-{    (Sh-Tab)  Remove recuo da linha atual (ou linhas marcadas)
+
+M-3              Comenta/descomenta a linha atual (ou linhas marcadas)
+^]               Tenta e completa a palavra atual
+
+M-:              Inicia/para gravação de um macro
+M-;              Executa a última macro gravada
+
+M-Del            Descarta a linha atual (ou região marcada)
+
+M-Ins            Coloca ou remove uma âncora na linha atual
+M-PgUp           Pula para a âncora anterior mais próxima
+M-PgDn           Pula para a próxima âncora mais próxima
+
+F12              Chama o verificador ortográfico, se disponível
+M-B              Chama o lintador, se disponível
+M-F              Chama um programa para formatar/organizar/manipular o buffer
+
+		 Suspende o editor (retorna para o shell)
+^L               Atualiza (re-desenha) a tela atual
+^L               Centraliza a linha onde o cursor está
+
+^S               Salva o arquivo sem perguntar
+
+M-Z		 Interface oculta habilitado/desabilitado
+M-X		 Modo ajuda habilitado/desabilitado
+M-C		 Mostra da posição do cursor constante habilitado/desabilitado
+M-S		 Quebra suave de linhas longas habilitado/desabilitado
+M-N		 Numeração de linha habilitado/desabilitado
+M-P		 Mostra espaços vazios habilitado/desabilitado
+M-Y		 Marcação colorida de sintaxe habilitado/desabilitado
+
+M-H		 Tecla Home inteligente habilitado/desabilitado
+M-I		 Recuo automático habilitado/desabilitado
+M-K		 Recorta até o fim habilitado/desabilitado
+M-L		 Quebra rígida de linhas longas habilitado/desabilitado
+M-O		 Conversão de tabulações para espaços habilitado/desabilitado
+M-M		 Suporte ao Mouse habilitado/desabilitado

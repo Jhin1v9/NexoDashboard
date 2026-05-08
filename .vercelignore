@@ -1,0 +1,96 @@
+# Dependencies
+node_modules
+backend/node_modules
+frontend/node_modules
+package-lock.json
+
+# Git
+.git
+.gitignore
+
+# Backend (não necessário para static build)
+backend/
+backend/data/
+backend/cache/
+backend/public/
+
+# Agents e scripts
+agents/
+scripts/
+*.bat
+*.ps1
+*.sh
+
+# Documentação
+docs/
+*.md
+README.md
+DEPLOY.md
+ECOSSISTEMA_DEEP_ANALYSIS_2026-04-29.md
+KDS_DEEP_ANALYSIS_2026-04-29.md
+PROMPT_MASTER*.md
+PLANO*.md
+RELATORIO*.md
+ARQUITETURA*.md
+TAREFAS*.md
+AUTO-PILOT*.md
+TUTORIAL*.md
+
+# Logs
+*.log
+logs/
+
+# Vercel
+.vercel
+
+# Playwright/E2E
+playwright-mcp/
+e2e/
+
+# Supabase
+.supabase
+
+# Artifacts e builds antigos
+artifacts/
+dist-old/
+build/
+
+# Imagens e screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+screenshots/
+captures/
+chrome-whatsapp-check.png
+
+# Arquivos de backup e temporários
+*.bak
+*.tmp
+*.temp
+*.old
+backup/
+.brain-backup*/
+
+# Código e executáveis extras
+*.exe
+*.cs
+*.csproj
+*.sln
+*.py
+*.pyc
+__pycache__/
+
+# Arquivos de configuração local
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+
+# Outros
+*.zip
+*.tar
+*.gz
+*.7z

@@ -1,0 +1,255 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_PROJECT_HUB",
+    "lastUpdated": "2026-05-05T09:45:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Registro mestre de projetos NEXO. Todo projeto ativo, pausado ou arquivado vive aqui. Projetos pessoais (Bool, Truco, Tetris) NÃO constam."
+  },
+  "_meta": {
+    "company": "NEXO DIGITAL",
+    "totalProjects": 2,
+    "activeProjects": 2,
+    "pausedProjects": 0,
+    "completedProjects": 0,
+    "currency": "EUR",
+    "note": "Projetos pessoais (Bool/Billar Bool, Truco PWA, Tetris CLI, Superclim.es) NÃO constam aqui. NEXO = empresa tech dos 3 sócios."
+  },
+  "projectTypes": [
+    "cliente-externo",
+    "produto-nexo",
+    "infraestrutura-nexo",
+    "empresa-pessoal"
+  ],
+  "statuses": [
+    "planejamento",
+    "em-progresso",
+    "em-teste",
+    "concluido",
+    "arquivado",
+    "pausado"
+  ],
+  "projects": {
+    "SANTAFE-CONSTRUCCIONES": {
+      "id": "SANTAFE-CONSTRUCCIONES",
+      "codename": "SANTAFE",
+      "name": "SantaFe Construcciones",
+      "type": "cliente-externo",
+      "status": "em-progresso",
+      "priority": "P1",
+      "team": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal"
+      ],
+      "clientId": "paulo-santafe",
+      "services": [
+        "Web",
+        "SEO Básico",
+        "Publicação"
+      ],
+      "financial": {
+        "budgetApproved": true,
+        "contractSigned": true,
+        "paymentStatus": "pendente",
+        "totalValue": null,
+        "paidAmount": 0,
+        "currency": "EUR",
+        "paymentTerms": "50% início + 50% entrega",
+        "nextInvoiceDate": null,
+        "paymentHistory": []
+      },
+      "milestones": [
+        {
+          "name": "Design aprovado",
+          "done": true,
+          "date": "2026-03-15",
+          "assignedTo": "nexo-enoque-001",
+          "note": "Layout aprovado pelo Paulo"
+        },
+        {
+          "name": "Desenvolvimento",
+          "done": true,
+          "date": "2026-04-20",
+          "assignedTo": "nexo-enoque-001",
+          "note": "Site funcional, responsivo, dark mode"
+        },
+        {
+          "name": "SEO básico",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-abner-001",
+          "note": "Meta tags, sitemap, robots.txt"
+        },
+        {
+          "name": "Publicação",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-enoque-001",
+          "note": "Deploy Vercel + domínio configurado"
+        }
+      ],
+      "bugs": [],
+      "demoReady": false,
+      "deployed": false,
+      "repo": null,
+      "deployUrl": null,
+      "stagingUrl": null,
+      "editableFields": [
+        "name",
+        "status",
+        "priority",
+        "services",
+        "milestones",
+        "repo",
+        "deployUrl",
+        "stagingUrl"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": [],
+      "tags": [
+        "cliente-externo",
+        "web",
+        "seo",
+        "santafe",
+        "paulo",
+        "em-progresso"
+      ]
+    },
+    "NEXO-DASHBOARD": {
+      "id": "NEXO-DASHBOARD",
+      "codename": "DASHBOARD",
+      "name": "NEXO Dashboard Pro",
+      "type": "infraestrutura-nexo",
+      "status": "em-progresso",
+      "priority": "P0",
+      "team": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal"
+      ],
+      "clientId": null,
+      "services": [
+        "Dashboard",
+        "Automação",
+        "IA",
+        "WhatsApp Integration",
+        "Playwright Screenshot"
+      ],
+      "financial": {
+        "budgetApproved": true,
+        "contractSigned": false,
+        "paymentStatus": "interno",
+        "totalValue": 0,
+        "paidAmount": 0,
+        "currency": "EUR",
+        "paymentTerms": "Investimento interno NEXO",
+        "nextInvoiceDate": null,
+        "paymentHistory": []
+      },
+      "milestones": [
+        {
+          "name": "Schema de dados v16.0",
+          "done": true,
+          "date": "2026-05-04",
+          "assignedTo": "nexo-abner-001",
+          "note": "7 arquivos JSON: contacts, clients, projects, groups, integrations, dashboard-config, schema-version"
+        },
+        {
+          "name": "Extração WhatsApp (Playwright + whatsapp-web.js)",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-enoque-001",
+          "note": "Scan 10min, scroll infinito, checkpoint persistente"
+        },
+        {
+          "name": "Dashboard visual (HTML + Tailwind + Screenshot)",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-enoque-001",
+          "note": "1920x1080 @ 1.5x, tema NEXO Dark, envio automático"
+        },
+        {
+          "name": "Classificador híbrido (Regex + Ollama Qwen)",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-abner-001",
+          "note": "3 camadas: regex blindado → Ollama → fallback heuristic"
+        },
+        {
+          "name": "Comandos WhatsApp expandidos (15+)",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-enoque-001",
+          "note": "/dashboard, /tarefas, /leads, /links, /stats, /sentimento"
+        },
+        {
+          "name": "Relatório inteligente (O que VI / NÃO VI)",
+          "done": false,
+          "date": null,
+          "assignedTo": "nexo-abner-001",
+          "note": "Análise proativa com perguntas para o time"
+        },
+        {
+          "name": "Email integration (futuro)",
+          "done": false,
+          "date": null,
+          "assignedTo": null,
+          "note": "IMAP/SMTP, leitura automática, classificação"
+        },
+        {
+          "name": "Form leads (futuro)",
+          "done": false,
+          "date": null,
+          "assignedTo": null,
+          "note": "Captura de leads do site, scoring automático"
+        }
+      ],
+      "bugs": [],
+      "demoReady": false,
+      "deployed": false,
+      "repo": "Jhin1v9/nexo-dashboard-pro",
+      "deployUrl": null,
+      "stagingUrl": null,
+      "editableFields": [
+        "name",
+        "status",
+        "priority",
+        "services",
+        "milestones",
+        "repo",
+        "deployUrl",
+        "stagingUrl"
+      ],
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": [],
+      "note": "Ferramenta interna da NEXO. Não é projeto para cliente externo. Orquestra toda a inteligência da empresa.",
+      "tags": [
+        "infraestrutura-nexo",
+        "dashboard",
+        "automacao",
+        "ia",
+        "p0",
+        "em-progresso"
+      ]
+    }
+  },
+  "crossReferences": {
+    "contactsMap": "backend/data/schema/contacts-map.json",
+    "clientsRegistry": "backend/data/schema/clients-registry.json",
+    "groupsConfig": "backend/data/schema/groups-config.json"
+  },
+  "analytics": {
+    "enabled": true,
+    "trackVelocity": true,
+    "trackBugs": true,
+    "trackDeploys": true,
+    "velocityWindow": "sprint-2-semanas",
+    "alertOnDelay": true,
+    "delayThresholdDays": 7
+  }
+}

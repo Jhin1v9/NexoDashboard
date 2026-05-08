@@ -1,0 +1,35 @@
+---
+description: Regras para modulo financeiro
+glob: "**/*[Ff]inance*"
+alwaysApply: true
+---
+
+# Finance Module Rules
+
+## Entidades
+- **Transaction:** id, type ('income'|'expense'), amount, description, date, category, createdBy, createdAt
+- **Cash Box:** saldo calculado a partir de transactions, historico, projecoes
+- **Quote:** orcamentos para clientes (valor, status, parcelas)
+
+## Regras de Negocio
+- Split: 25% cada (Abner, Nonoke, Elias, NEXO Digital)
+- Entrada → split automatico; cada um recebe 25%
+- Saida (despesa) → split entre 3 (Abner/Nonoke/Elias); NEXO nao paga despesa
+- Caixa empresa = 25% das entradas - despesas
+
+## Sincronizacao
+- `transactions.json` é a fonte da verdade
+- `cash-box.json` é derivado (recalculado ao alterar transactions)
+- Ao criar/editar/deletar transaction → recalcular caixa automaticamente
+
+## Valores
+- Moeda: EUR (euro)
+- Formatacao: `€ 1.234,56` (pt-BR)
+- Nunca hardcode valores; sempre ler de transactions
+
+## APIs
+- `GET /api/transactions` — lista todas
+- `POST /api/transactions` — criar (recalcula caixa)
+- `PUT /api/transactions/:id` — editar (recalcula caixa)
+- `DELETE /api/transactions/:id` — deletar (recalcula caixa)
+- `GET /api/finance/summary` — resumo reativo

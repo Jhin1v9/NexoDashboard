@@ -1,0 +1,273 @@
+﻿import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
+import net from 'net';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const CONFIG = {
+  CDP_URL: 'http://127.0.0.1:9223',
+  GRUPOS: [
+    { nombre: 'Production - 2026', corto: 'Production', tipo: 'interno' },
+    { nombre: 'Paulo (web)', corto: 'Paulo', tipo: 'cliente' }
+  ],
+  DESTINO: { nombre: 'Production', numero: '34685093192', grupo: 'Production - 2026' },
+  CHECKPOINT: path.join(__dirname, '..', 'backend', 'data', 'luna-checkpoint.json'),
+  SALIDA: path.join(__dirname, '..', 'backend', 'data', 'whatsapp-agent-data.json'),
+  REPORTES: path.join(__dirname, '..', 'backend', 'data', 'reports'),
+  LOG: path.join(__dirname, '..', 'ARTIFACTS', 'luna-v11.log'),
+  INTERVALO: 10 * 60 * 1000
+};
+
+function log(nivel, msg, data) {
+  const t = new Date().toISOString();
+  const line = `[${nivel}] [${t}] ${msg}` + (data ? ` -> ${JSON.stringify(data)}` : '');
+  console.log(line);
+  try {
+    fs.appendFileSync(CONFIG.LOG, line + '\n');
+  } catch(e) {}
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function checkPort(port) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(2000);
+    socket.on('connect', () => { socket.destroy(); resolve(true); });
+    socket.on('timeout', () => { socket.destroy(); resolve(false); });
+    socket.on('error', () => resolve(false));
+    socket.connect(port, '127.0.0.1');
+  });
+}
+
+function loadJson(file, def = {}) {
+  try { if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) {}
+  return def;
+}
+
+function saveJson(file, data) {
+  try {
+    const dir = path.dirname(file);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+    return true;
+  } catch(e) { return false; }
+}
+
+class Extractor {
+  constructor() { this.browser = null; this.page = null; }
+
+  async connect() {
+    try {
+      log('INFO', 'Conectando a Chrome CDP...');
+      this.browser = await chromium.connectOverCDP(CONFIG.CDP_URL);
+      const contexts = this.browser.contexts();
+      if (contexts.length === 0) throw new Error('Sin contexto Chrome');
+      this.page = await contexts[0].newPage();
+      await this.page.goto('https://web.whatsapp.com', { waitUntil: 'networkidle' });
+      await this.page.waitForSelector('[data-testid="chat-list"]', { timeout: 30000 });
+      log('SUCCESS', 'Conectado a WhatsApp Web!');
+      return true;
+    } catch(e) {
+      log('ERROR', 'Fallo conexion: ' + e.message);
+      return false;
+    }
+  }
+
+  async extract(groupName, maxScrolls = 5) {
+    const msgs = [];
+    try {
+      log('SCAN', 'Extrayendo: ' + groupName);
+      await this.page.click(`[title="${groupName}"]`);
+      await sleep(2000);
+      await this.page.waitForSelector('.message-in, .message-out', { timeout: 10000 });
+
+      for (let i = 0; i < maxScrolls; i++) {
+        const prev = msgs.length;
+        await this.page.evaluate(() => {
+          const chat = document.querySelector('[data-testid="conversation-panel-messages"]');
+          if (chat) chat.scrollTop = 0;
+        });
+        await sleep(1500);
+
+        const nuevas = await this.page.evaluate(() => {
+          const r = [];
+          document.querySelectorAll('.message-in, .message-out').forEach(el => {
+            try {
+              const t = el.querySelector('.selectable-text');
+              const text = t ? t.innerText : '';
+              const tm = el.querySelector('[data-pre-plain-text]');
+              const time = tm ? tm.getAttribute('data-pre-plain-text') : '';
+              const id = el.getAttribute('data-id') || Date.now() + '-' + Math.random();
+              if (text && text.trim()) r.push({ id, text: text.trim(), time });
+            } catch(e) {}
+          });
+          return r;
+        });
+
+        nuevas.forEach(m => { if (!msgs.find(x => x.id === m.id)) msgs.push(m); });
+        if (msgs.length === prev) break;
+      }
+      log('SUCCESS', `Extraidas ${msgs.length} mensajes de ${groupName}`);
+    } catch(e) {
+      log('ERROR', `Error extrayendo ${groupName}: ${e.message}`);
+    }
+    return msgs;
+  }
+
+  async disconnect() {
+    if (this.browser) { await this.browser.close(); this.browser = null; }
+  }
+}
+
+class Analyzer {
+  analyze(msgs) {
+    log('INFO', `Analizando ${msgs.length} mensajes...`);
+    const r = { tareas: [], ideas: [], decisiones: [], links: [], all: msgs };
+
+    msgs.forEach(m => {
+      const t = m.text.toLowerCase();
+      if (/tarea|hacer|necesita|urgente|@kimi|@luna/.test(t)) {
+        r.tareas.push({ ...m, urgent: /urgente/.test(t), prio: /urgente/.test(t) ? 'P0' : 'P1' });
+      }
+      if (/idea|sugerencia|propuesta|podriamos/.test(t)) r.ideas.push(m);
+      if (/decidimos|vamos|quedo|definido|aprobado/.test(t)) r.decisiones.push(m);
+      const links = m.text.match(/(https?:\/\/[^\s]+)/g);
+      if (links) links.forEach(url => r.links.push({ ...m, url }));
+    });
+
+    r.links = [...new Map(r.links.map(l => [l.url, l])).values()];
+    log('SUCCESS', `Analisis: ${r.tareas.length} tareas, ${r.ideas.length} ideas, ${r.decisiones.length} decisiones, ${r.links.length} links`);
+    return r;
+  }
+}
+
+class Reporter {
+  constructor() {
+    const dir = CONFIG.REPORTES;
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+
+  generate(data) {
+    const ts = Date.now();
+    const date = new Date().toLocaleString('es-ES');
+    const { msgs, analysis } = data;
+
+    const txt = `REPORTE NEXO - ${date}\n\nRESUMEN:\n- ${msgs.length} mensajes nuevos\n- ${analysis.tareas.length} tareas (${analysis.tareas.filter(t => t.urgent).length} urgentes)\n- ${analysis.ideas.length} ideas\n- ${analysis.decisiones.length} decisiones\n- ${analysis.links.length} links\n\n${analysis.tareas.length > 0 ? 'TAREAS:\n' + analysis.tareas.map(t => `  [${t.prio}] ${t.text}`).join('\n') + '\n\n' : ''}${analysis.links.length > 0 ? 'LINKS:\n' + analysis.links.map(l => `  ${l.url}`).join('\n') + '\n\n' : ''}Generado por Luna v11.0`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>NEXO Reporte</title><style>body{font-family:Arial;background:#0f0f23;color:#e0e0e0;padding:20px}h1{color:#00ff88;border-bottom:2px solid #00ff88}.stat{display:inline-block;margin:10px 20px}.val{font-size:2em;color:#00ff88;font-weight:bold}.msg{background:#0f3460;padding:10px;margin:8px 0;border-radius:5px;border-left:3px solid #00ff88}.urg{border-left-color:#ff4444}</style></head><body><h1>Reporte NEXO</h1><div class="stat"><div class="val">${msgs.length}</div><div>Mensajes</div></div><div class="stat"><div class="val">${analysis.tareas.length}</div><div>Tareas</div></div><div class="stat"><div class="val">${analysis.links.length}</div><div>Links</div></div>${analysis.tareas.map(t => `<div class="msg ${t.urgent ? 'urg' : ''}"><strong>[${t.prio}]</strong> ${t.text}</div>`).join('')}${analysis.links.map(l => `<div class="msg"><a href="${l.url}" style="color:#00ccff">${l.url}</a></div>`).join('')}<div style="margin-top:30px;color:#666">${date}</div></body></html>`;
+
+    const pTxt = path.join(CONFIG.REPORTES, `report-${ts}.txt`);
+    const pHtml = path.join(CONFIG.REPORTES, `report-${ts}.html`);
+    fs.writeFileSync(pTxt, txt);
+    fs.writeFileSync(pHtml, html);
+    log('SUCCESS', 'Reportes generados');
+    return { txt, html, pTxt, pHtml };
+  }
+}
+
+class Storage {
+  constructor() {
+    this.cp = loadJson(CONFIG.CHECKPOINT, { lastScan: null, processed: [], version: '11.0' });
+  }
+
+  isProcessed(id) { return this.cp.processed.includes(id); }
+
+  markProcessed(id) {
+    if (!this.cp.processed.includes(id)) {
+      this.cp.processed.push(id);
+      if (this.cp.processed.length > 1000) this.cp.processed = this.cp.processed.slice(-1000);
+    }
+  }
+
+  filterNew(msgs) {
+    const n = msgs.filter(m => !this.isProcessed(m.id));
+    log('INFO', `${msgs.length} total, ${n.length} nuevas`);
+    return n;
+  }
+
+  save() {
+    this.cp.lastScan = new Date().toISOString();
+    saveJson(CONFIG.CHECKPOINT, this.cp);
+  }
+}
+
+class Luna {
+  constructor() {
+    this.extractor = new Extractor();
+    this.analyzer = new Analyzer();
+    this.reporter = new Reporter();
+    this.storage = new Storage();
+    this.running = false;
+  }
+
+  async run() {
+    if (this.running) { log('WARN', 'Ya ejecutando...'); return; }
+    this.running = true;
+    log('INFO', '=== LUNA v11.0 INICIANDO ===');
+
+    try {
+      const connected = await this.extractor.connect();
+      if (!connected) throw new Error('No conectado');
+
+      const allMsgs = [];
+      for (const g of CONFIG.GRUPOS) {
+        const m = await this.extractor.extract(g.nombre, 5);
+        allMsgs.push(...m);
+      }
+
+      const newMsgs = this.storage.filterNew(allMsgs);
+      if (newMsgs.length === 0) {
+        log('INFO', 'Sin mensajes nuevas');
+        this.finish();
+        return;
+      }
+
+      const analysis = this.analyzer.analyze(newMsgs);
+      const report = this.reporter.generate({ msgs: newMsgs, analysis });
+
+      const existing = loadJson(CONFIG.SALIDA, { sessions: [] });
+      existing.sessions.push({ msgs: newMsgs, analysis, report, time: new Date().toISOString() });
+      saveJson(CONFIG.SALIDA, existing);
+
+      newMsgs.forEach(m => this.storage.markProcessed(m.id));
+      this.storage.save();
+
+      log('SUCCESS', '=== CICLO COMPLETADO ===');
+
+    } catch(e) {
+      log('ERROR', 'Error: ' + e.message);
+    } finally {
+      this.finish();
+    }
+  }
+
+  finish() {
+    this.extractor.disconnect();
+    this.running = false;
+    log('INFO', 'Finalizado');
+  }
+
+  async runOnce() { await this.run(); }
+
+  startScheduler() {
+    log('INFO', 'Programador activo (10min)');
+    this.run();
+    setInterval(() => { if (!this.running) this.run(); }, CONFIG.INTERVALO);
+  }
+}
+
+const luna = new Luna();
+const args = process.argv.slice(2);
+if (args.includes('--once')) {
+  luna.runOnce().then(() => process.exit(0));
+} else {
+  luna.startScheduler();
+}
+
+export default Luna;

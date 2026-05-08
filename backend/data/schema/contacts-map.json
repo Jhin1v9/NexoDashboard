@@ -1,0 +1,535 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_INTELLIGENCE_CORE",
+    "lastUpdated": "2026-05-05T09:37:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Mapa mestre de identidade. Todo número WhatsApp que entra no sistema passa por aqui primeiro."
+  },
+  "_meta": {
+    "company": "NEXO DIGITAL",
+    "legalName": "NEXO DIGITAL S.L.",
+    "location": "Barcelona, Espanha",
+    "timezone": "Europe/Madrid",
+    "currency": "EUR",
+    "founders": [
+      {
+        "id": "nexo-abner-001",
+        "name": "Abner Gabriel Mendes",
+        "role": "CEO & Co-Founder",
+        "codename": "ARCHITECT"
+      },
+      {
+        "id": "nexo-elias-001",
+        "name": "Elias Mendes",
+        "role": "CEO & Co-Founder",
+        "codename": "STRATEGIST"
+      },
+      {
+        "id": "nexo-enoque-001",
+        "name": "Enoque G Santos Clemente",
+        "role": "CEO & Co-Founder",
+        "codename": "ENGINE"
+      }
+    ],
+    "ownership": {
+      "model": "equal-partners",
+      "split": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "reinvestment": 0.25,
+      "note": "25% cada fundador + 25% reinvestimento NEXO"
+    },
+    "allFullstack": true,
+    "note": "NEXO = empresa tech dos 3 sócios. Superclim = empresa pessoal Elias/Abner (limpeza). Projetos pessoais (Bool, Truco, Tetris) NÃO constam aqui."
+  },
+  "contacts": {
+    "34685093192@c.us": {
+      "id": "nexo-abner-001",
+      "codename": "ARCHITECT",
+      "displayName": "Abner",
+      "fullName": "Abner Gabriel Mendes",
+      "shortName": "Abner",
+      "role": "CEO & Co-Founder",
+      "department": "Direção & Tecnologia",
+      "isNexo": true,
+      "isAdmin": true,
+      "isFounder": true,
+      "ownership": 0.25,
+      "phones": {
+        "primary": "34685093192",
+        "secondary": null,
+        "whatsapp": "34685093192",
+        "label": "Principal"
+      },
+      "emails": {
+        "primary": "abner@nexo-digital.app",
+        "secondary": null,
+        "business": "abner@nexo-digital.app"
+      },
+      "skills": [
+        "Fullstack",
+        "Gestão",
+        "Arquitetura",
+        "Negócios",
+        "IA",
+        "Orquestração"
+      ],
+      "responsibilities": [
+        "Gestão estratégica e decisões executivas",
+        "Arquitetura de sistemas e infraestrutura",
+        "Relacionamento com clientes e leads",
+        "Orquestração de agentes de IA (Kimi, Codex, etc.)"
+      ],
+      "avatar": null,
+      "avatarUrl": null,
+      "avatarEmoji": "🧠",
+      "status": "active",
+      "timezone": "Europe/Madrid",
+      "language": "pt-BR",
+      "notificationPriority": "P0",
+      "lastSeen": null,
+      "activityScore": 0,
+      "joinDate": "2026-01-01",
+      "tags": [
+        "founder",
+        "admin",
+        "fullstack",
+        "client-facing"
+      ],
+      "editableFields": [
+        "displayName",
+        "role",
+        "department",
+        "skills",
+        "responsibilities",
+        "avatar",
+        "avatarUrl",
+        "avatarEmoji",
+        "status",
+        "timezone",
+        "language",
+        "notificationPriority",
+        "emails.secondary"
+      ],
+      "validation": {
+        "displayName": {
+          "minLength": 2,
+          "maxLength": 50,
+          "required": true
+        },
+        "role": {
+          "enum": [
+            "CEO & Co-Founder",
+            "Dev",
+            "Designer",
+            "Estagiário"
+          ],
+          "required": true
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive",
+            "away",
+            "busy"
+          ],
+          "required": true
+        },
+        "notificationPriority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ],
+          "required": true
+        }
+      },
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": []
+    },
+    "34689135159@c.us": {
+      "id": "nexo-enoque-001",
+      "codename": "ENGINE",
+      "displayName": "Enoque",
+      "fullName": "Enoque G Santos Clemente",
+      "shortName": "Enoque",
+      "role": "CEO & Co-Founder",
+      "department": "Tecnologia",
+      "isNexo": true,
+      "isAdmin": true,
+      "isFounder": true,
+      "ownership": 0.25,
+      "phones": {
+        "primary": "34689135159",
+        "secondary": null,
+        "whatsapp": "34689135159",
+        "label": "Principal"
+      },
+      "emails": {
+        "primary": "enoque009@gmail.com",
+        "secondary": null,
+        "business": "enoque009@gmail.com"
+      },
+      "skills": [
+        "Fullstack",
+        "React",
+        "Next.js",
+        "Vite",
+        "Tailwind",
+        "Node.js",
+        "TypeScript"
+      ],
+      "responsibilities": [
+        "Desenvolvimento frontend e implementação de features",
+        "UI/UX e experiência do usuário",
+        "Code review e qualidade de código",
+        "Deploy e integração contínua"
+      ],
+      "avatar": null,
+      "avatarUrl": null,
+      "avatarEmoji": "⚡",
+      "status": "active",
+      "timezone": "Europe/Madrid",
+      "language": "pt-BR",
+      "notificationPriority": "P1",
+      "lastSeen": null,
+      "activityScore": 0,
+      "joinDate": "2026-01-01",
+      "tags": [
+        "founder",
+        "admin",
+        "fullstack",
+        "frontend-lead"
+      ],
+      "editableFields": [
+        "displayName",
+        "role",
+        "department",
+        "skills",
+        "responsibilities",
+        "avatar",
+        "avatarUrl",
+        "avatarEmoji",
+        "status",
+        "timezone",
+        "language",
+        "notificationPriority",
+        "emails.secondary"
+      ],
+      "validation": {
+        "displayName": {
+          "minLength": 2,
+          "maxLength": 50,
+          "required": true
+        },
+        "role": {
+          "enum": [
+            "CEO & Co-Founder",
+            "Dev",
+            "Designer",
+            "Estagiário"
+          ],
+          "required": true
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive",
+            "away",
+            "busy"
+          ],
+          "required": true
+        },
+        "notificationPriority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ],
+          "required": true
+        }
+      },
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": []
+    },
+    "34672953062@c.us": {
+      "id": "nexo-elias-pessoal",
+      "codename": "STRATEGIST",
+      "displayName": "Elias (Pessoal)",
+      "fullName": "Elias Mendes",
+      "shortName": "Elias",
+      "role": "CEO & Co-Founder",
+      "department": "Consultoria & Negócios",
+      "isNexo": true,
+      "isAdmin": true,
+      "isFounder": true,
+      "ownership": 0.25,
+      "phones": {
+        "primary": "34672953062",
+        "secondary": null,
+        "whatsapp": "34672953062",
+        "label": "Pessoal"
+      },
+      "emails": {
+        "primary": "elias@superclim.es",
+        "secondary": null,
+        "business": "elias@superclim.es"
+      },
+      "skills": [
+        "Fullstack",
+        "Consultoria",
+        "Negócios",
+        "Limpeza",
+        "Impermeabilização"
+      ],
+      "responsibilities": [
+        "Consultoria estratégica e direcionamento de negócios",
+        "Relacionamento com clientes e negociação",
+        "Supervisão operacional da Superclim Servicios",
+        "Aconselhamento técnico e arquitetural"
+      ],
+      "avatar": null,
+      "avatarUrl": null,
+      "avatarEmoji": "🎯",
+      "status": "active",
+      "timezone": "Europe/Madrid",
+      "language": "es-ES",
+      "notificationPriority": "P1",
+      "lastSeen": null,
+      "activityScore": 0,
+      "joinDate": "2026-01-01",
+      "note": "Pai biológico do Abner. Dono da Superclim Servicios. Número pessoal.",
+      "tags": [
+        "founder",
+        "admin",
+        "fullstack",
+        "business-lead",
+        "superclim"
+      ],
+      "editableFields": [
+        "displayName",
+        "role",
+        "department",
+        "skills",
+        "responsibilities",
+        "avatar",
+        "avatarUrl",
+        "avatarEmoji",
+        "status",
+        "timezone",
+        "language",
+        "notificationPriority",
+        "emails.secondary",
+        "note"
+      ],
+      "validation": {
+        "displayName": {
+          "minLength": 2,
+          "maxLength": 50,
+          "required": true
+        },
+        "role": {
+          "enum": [
+            "CEO & Co-Founder",
+            "Dev",
+            "Designer",
+            "Estagiário"
+          ],
+          "required": true
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive",
+            "away",
+            "busy"
+          ],
+          "required": true
+        },
+        "notificationPriority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ],
+          "required": true
+        }
+      },
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": []
+    },
+    "34624529442@c.us": {
+      "id": "nexo-elias-empresarial",
+      "codename": "STRATEGIST-BIZ",
+      "displayName": "Elias (Empresarial)",
+      "fullName": "Elias Mendes",
+      "shortName": "Elias",
+      "role": "CEO & Co-Founder",
+      "department": "Consultoria & Negócios",
+      "isNexo": true,
+      "isAdmin": true,
+      "isFounder": true,
+      "ownership": 0.25,
+      "phones": {
+        "primary": "34624529442",
+        "secondary": null,
+        "whatsapp": "34624529442",
+        "label": "Empresarial"
+      },
+      "emails": {
+        "primary": "elias@superclim.es",
+        "secondary": null,
+        "business": "elias@superclim.es"
+      },
+      "company": "Superclim Servicios",
+      "companyRole": "Proprietário",
+      "skills": [
+        "Fullstack",
+        "Consultoria",
+        "Negócios",
+        "Limpeza",
+        "Impermeabilização"
+      ],
+      "responsibilities": [
+        "Consultoria estratégica e direcionamento de negócios",
+        "Relacionamento com clientes e negociação",
+        "Gestão operacional da Superclim Servicios",
+        "Aconselhamento técnico e arquitetural"
+      ],
+      "avatar": null,
+      "avatarUrl": null,
+      "avatarEmoji": "🏢",
+      "status": "active",
+      "timezone": "Europe/Madrid",
+      "language": "es-ES",
+      "notificationPriority": "P1",
+      "lastSeen": null,
+      "activityScore": 0,
+      "joinDate": "2026-01-01",
+      "note": "Número empresarial da Superclim Servicios. Mesma pessoa do Elias (Pessoal).",
+      "tags": [
+        "founder",
+        "admin",
+        "fullstack",
+        "business-lead",
+        "superclim"
+      ],
+      "editableFields": [
+        "displayName",
+        "role",
+        "department",
+        "skills",
+        "responsibilities",
+        "avatar",
+        "avatarUrl",
+        "avatarEmoji",
+        "status",
+        "timezone",
+        "language",
+        "notificationPriority",
+        "emails.secondary",
+        "company",
+        "companyRole",
+        "note"
+      ],
+      "validation": {
+        "displayName": {
+          "minLength": 2,
+          "maxLength": 50,
+          "required": true
+        },
+        "role": {
+          "enum": [
+            "CEO & Co-Founder",
+            "Dev",
+            "Designer",
+            "Estagiário"
+          ],
+          "required": true
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive",
+            "away",
+            "busy"
+          ],
+          "required": true
+        },
+        "notificationPriority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ],
+          "required": true
+        }
+      },
+      "lastEdited": null,
+      "editedBy": null,
+      "editHistory": []
+    }
+  },
+  "crossReferences": {
+    "description": "Pontes para outros schemas. Quando alguém menciona um nome que não está aqui, o sistema busca nesses arquivos.",
+    "clientsRegistry": "backend/data/schema/clients-registry.json",
+    "projectsRegistry": "backend/data/schema/projects-registry.json",
+    "groupsConfig": "backend/data/schema/groups-config.json"
+  },
+  "resolutionRules": {
+    "priority": [
+      "exactMatch",
+      "normalizedMatch",
+      "partialMatch",
+      "crossReference",
+      "fallback"
+    ],
+    "exactMatch": {
+      "description": "Número WhatsApp idêntico ao mapeado",
+      "confidence": 1.0
+    },
+    "normalizedMatch": {
+      "description": "Número sem prefixo ou com formatação diferente",
+      "confidence": 0.95,
+      "example": "+34685093192 → 34685093192"
+    },
+    "partialMatch": {
+      "description": "Últimos 8 dígitos coincidem",
+      "confidence": 0.7,
+      "action": "logWarning"
+    },
+    "crossReference": {
+      "description": "Nome não encontrado em contacts, mas existe em clients-registry (ex: Juan, Paulo)",
+      "confidence": 0.85,
+      "action": "resolveFromClientsRegistry",
+      "example": "Mencionou 'Juan' → busca em clients-registry → encontra 'tpv-sorveteria'"
+    },
+    "fallback": {
+      "description": "Número/nome não reconhecido",
+      "confidence": 0.0,
+      "action": "askUser",
+      "prompt": "🔍 Número {phone} não reconhecido no contacts-map.\n\nQuem é esta pessoa?\n1️⃣ Cliente novo\n2️⃣ Parceiro/fornecedor\n3️⃣ Spam\n4️⃣ Erro meu (é número de alguém da NEXO)\n5️⃣ Ignorar esta vez\n\nResponda com o número da opção ou o nome da pessoa.",
+      "timeout": 300000,
+      "defaultAction": "logUnknown"
+    }
+  },
+  "unknownContacts": {
+    "logFile": "backend/data/runtime/unknown-contacts.json",
+    "autoExpire": 2592000000,
+    "maxStored": 100,
+    "alertThreshold": 5,
+    "alertMessage": "⚠️ {count} contatos desconhecidos detectados nas últimas 24h. Verifique se são leads ou erros de mapeamento."
+  }
+}

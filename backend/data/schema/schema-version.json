@@ -1,0 +1,131 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "codename": "NEXO_SCHEMA_CONTROLLER",
+    "lastUpdated": "2026-05-05T10:05:00Z",
+    "editable": true,
+    "editedBy": "system",
+    "editHistory": [],
+    "description": "Controle de versão mestre de todos os schemas NEXO. NUNCA edite manualmente — use o dashboard ou API.",
+    "editableFields": [
+      "currentVersion",
+      "migration.autoMigrate",
+      "migration.backupBeforeMigrate",
+      "migration.rollbackOnError",
+      "migration.maxRollbackVersions",
+      "compatibility.minAgentVersion",
+      "compatibility.recommendedAgentVersion"
+    ],
+    "validation": {
+      "currentVersion": {
+        "pattern": "^\\d+\\.\\d+\\.\\d+$",
+        "required": true
+      },
+      "migration.autoMigrate": {
+        "type": "boolean",
+        "required": true
+      },
+      "migration.maxRollbackVersions": {
+        "type": "integer",
+        "min": 1,
+        "max": 10,
+        "required": true
+      }
+    },
+    "permissions": {
+      "canEdit": [
+        "nexo-abner-001",
+        "nexo-enoque-001",
+        "nexo-elias-pessoal",
+        "nexo-elias-empresarial"
+      ],
+      "requiresApproval": true,
+      "approvalFrom": "nexo-abner-001",
+      "note": "Edição de versionamento requer aprovação do CEO. Backup automático antes de qualquer mudança."
+    }
+  },
+  "currentVersion": "16.0.1",
+  "versionHistory": [
+    {
+      "version": "16.0.1",
+      "date": "2026-05-05T10:05:00Z",
+      "changes": [
+        "Schema inicial definitivo v16.0",
+        "7 arquivos JSON estruturados e interconectados",
+        "contacts-map: 4 membros NEXO, todos CEO & Co-Founder",
+        "clients-registry: 1 cliente (Paulo) + 5 leads (Juan/Sorveteria Tropicale, Jess, Gesse, Lucas, CCB)",
+        "projects-registry: 2 projetos (SantaFe P1, Dashboard P0)",
+        "groups-config: 2 grupos (Production interno, Paulo cliente)",
+        "Regra absoluta: Luna NUNCA fala em grupo de cliente",
+        "Cross-references ativas entre todos os schemas",
+        "Editable fields e validation rules em cada registro"
+      ],
+      "author": "system",
+      "rollbackAvailable": false,
+      "breakingChanges": false,
+      "migrationRequired": false
+    }
+  ],
+  "migration": {
+    "autoMigrate": true,
+    "backupBeforeMigrate": true,
+    "migrationLog": [],
+    "lastMigration": null,
+    "pendingMigrations": [],
+    "rollbackOnError": true,
+    "maxRollbackVersions": 3
+  },
+  "schemasTracked": [
+    {
+      "name": "contacts-map.json",
+      "path": "backend/data/schema/contacts-map.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    },
+    {
+      "name": "clients-registry.json",
+      "path": "backend/data/schema/clients-registry.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    },
+    {
+      "name": "projects-registry.json",
+      "path": "backend/data/schema/projects-registry.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    },
+    {
+      "name": "groups-config.json",
+      "path": "backend/data/schema/groups-config.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    },
+    {
+      "name": "integrations-config.json",
+      "path": "backend/data/config/integrations-config.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    },
+    {
+      "name": "luna-dashboard-config.json",
+      "path": "backend/data/config/luna-dashboard-config.json",
+      "currentVersion": "16.0.1",
+      "lastHash": null,
+      "checksumAlgorithm": "sha256"
+    }
+  ],
+  "compatibility": {
+    "minAgentVersion": "15.1",
+    "recommendedAgentVersion": "16.0",
+    "breakingChangesWith": [
+      "15.0",
+      "14.0"
+    ],
+    "note": "Agente v15.1 pode ler mas não editar. v16.0+ tem full access."
+  }
+}

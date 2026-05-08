@@ -1,0 +1,163 @@
+{
+  "_schema": {
+    "version": "16.0.1",
+    "lastUpdated": "2026-05-04T19:50:00Z",
+    "description": "Schema de enriquecimento NLP para cada mensagem processada"
+  },
+  "sentiment": {
+    "score": {
+      "type": "number",
+      "min": -1,
+      "max": 1,
+      "description": "Score de sentimento (-1 negativo, 1 positivo)"
+    },
+    "label": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "neutral",
+        "negative",
+        "mixed"
+      ]
+    },
+    "intensity": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "aspects": {
+      "product": {
+        "type": "number",
+        "min": -1,
+        "max": 1
+      },
+      "service": {
+        "type": "number",
+        "min": -1,
+        "max": 1
+      },
+      "price": {
+        "type": "number",
+        "min": -1,
+        "max": 1
+      }
+    }
+  },
+  "intent": {
+    "primary": {
+      "type": "string",
+      "enum": [
+        "request",
+        "inform",
+        "question",
+        "complaint",
+        "suggestion",
+        "command",
+        "greeting",
+        "farewell"
+      ]
+    },
+    "secondary": {
+      "type": "string",
+      "enum": [
+        "create-task",
+        "ask-status",
+        "share-link",
+        "request-help",
+        "give-feedback",
+        "schedule-meeting",
+        "make-decision"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "min": 0,
+      "max": 1
+    }
+  },
+  "entities": {
+    "people": [
+      {
+        "name": "string",
+        "role": "string",
+        "confidence": "number"
+      }
+    ],
+    "organizations": [
+      {
+        "name": "string",
+        "type": "string",
+        "isNexo": "boolean"
+      }
+    ],
+    "locations": [
+      {
+        "name": "string",
+        "type": "string"
+      }
+    ],
+    "dates": [
+      {
+        "text": "string",
+        "resolved": "string",
+        "type": "string"
+      }
+    ],
+    "products": [
+      {
+        "name": "string",
+        "category": "string"
+      }
+    ],
+    "technologies": [
+      {
+        "name": "string",
+        "type": "string"
+      }
+    ],
+    "amounts": [
+      {
+        "value": "number",
+        "currency": "string",
+        "context": "string"
+      }
+    ]
+  },
+  "keywords": {
+    "type": "array",
+    "items": "string"
+  },
+  "topics": {
+    "type": "array",
+    "items": "string"
+  },
+  "summary": {
+    "type": "string",
+    "maxLength": 200,
+    "description": "Resumo de 1 linha gerado por LLM"
+  },
+  "language": {
+    "type": "string",
+    "enum": [
+      "pt-BR",
+      "es-ES",
+      "en-US",
+      "ca-ES"
+    ]
+  },
+  "readability": {
+    "wordCount": "number",
+    "readTimeSeconds": "number",
+    "complexity": {
+      "type": "string",
+      "enum": [
+        "simple",
+        "medium",
+        "complex"
+      ]
+    }
+  }
+}

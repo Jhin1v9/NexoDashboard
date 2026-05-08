@@ -1,0 +1,26 @@
+# Cria o arquivo de config
+cat > ~/.openclaw/openclaw.json << 'EOF'
+{
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://localhost:11434",
+        "apiKey": "ollama-local",
+        "models": [
+          {
+            "id": "llama3.3:8b",
+            "name": "Llama 3.3 8B"
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/llama3.3:8b"
+      }
+    }
+  }
+}
+EOF
