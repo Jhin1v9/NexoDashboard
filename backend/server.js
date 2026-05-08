@@ -592,6 +592,48 @@ app.get('/api/whatsapp/history', (req, res) => {
   }
 });
 
+// WhatsApp Send — Enviar mensagem via Playwright CDP
+app.post('/api/whatsapp/send', async (req, res) => {
+  try {
+    const { chatName, text } = req.body;
+    if (!chatName || !text) {
+      return res.status(400).json({ success: false, error: 'chatName e text obrigatorios' });
+    }
+
+    const WhatsAppSender = require('./services/whatsapp-sender');
+    const sender = new WhatsAppSender();
+    const result = await sender.sendMessage({ chatName, text });
+
+    // Salvar no historico como "enviado pelo dashboard"
+    const history = readWhatsappHistory();
+    history.unshift({
+      id: `sent-${Date.now()}`,
+      text,
+      body: text,
+      author: 'NEXO Dashboard',
+      authorName: 'NEXO Dashboard',
+      chat: chatName,
+      timestamp: new Date().toISOString(),
+      sentViaDashboard: true,
+      direction: 'outgoing',
+      resolvedAuthor: {
+        name: 'NEXO Dashboard',
+        shortName: 'Dashboard',
+        color: '#3b82f6',
+        avatarEmoji: '🤖',
+        role: 'system',
+        confidence: 1.0
+      }
+    });
+    writeWhatsappHistory(history);
+
+    broadcast({ type: 'whatsapp:sent', data: result });
+    res.json({ success: true, result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.get('/api/classifications/review', (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
