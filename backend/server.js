@@ -3908,6 +3908,58 @@ app.delete('/api/leads/:id', (req, res) => {
   }
 });
 
+// Instagram Hub API
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+app.get('/api/instagram/profile', (req, res) => {
+  try {
+    const profile = {
+      username: 'nexodigital',
+      displayName: 'NEXO Digital',
+      bio: 'Transformando ideias em realidade digital 🚀',
+      profileUrl: 'https://instagram.com/nexodigital',
+      avatarUrl: '/assets/nexo-insta-avatar.jpg',
+      followers: 1250,
+      following: 340,
+      posts: 89,
+      isBusiness: true,
+      category: 'Marketing Agency'
+    };
+    res.json({ success: true, profile });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/instagram/messages', (req, res) => {
+  try {
+    const instaFile = path.join(DATA_DIR, 'instagram-messages.json');
+    const data = fs.existsSync(instaFile) ? JSON.parse(fs.readFileSync(instaFile, 'utf8')) : { messages: [] };
+    res.json({ success: true, messages: data.messages || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/instagram/messages/import', (req, res) => {
+  try {
+    const { messages } = req.body;
+    const instaFile = path.join(DATA_DIR, 'instagram-messages.json');
+    const data = fs.existsSync(instaFile) ? JSON.parse(fs.readFileSync(instaFile, 'utf8')) : { messages: [] };
+    let added = 0;
+    for (const msg of (messages || [])) {
+      if (!data.messages.find(m => m.id === msg.id)) {
+        data.messages.unshift({ ...msg, importedAt: new Date().toISOString() });
+        added++;
+      }
+    }
+    fs.writeFileSync(instaFile, JSON.stringify(data, null, 2));
+    res.json({ success: true, added, total: data.messages.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Catch-all
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
