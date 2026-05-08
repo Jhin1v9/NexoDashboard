@@ -9,6 +9,8 @@ import Clientes from './pages/Clientes'
 import Projetos from './pages/Projetos'
 import Tarefas from './pages/Tarefas'
 import WhatsApp from './pages/WhatsApp'
+import EmailHub from './pages/EmailHub'
+import InstagramHub from './pages/InstagramHub'
 import Relatorios from './pages/Relatorios'
 import GitHub from './pages/GitHub'
 import VercelProjects from './pages/VercelProjects'
@@ -20,6 +22,9 @@ import Gastos from './pages/Gastos'
 import MeusGastos from './pages/MeusGastos'
 import Orcamentos from './pages/Orcamentos'
 import Operacoes from './pages/Operacoes'
+import Leads from './pages/Leads'
+import LunaControl from './pages/LunaControl'
+import Settings from './pages/Settings'
 import Changelog from './pages/Changelog'
 
 function App() {
@@ -33,7 +38,7 @@ function App() {
         <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} onSearchClick={() => setCmdOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6">
           <Routes>
-            <Route path="/" element={<Operacoes />} />
+            <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/operacoes" element={<Operacoes />} />
             <Route path="/orcamentos" element={<Orcamentos />} />
@@ -41,6 +46,8 @@ function App() {
             <Route path="/projetos" element={<Projetos />} />
             <Route path="/tarefas" element={<Tarefas />} />
             <Route path="/whatsapp" element={<WhatsApp />} />
+            <Route path="/email" element={<EmailHub />} />
+            <Route path="/instagram" element={<InstagramHub />} />
             <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/github" element={<GitHub />} />
             <Route path="/vercel" element={<VercelProjects />} />
@@ -52,6 +59,9 @@ function App() {
             <Route path="/financeiro/gastos" element={<Gastos />} />
             <Route path="/gastos" element={<Gastos />} />
             <Route path="/financeiro/gastos/meus" element={<MeusGastos />} />
+            <Route path="/leads" element={<Leads />} />
+            <Route path="/luna" element={<LunaControl />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </main>

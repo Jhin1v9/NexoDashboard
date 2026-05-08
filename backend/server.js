@@ -429,17 +429,34 @@ function resolveAuthor(msg) {
     const rawAuthor = msg.author || msg.originalAuthor || '';
     const digits = rawAuthor.replace(/\D/g, '');
 
+    // Cores fixas para founders (quando não há avatar configurado)
+    const founderColors = {
+      'abner': '#3742fa',
+      'enoque': '#2ed573',
+      'elias': '#ffa502'
+    };
+
+    const pickColor = (name) => {
+      const n = (name || '').toLowerCase();
+      for (const [key, color] of Object.entries(founderColors)) {
+        if (n.includes(key)) return color;
+      }
+      return null;
+    };
+
     // 1. Match exato
     if (contacts[rawAuthor]) {
       const c = contacts[rawAuthor];
+      const name = c.displayName || c.shortName || c.fullName || rawAuthor;
       return {
-        name: c.displayName || c.shortName || c.fullName || rawAuthor,
+        name,
         shortName: c.shortName || c.displayName || rawAuthor,
-        color: c.avatar?.color || '#6B7280',
+        color: c.avatar?.color || pickColor(name) || '#6B7280',
         avatar: c.avatar?.url || null,
         avatarEmoji: c.avatarEmoji || '👤',
         role: c.role || 'member',
-        phone: c.phones?.primary || digits || rawAuthor
+        phone: c.phones?.primary || digits || rawAuthor,
+        confidence: 1.0
       };
     }
 
@@ -449,14 +466,16 @@ function resolveAuthor(msg) {
       for (const [key, c] of Object.entries(contacts)) {
         const keyDigits = key.replace(/\D/g, '');
         if (keyDigits.slice(-8) === tail) {
+          const name = c.displayName || c.shortName || c.fullName || rawAuthor;
           return {
-            name: c.displayName || c.shortName || c.fullName || rawAuthor,
+            name,
             shortName: c.shortName || c.displayName || rawAuthor,
-            color: c.avatar?.color || '#6B7280',
+            color: c.avatar?.color || pickColor(name) || '#6B7280',
             avatar: c.avatar?.url || null,
             avatarEmoji: c.avatarEmoji || '👤',
             role: c.role || 'member',
-            phone: c.phones?.primary || digits || rawAuthor
+            phone: c.phones?.primary || digits || rawAuthor,
+            confidence: 0.8
           };
         }
       }
@@ -474,36 +493,55 @@ function resolveAuthor(msg) {
         ];
         // Match exato do nome ou do alias
         if (names.includes(searchName)) {
+          const name = c.displayName || c.shortName || c.fullName || searchName;
           return {
-            name: c.displayName || c.shortName || c.fullName || searchName,
+            name,
             shortName: c.shortName || c.displayName || searchName,
-            color: c.avatar?.color || '#6B7280',
+            color: c.avatar?.color || pickColor(name) || '#6B7280',
             avatar: c.avatar?.url || null,
             avatarEmoji: c.avatarEmoji || '👤',
             role: c.role || 'member',
-            phone: c.phones?.primary || digits || rawAuthor
+            phone: c.phones?.primary || digits || rawAuthor,
+            confidence: 0.7
           };
         }
         // Match parcial: se o nome de busca está contido em algum nome do contato
         // ou vice-versa (ex: "Enoque" corresponde a "Enoque G Santos Clemente")
         for (const n of names) {
           if (n && (n.includes(searchName) || searchName.includes(n))) {
+            const name = c.displayName || c.shortName || c.fullName || searchName;
             return {
-              name: c.displayName || c.shortName || c.fullName || searchName,
+              name,
               shortName: c.shortName || c.displayName || searchName,
-              color: c.avatar?.color || '#6B7280',
+              color: c.avatar?.color || pickColor(name) || '#6B7280',
               avatar: c.avatar?.url || null,
               avatarEmoji: c.avatarEmoji || '👤',
               role: c.role || 'member',
-              phone: c.phones?.primary || digits || rawAuthor
+              phone: c.phones?.primary || digits || rawAuthor,
+              confidence: 0.5
             };
           }
         }
       }
     }
 
-    // 4. Fallback por nome conhecido
-    const fallbackName = msg.authorName || msg.pushName || msg.originalAuthor || msg.author || 'Desconhecido';
+    // 4. Fallback: usar pushname (nome de exibição do WhatsApp) quando disponível
+    const pushName = msg.pushName || msg.pushname || msg._data?.pushname || msg._data?.notifyName;
+    if (pushName && pushName !== 'Desconhecido') {
+      return {
+        name: pushName,
+        shortName: pushName,
+        color: pickColor(pushName) || '#6B7280',
+        avatar: null,
+        avatarEmoji: '👤',
+        role: 'member',
+        phone: digits || rawAuthor,
+        confidence: 0.3
+      };
+    }
+
+    // 5. Último fallback
+    const fallbackName = msg.authorName || msg.originalAuthor || msg.author || 'Desconhecido';
     return {
       name: fallbackName,
       shortName: fallbackName,
@@ -511,7 +549,8 @@ function resolveAuthor(msg) {
       avatar: null,
       avatarEmoji: '👤',
       role: 'member',
-      phone: digits || rawAuthor
+      phone: digits || rawAuthor,
+      confidence: 0
     };
   } catch (e) {
     return {
@@ -521,7 +560,8 @@ function resolveAuthor(msg) {
       avatar: null,
       avatarEmoji: '👤',
       role: 'member',
-      phone: msg.author || ''
+      phone: msg.author || '',
+      confidence: 0
     };
   }
 }

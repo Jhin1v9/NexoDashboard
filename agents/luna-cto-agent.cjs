@@ -97,9 +97,44 @@ global.SCHEMAS = SCHEMAS;
 // CONFIGURAÃ‡ÃƒO v15.1
 // =====================================================
 
-const isAuthorizedChat = (name) => {
-  const n = (name || '').trim().toLowerCase();
-  return n.includes('production') || n.includes('paulo');
+/**
+ * Verifica se um chat/grupo está autorizado para monitoramento.
+ * Só monitora grupos explicitamente configurados em groups-config.json com monitoring.enabled = true.
+ * DMs (chats individuais) são ignorados por padrão para proteger privacidade.
+ */
+const isAuthorizedChat = (chatId) => {
+  const id = (chatId || '').trim();
+  
+  // Ignorar DMs individuais — proteção de privacidade
+  if (id.endsWith('@c.us')) {
+    return false;
+  }
+  
+  // Verificar se é um grupo monitorado pelo schema groups-config
+  if (SCHEMAS.groups && SCHEMAS.groups.groups) {
+    const groupValues = Object.values(SCHEMAS.groups.groups);
+    // Verifica por match no ID do grupo (@g.us)
+    const byId = groupValues.find(g => g.groupId === id || id.includes(g.id));
+    if (byId) {
+      return byId.monitoring?.enabled === true;
+    }
+    // Verifica por match no nome do grupo
+    const byName = groupValues.find(g => {
+      const names = [
+        g.originalName,
+        g.displayName,
+        ...(g.aliases || [])
+      ].filter(Boolean).map(n => n.toLowerCase());
+      return names.some(n => id.toLowerCase().includes(n));
+    });
+    if (byName) {
+      return byName.monitoring?.enabled === true;
+    }
+  }
+  
+  // Fallback: verificar contra CONFIG.GROUPS (hardcoded whitelist)
+  const n = id.toLowerCase();
+  return CONFIG.GROUPS.some(g => n.includes(g.name.toLowerCase()));
 };
 
 const SESSION_DATA_PATH = path.join(__dirname, '..', 'ARTIFACTS', 'wwebjs-auth');
@@ -820,6 +855,12 @@ class LunaAgent {
 
       if (msg.fromMe) {
         log.info('[SELF] Ignorando mensagem propria para evitar loop/classificacao duplicada');
+        return;
+      }
+
+      // FILTRO DE PRIVACIDADE: só processar chats autorizados (grupos monitorados)
+      if (!isAuthorizedChat(msg.from)) {
+        log.info(`[PRIVACY] Ignorando mensagem de chat nao autorizado: ${msg.from}`);
         return;
       }
 
@@ -1956,7 +1997,7 @@ class LunaAgent {
           authorId: msg.authorPhone || msg.author || msg.from || null,
           text: msg.text || msg.body || '',
           body: msg.body || msg.text || '',
-          chat: msg.chatName || '',
+          chat: msg.chatName || (msg.from || '').replace(/@g\.us|@c\.us/, '') || '',
           timestamp,
           classification: msg.classification || null,
           resolvedAuthor: resolved.confidence > 0 ? {

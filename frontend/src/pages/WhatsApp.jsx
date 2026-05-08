@@ -316,6 +316,167 @@ const LinkPreview = ({ link, index }) => (
   </motion.a>
 )
 
+// ─── COMPONENTES DE CHAT ───
+
+function ChatMessageBubble({ msg, index }) {
+  const isOutgoing = msg.direction === 'outgoing' || msg.sentViaDashboard
+  const avatarBg = msg.senderColor ? msg.senderColor + '20' : 'rgba(108,92,231,0.2)'
+  const avatarText = msg.senderColor || '#6c5ce7'
+  const timeStr = msg.time ? new Date(msg.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.02 }}
+      className={`flex gap-3 ${isOutgoing ? 'flex-row-reverse' : ''}`}
+    >
+      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: avatarBg }}>
+        <span className="text-xs font-bold" style={{ color: avatarText }}>
+          {msg.senderEmoji || msg.sender?.[0]?.toUpperCase() || '?'}
+        </span>
+      </div>
+      <div className={`max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'} flex flex-col`}>
+        {!isOutgoing && (
+          <span className="text-[11px] text-nexo-muted mb-0.5 ml-1">{msg.sender || 'Desconhecido'}</span>
+        )}
+        <div className={`px-3 py-2 rounded-2xl text-sm ${
+          isOutgoing 
+            ? 'bg-nexo-primary/20 text-nexo-text rounded-br-sm border border-nexo-primary/20' 
+            : 'bg-nexo-card text-nexo-text rounded-bl-sm border border-nexo-border'
+        }`}>
+          <p className="whitespace-pre-wrap">{msg.text}</p>
+        </div>
+        <span className="text-[10px] text-nexo-muted mt-0.5 mx-1">{timeStr}</span>
+      </div>
+    </motion.div>
+  )
+}
+
+function ChatView({ messages, selectedChat, setSelectedChat, historyMessages }) {
+  // Agrupar mensagens por chat
+  const chatsMap = useMemo(() => {
+    const map = {}
+    for (const msg of historyMessages.length > 0 ? historyMessages : messages) {
+      const chatName = msg.chat || msg.group || 'Production'
+      if (!map[chatName]) {
+        map[chatName] = { name: chatName, messages: [], lastMessage: null }
+      }
+      map[chatName].messages.push(msg)
+      if (!map[chatName].lastMessage || new Date(msg.timestamp || msg.time) > new Date(map[chatName].lastMessage.timestamp || map[chatName].lastMessage.time)) {
+        map[chatName].lastMessage = msg
+      }
+    }
+    // Ordenar mensagens dentro de cada chat
+    for (const chat of Object.values(map)) {
+      chat.messages.sort((a, b) => new Date(a.timestamp || a.time || 0) - new Date(b.timestamp || b.time || 0))
+    }
+    return map
+  }, [historyMessages, messages])
+
+  const chats = useMemo(() => Object.values(chatsMap), [chatsMap])
+  const currentChat = selectedChat ? chatsMap[selectedChat] : null
+
+  // Normalizar mensagens do chat atual para o formato da UI
+  const currentMessages = useMemo(() => {
+    if (!currentChat) return []
+    return currentChat.messages.map((m, i) => ({
+      id: m.id || `msg-${i}`,
+      sender: m.resolvedAuthor?.name || m.authorName || m.sender || m.author || 'Desconhecido',
+      senderColor: m.resolvedAuthor?.color || null,
+      senderEmoji: m.resolvedAuthor?.avatarEmoji || null,
+      text: m.body || m.text || m.message || '(sem texto)',
+      time: m.timestamp || m.time || '',
+      group: m.chat || m.group || 'Production',
+      direction: m.direction || 'incoming'
+    }))
+  }, [currentChat])
+
+  if (chats.length === 0) {
+    return (
+      <div className="text-center text-nexo-muted py-12">
+        <MessageCircle size={48} className="mx-auto mb-4 opacity-30" />
+        <p>Nenhuma mensagem recente</p>
+        <p className="text-xs mt-2">As mensagens aparecem quando o Luna faz scan com novidades.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-[600px] glass-card rounded-xl border border-nexo-border overflow-hidden">
+      {/* SIDEBAR DE CONVERSAS */}
+      <div className="w-72 border-r border-nexo-border flex flex-col">
+        <div className="p-3 border-b border-nexo-border">
+          <h3 className="text-sm font-semibold">Conversas</h3>
+          <p className="text-[10px] text-nexo-muted">{chats.length} chat{chats.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {chats.map(chat => {
+            const last = chat.lastMessage
+            const lastText = last ? (last.body || last.text || '').slice(0, 40) : ''
+            const lastSender = last?.resolvedAuthor?.name || last?.authorName || last?.author || ''
+            return (
+              <button
+                key={chat.name}
+                onClick={() => setSelectedChat(chat.name)}
+                className={`w-full text-left p-3 border-b border-nexo-border transition-colors ${
+                  selectedChat === chat.name ? 'bg-nexo-primary/10 border-l-2 border-l-nexo-primary' : 'hover:bg-nexo-card/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-nexo-success/20 flex items-center justify-center text-nexo-success text-xs font-bold">
+                    {chat.name[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{chat.name}</p>
+                    <p className="text-[10px] text-nexo-muted truncate">
+                      {lastSender ? `${lastSender}: ` : ''}{lastText}{lastText.length >= 40 ? '...' : ''}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-nexo-muted bg-nexo-card px-1.5 py-0.5 rounded-full">
+                    {chat.messages.length}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ÁREA DE MENSAGENS */}
+      <div className="flex-1 flex flex-col">
+        {currentChat ? (
+          <>
+            {/* Header */}
+            <div className="p-3 border-b border-nexo-border flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-nexo-success/20 flex items-center justify-center text-nexo-success text-xs font-bold">
+                {currentChat.name[0]?.toUpperCase() || '?'}
+              </div>
+              <div>
+                <p className="text-sm font-medium">{currentChat.name}</p>
+                <p className="text-[10px] text-nexo-muted">{currentMessages.length} mensagens</p>
+              </div>
+            </div>
+            {/* Mensagens */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {currentMessages.map((msg, i) => (
+                <ChatMessageBubble key={msg.id} msg={msg} index={i} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-nexo-muted">
+            <div className="text-center">
+              <MessageCircle size={48} className="mx-auto mb-4 opacity-30" />
+              <p>Selecione uma conversa para visualizar</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── PÁGINA PRINCIPAL ───
 
 export default function WhatsApp() {
@@ -328,6 +489,7 @@ export default function WhatsApp() {
   const [activeTab, setActiveTab] = useState('overview')
   const [lastUpdate, setLastUpdate] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedChat, setSelectedChat] = useState(null)
   const navigate = useNavigate()
 
   const data = useMemo(() => {
@@ -698,17 +860,13 @@ export default function WhatsApp() {
         )}
 
         {activeTab === 'messages' && (
-          <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-            {messages.map((msg, i) => (
-              <MessageBubble key={i} msg={msg} index={i} />
-            ))}
-            {messages.length === 0 && (
-              <div className="text-center text-nexo-muted py-12">
-                <MessageCircle size={48} className="mx-auto mb-4 opacity-30" />
-                <p>Nenhuma mensagem recente</p>
-                <p className="text-xs mt-2">As mensagens aparecem quando o Luna faz scan com novidades.</p>
-              </div>
-            )}
+          <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <ChatView
+              messages={messages}
+              selectedChat={selectedChat}
+              setSelectedChat={setSelectedChat}
+              historyMessages={historyMessages}
+            />
           </motion.div>
         )}
 

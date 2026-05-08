@@ -2,32 +2,21 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Command, LayoutDashboard, FileText, Users, Rocket,
-  CheckSquare, MessageCircle, Github, Triangle, Wrench,
-  DollarSign, Newspaper, ChevronDown,
-  BarChart3, Wallet, Receipt
+  LayoutDashboard, Mail, MessageCircle, Instagram,
+  CheckSquare, Folder, Target, Bell, Cpu, Settings,
+  DollarSign, Wallet, Receipt, ChevronDown
 } from 'lucide-react'
 
 const navItems = [
-  { path: '/', icon: Command, label: 'Operacoes' },
-  {
-    id: 'negocio',
-    icon: Rocket,
-    label: 'Negocio',
-    children: [
-      { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { path: '/clientes', icon: Users, label: 'Clientes' },
-      { path: '/projetos', icon: Rocket, label: 'Projetos' },
-      { path: '/orcamentos', icon: FileText, label: 'Orcamentos' },
-    ]
-  },
+  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   {
     id: 'comunicacao',
     icon: MessageCircle,
     label: 'Comunicacao',
     children: [
       { path: '/whatsapp', icon: MessageCircle, label: 'WhatsApp' },
-      { path: '/relatorios', icon: BarChart3, label: 'Relatorios' },
+      { path: '/email', icon: Mail, label: 'Email' },
+      { path: '/instagram', icon: Instagram, label: 'Instagram' },
     ]
   },
   {
@@ -40,18 +29,12 @@ const navItems = [
       { path: '/financeiro/gastos', icon: Receipt, label: 'Gastos' },
     ]
   },
-  {
-    id: 'devops',
-    icon: Github,
-    label: 'DevOps',
-    children: [
-      { path: '/github', icon: Github, label: 'GitHub' },
-      { path: '/vercel', icon: Triangle, label: 'Vercel' },
-      { path: '/ferramentas', icon: Wrench, label: 'Ferramentas' },
-    ]
-  },
+  { path: '/projetos', icon: Folder, label: 'Projetos' },
   { path: '/tarefas', icon: CheckSquare, label: 'Tarefas' },
-  { path: '/changelog', icon: Newspaper, label: 'Changelog' },
+  { path: '/leads', icon: Target, label: 'Leads' },
+  { path: '/operacoes', icon: Bell, label: 'Operacoes' },
+  { path: '/luna', icon: Cpu, label: 'Luna' },
+  { path: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 
 function isSectionActive(children, pathname) {
@@ -168,7 +151,7 @@ export default function Sidebar({ open }) {
         {navItems.map(item => <NavItem key={item.path || item.id} item={item} sidebarOpen={open} />)}
       </nav>
       <div className="p-4 border-t border-nexo-border text-xs text-nexo-muted text-center">
-        {open && <span>v1.0.0 - VPN Only</span>}
+        {open && <span>v4.0 — Command Center</span>}
       </div>
     </aside>
   )
