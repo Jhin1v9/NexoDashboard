@@ -4,22 +4,24 @@ class LunaBrain {
   constructor(ollamaConfig = null) {
     // ============================================
     // LUNA BRAIN v16.0 — Orquestrador de Personalidades
-    // Hybrid: Regex Blindado + Gemma 2B + Context Scoring
+    // Hybrid: Regex Blindado + Qwen3 local + Context Scoring
     // ============================================
 
     this.ollamaConfig = {
-      model: process.env.LUNA_GEMMA_MODEL || process.env.LUNA_LLM_MODEL || 'qwen2.5:7b',
+      model: process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || process.env.LUNA_GEMMA_MODEL || 'qwen3:1.7b',
       host: 'http://localhost:11434',
       systemPrompt: this.getBasePersonality(),
       temperature: 0.7,
       maxTokens: 200,
-      healthTimeoutMs: Number(process.env.LUNA_GEMMA_HEALTH_TIMEOUT_MS || 5000),
-      warmupTimeoutMs: Number(process.env.LUNA_GEMMA_WARMUP_TIMEOUT_MS || 300000),
-      classifyTimeoutMs: Number(process.env.LUNA_GEMMA_CLASSIFY_TIMEOUT_MS || 180000),
-      responseTimeoutMs: Number(process.env.LUNA_GEMMA_RESPONSE_TIMEOUT_MS || 300000)
+      healthTimeoutMs: Number(process.env.LUNA_LLM_HEALTH_TIMEOUT_MS || process.env.LUNA_GEMMA_HEALTH_TIMEOUT_MS || 5000),
+      warmupTimeoutMs: Number(process.env.LUNA_LLM_WARMUP_TIMEOUT_MS || process.env.LUNA_GEMMA_WARMUP_TIMEOUT_MS || 120000),
+      classifyTimeoutMs: Number(process.env.LUNA_LLM_CLASSIFY_TIMEOUT_MS || process.env.LUNA_GEMMA_CLASSIFY_TIMEOUT_MS || 30000),
+      responseTimeoutMs: Number(process.env.LUNA_LLM_RESPONSE_TIMEOUT_MS || process.env.LUNA_GEMMA_RESPONSE_TIMEOUT_MS || 120000)
     };
     this.ollamaConfig = { ...this.ollamaConfig, ...(ollamaConfig || {}) };
-    if (process.env.LUNA_GEMMA_MODEL) this.ollamaConfig.model = process.env.LUNA_GEMMA_MODEL;
+    if (process.env.LUNA_QWEN_MODEL) this.ollamaConfig.model = process.env.LUNA_QWEN_MODEL;
+    if (process.env.LUNA_LLM_MODEL) this.ollamaConfig.model = process.env.LUNA_LLM_MODEL;
+    if (process.env.LUNA_GEMMA_MODEL && !process.env.LUNA_QWEN_MODEL && !process.env.LUNA_LLM_MODEL) this.ollamaConfig.model = process.env.LUNA_GEMMA_MODEL;
 
     // ============================================
     // PERSONALIDADES DA LUNA
@@ -210,6 +212,9 @@ Sigues sin poder jerárquico: eres la amiga de la noche.`
     this.gemmaHasWarmedUp = false;
     this.gemmaFailureCount = 0;
     this.gemmaDisabledUntil = 0;
+    this.llmHasWarmedUp = false;
+    this.llmFailureCount = 0;
+    this.llmDisabledUntil = 0;
     this.modelResolved = false;
     this.emotionalState = {
       happiness: 70,
@@ -307,13 +312,13 @@ NUNCA RESPONDA ASSIM:
     // 1. REGEX LAYER (rápido, 10ms)
     const regexResult = await this.classifier.classify(msg);
 
-    // 2. DECIDIR SE PRECISA DA GEMMA 2B
+    // 2. DECIDIR SE PRECISA DO LLM LOCAL
     const needsGemma = this.shouldUseGemma(regexResult, text, threadHistory);
 
     let gemmaResult = null;
     if (needsGemma) {
-      // 3. GEMMA 2B LAYER (200ms)
-      gemmaResult = await this.gemmaClassify(msg, regexResult, threadHistory);
+      // 3. QWEN3 NON-THINKING LAYER (classificacao curta)
+      gemmaResult = await this.fastClassify(msg, regexResult);
     }
 
     // 4. MERGE RESULTS
@@ -328,8 +333,156 @@ NUNCA RESPONDA ASSIM:
     return finalResult;
   }
 
+  async fastClassify(msg, regexResult = null) {
+    const text = (msg.text || msg.body || '').toLowerCase();
+    const baseResult = regexResult || await this.classifier.classify(msg);
+
+    if (baseResult.confidence >= 0.85) {
+      return baseResult;
+    }
+
+    if (Date.now() < this.llmDisabledUntil) {
+      console.warn('[LLM] Desativado temporariamente, usando regex');
+      return baseResult;
+    }
+
+    await this.resolveBestGemmaModel();
+    const healthy = await this.checkOllamaHealth();
+    if (!healthy) {
+      this.markLlmFailure('Ollama offline, usando regex');
+      return baseResult;
+    }
+
+    const labels = [
+      'tarefaRealizada', 'tarefaPendente', 'bug', 'feedbackPositivo',
+      'feedbackNegativo', 'ideiaNova', 'decisao', 'financeiroPagamento',
+      'financeiroPendente', 'financeiroOrcamento', 'leadQuente', 'leadMorno',
+      'leadFrio', 'link', 'reuniao', 'documento', 'urgencia',
+      'projetoMencionado', 'noticia'
+    ];
+
+    const prompt = `You are a strict WhatsApp text classifier for NEXO Digital.
+Return exactly one label from the allowed list. No markdown. No explanation.
+
+Allowed labels:
+${labels.join(', ')}
+
+Examples:
+Text: Consegui consertar o bug do TPV
+Label: tarefaRealizada
+Text: Precisamos criar o formulario do Santafe
+Label: tarefaPendente
+Text: O dashboard travou de novo
+Label: bug
+Text: Gostaria de saber mais sobre voces
+Label: leadMorno
+Text: Quanto custa um site e-commerce?
+Label: financeiroOrcamento
+Text: URGENTE: servidor caiu!
+Label: urgencia
+Text: Saiu atualizacao do Node.js
+Label: noticia
+
+Text: ${text.slice(0, 200)}
+Label:`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.ollamaConfig.classifyTimeoutMs);
+
+    try {
+      const response = await fetch(`${this.ollamaConfig.host}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.ollamaConfig.model,
+          prompt,
+          think: false,
+          options: {
+            temperature: 0.1,
+            num_predict: 16
+          },
+          stream: false
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) throw new Error(`Ollama error: ${response.status}`);
+
+      const data = await response.json();
+      const llmCategory = this.extractLLMCategory(data.response, labels);
+      this.llmHasWarmedUp = true;
+      this.llmFailureCount = 0;
+      this.llmDisabledUntil = 0;
+      return this.mapLLMCategory(llmCategory, baseResult);
+    } catch (error) {
+      this.markLlmFailure(error.name === 'AbortError'
+        ? `Timeout ${this.ollamaConfig.classifyTimeoutMs}ms, usando regex`
+        : `${error.message}, usando regex`);
+      return baseResult;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  mapLLMCategory(llmCategory, regexResult) {
+    const categoryMap = {
+      tarefarealizada: 'tarefaRealizada',
+      tarefapendente: 'tarefaPendente',
+      bug: 'bug',
+      feedbackpositivo: 'feedbackPositivo',
+      feedbacknegativo: 'feedbackNegativo',
+      ideianova: 'ideiaNova',
+      decisao: 'decisao',
+      financeiropagamento: 'financeiro',
+      financeiropendente: 'financeiro',
+      financeiroorcamento: 'financeiro',
+      leadquente: 'lead',
+      leadmorno: 'lead',
+      leadfrio: 'lead',
+      link: 'link',
+      reuniao: 'reuniao',
+      documento: 'documento',
+      urgencia: 'urgencia',
+      projetomencionado: 'projeto',
+      noticia: 'noticia'
+    };
+
+    return {
+      ...regexResult,
+      category: categoryMap[llmCategory] || regexResult.category,
+      confidence: categoryMap[llmCategory] ? Math.max(regexResult.confidence || 0, 0.92) : regexResult.confidence,
+      source: categoryMap[llmCategory] ? 'llm' : regexResult.source || 'regex',
+      llmRaw: llmCategory
+    };
+  }
+
+  extractLLMCategory(responseText, labels) {
+    const raw = (responseText || '').trim();
+    if (!raw) return '';
+
+    const normalized = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const label of labels) {
+      const key = label.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalized === key || normalized.includes(key)) return key;
+    }
+
+    return normalized.split(/\s+/)[0] || '';
+  }
+
+  markLlmFailure(message) {
+    this.llmFailureCount += 1;
+    this.gemmaFailureCount = this.llmFailureCount;
+    if (this.llmFailureCount >= 5) {
+      this.llmDisabledUntil = Date.now() + 5 * 60 * 1000;
+      this.gemmaDisabledUntil = this.llmDisabledUntil;
+      console.warn(`[LLM] ${message}; 5 falhas seguidas, pausa por 5min`);
+      return;
+    }
+    console.warn(`[LLM] ${message}`);
+  }
+
   // ============================================
-  // GEMMA 2B CLASSIFICATION
+  // LLM LOCAL CLASSIFICATION
   // ============================================
   async checkOllamaHealth() {
     const controller = new AbortController();
@@ -361,9 +514,11 @@ NUNCA RESPONDA ASSIM:
       const data = await res.json();
       const installed = (data.models || []).map(model => model.name || model.model).filter(Boolean);
       const preferred = [
-        process.env.LUNA_GEMMA_MODEL,
+        process.env.LUNA_QWEN_MODEL,
         process.env.LUNA_LLM_MODEL,
+        process.env.LUNA_GEMMA_MODEL,
         this.ollamaConfig.model,
+        'qwen3:1.7b',
         'qwen2.5:7b',
         'qwen:7b',
         'gemma2:9b',
@@ -628,7 +783,7 @@ RESPONDE EN JSON:
         entities: { ...regexResult.entities, ...(gemmaResult.entities || {}) },
         suggestedActions: gemmaResult.suggestedActions || [],
         lunaComment: gemmaResult.lunaComment || null,
-        source: 'gemma'
+        source: 'llm'
       };
     }
 

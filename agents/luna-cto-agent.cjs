@@ -627,7 +627,7 @@ class LunaAgent {
   constructor() {
     this.cp = new CheckpointManager();
     this.brain = new LunaBrain({
-      model: process.env.LUNA_GEMMA_MODEL || process.env.LUNA_LLM_MODEL || 'qwen2.5:7b',
+      model: process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || process.env.LUNA_GEMMA_MODEL || 'qwen3:1.7b',
       host: process.env.OLLAMA_HOST || 'http://localhost:11434'
     });
     this.linkAnalyzer = new LinkAnalyzer();
@@ -1453,7 +1453,7 @@ class LunaAgent {
       await msg.reply(
         `🌙 *IDENTIDADE LUNA*\n\n` +
         `🎭 Nome: Luna\n` +
-        `🧠 Cerebro: Gemma2B (Ollama local)\n` +
+        `🧠 Cerebro: Qwen3 1.7B (Ollama local)\n` +
         `👁️ Visao: Playwright CDP + Chrome\n` +
         `💬 Voz: whatsapp-web.js\n` +
         `🏠 Casa: NEXO Digital\n\n` +
