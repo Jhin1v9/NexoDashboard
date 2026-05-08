@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import CommandPalette from './components/CommandPalette'
+import ToastContainer from './components/ToastContainer'
 import MobileBottomNav from './components/MobileBottomNav'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
@@ -67,6 +68,7 @@ function App() {
         </main>
       </div>
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <ToastContainer />
       <MobileBottomNav />
     </div>
   )
