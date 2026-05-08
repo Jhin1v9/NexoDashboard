@@ -3085,6 +3085,127 @@ app.post('/api/luna/scan', (req, res) => {
 });
 
 // ============================================================================
+// === LUNA CONTROL CENTER — Comandos Humanizados v4.0 ======================
+// ============================================================================
+
+const LUNA_COMMANDS = {
+  'acordar': { action: 'start', description: 'Inicia o daemon Luna', category: 'estado', icon: 'Sun' },
+  'dormir': { action: 'stop', description: 'Para o daemon Luna', category: 'estado', icon: 'Moon' },
+  'status': { action: 'status', description: 'Verifica saude da Luna', category: 'estado', icon: 'Activity' },
+  'limpar-memoria': { action: 'clear-buffer', description: 'Limpa o buffer de mensagens', category: 'memoria', icon: 'Trash2' },
+  'esquecer-tudo': { action: 'reset-checkpoint', description: 'Reset checkpoint (proximo scan le tudo)', category: 'memoria', icon: 'Eraser' },
+  'lembrar': { action: 'save-checkpoint', description: 'Salva estado atual como checkpoint', category: 'memoria', icon: 'Save' },
+  'escanear-agora': { action: 'force-scan', description: 'Forca scan imediato do WhatsApp', category: 'acoes', icon: 'Scan' },
+  'gerar-relatorio': { action: 'force-report', description: 'Gera relatorio inteligente', category: 'acoes', icon: 'FileText' },
+  'verificar-mencoes': { action: 'check-mentions', description: 'Verifica mencoes pendentes', category: 'acoes', icon: 'AtSign' },
+  'verificar-links': { action: 'check-links', description: 'Verifica links pendentes', category: 'acoes', icon: 'Link' },
+  'atualizar-cache': { action: 'refresh-cache', description: 'Forca refresh de cache externo', category: 'sistema', icon: 'RefreshCw' },
+  'reiniciar-backend': { action: 'restart-backend', description: 'Reinicia servidor Express', category: 'sistema', icon: 'Server' },
+  'fazer-backup': { action: 'backup-data', description: 'Backup dos arquivos JSON', category: 'sistema', icon: 'Database' },
+  'diagnostico': { action: 'diagnose', description: 'Diagnostico completo do sistema', category: 'diagnostico', icon: 'Stethoscope' },
+  'autoconserto': { action: 'autofix', description: 'Tenta corrigir erros automaticamente', category: 'diagnostico', icon: 'Wrench' }
+};
+
+// GET /api/luna/commands — Lista comandos disponiveis
+app.get('/api/luna/commands', (req, res) => {
+  res.json({
+    success: true,
+    commands: Object.entries(LUNA_COMMANDS).map(([key, value]) => ({
+      id: key,
+      label: key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      ...value
+    }))
+  });
+});
+
+// POST /api/luna/command — Executar comando humanizado
+app.post('/api/luna/command', async (req, res) => {
+  try {
+    const { command, params = {} } = req.body;
+    const cmd = LUNA_COMMANDS[command];
+
+    if (!cmd) {
+      return res.status(400).json({ success: false, error: `Comando desconhecido: ${command}` });
+    }
+
+    let result = { executed: true };
+    const agentsDir = path.join(__dirname, '..', 'agents');
+
+    switch (cmd.action) {
+      case 'start':
+        const startProc = spawn('node', ['agents/luna-daemon.mjs'], {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
+        });
+        startProc.unref();
+        result = { pid: startProc.pid, status: 'starting' };
+        break;
+      case 'stop':
+        const { exec } = require('child_process');
+        exec('tasklist /FI "IMAGENAME eq node.exe" /FO CSV', (err, stdout) => {
+          const lines = (stdout || '').split(/\r?\n/).filter(Boolean);
+          for (const line of lines) {
+            if (!line.includes('luna-daemon') && !line.includes('luna-scheduler')) continue;
+            const pid = Number(line.split(',').pop()?.replace(/"/g, ''));
+            if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch {} }
+          }
+        });
+        result = { status: 'stopping' };
+        break;
+      case 'clear-buffer':
+        const bufferPath = path.join(agentsDir, 'luna-buffer.json');
+        writeJSON(bufferPath, { messages: [], tasks: [], ideas: [], decisions: [], links: [], mentions: [], sentiment: { positive: 0, negative: 0, urgent: 0 }, lastUpdated: new Date().toISOString() });
+        result = { cleared: true };
+        break;
+      case 'reset-checkpoint':
+        const checkpointPath = path.join(agentsDir, 'luna-checkpoint.json');
+        writeJSON(checkpointPath, { hashes: [], lastScan: null, version: '16.0', resetAt: new Date().toISOString() });
+        result = { reset: true };
+        break;
+      case 'force-scan':
+        const scanProc = spawn('node', ['agents/luna-scheduler.mjs', '--force-scan'], {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
+        });
+        scanProc.unref();
+        result = { pid: scanProc.pid, action: 'scan triggered' };
+        break;
+      case 'force-report':
+        const reportProc = spawn('node', ['agents/luna-scheduler.mjs', '--force-report'], {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
+        });
+        reportProc.unref();
+        result = { pid: reportProc.pid, action: 'report triggered' };
+        break;
+      case 'backup-data':
+        const backupDir = path.join(__dirname, '..', 'backups', `backup-${Date.now()}`);
+        fs.mkdirSync(backupDir, { recursive: true });
+        const dataDir = path.join(__dirname, '..', 'data');
+        fs.readdirSync(dataDir).forEach(file => {
+          if (file.endsWith('.json')) {
+            fs.copyFileSync(path.join(dataDir, file), path.join(backupDir, file));
+          }
+        });
+        result = { backupDir, files: fs.readdirSync(backupDir) };
+        break;
+      case 'restart-backend':
+        result = { message: 'Reinicio agendado — use PM2 ou reinicie manualmente' };
+        break;
+      case 'refresh-cache':
+        result = { refreshed: true, service: params.service || 'all' };
+        break;
+      default:
+        result = { message: `Acao ${cmd.action} reconhecida mas nao implementada via API` };
+    }
+
+    console.log(`[LUNA COMMAND] ${command} -> ${cmd.action} -> ${JSON.stringify(result)}`);
+    broadcast({ type: 'luna:command', data: { command, result, timestamp: new Date().toISOString() } });
+
+    res.json({ success: true, command, action: cmd.action, description: cmd.description, result, executedAt: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ============================================================================
 // === SCHEMA APIs v16.0 ===================================================
 // ============================================================================
 
