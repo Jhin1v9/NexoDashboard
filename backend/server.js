@@ -3526,6 +3526,146 @@ app.put('/api/links/:id', (req, res) => {
   }
 });
 
+// Leads Pipeline API
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+const LEAD_STATUSES = ['novo', 'contatado', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'];
+
+// GET /api/leads — Lista todos os leads
+app.get('/api/leads', (req, res) => {
+  try {
+    const { status, assignedTo, source, search } = req.query;
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    let leads = Object.entries(registry.clients || {}).map(([id, data]) => ({
+      id,
+      ...data
+    }));
+
+    // Só retornar leads (não clientes já convertidos, a menos que explicitamente pedido)
+    if (!req.query.includeClients) {
+      leads = leads.filter(l => l.type === 'lead' || LEAD_STATUSES.includes(l.pipelineStatus));
+    }
+
+    if (status) leads = leads.filter(l => l.pipelineStatus === status);
+    if (assignedTo) leads = leads.filter(l => l.assignedTo === assignedTo);
+    if (source) leads = leads.filter(l => (l.source || '').toLowerCase().includes(source.toLowerCase()));
+    if (search) {
+      const q = search.toLowerCase();
+      leads = leads.filter(l =>
+        (l.displayName || '').toLowerCase().includes(q) ||
+        (l.notes || '').toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q)
+      );
+    }
+
+    res.json({ success: true, leads, total: leads.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/leads/:id — Detalhe de um lead
+app.get('/api/leads/:id', (req, res) => {
+  try {
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    const lead = registry.clients?.[req.params.id];
+    if (!lead) return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
+    res.json({ success: true, lead: { id: req.params.id, ...lead } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/leads — Criar lead
+app.post('/api/leads', (req, res) => {
+  try {
+    const { displayName, email, phone, source, estimatedValue, notes, assignedTo, tags } = req.body;
+    if (!displayName) {
+      return res.status(400).json({ success: false, error: 'displayName obrigatorio' });
+    }
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {}, schema: { version: '16.1.0' } };
+    const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    registry.clients[id] = {
+      displayName,
+      email: email || '',
+      phone: phone || '',
+      source: source || 'manual',
+      type: 'lead',
+      status: 'potencial',
+      pipelineStatus: 'novo',
+      estimatedValue: estimatedValue || 0,
+      currency: 'EUR',
+      notes: notes || '',
+      assignedTo: assignedTo || null,
+      tags: tags || [],
+      createdAt: new Date().toISOString(),
+      lastContact: null
+    };
+    writeJSON(CLIENTS_REGISTRY_FILE, registry);
+    broadcast({ type: 'leads:create', data: { id, ...registry.clients[id] } });
+    res.json({ success: true, lead: { id, ...registry.clients[id] } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// PUT /api/leads/:id — Atualizar lead
+app.put('/api/leads/:id', (req, res) => {
+  try {
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    if (!registry.clients?.[req.params.id]) {
+      return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
+    }
+    const allowed = ['displayName', 'email', 'phone', 'source', 'pipelineStatus', 'estimatedValue', 'currency', 'notes', 'assignedTo', 'tags', 'lastContact'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        registry.clients[req.params.id][key] = req.body[key];
+      }
+    }
+    registry.clients[req.params.id].updatedAt = new Date().toISOString();
+    writeJSON(CLIENTS_REGISTRY_FILE, registry);
+    broadcast({ type: 'leads:update', data: { id: req.params.id, ...registry.clients[req.params.id] } });
+    res.json({ success: true, lead: { id: req.params.id, ...registry.clients[req.params.id] } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/leads/:id/convert — Converter lead em cliente
+app.post('/api/leads/:id/convert', (req, res) => {
+  try {
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    if (!registry.clients?.[req.params.id]) {
+      return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
+    }
+    registry.clients[req.params.id].type = 'cliente-externo';
+    registry.clients[req.params.id].status = 'ativo';
+    registry.clients[req.params.id].pipelineStatus = 'ganho';
+    registry.clients[req.params.id].convertedAt = new Date().toISOString();
+    writeJSON(CLIENTS_REGISTRY_FILE, registry);
+    broadcast({ type: 'leads:convert', data: { id: req.params.id, ...registry.clients[req.params.id] } });
+    res.json({ success: true, lead: { id: req.params.id, ...registry.clients[req.params.id] } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// DELETE /api/leads/:id — Remover lead
+app.delete('/api/leads/:id', (req, res) => {
+  try {
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    if (!registry.clients?.[req.params.id]) {
+      return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
+    }
+    delete registry.clients[req.params.id];
+    writeJSON(CLIENTS_REGISTRY_FILE, registry);
+    broadcast({ type: 'leads:delete', data: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Catch-all
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 

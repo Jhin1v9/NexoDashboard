@@ -114,7 +114,14 @@
         "seo",
         "santafe",
         "paulo"
-      ]
+      ],
+      "displayName": "Paulo Santafe",
+      "pipelineStatus": "ganho",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     },
     "tpv-sorveteria": {
       "id": "tpv-sorveteria",
@@ -203,7 +210,14 @@
         "juan",
         "tropicale",
         "orcamento-pendente"
-      ]
+      ],
+      "displayName": "TPV Sorveteria",
+      "pipelineStatus": "novo",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     },
     "jess-onadance": {
       "id": "jess-onadance",
@@ -265,7 +279,14 @@
         "seo",
         "jess",
         "onadance"
-      ]
+      ],
+      "displayName": "OnaDance (Jess)",
+      "pipelineStatus": "novo",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     },
     "gesse-reformasmachado": {
       "id": "gesse-reformasmachado",
@@ -327,7 +348,14 @@
         "seo",
         "gesse",
         "reformasmachado"
-      ]
+      ],
+      "displayName": "Gesse Reformas Machado",
+      "pipelineStatus": "novo",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     },
     "lucas-mapio": {
       "id": "lucas-mapio",
@@ -389,7 +417,14 @@
         "app",
         "lucas",
         "mapio"
-      ]
+      ],
+      "displayName": "Lucas Mapio",
+      "pipelineStatus": "novo",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     },
     "irmaos-ccb": {
       "id": "irmaos-ccb",
@@ -451,7 +486,14 @@
         "software",
         "irmaos-ccb",
         "ccb"
-      ]
+      ],
+      "displayName": "Irmãos CCB",
+      "pipelineStatus": "novo",
+      "assignedTo": null,
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "lastContact": null,
+      "createdAt": "2026-01-01T00:00:00Z"
     }
   },
   "autoDetect": {
