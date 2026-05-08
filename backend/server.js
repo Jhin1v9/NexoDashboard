@@ -3689,6 +3689,85 @@ app.put('/api/links/:id', (req, res) => {
   }
 });
 
+// Email Hub API
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+const EmailAgent = require('./services/email-agent');
+const emailAgent = new EmailAgent();
+
+app.get('/api/emails/config', (req, res) => {
+  try {
+    const config = emailAgent.loadConfig();
+    res.json({ success: true, config: { user: config.user, imap: config.imap, smtp: { host: config.smtp.host, port: config.smtp.port }, checkInterval: config.checkInterval, folders: config.folders } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/emails/config', (req, res) => {
+  try {
+    const { user, password, imap, smtp, checkInterval } = req.body;
+    const config = { user, password, imap: imap || { host: 'imap.gmail.com', port: 993, tls: true }, smtp: smtp || { host: 'smtp.gmail.com', port: 465, secure: true }, checkInterval: checkInterval || 5 * 60 * 1000, folders: ['INBOX', 'Sent', 'Drafts', 'Trash'] };
+    emailAgent.saveConfig(config);
+    res.json({ success: true, message: 'Configuracao salva' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/emails', async (req, res) => {
+  try {
+    const { folder = 'INBOX', search, isRead, limit = 50, offset = 0 } = req.query;
+    const index = emailAgent.loadEmailIndex();
+    let emails = [...(index.emails || [])];
+    if (folder !== 'all') emails = emails.filter(e => e.folder === folder);
+    if (search) { const q = search.toLowerCase(); emails = emails.filter(e => e.subject?.toLowerCase().includes(q) || e.from?.toLowerCase().includes(q) || e.text?.toLowerCase().includes(q)); }
+    if (isRead !== undefined) emails = emails.filter(e => e.isRead === (isRead === 'true'));
+    emails.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const total = emails.length;
+    const paginated = emails.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    res.json({ success: true, emails: paginated, pagination: { total, limit: parseInt(limit), offset: parseInt(offset), hasMore: parseInt(offset) + paginated.length < total }, stats: { total, unread: emails.filter(e => !e.isRead).length, withAttachments: emails.filter(e => e.attachments?.length > 0).length } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/emails/send', async (req, res) => {
+  try {
+    const { to, subject, text, html, attachments } = req.body;
+    if (!to || !subject) return res.status(400).json({ success: false, error: 'Destinatario e assunto obrigatorios' });
+    const result = await emailAgent.sendEmail({ to, subject, text, html, attachments });
+    const index = emailAgent.loadEmailIndex();
+    index.emails.unshift({ id: `email-sent-${Date.now()}`, folder: 'Sent', subject, from: emailAgent.config.user, to, text, html, date: new Date().toISOString(), isRead: true, sentViaDashboard: true });
+    emailAgent.saveEmailIndex(index);
+    broadcast({ type: 'email:sent', data: result });
+    res.json({ success: true, result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/emails/sync', async (req, res) => {
+  try {
+    const emails = await emailAgent.fetchEmails('INBOX', 100);
+    const index = emailAgent.loadEmailIndex();
+    let added = 0;
+    for (const email of emails) {
+      if (!index.emails.find(e => e.uid === email.uid)) {
+        index.emails.unshift(email);
+        added++;
+      }
+    }
+    if (index.emails.length > 500) index.emails = index.emails.slice(0, 500);
+    index.lastSync = new Date().toISOString();
+    emailAgent.saveEmailIndex(index);
+    broadcast({ type: 'emails:sync', data: { added, total: index.emails.length } });
+    res.json({ success: true, added, total: index.emails.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Leads Pipeline API
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
