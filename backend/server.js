@@ -201,7 +201,15 @@ app.get('/api/tasks', (req, res) => res.json(readJSON(TASKS_FILE) || []));
 
 app.post('/api/tasks', (req, res) => {
   const tasks = readJSON(TASKS_FILE) || [];
-  const task = { id: Date.now().toString(), ...req.body, createdAt: new Date().toISOString() };
+  const task = {
+    id: Date.now().toString(),
+    title: req.body.title,
+    completed: req.body.completed ?? false,
+    addedBy: req.body.addedBy || 'sistema',
+    assignedTo: req.body.assignedTo || null,
+    source: req.body.source || 'manual',
+    createdAt: new Date().toISOString()
+  };
   tasks.push(task);
   writeJSON(TASKS_FILE, tasks);
   broadcast({ type: 'tasks', data: tasks });
