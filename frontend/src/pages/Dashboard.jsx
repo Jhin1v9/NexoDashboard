@@ -199,24 +199,7 @@ export default function Dashboard() {
       </motion.div>
 
       
-      {/* Botao Scan Manual */}
-      <div className="flex gap-3 mb-4">
-        <button
-          onClick={async () => {
-            try {
-              const res = await fetch('/api/scan-now', { method: 'POST' });
-              const data = await res.json();
-              alert(data.message || 'Scan iniciado!');
-            } catch (e) {
-              alert('Erro: ' + e.message);
-            }
-          }}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-        >
-          ?? Forcar Scan
-        </button>
-      </div>
-{/* Stats Grid */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Clientes" value={clients.length} color="#6366f1" 
           onClick={() => navigate('/clientes')} />
