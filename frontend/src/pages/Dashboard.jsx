@@ -13,8 +13,7 @@ import HealthTimeline from '../components/charts/HealthTimeline'
 import PortfolioRadar from '../components/charts/PortfolioRadar'
 import BugVelocity from '../components/charts/BugVelocity'
 import ClientBurnup from '../components/charts/ClientBurnup'
-import StackStatusPanel from '../components/StackStatus'
-import AutoFixPanel from '../components/AutoFixPanel'
+
 
 // ── Components ─────────────────────────────────────────────────────────────
 
@@ -225,12 +224,6 @@ export default function Dashboard() {
           onClick={() => navigate('/tarefas')} />
         <StatCard icon={TrendingUp} label="Health" value={`${avgHealth}%`} color="#22c55e" />
         <StatCard icon={AlertTriangle} label="Alertas" value={predictions.length} color="#ef4444" />
-      </div>
-
-      {/* Stack Status + Auto Fix */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <StackStatusPanel />
-        <AutoFixPanel />
       </div>
 
       {/* WhatsApp Agent + Reminders Row */}
