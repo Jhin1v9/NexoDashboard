@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
 
-// â”€â”€ Cache + External Services (assÃ­ncrono, non-blocking) â”€â”€
+// ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
 const cache = new CacheManager(path.join(__dirname, 'cache'));
@@ -236,7 +236,7 @@ app.post('/api/users/switch', (req, res) => {
   res.json(users);
 });
 
-// CLI Tools status (assÃ­ncrono, spawn, cacheado)
+// CLI Tools status (assíncrono, spawn, cacheado)
 app.get('/api/tools', async (req, res) => {
   try {
     const result = await external.getToolsStatus();
@@ -246,7 +246,7 @@ app.get('/api/tools', async (req, res) => {
   }
 });
 
-// GitHub repos (assÃ­ncrono, spawn, cacheado)
+// GitHub repos (assíncrono, spawn, cacheado)
 app.get('/api/github-repos', async (req, res) => {
   try {
     const result = await external.getGitHubRepos();
@@ -256,7 +256,7 @@ app.get('/api/github-repos', async (req, res) => {
   }
 });
 
-// Vercel projects (assÃ­ncrono, spawn, cacheado)
+// Vercel projects (assíncrono, spawn, cacheado)
 app.get('/api/vercel-projects', async (req, res) => {
   try {
     const result = await external.getVercelProjects();
@@ -331,7 +331,7 @@ app.post('/api/whatsapp', (req, res) => {
   res.json({ ok: true });
 });
 
-// WhatsApp Agent v8.0 â€” Dados do agente inteligente
+// WhatsApp Agent v8.0 — Dados do agente inteligente
 const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
 const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
 const REPORTS_DIR = path.join(DATA_DIR, 'reports');
@@ -802,7 +802,7 @@ app.post('/api/luna/reports/generate', (req, res) => {
   }
 });
 
-// External refresh (forÃ§a refresh manual de serviÃ§o externo)
+// External refresh (força refresh manual de serviço externo)
 app.post('/api/external/refresh', async (req, res) => {
   const { service } = req.body; // 'github', 'vercel', 'tools'
   try {
@@ -813,7 +813,7 @@ app.post('/api/external/refresh', async (req, res) => {
   }
 });
 
-// Git push helper (spawn assÃ­ncrono, timeout 30s)
+// Git push helper (spawn assíncrono, timeout 30s)
 app.post('/api/git-push', async (req, res) => {
   const cwd = req.body.cwd || NEXO_BASE;
   const message = req.body.message || 'update';
@@ -827,7 +827,7 @@ app.post('/api/git-push', async (req, res) => {
 
     // git commit
     const commitResult = await cache.spawn('git', ['commit', '-m', message], { cwd }, 30000);
-    // commit retorna 1 se nÃ£o hÃ¡ mudanÃ§as â€” isso Ã© aceitÃ¡vel
+    // commit retorna 1 se não há mudanças — isso é aceitável
     if (!commitResult.ok && !commitResult.stderr?.includes('nothing to commit')) {
       return res.status(500).json({ ok: false, error: `git commit falhou: ${commitResult.error || commitResult.stderr}` });
     }
@@ -844,7 +844,7 @@ app.post('/api/git-push', async (req, res) => {
   }
 });
 
-// Run allowed commands (spawn assÃ­ncrono, timeout 10s)
+// Run allowed commands (spawn assíncrono, timeout 10s)
 app.post('/api/run', async (req, res) => {
   const ALLOWED = ['node --version', 'npm --version', 'git status', 'git log --oneline -5'];
   const cmd = req.body.cmd;
@@ -864,7 +864,7 @@ app.post('/api/run', async (req, res) => {
 });
 
 // ============================================================================
-// === FINANCIAL MODULE â€” NEXO Dashboard Pro =================================
+// === FINANCIAL MODULE — NEXO Dashboard Pro =================================
 // ============================================================================
 
 // --- Financial Data Files ---
@@ -1043,7 +1043,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
       date: req.body.date || new Date().toISOString().slice(0, 10),
       amount: req.body.amount || { value: 0, currency: 'EUR' },
       method: req.body.method || 'transfer',
-      methodLabel: req.body.methodLabel || 'TransferÃªncia',
+      methodLabel: req.body.methodLabel || 'Transferência',
       paidBy: req.body.paidBy || '',
       phase: req.body.phase || 1,
       notes: req.body.notes || '',
@@ -1079,7 +1079,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
         date: tx.date || new Date().toISOString().slice(0, 10),
         type: 'income',
         amount: parseFloat(companyShare.toFixed(2)),
-        source: `${payment.clientShortName || 'Cliente'} â€” empresa (${companySharePercent}%)`,
+        source: `${payment.clientShortName || 'Cliente'} — empresa (${companySharePercent}%)`,
         balanceAfter: cashBox.balance.value,
         recordedBy: tx.recordedBy || 'system',
         recordedAt: nowISO()
@@ -1195,7 +1195,7 @@ app.post('/api/expenses', async (req, res) => {
         date: new Date().toISOString().slice(0, 10),
         type: 'expense',
         amount: amountVal,
-        source: `${expense.name} â€” deduÃ§Ã£o do caixa`,
+        source: `${expense.name} — dedução do caixa`,
         balanceAfter: cashBox.balance.value,
         recordedBy: 'system',
         recordedAt: nowISO()
@@ -1518,7 +1518,7 @@ app.get('/api/cash-box/statement', async (req, res) => {
             date: p.paymentTerms?.splits?.find(s => s.status === 'pending')?.dueDate || p.updatedAt?.slice(0, 10),
             type: 'expected_income',
             amount: pendingAmount,
-            description: `${p.clientShortName} â€” pendente`,
+            description: `${p.clientShortName} — pendente`,
             balanceAfter: null,
             category: 'receita',
             status: 'pending',
@@ -1538,7 +1538,7 @@ app.get('/api/cash-box/statement', async (req, res) => {
             date: e.renewDate || new Date().toISOString().slice(0, 10),
             type: 'expected_expense',
             amount: monthly,
-            description: `${e.name} â€” mensal`,
+            description: `${e.name} — mensal`,
             balanceAfter: null,
             category: e.category || 'others',
             status: 'recurring',
@@ -1981,7 +1981,7 @@ app.get('/api/cash-box/payments/:id', async (req, res) => {
   }
 });
 
-// POST quick expense (gastei com tal, adiciono lÃ¡)
+// POST quick expense (gastei com tal, adiciono lá)
 app.post('/api/expenses/quick', async (req, res) => {
   try {
     const { name, amount, category, categoryLabel, note, deductFromCashBox } = req.body;
@@ -1998,7 +1998,7 @@ app.post('/api/expenses/quick', async (req, res) => {
       costPerPerson: { value: parseFloat(amount), currency: 'EUR' },
       type: 'one_time',
       period: null,
-      periodLabel: 'Ãšnico',
+      periodLabel: 'Único',
       startDate: new Date().toISOString().slice(0, 10),
       renewDate: null,
       endDate: null,
@@ -2029,7 +2029,7 @@ app.post('/api/expenses/quick', async (req, res) => {
         date: new Date().toISOString().slice(0, 10),
         type: 'expense',
         amount: amountVal,
-        source: `${name} â€” despesa rÃ¡pida`,
+        source: `${name} — despesa rápida`,
         balanceAfter: cashBox.balance.value,
         recordedBy: req.body.createdBy || 'system',
         recordedAt: nowISO(),
@@ -2128,7 +2128,7 @@ function checkAndGenerateAlerts() {
             id: generateId('alert'),
             type: 'overdue',
             severity: 'high',
-            message: `${p.clientShortName || 'Cliente'} â€” ${split.label || 'Pagamento'} atrasado hÃ¡ ${daysDiff} dias`,
+            message: `${p.clientShortName || 'Cliente'} — ${split.label || 'Pagamento'} atrasado há ${daysDiff} dias`,
             relatedId: p.paymentId || p.id,
             relatedType: 'payment',
             createdAt: nowISO()
@@ -2138,7 +2138,7 @@ function checkAndGenerateAlerts() {
             id: generateId('alert'),
             type: 'due_soon',
             severity: 'medium',
-            message: `${p.clientShortName || 'Cliente'} â€” ${split.label || 'Pagamento'} vence em ${Math.abs(daysDiff)} dia(s)`,
+            message: `${p.clientShortName || 'Cliente'} — ${split.label || 'Pagamento'} vence em ${Math.abs(daysDiff)} dia(s)`,
             relatedId: p.paymentId || p.id,
             relatedType: 'payment',
             createdAt: nowISO()
@@ -2155,7 +2155,7 @@ function checkAndGenerateAlerts() {
         id: generateId('alert'),
         type: 'low_cash',
         severity: balance < monthlyExp ? 'high' : 'medium',
-        message: `Caixa baixo: â‚¬${balance.toFixed(2)} < â‚¬${(monthlyExp * multiplier).toFixed(2)} (${multiplier}x gastos mensais)`,
+        message: `Caixa baixo: €${balance.toFixed(2)} < €${(monthlyExp * multiplier).toFixed(2)} (${multiplier}x gastos mensais)`,
         relatedId: 'cash-box',
         relatedType: 'cashbox',
         createdAt: nowISO()
@@ -2171,7 +2171,7 @@ function checkAndGenerateAlerts() {
           id: generateId('alert'),
           type: 'expense_renewal_soon',
           severity: 'medium',
-          message: `${e.name} â€” renovaÃ§Ã£o em ${daysToRenew} dia(s) (${e.renewDate})`,
+          message: `${e.name} — renovação em ${daysToRenew} dia(s) (${e.renewDate})`,
           relatedId: e.id,
           relatedType: 'expense',
           createdAt: nowISO()
@@ -2181,7 +2181,7 @@ function checkAndGenerateAlerts() {
           id: generateId('alert'),
           type: 'expense_renewal_overdue',
           severity: 'high',
-          message: `${e.name} â€” renovaÃ§Ã£o vencida (${e.renewDate})`,
+          message: `${e.name} — renovação vencida (${e.renewDate})`,
           relatedId: e.id,
           relatedType: 'expense',
           createdAt: nowISO()
@@ -2226,7 +2226,7 @@ function deductRecurringExpenses() {
           date: new Date().toISOString().slice(0, 10),
           type: 'recurring_deduction',
           amount: parseFloat(deduction.toFixed(2)),
-          source: `${e.name} â€” deduÃ§Ã£o mensal (${e.period || 'recorrente'})`,
+          source: `${e.name} — dedução mensal (${e.period || 'recorrente'})`,
           balanceAfter: cashBox.balance.value,
           recordedBy: 'system',
           recordedAt: nowISO()
@@ -2254,7 +2254,7 @@ function deductRecurringExpenses() {
     cashBox.lastUpdated = nowISO();
     writeJSON(CASH_BOX_FILE, cashBox);
     broadcast({ type: 'cashbox', data: cashBox });
-    console.log(`[CRON] Recurring expenses deducted at ${nowISO()}: total=â‚¬${totalDeducted.toFixed(2)}`);
+    console.log(`[CRON] Recurring expenses deducted at ${nowISO()}: total=€${totalDeducted.toFixed(2)}`);
   } catch (err) {
     console.error('[CRON] Error deducting recurring expenses:', err.message);
   }
@@ -2279,9 +2279,9 @@ console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
 
 
 
-// LUNA ACTION ROUTES (CANONICAL) â€” UNICO BLOCO
+// LUNA ACTION ROUTES (CANONICAL) — UNICO BLOCO
 // Catch-all -> SPA
-// â”€â”€ Quotes / OrÃ§amentos â”€â”€
+// ── Quotes / Orçamentos ──
 const QUOTES_FILE = path.join(DATA_DIR, 'quotes.json');
 
 app.get('/api/quotes', (req, res) => {
@@ -2292,7 +2292,7 @@ app.get('/api/quotes', (req, res) => {
 app.get('/api/quotes/:id', (req, res) => {
   const quotes = readJSON(QUOTES_FILE) || [];
   const quote = quotes.find(q => q.quoteId === req.params.id);
-  if (!quote) return res.status(404).json({ error: 'OrÃ§amento nÃ£o encontrado' });
+  if (!quote) return res.status(404).json({ error: 'Orçamento não encontrado' });
   res.json(quote);
 });
 
@@ -2308,7 +2308,7 @@ app.post('/api/quotes', (req, res) => {
 app.put('/api/quotes/:id', (req, res) => {
   const quotes = readJSON(QUOTES_FILE) || [];
   const idx = quotes.findIndex(q => q.quoteId === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'OrÃ§amento nÃ£o encontrado' });
+  if (idx === -1) return res.status(404).json({ error: 'Orçamento não encontrado' });
   quotes[idx] = { ...quotes[idx], ...req.body, updatedAt: new Date().toISOString() };
   writeJSON(QUOTES_FILE, quotes);
   broadcast({ type: 'quotes', data: quotes });
@@ -2323,7 +2323,7 @@ app.delete('/api/quotes/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// â”€â”€ Operations Center / Centro de OperaÃ§Ãµes â”€â”€
+// ── Operations Center / Centro de Operações ──
 const OPS_STATE_FILE = path.join(DATA_DIR, 'ops-state.json');
 
 app.get('/api/ops', (req, res) => {
@@ -2364,7 +2364,7 @@ app.post('/api/ops/changes', (req, res) => {
   res.json(change);
 });
 
-// â”€â”€ Members â”€â”€
+// ── Members ──
 const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
 
 app.get('/api/members', (req, res) => {
@@ -2375,25 +2375,25 @@ app.get('/api/members', (req, res) => {
 app.put('/api/members/:id', (req, res) => {
   const members = readJSON(MEMBERS_FILE) || [];
   const idx = members.findIndex(m => m.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Membro nÃ£o encontrado' });
+  if (idx === -1) return res.status(404).json({ error: 'Membro não encontrado' });
   members[idx] = { ...members[idx], ...req.body, updatedAt: new Date().toISOString() };
   writeJSON(MEMBERS_FILE, members);
   broadcast({ type: 'members', data: members });
   res.json(members[idx]);
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// API FINANCEIRA COMPLETA â€” CRUD DE TRANSAÃ‡Ã•ES
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
+// API FINANCEIRA COMPLETA — CRUD DE TRANSAÇÕES
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
 
-// Inicializa arquivo de transaÃ§Ãµes se nÃ£o existir
+// Inicializa arquivo de transações se não existir
 if (!fs.existsSync(TRANSACTIONS_FILE)) {
   writeJSON(TRANSACTIONS_FILE, []);
 }
 
-// GET /api/transactions â€” Lista todas as transaÃ§Ãµes
+// GET /api/transactions — Lista todas as transações
 app.get('/api/transactions', (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   // Ordena por data (mais recente primeiro)
@@ -2401,21 +2401,21 @@ app.get('/api/transactions', (req, res) => {
   res.json(transactions);
 });
 
-// GET /api/transactions/:id â€” Uma transaÃ§Ã£o especÃ­fica
+// GET /api/transactions/:id — Uma transação específica
 app.get('/api/transactions/:id', (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const tx = transactions.find(t => t.id === req.params.id);
-  if (!tx) return res.status(404).json({ error: 'TransaÃ§Ã£o nÃ£o encontrada' });
+  if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
   res.json(tx);
 });
 
-// POST /api/transactions â€” Cria nova transaÃ§Ã£o
+// POST /api/transactions — Cria nova transação
 app.post('/api/transactions', (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const { type, amount, description, category, date, source, notes } = req.body;
   
   if (!type || !amount || !description) {
-    return res.status(400).json({ error: 'Tipo, valor e descriÃ§Ã£o sÃ£o obrigatÃ³rios' });
+    return res.status(400).json({ error: 'Tipo, valor e descrição são obrigatórios' });
   }
   
   const newTx = {
@@ -2444,11 +2444,11 @@ app.post('/api/transactions', (req, res) => {
   res.status(201).json(newTx);
 });
 
-// PUT /api/transactions/:id â€” Edita transaÃ§Ã£o
+// PUT /api/transactions/:id — Edita transação
 app.put('/api/transactions/:id', (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const idx = transactions.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'TransaÃ§Ã£o nÃ£o encontrada' });
+  if (idx === -1) return res.status(404).json({ error: 'Transação não encontrada' });
   
   transactions[idx] = {
     ...transactions[idx],
@@ -2465,13 +2465,13 @@ app.put('/api/transactions/:id', (req, res) => {
   res.json(transactions[idx]);
 });
 
-// DELETE /api/transactions/:id â€” Remove transaÃ§Ã£o
+// DELETE /api/transactions/:id — Remove transação
 app.delete('/api/transactions/:id', (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const filtered = transactions.filter(t => t.id !== req.params.id);
   
   if (filtered.length === transactions.length) {
-    return res.status(404).json({ error: 'TransaÃ§Ã£o nÃ£o encontrada' });
+    return res.status(404).json({ error: 'Transação não encontrada' });
   }
   
   writeJSON(TRANSACTIONS_FILE, filtered);
@@ -2480,14 +2480,14 @@ app.delete('/api/transactions/:id', (req, res) => {
   broadcast({ type: 'transactions', data: filtered });
   broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
   
-  res.json({ success: true, message: 'TransaÃ§Ã£o removida' });
+  res.json({ success: true, message: 'Transação removida' });
 });
 
 // [REMOVED] Rota duplicada /api/finance/summary (linha 1856)
 // A rota correta e completa está em ~1422 (inclui payments, expenses, alerts, overdue)
 // Removida em 2026-05-08 para evitar sobrescrita da versão completa.
 
-// FunÃ§Ã£o auxiliar: recalcula caixa baseado em transaÃ§Ãµes
+// Função auxiliar: recalcula caixa baseado em transações
 function updateCashBoxFromTransactions(transactions) {
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -2517,9 +2517,9 @@ function updateCashBoxFromTransactions(transactions) {
 }
 
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 // CHANGELOG / RELEASE NOTES API
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const CHANGELOG_FILE = path.join(DATA_DIR, 'changelog.json');
 const LINKS_INDEX_FILE = path.join(DATA_DIR, 'links-index.json');
@@ -2539,7 +2539,7 @@ function ensureChangelog() {
           title: 'Sistema de Changelog e Release Notes',
           description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
           category: 'feature',
-          emoji: 'âœ¨',
+          emoji: '✨',
           author: 'Luna',
           tier: 2,
           date: new Date().toISOString(),
@@ -2549,10 +2549,10 @@ function ensureChangelog() {
         {
           id: 'changelog-002',
           version: '3.1.0',
-          title: 'WhatsApp Intelligence v10.2 â€” Correcao Completa',
+          title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
           description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
           category: 'whatsapp',
-          emoji: 'ðŸ“±',
+          emoji: '📱',
           author: 'Luna',
           tier: 1,
           date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
@@ -2562,10 +2562,10 @@ function ensureChangelog() {
         {
           id: 'changelog-003',
           version: '3.1.0',
-          title: 'Sistema Financeiro v3.1 â€” CRUD Completo',
+          title: 'Sistema Financeiro v3.1 — CRUD Completo',
           description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
           category: 'finance',
-          emoji: 'ðŸ’°',
+          emoji: '💰',
           author: 'Abner',
           tier: 2,
           date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
@@ -2578,7 +2578,7 @@ function ensureChangelog() {
           title: 'Centro de Operacoes NEXO Digital',
           description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
           category: 'feature',
-          emoji: 'âœ¨',
+          emoji: '✨',
           author: 'Abner',
           tier: 2,
           date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -2588,10 +2588,10 @@ function ensureChangelog() {
         {
           id: 'changelog-005',
           version: '3.0.0',
-          title: 'Orcamentos â€” Tropicale â‚¬5.500 + Santafe â‚¬350',
-          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Juan (Tropicale) â‚¬5.500 total, Paulo (Santafe) â‚¬350 (parcela 2 pendente â‚¬175).',
+          title: 'Orcamentos — Tropicale €5.500 + Santafe €350',
+          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Juan (Tropicale) €5.500 total, Paulo (Santafe) €350 (parcela 2 pendente €175).',
           category: 'feature',
-          emoji: 'âœ¨',
+          emoji: '✨',
           author: 'Abner',
           tier: 3,
           date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
@@ -2604,7 +2604,7 @@ function ensureChangelog() {
           title: 'Integracao GitHub + Vercel',
           description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
           category: 'improvement',
-          emoji: 'ðŸš€',
+          emoji: '🚀',
           author: 'Nonoke',
           tier: 3,
           date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
@@ -2614,10 +2614,10 @@ function ensureChangelog() {
         {
           id: 'changelog-007',
           version: '2.0.0',
-          title: 'WhatsApp Agent v1.0 â€” Monitoramento Inicial',
+          title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
           description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
           category: 'whatsapp',
-          emoji: 'ðŸ“±',
+          emoji: '📱',
           author: 'Luna',
           tier: 2,
           date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -2632,7 +2632,7 @@ function ensureChangelog() {
 
 ensureChangelog();
 
-// GET /api/changelog â€” Lista todos os updates
+// GET /api/changelog — Lista todos os updates
 app.get('/api/changelog', (req, res) => {
   const data = readJSON(CHANGELOG_FILE) || { entries: [] };
   const { category, limit = 50, unreadOnly } = req.query;
@@ -2658,14 +2658,14 @@ app.get('/api/changelog', (req, res) => {
   });
 });
 
-// GET /api/changelog/latest â€” Ultimo update
+// GET /api/changelog/latest — Ultimo update
 app.get('/api/changelog/latest', (req, res) => {
   const data = readJSON(CHANGELOG_FILE) || { entries: [] };
   const latest = data.entries.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   res.json({ success: true, entry: latest || null });
 });
 
-// GET /api/changelog/unread â€” Contagem de nao lidos
+// GET /api/changelog/unread — Contagem de nao lidos
 app.get('/api/changelog/unread', (req, res) => {
   const data = readJSON(CHANGELOG_FILE) || { entries: [] };
   const userId = req.headers['x-user-id'] || 'default';
@@ -2673,7 +2673,7 @@ app.get('/api/changelog/unread', (req, res) => {
   res.json({ success: true, unreadCount, total: data.entries.length });
 });
 
-// POST /api/changelog/:id/read â€” Marcar como lido
+// POST /api/changelog/:id/read — Marcar como lido
 app.post('/api/changelog/:id/read', (req, res) => {
   const data = readJSON(CHANGELOG_FILE) || { entries: [] };
   const userId = req.headers['x-user-id'] || 'default';
@@ -2691,7 +2691,7 @@ app.post('/api/changelog/:id/read', (req, res) => {
   res.json({ success: true, message: 'Marked as read' });
 });
 
-// POST /api/changelog/:id/unread â€” Marcar como nao lido
+// POST /api/changelog/:id/unread — Marcar como nao lido
 app.post('/api/changelog/:id/unread', (req, res) => {
   const data = readJSON(CHANGELOG_FILE) || { entries: [] };
   const userId = req.headers['x-user-id'] || 'default';
@@ -2707,7 +2707,7 @@ app.post('/api/changelog/:id/unread', (req, res) => {
   res.json({ success: true, message: 'Marked as unread' });
 });
 
-// POST /api/changelog â€” Criar novo update (admin)
+// POST /api/changelog — Criar novo update (admin)
 app.post('/api/changelog', (req, res) => {
   const { title, description, category, emoji, tier = 3, tags = [], author = 'Luna' } = req.body;
   
@@ -2743,20 +2743,20 @@ app.post('/api/changelog', (req, res) => {
 
 function getEmojiForCategory(category) {
   const map = {
-    feature: 'âœ¨',
-    improvement: 'ðŸš€',
-    bugfix: 'ðŸ›',
-    security: 'ðŸ”’',
+    feature: '✨',
+    improvement: '🚀',
+    bugfix: '🐛',
+    security: '🔒',
     performance: 'âš¡',
-    whatsapp: 'ðŸ“±',
-    finance: 'ðŸ’°',
+    whatsapp: '📱',
+    finance: '💰',
   };
-  return map[category] || 'ðŸ“';
+  return map[category] || '📝';
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// LEADS API â€” Receber formulÃ¡rios do site chatopsmaster.com
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEADS API — Receber formulários do site chatopsmaster.com
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
 
@@ -2765,7 +2765,7 @@ const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
 
 
 // ============================================================================
-// === LUNA COMMAND CENTER v14.1 â€” Rotas de Controle do Agente ==============
+// === LUNA COMMAND CENTER v14.1 — Rotas de Controle do Agente ==============
 // ============================================================================
 
 // Dashboard HTML
@@ -2894,11 +2894,11 @@ app.post('/api/luna/control', (req, res) => {
     }
 });
 
-// 4. ForÃ§ar scan
+// 4. Forçar scan
 // 5. Extrair mensagens
-// 6. Verificar menÃ§Ãµes
+// 6. Verificar menções
 // 7. Verificar links
-// 8. ForÃ§ar relatÃ³rio
+// 8. Forçar relatório
 // 9. Checkpoint
 app.get('/api/whatsapp/checkpoint', (req, res) => {
     try {
@@ -2916,7 +2916,7 @@ app.delete('/api/whatsapp/checkpoint', (req, res) => {
         const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
         const emptyCheckpoint = { hashes: [], lastScan: null, version: '14.1', resetAt: new Date().toISOString() };
         fs.writeFileSync(checkpointPath, JSON.stringify(emptyCheckpoint, null, 2), 'utf8');
-        res.json({ success: true, message: 'Checkpoint resetado. PrÃ³ximo scan lerÃ¡ TODAS as mensagens.' });
+        res.json({ success: true, message: 'Checkpoint resetado. Próximo scan lerá TODAS as mensagens.' });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -2949,12 +2949,12 @@ app.delete('/api/whatsapp/buffer', (req, res) => {
     }
 });
 
-// 11. ConfiguraÃ§Ãµes
+// 11. Configurações
 app.post('/api/luna/config', (req, res) => {
-    res.json({ success: true, config: req.body, message: 'ConfiguraÃ§Ãµes salvas (requer reinÃ­cio do daemon para aplicar)' });
+    res.json({ success: true, config: req.body, message: 'Configurações salvas (requer reinício do daemon para aplicar)' });
 });
 
-// 12. DiagnÃ³stico
+// 12. Diagnóstico
 app.get('/api/luna/diagnose', (req, res) => {
     const errors = [];
     const agentsDir = path.join(__dirname, '..', 'agents');
@@ -2975,7 +2975,7 @@ app.get('/api/luna/diagnose', (req, res) => {
                 errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint corrompido', severity: 'high' });
             }
         } catch {
-            errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint nÃ£o Ã© JSON vÃ¡lido', severity: 'high' });
+            errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint não é JSON válido', severity: 'high' });
         }
     }
 
@@ -2995,7 +2995,7 @@ app.post('/api/luna/autofix', (req, res) => {
     res.json({ 
         success: true, 
         fixed: false, 
-        message: fixes[errorType] || 'AutoFix manual necessÃ¡rio',
+        message: fixes[errorType] || 'AutoFix manual necessário',
         errorType,
         suggestion: fixes[errorType]
     });
@@ -3003,10 +3003,10 @@ app.post('/api/luna/autofix', (req, res) => {
 
 // 14A. Ligar Luna
 // ============================================================================
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 
-// LUNA ACTION ROUTES (CANONICAL) â€” UNICO BLOCO
+// LUNA ACTION ROUTES (CANONICAL) — UNICO BLOCO
 app.post('/api/luna/start', (req, res) => {
   try {
     const daemonPath = path.join(__dirname, '..', 'agents', 'luna-daemon.mjs');
@@ -3750,7 +3750,7 @@ app.put('/api/links/:id', (req, res) => {
 });
 
 // Email Hub API
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const EmailAgent = require('./services/email-agent');
 const emailAgent = new EmailAgent();
@@ -3829,7 +3829,7 @@ app.post('/api/emails/sync', async (req, res) => {
 });
 
 // Leads Pipeline API
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const LEAD_STATUSES = ['novo', 'contatado', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'];
 
@@ -3969,7 +3969,7 @@ app.delete('/api/leads/:id', (req, res) => {
 });
 
 // Instagram Hub API
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('/api/instagram/profile', (req, res) => {
   try {
@@ -4021,7 +4021,7 @@ app.post('/api/instagram/messages/import', (req, res) => {
 });
 
 // Detect Client API
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const { detectClient } = require('./services/detect-client');
 
@@ -4156,7 +4156,7 @@ app.post('/api/system/control', (req, res) => {
 
 // ============================================================================
 // Catch-all
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
@@ -4164,10 +4164,10 @@ app.get('*', (req, res) => {
 
 // Start
 server.listen(PORT, BIND_IP, () => {
-  console.log(`ðŸ”¥ NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+  console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
 });
 
-// â”€â”€ Background Refresh: tools a cada 10 min â”€â”€
+// ── Background Refresh: tools a cada 10 min ──
 setInterval(() => {
   external.refreshExternal('tools').catch(() => {});
 }, 10 * 60 * 1000);

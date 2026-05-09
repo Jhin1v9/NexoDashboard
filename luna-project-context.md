@@ -63021,7 +63021,7 @@ if ($monitorRunning) {
 - **Exports:** module.exports: { LunaAgent, runAgent, diagnose, CONFIG }
 
 ```javascript
-﻿// ============================================================
+// ============================================================
 // LUNA v14.1 "OMNIA HYBRID" — v10.2 + whatsapp-web.js
 // Mantém 100% personalidade original, engine novo e funcional
 // ============================================================
@@ -63113,7 +63113,7 @@ class CheckpointManager {
 - **Exports:** module.exports: { LunaAgent, runAgent, diagnose, CONFIG }
 
 ```javascript
-﻿// ============================================================
+// ============================================================
 // LUNA v14.1 "OMNIA HYBRID" — v10.2 + whatsapp-web.js
 // Mantém 100% personalidade original, engine novo e funcional
 // ============================================================
@@ -64232,7 +64232,7 @@ function canSpeak(chatName) {
 - **Exports:** module.exports: { LunaAgent, runAgent, diagnose, CONFIG }
 
 ```javascript
-﻿// ============================================================
+// ============================================================
 // LUNA v14.1 "OMNIA HYBRID" — v10.2 + whatsapp-web.js
 // Mantém 100% personalidade original, engine novo e funcional
 // ============================================================
@@ -64505,7 +64505,7 @@ const CLASSIFIERS = {
 - **Imports:** playwright, fs, path, url, https, http
 
 ```javascript
-﻿/**
+/**
  * ═══════════════════════════════════════════════════════════════════════════════
  * NEXO WhatsApp Agent v8.0 — RELATÓRIO INTELIGENTE
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -64888,7 +64888,7 @@ pause
 - **Linhas lidas:** 23
 
 ```text
-﻿@echo off
+@echo off
 chcp 65001 >nul
 :: Chrome CDP para Luna Agent — NUNCA reinicie o Chrome PWA original!
 :: Este script lança uma segunda instância do Chrome com perfil COPIADO
@@ -65959,7 +65959,7 @@ Para regras completas: veja `docs/CONVENTIONS.md`
 - **Linhas lidas:** 80
 
 ```text
-﻿=======================================================================
+=======================================================================
   LUNA / NEXO DIAGNOSTICO LOCAL — READ ONLY
   Gerado em: 2026-05-02 21:07:25
 =======================================================================
@@ -68519,7 +68519,7 @@ sure
 - **Imports:** child_process, fs, path
 
 ```javascript
-﻿/**
+/**
  * Cache Manager Assíncrono para dados externos (GitHub, Vercel, CLI Tools)
  * Usa spawn com timeout + file-based persistence
  */
@@ -68671,7 +68671,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "version": "1.0",
   "updatedAt": "2026-05-01T13:15:00+02:00",
   "autoMode": {
@@ -68761,7 +68761,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "balance": {
     "value": null,
     "currency": "EUR"
@@ -68851,7 +68851,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "metadata": {
     "company": "NEXO DIGITAL",
     "version": "1.0.0",
@@ -69211,7 +69211,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "id": "exp-001",
     "name": "Hostinger 1 ano",
@@ -69340,9 +69340,9 @@ class CacheManager {
       }
     },
     {
-      "id": "Tú\nOs cara ainda fala “alguém multi tarefas multi ",
+      "id": "Tú\nOs cara ainda fala "alguém multi tarefas multi ",
       "author": "Desconhecido",
-      "text": "Tú\nOs cara ainda fala “alguém multi tarefas multi funções tecnologia “\nHahhahahaha é isso que eu faço mano 61 empregados agora! Muit trampo em! O perfil de vcs encaixa em e eu posso ajudar se vcs buscar algo assim para o tema dos docus etc ",
+      "text": "Tú\nOs cara ainda fala "alguém multi tarefas multi funções tecnologia "\nHahhahahaha é isso que eu faço mano 61 empregados agora! Muit trampo em! O perfil de vcs encaixa em e eu posso ajudar se vcs buscar algo assim para o tema dos docus etc ",
       "time": "18:13",
       "chatName": "Production",
       "extractedAt": "2026-05-04T16:20:54.775Z",
@@ -69365,7 +69365,7 @@ class CacheManager {
         },
         "urls": [],
         "possibleNewClient": null,
-        "text": "tú\nos cara ainda fala “alguém multi tarefas multi funções tecnologia “\nhahhahahaha é isso que eu faço mano 61 empregados agora! muit trampo em! o perfil de vcs encaixa em e eu posso ajudar se vcs busc",
+        "text": "tú\nos cara ainda fala "alguém multi tarefas multi funções tecnologia "\nhahhahahaha é isso que eu faço mano 61 empregados agora! muit trampo em! o perfil de vcs encaixa em e eu posso ajudar se vcs busc",
         "author": "Desconhecido",
         "timestamp": "18:13"
       }
@@ -69530,7 +69530,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "text": "Meu Amorzinho ",
@@ -69620,7 +69620,7 @@ class CacheManager {
 - **Linhas lidas:** 57
 
 ```json
-﻿[
+[
   {
     \"id\": \"abner\",
     \"name\": \"Abner (Jhin1v9)\",
@@ -69867,7 +69867,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "version": "2.0",
   "updatedAt": "2026-04-30T12:45:00+02:00",
   "currency": "EUR",
@@ -69957,7 +69957,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "paymentId": "pay-tropicale-001",
     "clientId": "juan-tropicale",
@@ -70047,7 +70047,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "quoteId": "quote-tropicale-001",
     "projectId": "proj-tropicale-001",
@@ -70227,7 +70227,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70355,7 +70355,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70479,7 +70479,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70603,7 +70603,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70727,7 +70727,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70851,7 +70851,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -70975,7 +70975,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71099,7 +71099,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71223,7 +71223,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71347,7 +71347,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71471,7 +71471,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71595,7 +71595,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71719,7 +71719,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71843,7 +71843,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -71967,7 +71967,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72095,7 +72095,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72219,7 +72219,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72343,7 +72343,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72467,7 +72467,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72591,7 +72591,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72715,7 +72715,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72839,7 +72839,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -72963,7 +72963,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73087,7 +73087,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73217,7 +73217,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73341,7 +73341,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73469,7 +73469,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73593,7 +73593,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73717,7 +73717,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73841,7 +73841,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -73965,7 +73965,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74089,7 +74089,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74213,7 +74213,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74337,7 +74337,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74461,7 +74461,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74585,7 +74585,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74709,7 +74709,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74833,7 +74833,7 @@ class CacheManager {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -74957,7 +74957,7 @@ class CacheManager {
 - **Linhas lidas:** 31
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v13.1 - 2/5/2026, 15:38:24</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v13.1 - 2/5/2026, 15:38:24</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -74998,7 +74998,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "text": "Meu Amorzinho ",
@@ -75111,7 +75111,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -75235,7 +75235,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 30
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA - 2/5/2026, 16:08:30</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA - 2/5/2026, 16:08:30</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -75275,7 +75275,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "text": "Meu Amorzinho ",
@@ -75389,7 +75389,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -75513,7 +75513,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -75637,7 +75637,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -75761,7 +75761,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -75885,7 +75885,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -76009,7 +76009,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -76133,7 +76133,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -76257,7 +76257,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -76381,7 +76381,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -76505,7 +76505,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 2/5/2026, 22:00:41</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 2/5/2026, 22:00:41</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -76521,18 +76521,18 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>2/5/2026, 22:00:41</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>2/5/2026, 22:00:41</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">408</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">40</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">13</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">16</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">10</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">4</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">408</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">40</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">13</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">16</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">10</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">4</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 20 | ðŸ˜¤ 4 | âš¡ 0</p></div>
-<div class="section"><h2>ðŸ”— Links</h2><div class="item"><span>ðŸ”—</span><div><a href="https://santafe.nexo-digital.app/es/" class="link-url">https://santafe.nexo-digital.app/es/</a><div class="meta">148193736163343@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://github.com/EEA-Ops-Master/aee" class="link-url">https://github.com/EEA-Ops-Master/aee</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://github.com/EEA-Ops-Master/nexo-digital" class="link-url">https://github.com/EEA-Ops-Master/nexo-digital</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://santafe.nexo-digital.app/" class="link-url">https://santafe.nexo-digital.app/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://vt.tiktok.com/ZS9FjAWXy/" class="link-url">https://vt.tiktok.com/ZS9FjAWXy/</a><div class="meta">218424923959526@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca" class="link-url">https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://share.google/CXF7eEadwK7SwrMLA" class="link-url">https://share.google/CXF7eEadwK7SwrMLA</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://forms.gle/dGxeG7SDqikcaLPg9" class="link-url">https://forms.gle/dGxeG7SDqikcaLPg9</a><div class="meta">68552090464350@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://www.instagram.com/stories/lilissimaa/3855719679558159722" class="link-url">https://www.instagram.com/stories/lilissimaa/3855719679558159722</a><div class="meta">95344683647092@lid</div></div></div></div>
-<div class="section"><h2>ðŸ“ Tareas</h2><div class="item"><span class="p0">P0-CRITICO</span><div><div>@41433717305344 o motivo que quria o acesso da hostinger era pra subir o site e o repositorio do templates php do site i</div><div class="meta">148193736163343@lid</div></div></div><div class="item"><span class="p2">P2-MEDIA</span><div><div>nosso dashboard tem que subir aqui https://github.com/EEA-Ops-Master/aee, porem se for uma app tenho que configurar o de</div><div class="meta">41433717305344@lid</div></div></div><div class="item"><span class="p2">P2-MEDIA</span><div><div>https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal so vai faltar: 
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 20 | 😤 4 | ⚡ 0</p></div>
+<div class="section"><h2>🔗 Links</h2><div class="item"><span>🔗</span><div><a href="https://santafe.nexo-digital.app/es/" class="link-url">https://santafe.nexo-digital.app/es/</a><div class="meta">148193736163343@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://github.com/EEA-Ops-Master/aee" class="link-url">https://github.com/EEA-Ops-Master/aee</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://github.com/EEA-Ops-Master/nexo-digital" class="link-url">https://github.com/EEA-Ops-Master/nexo-digital</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://santafe.nexo-digital.app/" class="link-url">https://santafe.nexo-digital.app/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://vt.tiktok.com/ZS9FjAWXy/" class="link-url">https://vt.tiktok.com/ZS9FjAWXy/</a><div class="meta">218424923959526@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca" class="link-url">https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://share.google/CXF7eEadwK7SwrMLA" class="link-url">https://share.google/CXF7eEadwK7SwrMLA</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://forms.gle/dGxeG7SDqikcaLPg9" class="link-url">https://forms.gle/dGxeG7SDqikcaLPg9</a><div class="meta">68552090464350@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://www.instagram.com/stories/lilissimaa/3855719679558159722" class="link-url">https://www.instagram.com/stories/lilissimaa/3855719679558159722</a><div class="meta">95344683647092@lid</div></div></div></div>
+<div class="section"><h2>📝 Tareas</h2><div class="item"><span class="p0">P0-CRITICO</span><div><div>@41433717305344 o motivo que quria o acesso da hostinger era pra subir o site e o repositorio do templates php do site i</div><div class="meta">148193736163343@lid</div></div></div><div class="item"><span class="p2">P2-MEDIA</span><div><div>nosso dashboard tem que subir aqui https://github.com/EEA-Ops-Master/aee, porem se for uma app tenho que configurar o de</div><div class="meta">41433717305344@lid</div></div></div><div class="item"><span class="p2">P2-MEDIA</span><div><div>https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal so vai faltar: 
 
 Pendiente real:
 
@@ -76595,84 +76595,84 @@ eu ja a</div><div class="meta">95344683647092@lid</div></div></div><div class="i
 - **Linhas lidas:** 80
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 2/5/2026, 22:00:41
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 2/5/2026, 22:00:41
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 408 mensajes
-â€¢ 40 tareas (4 urgentes)
-â€¢ 13 ideas
-â€¢ 16 decisiones
-â€¢ 10 links
-â€¢ 4 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 408 mensajes
+• 40 tareas (4 urgentes)
+• 13 ideas
+• 16 decisiones
+• 10 links
+• 4 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 20
-â€¢ ðŸ˜¤ Negativo: 4
-â€¢ âš¡ Urgente: 0
-
-
-ðŸ”— *LINKS*
-â€¢ https://santafe.nexo-digital.app/es/
-â€¢ https://github.com/EEA-Ops-Master/aee
-â€¢ https://github.com/EEA-Ops-Master/nexo-digital
-â€¢ https://santafe.nexo-digital.app/
-â€¢ https://vt.tiktok.com/ZS9FjAWXy/
-â€¢ https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca
-â€¢ https://share.google/CXF7eEadwK7SwrMLA
-â€¢ https://forms.gle/dGxeG7SDqikcaLPg9
-â€¢ https://lilissimaa.com/metodo
-â€¢ https://www.instagram.com/stories/lilissimaa/3855719679558159722
+📊 *SENTIMIENTO*
+• 😊 Positivo: 20
+• 😤 Negativo: 4
+• ⚡ Urgente: 0
 
 
-ðŸ“ *TAREAS*
-â€¢ [P0-CRITICO] @41433717305344 o motivo que quria o acesso da hostinger era pra subir o site e  (148193736163343@lid)
-â€¢ [P2-MEDIA] nosso dashboard tem que subir aqui https://github.com/EEA-Ops-Master/aee, porem  (41433717305344@lid)
-â€¢ [P2-MEDIA] https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal (41433717305344@lid)
-â€¢ [P2-MEDIA] Ja vamos fazendo tempo pra gente jogar (29055470555236@lid)
-â€¢ [P0-CRITICO] ApdD meu irmão Paulo! Tudo bem? Esperamos que sim 😊
+🔗 *LINKS*
+• https://santafe.nexo-digital.app/es/
+• https://github.com/EEA-Ops-Master/aee
+• https://github.com/EEA-Ops-Master/nexo-digital
+• https://santafe.nexo-digital.app/
+• https://vt.tiktok.com/ZS9FjAWXy/
+• https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca
+• https://share.google/CXF7eEadwK7SwrMLA
+• https://forms.gle/dGxeG7SDqikcaLPg9
+• https://lilissimaa.com/metodo
+• https://www.instagram.com/stories/lilissimaa/3855719679558159722
+
+
+📝 *TAREAS*
+• [P0-CRITICO] @41433717305344 o motivo que quria o acesso da hostinger era pra subir o site e  (148193736163343@lid)
+• [P2-MEDIA] nosso dashboard tem que subir aqui https://github.com/EEA-Ops-Master/aee, porem  (41433717305344@lid)
+• [P2-MEDIA] https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal (41433717305344@lid)
+• [P2-MEDIA] Ja vamos fazendo tempo pra gente jogar (29055470555236@lid)
+• [P0-CRITICO] ApdD meu irmão Paulo! Tudo bem? Esperamos que sim 😊
 
 Seguimos firmes aqui no pr (41433717305344@lid)
-â€¢ [P1-ALTA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA — ALFREDO FREIRE!
+• [P1-ALTA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA — ALFREDO FREIRE!
 📅 Sexta-feira, 24/04 — É HOJ (35596756099211@lid)
-â€¢ [P2-MEDIA] 😵 NEM A PATROA AGUENTOU E TEVE QUE FAZER RESSUSCITAÇÃO!
+• [P2-MEDIA] 😵 NEM A PATROA AGUENTOU E TEVE QUE FAZER RESSUSCITAÇÃO!
 💥 As ofertas da Ki Del (35596756099211@lid)
-â€¢ [P2-MEDIA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA ALFREDO FREIRE!
+• [P2-MEDIA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA ALFREDO FREIRE!
 
 📅 Sexta-feira, 24/04 
 🍺 Cerv (35596756099211@lid)
-â€¢ [P2-MEDIA] Paz de Dios con todos !!! (87063483404382@lid)
-â€¢ [P2-MEDIA] A Paz de Deus! 
+• [P2-MEDIA] Paz de Dios con todos !!! (87063483404382@lid)
+• [P2-MEDIA] A Paz de Deus! 
 
 Mocidade bora fazer um encontro dia 17 de maio, um churras? Dep (237516070359237@lid)
-â€¢ [P2-MEDIA] Amém Caio podemos animar em fazer esse encontro seria muito top 🔝 faz tempo que (87063483404382@lid)
-â€¢ [P2-MEDIA] A paz de Deus Caio que legal,que lugar lindo estamos juntos,cadê os jovens anima (95391341084757@lid)
-â€¢ [P2-MEDIA] Amém! Por aquí estamos todos animados pro churrasco, só teria que confirmar pro  (235471598805239@lid)
-â€¢ [P2-MEDIA] La paz de Dios a todos
+• [P2-MEDIA] Amém Caio podemos animar em fazer esse encontro seria muito top 🔝 faz tempo que (87063483404382@lid)
+• [P2-MEDIA] A paz de Deus Caio que legal,que lugar lindo estamos juntos,cadê os jovens anima (95391341084757@lid)
+• [P2-MEDIA] Amém! Por aquí estamos todos animados pro churrasco, só teria que confirmar pro  (235471598805239@lid)
+• [P2-MEDIA] La paz de Dios a todos
 El proximo dia 14/02 NO habrá classes de musica por motiv (68552090464350@lid)
-â€¢ [P2-MEDIA] Apaz de DEUS a todos (279517075632243@lid)
-â€¢ [P2-MEDIA] Paz de Dios, el ensaio es el primer sabado del mes 07/03, estan todos invitados (60065335742637@lid)
-â€¢ [P2-MEDIA] A paz de Deus
+• [P2-MEDIA] Apaz de DEUS a todos (279517075632243@lid)
+• [P2-MEDIA] Paz de Dios, el ensaio es el primer sabado del mes 07/03, estan todos invitados (60065335742637@lid)
+• [P2-MEDIA] A paz de Deus
 Queridos hermanos e instrutores.
 
 Les informo que  por motivos de  (109977066819772@lid)
-â€¢ [P2-MEDIA] La Paz De Dios a toda la  hermandad recordemos que hoy tenemos ensayo local en s (68552090464350@lid)
-â€¢ [P1-ALTA] La Paz de Dios, 
+• [P2-MEDIA] La Paz De Dios a toda la  hermandad recordemos que hoy tenemos ensayo local en s (68552090464350@lid)
+• [P1-ALTA] La Paz de Dios, 
 
 Animados para el ensayo del gem (Practica del GEM), recordemos (237516070359237@lid)
-â€¢ [P2-MEDIA] Paz de Deus a todos 
+• [P2-MEDIA] Paz de Deus a todos 
 Espero que vamos  todos bem
 
 
 Uma pergunta a manhã a  aulin (38054198775864@lid)
-â€¢ [P2-MEDIA] La paz de Dios a todos
+• [P2-MEDIA] La paz de Dios a todos
 
 El día 01 de mayo a las 10h habrá un ensayo local técnic (68552090464350@lid)
-â€¢ [P0-CRITICO] Oioi, gente 💗
+• [P0-CRITICO] Oioi, gente 💗
 
 PRIMEIRO DE TUDO: confie só nas ADMINS do grupo. Se alguém te ch (95344683647092@lid)
-â€¢ [P1-ALTA] *Faltam 3 dias pra abertura das vagas*
+• [P1-ALTA] *Faltam 3 dias pra abertura das vagas*
 
 E toda vez que ficamos perto da data, eu (95344683647092@lid)
 ```
@@ -76685,7 +76685,7 @@ E toda vez que ficamos perto da data, eu (95344683647092@lid)
 - **Linhas lidas:** 31
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:45:46</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:45:46</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -76701,19 +76701,19 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:45:46</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:45:46</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">2</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">2</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 0 | ðŸ˜¤ 0 | âš¡ 0</p></div>
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 0 | 😤 0 | ⚡ 0</p></div>
 
 
-<div class="footer">ðŸ¤– Luna v14.1 | NEXO Digital</div>
+<div class="footer">🤖 Luna v14.1 | NEXO Digital</div>
 </div></body></html>
 
 ```
@@ -76726,7 +76726,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "_data": {
@@ -76816,30 +76816,30 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 24
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 3/5/2026, 10:45:46
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 3/5/2026, 10:45:46
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 2 mensajes
-â€¢ 0 tareas (0 urgentes)
-â€¢ 0 ideas
-â€¢ 0 decisiones
-â€¢ 0 links
-â€¢ 0 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 2 mensajes
+• 0 tareas (0 urgentes)
+• 0 ideas
+• 0 decisiones
+• 0 links
+• 0 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 0
-â€¢ ðŸ˜¤ Negativo: 0
-â€¢ âš¡ Urgente: 0
-
-
+📊 *SENTIMIENTO*
+• 😊 Positivo: 0
+• 😤 Negativo: 0
+• ⚡ Urgente: 0
 
 
 
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ¤– Luna v14.1 | NEXO Digital
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 Luna v14.1 | NEXO Digital
 ```
 
 ---
@@ -76850,7 +76850,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 33
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:48:53</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:48:53</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -76866,21 +76866,21 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:48:53</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:48:53</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 0 | ðŸ˜¤ 0 | âš¡ 0</p></div>
-<div class="section"><h2>ðŸ”— Links</h2><div class="item"><span>ðŸ”—</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div></div>
-<div class="section"><h2>ðŸ“ Tareas</h2><div class="item"><span class="p0">P0-CRITICO</span><div><div>_genteee kkkk e eu que esqueci de falar os bônus_😹😹😹 mesmo assim tá no site, então provavelmente vocês já virammm
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 0 | 😤 0 | ⚡ 0</p></div>
+<div class="section"><h2>🔗 Links</h2><div class="item"><span>🔗</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div></div>
+<div class="section"><h2>📝 Tareas</h2><div class="item"><span class="p0">P0-CRITICO</span><div><div>_genteee kkkk e eu que esqueci de falar os bônus_😹😹😹 mesmo assim tá no site, então provavelmente vocês já virammm
 
 _m</div><div class="meta">95344683647092@lid</div></div></div></div>
-<div class="footer">ðŸ¤– Luna v14.1 | NEXO Digital</div>
+<div class="footer">🤖 Luna v14.1 | NEXO Digital</div>
 </div></body></html>
 
 ```
@@ -76893,7 +76893,7 @@ _m</div><div class="meta">95344683647092@lid</div></div></div></div>
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "_data": {
@@ -76983,34 +76983,34 @@ _m</div><div class="meta">95344683647092@lid</div></div></div></div>
 - **Linhas lidas:** 28
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 3/5/2026, 10:48:53
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 3/5/2026, 10:48:53
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 1 mensajes
-â€¢ 1 tareas (1 urgentes)
-â€¢ 0 ideas
-â€¢ 0 decisiones
-â€¢ 1 links
-â€¢ 0 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 1 mensajes
+• 1 tareas (1 urgentes)
+• 0 ideas
+• 0 decisiones
+• 1 links
+• 0 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 0
-â€¢ ðŸ˜¤ Negativo: 0
-â€¢ âš¡ Urgente: 0
-
-
-ðŸ”— *LINKS*
-â€¢ https://lilissimaa.com/metodo
+📊 *SENTIMIENTO*
+• 😊 Positivo: 0
+• 😤 Negativo: 0
+• ⚡ Urgente: 0
 
 
-ðŸ“ *TAREAS*
-â€¢ [P0-CRITICO] _genteee kkkk e eu que esqueci de falar os bônus_😹😹😹 mesmo assim tá no site,  (95344683647092@lid)
+🔗 *LINKS*
+• https://lilissimaa.com/metodo
 
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ¤– Luna v14.1 | NEXO Digital
+📝 *TAREAS*
+• [P0-CRITICO] _genteee kkkk e eu que esqueci de falar os bônus_😹😹😹 mesmo assim tá no site,  (95344683647092@lid)
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 Luna v14.1 | NEXO Digital
 ```
 
 ---
@@ -77021,7 +77021,7 @@ _m</div><div class="meta">95344683647092@lid</div></div></div></div>
 - **Linhas lidas:** 31
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:59:10</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 10:59:10</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -77037,19 +77037,19 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:59:10</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 10:59:10</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 0 | ðŸ˜¤ 0 | âš¡ 0</p></div>
-<div class="section"><h2>ðŸ”— Links</h2><div class="item"><span>ðŸ”—</span><div><a href="https://vm.tiktok.com/ZNRpRPeVn/" class="link-url">https://vm.tiktok.com/ZNRpRPeVn/</a><div class="meta">41433717305344@lid</div></div></div></div>
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 0 | 😤 0 | ⚡ 0</p></div>
+<div class="section"><h2>🔗 Links</h2><div class="item"><span>🔗</span><div><a href="https://vm.tiktok.com/ZNRpRPeVn/" class="link-url">https://vm.tiktok.com/ZNRpRPeVn/</a><div class="meta">41433717305344@lid</div></div></div></div>
 
-<div class="footer">ðŸ¤– Luna v14.1 | NEXO Digital</div>
+<div class="footer">🤖 Luna v14.1 | NEXO Digital</div>
 </div></body></html>
 
 ```
@@ -77062,7 +77062,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "_data": {
@@ -77152,32 +77152,32 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 26
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 3/5/2026, 10:59:10
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 3/5/2026, 10:59:10
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 1 mensajes
-â€¢ 0 tareas (0 urgentes)
-â€¢ 0 ideas
-â€¢ 0 decisiones
-â€¢ 1 links
-â€¢ 0 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 1 mensajes
+• 0 tareas (0 urgentes)
+• 0 ideas
+• 0 decisiones
+• 1 links
+• 0 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 0
-â€¢ ðŸ˜¤ Negativo: 0
-â€¢ âš¡ Urgente: 0
-
-
-ðŸ”— *LINKS*
-â€¢ https://vm.tiktok.com/ZNRpRPeVn/
+📊 *SENTIMIENTO*
+• 😊 Positivo: 0
+• 😤 Negativo: 0
+• ⚡ Urgente: 0
 
 
+🔗 *LINKS*
+• https://vm.tiktok.com/ZNRpRPeVn/
 
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ¤– Luna v14.1 | NEXO Digital
+
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 Luna v14.1 | NEXO Digital
 ```
 
 ---
@@ -77188,7 +77188,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 32
 
 ```html
-﻿<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 11:09:30</title><style>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>LUNA v14.1 - 3/5/2026, 11:09:30</title><style>
 body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#e2e8f0;margin:0;padding:20px}
 .container{max-width:1100px;margin:0 auto}
 .header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:25px;border-radius:16px;margin-bottom:25px}
@@ -77204,20 +77204,20 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 11:09:30</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 11:09:30</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">6</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">1</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">0</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">6</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">1</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">0</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 1 | ðŸ˜¤ 0 | âš¡ 0</p></div>
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 1 | 😤 0 | ⚡ 0</p></div>
 
-<div class="section"><h2>ðŸ“ Tareas</h2><div class="item"><span class="p2">P2-MEDIA</span><div><div>Bom diaaa turma! 
+<div class="section"><h2>📝 Tareas</h2><div class="item"><span class="p2">P2-MEDIA</span><div><div>Bom diaaa turma! 
 Ontem as redes sociais foi arrumadas e creadas do irmão Paulo, também demos um paso mais na web nexo. </div><div class="meta">41433717305344@lid</div></div></div></div>
-<div class="footer">ðŸ¤– Luna v14.1 | NEXO Digital</div>
+<div class="footer">🤖 Luna v14.1 | NEXO Digital</div>
 </div></body></html>
 
 ```
@@ -77230,7 +77230,7 @@ Ontem as redes sociais foi arrumadas e creadas do irmão Paulo, também demos um
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "messages": [
     {
       "_data": {
@@ -77320,33 +77320,33 @@ Ontem as redes sociais foi arrumadas e creadas do irmão Paulo, também demos um
 - **Linhas lidas:** 27
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 3/5/2026, 11:09:30
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 3/5/2026, 11:09:30
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 6 mensajes
-â€¢ 1 tareas (0 urgentes)
-â€¢ 0 ideas
-â€¢ 0 decisiones
-â€¢ 0 links
-â€¢ 0 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 6 mensajes
+• 1 tareas (0 urgentes)
+• 0 ideas
+• 0 decisiones
+• 0 links
+• 0 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 1
-â€¢ ðŸ˜¤ Negativo: 0
-â€¢ âš¡ Urgente: 0
-
-
+📊 *SENTIMIENTO*
+• 😊 Positivo: 1
+• 😤 Negativo: 0
+• ⚡ Urgente: 0
 
 
-ðŸ“ *TAREAS*
-â€¢ [P2-MEDIA] Bom diaaa turma! 
+
+
+📝 *TAREAS*
+• [P2-MEDIA] Bom diaaa turma! 
 Ontem as redes sociais foi arrumadas e creadas do irmão Paulo, (41433717305344@lid)
 
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ¤– Luna v14.1 | NEXO Digital
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 Luna v14.1 | NEXO Digital
 ```
 
 ---
@@ -77373,18 +77373,18 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 .meta{color:#64748b;font-size:.85em}
 .footer{text-align:center;padding:20px;color:#64748b}
 </style></head><body><div class="container">
-<div class="header"><h1>ðŸŒ™ LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 12:06:20</p></div>
+<div class="header"><h1>🌙 LUNA v14.1 "OMNIA HYBRID"</h1><p>3/5/2026, 12:06:20</p></div>
 <div class="stats">
-<div class="stat-card"><div class="stat-number">403</div><div>ðŸ’¬ Mensajes</div></div>
-<div class="stat-card"><div class="stat-number">39</div><div>ðŸ“ Tareas</div></div>
-<div class="stat-card"><div class="stat-number">13</div><div>ðŸ’¡ Ideas</div></div>
-<div class="stat-card"><div class="stat-number">16</div><div>âœ… Decisiones</div></div>
-<div class="stat-card"><div class="stat-number">9</div><div>ðŸ”— Links</div></div>
-<div class="stat-card"><div class="stat-number">2</div><div>ðŸ‘¤ Menciones</div></div>
+<div class="stat-card"><div class="stat-number">403</div><div>💬 Mensajes</div></div>
+<div class="stat-card"><div class="stat-number">39</div><div>📝 Tareas</div></div>
+<div class="stat-card"><div class="stat-number">13</div><div>💡 Ideas</div></div>
+<div class="stat-card"><div class="stat-number">16</div><div>✅ Decisiones</div></div>
+<div class="stat-card"><div class="stat-number">9</div><div>🔗 Links</div></div>
+<div class="stat-card"><div class="stat-number">2</div><div>👤 Menciones</div></div>
 </div>
-<div class="section"><h2>ðŸ“Š Sentimiento</h2><p>ðŸ˜Š 20 | ðŸ˜¤ 4 | âš¡ 0</p></div>
-<div class="section"><h2>ðŸ”— Links</h2><div class="item"><span>ðŸ”—</span><div><a href="https://github.com/EEA-Ops-Master/nexo-digital" class="link-url">https://github.com/EEA-Ops-Master/nexo-digital</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://github.com/EEA-Ops-Master/aee" class="link-url">https://github.com/EEA-Ops-Master/aee</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://vm.tiktok.com/ZNRpRPeVn/" class="link-url">https://vm.tiktok.com/ZNRpRPeVn/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://santafe.nexo-digital.app/" class="link-url">https://santafe.nexo-digital.app/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca" class="link-url">https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://share.google/CXF7eEadwK7SwrMLA" class="link-url">https://share.google/CXF7eEadwK7SwrMLA</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://forms.gle/dGxeG7SDqikcaLPg9" class="link-url">https://forms.gle/dGxeG7SDqikcaLPg9</a><div class="meta">68552090464350@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div><div class="item"><span>ðŸ”—</span><div><a href="https://www.instagram.com/stories/lilissimaa/3855719679558159722" class="link-url">https://www.instagram.com/stories/lilissimaa/3855719679558159722</a><div class="meta">95344683647092@lid</div></div></div></div>
-<div class="section"><h2>ðŸ“ Tareas</h2><div class="item"><span class="p2">P2-MEDIA</span><div><div>https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal so vai faltar: 
+<div class="section"><h2>📊 Sentimiento</h2><p>😊 20 | 😤 4 | ⚡ 0</p></div>
+<div class="section"><h2>🔗 Links</h2><div class="item"><span>🔗</span><div><a href="https://github.com/EEA-Ops-Master/nexo-digital" class="link-url">https://github.com/EEA-Ops-Master/nexo-digital</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://github.com/EEA-Ops-Master/aee" class="link-url">https://github.com/EEA-Ops-Master/aee</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://vm.tiktok.com/ZNRpRPeVn/" class="link-url">https://vm.tiktok.com/ZNRpRPeVn/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://santafe.nexo-digital.app/" class="link-url">https://santafe.nexo-digital.app/</a><div class="meta">41433717305344@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca" class="link-url">https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://share.google/CXF7eEadwK7SwrMLA" class="link-url">https://share.google/CXF7eEadwK7SwrMLA</a><div class="meta">237516070359237@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://forms.gle/dGxeG7SDqikcaLPg9" class="link-url">https://forms.gle/dGxeG7SDqikcaLPg9</a><div class="meta">68552090464350@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://lilissimaa.com/metodo" class="link-url">https://lilissimaa.com/metodo</a><div class="meta">95344683647092@lid</div></div></div><div class="item"><span>🔗</span><div><a href="https://www.instagram.com/stories/lilissimaa/3855719679558159722" class="link-url">https://www.instagram.com/stories/lilissimaa/3855719679558159722</a><div class="meta">95344683647092@lid</div></div></div></div>
+<div class="section"><h2>📝 Tareas</h2><div class="item"><span class="p2">P2-MEDIA</span><div><div>https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal so vai faltar: 
 
 Pendiente real:
 
@@ -77447,86 +77447,86 @@ eu ja a</div><div class="meta">95344683647092@lid</div></div></div><div class="i
 - **Linhas lidas:** 80
 
 ```text
-ðŸŒ™ *LUNA REPORT INTELIGENTE*
-ðŸ• 3/5/2026, 12:06:20
+🌙 *LUNA REPORT INTELIGENTE*
+🕐 3/5/2026, 12:06:20
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“ˆ *RESUMEN*
-â€¢ 403 mensajes
-â€¢ 39 tareas (3 urgentes)
-â€¢ 13 ideas
-â€¢ 16 decisiones
-â€¢ 9 links
-â€¢ 2 menciones
+━━━━━━━━━━━━━━━━━━━━━━
+📈 *RESUMEN*
+• 403 mensajes
+• 39 tareas (3 urgentes)
+• 13 ideas
+• 16 decisiones
+• 9 links
+• 2 menciones
 
-ðŸ“Š *SENTIMIENTO*
-â€¢ ðŸ˜Š Positivo: 20
-â€¢ ðŸ˜¤ Negativo: 4
-â€¢ âš¡ Urgente: 0
-
-
-ðŸ”— *LINKS*
-â€¢ https://github.com/EEA-Ops-Master/nexo-digital
-â€¢ https://github.com/EEA-Ops-Master/aee
-â€¢ https://vm.tiktok.com/ZNRpRPeVn/
-â€¢ https://santafe.nexo-digital.app/
-â€¢ https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca
-â€¢ https://share.google/CXF7eEadwK7SwrMLA
-â€¢ https://forms.gle/dGxeG7SDqikcaLPg9
-â€¢ https://lilissimaa.com/metodo
-â€¢ https://www.instagram.com/stories/lilissimaa/3855719679558159722
+📊 *SENTIMIENTO*
+• 😊 Positivo: 20
+• 😤 Negativo: 4
+• ⚡ Urgente: 0
 
 
-ðŸ“ *TAREAS*
-â€¢ [P2-MEDIA] https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal (41433717305344@lid)
-â€¢ [P2-MEDIA] Bom diaaa turma! 
+🔗 *LINKS*
+• https://github.com/EEA-Ops-Master/nexo-digital
+• https://github.com/EEA-Ops-Master/aee
+• https://vm.tiktok.com/ZNRpRPeVn/
+• https://santafe.nexo-digital.app/
+• https://maps.google.com/maps/place//data=!4m2!3m1!1s0x12a495c804cb13cb:0xcf69b6131c42ab54?entry=s&sa=X&ved=2ahUKEwjJnNG40ZKUAxXnWqQEHUmHDQsQ4kB6BAgEEAA&hl=ca
+• https://share.google/CXF7eEadwK7SwrMLA
+• https://forms.gle/dGxeG7SDqikcaLPg9
+• https://lilissimaa.com/metodo
+• https://www.instagram.com/stories/lilissimaa/3855719679558159722
+
+
+📝 *TAREAS*
+• [P2-MEDIA] https://github.com/EEA-Ops-Master/nexo-digital sobem a nexo no dominio principal (41433717305344@lid)
+• [P2-MEDIA] Bom diaaa turma! 
 Ontem as redes sociais foi arrumadas e creadas do irmão Paulo, (41433717305344@lid)
-â€¢ [P2-MEDIA] HAHAHAHAHAH noke eu nao acredito cara, eu tava lembrando justamente disso que to (148193736163343@lid)
-â€¢ [P1-ALTA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA — ALFREDO FREIRE!
+• [P2-MEDIA] HAHAHAHAHAH noke eu nao acredito cara, eu tava lembrando justamente disso que to (148193736163343@lid)
+• [P1-ALTA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA — ALFREDO FREIRE!
 📅 Sexta-feira, 24/04 — É HOJ (35596756099211@lid)
-â€¢ [P2-MEDIA] 😵 NEM A PATROA AGUENTOU E TEVE QUE FAZER RESSUSCITAÇÃO!
+• [P2-MEDIA] 😵 NEM A PATROA AGUENTOU E TEVE QUE FAZER RESSUSCITAÇÃO!
 💥 As ofertas da Ki Del (35596756099211@lid)
-â€¢ [P2-MEDIA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA ALFREDO FREIRE!
+• [P2-MEDIA] 🎉 MEGA REINAUGURAÇÃO KI DELÍCIA ALFREDO FREIRE!
 
 📅 Sexta-feira, 24/04 
 🍺 Cerv (35596756099211@lid)
-â€¢ [P2-MEDIA] Ja vamos fazendo tempo pra gente jogar (29055470555236@lid)
-â€¢ [P0-CRITICO] ApdD meu irmão Paulo! Tudo bem? Esperamos que sim 😊
+• [P2-MEDIA] Ja vamos fazendo tempo pra gente jogar (29055470555236@lid)
+• [P0-CRITICO] ApdD meu irmão Paulo! Tudo bem? Esperamos que sim 😊
 
 Seguimos firmes aqui no pr (41433717305344@lid)
-â€¢ [P2-MEDIA] A Paz de Deus! 
+• [P2-MEDIA] A Paz de Deus! 
 
 Mocidade bora fazer um encontro dia 17 de maio, um churras? Dep (237516070359237@lid)
-â€¢ [P2-MEDIA] Amém Caio podemos animar em fazer esse encontro seria muito top 🔝 faz tempo que (87063483404382@lid)
-â€¢ [P2-MEDIA] A paz de Deus Caio que legal,que lugar lindo estamos juntos,cadê os jovens anima (95391341084757@lid)
-â€¢ [P2-MEDIA] Amém! Por aquí estamos todos animados pro churrasco, só teria que confirmar pro  (235471598805239@lid)
-â€¢ [P2-MEDIA] La paz de Dios a todos
+• [P2-MEDIA] Amém Caio podemos animar em fazer esse encontro seria muito top 🔝 faz tempo que (87063483404382@lid)
+• [P2-MEDIA] A paz de Deus Caio que legal,que lugar lindo estamos juntos,cadê os jovens anima (95391341084757@lid)
+• [P2-MEDIA] Amém! Por aquí estamos todos animados pro churrasco, só teria que confirmar pro  (235471598805239@lid)
+• [P2-MEDIA] La paz de Dios a todos
 El proximo dia 14/02 NO habrá classes de musica por motiv (68552090464350@lid)
-â€¢ [P2-MEDIA] Apaz de DEUS a todos (279517075632243@lid)
-â€¢ [P2-MEDIA] Paz de Dios, el ensaio es el primer sabado del mes 07/03, estan todos invitados (60065335742637@lid)
-â€¢ [P2-MEDIA] A paz de Deus
+• [P2-MEDIA] Apaz de DEUS a todos (279517075632243@lid)
+• [P2-MEDIA] Paz de Dios, el ensaio es el primer sabado del mes 07/03, estan todos invitados (60065335742637@lid)
+• [P2-MEDIA] A paz de Deus
 Queridos hermanos e instrutores.
 
 Les informo que  por motivos de  (109977066819772@lid)
-â€¢ [P2-MEDIA] La Paz De Dios a toda la  hermandad recordemos que hoy tenemos ensayo local en s (68552090464350@lid)
-â€¢ [P1-ALTA] La Paz de Dios, 
+• [P2-MEDIA] La Paz De Dios a toda la  hermandad recordemos que hoy tenemos ensayo local en s (68552090464350@lid)
+• [P1-ALTA] La Paz de Dios, 
 
 Animados para el ensayo del gem (Practica del GEM), recordemos (237516070359237@lid)
-â€¢ [P2-MEDIA] Paz de Deus a todos 
+• [P2-MEDIA] Paz de Deus a todos 
 Espero que vamos  todos bem
 
 
 Uma pergunta a manhã a  aulin (38054198775864@lid)
-â€¢ [P2-MEDIA] La paz de Dios a todos
+• [P2-MEDIA] La paz de Dios a todos
 
 El día 01 de mayo a las 10h habrá un ensayo local técnic (68552090464350@lid)
-â€¢ [P0-CRITICO] Oioi, gente 💗
+• [P0-CRITICO] Oioi, gente 💗
 
 PRIMEIRO DE TUDO: confie só nas ADMINS do grupo. Se alguém te ch (95344683647092@lid)
-â€¢ [P1-ALTA] *Faltam 3 dias pra abertura das vagas*
+• [P1-ALTA] *Faltam 3 dias pra abertura das vagas*
 
 E toda vez que ficamos perto da data, eu (95344683647092@lid)
-â€¢ [P2-MEDIA] Oioii gente :)💗
+• [P2-MEDIA] Oioii gente :)💗
 ```
 
 ---
@@ -80635,7 +80635,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "id": "task-1777637576514-8ezk",
     "title": "[LEAD] Contactar Teste Lead",
@@ -80725,7 +80725,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "id": "tx-001",
     "type": "income",
@@ -80815,7 +80815,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿{
+{
   "version": "1.0",
   "updatedAt": "2026-05-01T13:45:00+02:00",
   "integration": {
@@ -81053,7 +81053,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```json
-﻿[
+[
   {
     "id": "wa-task-001",
     "title": "Gerar logo para NEXO Digital (ChatGPT + contexto do site)",
@@ -81143,7 +81143,7 @@ body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a
 - **Linhas lidas:** 80
 
 ```javascript
-﻿/**
+/**
  * ExternalServices - Wrapper cacheado para CLI tools externos
  * Todas as operações usam spawn com timeout + fallback para cache
  */
@@ -81312,7 +81312,7 @@ class ExternalServices {
 - **Linhas lidas:** 80
 
 ```html
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -81412,7 +81412,7 @@ const WebSocket = require('ws');
 const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
 
-// â”€â”€ Cache + External Services (assÃ­ncrono, non-blocking) â”€â”€
+// ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
 const cache = new CacheManager(path.join(__dirname, 'cache'));
@@ -81494,7 +81494,7 @@ function scanClients() {
 - **Imports:** child_process, path
 
 ```javascript
-﻿const { spawn, exec } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 
 console.log("=== TESTE DO BLOCO LUNA ===");
@@ -82814,7 +82814,7 @@ setTimeout(() => {
     "Desconhecido:+34 624 43 85 49:1777729104566",
     "Desconhecido:Maria Edileusa ( Amiga Mãe ):1777729104566",
     "Desconhecido:Luisão O Brabo:1777729104566",
-    "Desconhecido:エヴェリンダ　:1777729104566",
+    "Desconhecido:エヴェリンダ :1777729104566",
     "Desconhecido:Samuel Neto Ir Dora:1777729104566",
     "Desconhecido:Naty Do Claudinei:1777729104566",
     "Desconhecido:Irmão Wesley:1777729104566",
@@ -82865,9 +82865,9 @@ setTimeout(() => {
 - **Exports:** module.exports: { LunaAgent, runAgent, diagnose, CONFIG }
 
 ```javascript
-﻿// ============================================================
-// LUNA v14.1 "OMNIA HYBRID" â€” v10.2 + whatsapp-web.js
-// MantÃ©m 100% personalidade original, engine novo e funcional
+// ============================================================
+// LUNA v14.1 "OMNIA HYBRID" — v10.2 + whatsapp-web.js
+// Mantém 100% personalidade original, engine novo e funcional
 // ============================================================
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -82926,7 +82926,7 @@ class Logger {
   error(m) { this._w('ERROR', m); }
   warn(m) { this._w('WARN', m); }
   scan(m) { this._w('SCAN', m); }
-  extraordinary(m) { console.log(`âœ¨ ${m} âœ¨`); this._w('EXTRAORDINARY', m); }
+  extraordinary(m) { console.log(`✨ ${m} ✨`); this._w('EXTRAORDINARY', m); }
   getEvents() { return this.events; }
 }
 const log = new Logger();
@@ -83868,7 +83868,7 @@ async function main() {
 - **Linhas lidas:** 57
 
 ```json
-﻿[
+[
   {
     \"id\": \"abner\",
     \"name\": \"Abner (Jhin1v9)\",
@@ -92684,8 +92684,8 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$77d5a499-6920-400d-af21-c3ca65deb9ac�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e https://web.whatsapp.com/https://web.whatsapp.com/ (
+�
+wa_web_user_prefs_cache_store$77d5a499-6920-400d-af21-c3ca65deb9ac�(0::wa_web_user_prefs_cache_storehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -93614,12 +93614,12 @@ Taxonomy Version: v2
 
 ```text
 
-�
-lru-media-array-buffer-cache$e7e88ed8-0eba-4eb0-8e3f-7d8fc0741fe5 ( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e 
-�
-wa_web_user_prefs_cache_store$8dfe02e0-b52b-4627-98be-4a042a3ced80�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+lru-media-array-buffer-cache$e7e88ed8-0eba-4eb0-8e3f-7d8fc0741fe5(0:8lru-media-array-buffer-cache
+�
+wa_web_user_prefs_cache_store$8dfe02e0-b52b-4627-98be-4a042a3ced80�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$b70f0104-6e20-4cb9-8ff9-a07eaa3836b8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ 0(
+wa-stickers$b70f0104-6e20-4cb9-8ff9-a07eaa3836b8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ 0(
 ```
 
 ---
@@ -93632,11 +93632,11 @@ Q
 ```text
 
 J
-yt-icons$51084fde-c01e-49e5-8848-6bc1eec51b54��( 0:y t - i c o n s 
+yt-icons$51084fde-c01e-49e5-8848-6bc1eec51b54��(0:yt-icons
 i
-yt-appshell-assets$371b567a-5658-40a8-9725-a8ceab1a13d0���( 0:$y t - a p p s h e l l - a s s e t s 
-�
-yt-player-local-img:V81a25f90||$e728f0e9-2f2b-478a-9dfa-5429655e1c7a ( 0:>y t - p l a y e r - l o c a l - i m g : V 8 1 a 2 5 f 9 0 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-appshell-assets$371b567a-5658-40a8-9725-a8ceab1a13d0���(0:$yt-appshell-assets
+�
+yt-player-local-img:V81a25f90||$e728f0e9-2f2b-478a-9dfa-5429655e1c7a(0:>yt-player-local-img:V81a25f90||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -93649,7 +93649,7 @@ i
 ```text
 
 g
-pns-network-config$ef55c75d-0fe6-4a4b-b84d-2acb88563068�( 0:$p n s - n e t w o r k - c o n f i g https://www.tiktok.com/https://www.tiktok.com/ (
+pns-network-config$ef55c75d-0fe6-4a4b-b84d-2acb88563068�(0:$pns-network-confighttps://www.tiktok.com/https://www.tiktok.com/ (
 ```
 
 ---
@@ -93661,10 +93661,10 @@ g
 
 ```text
 
-�
-notion-sw-23.13.20260421.1413$7f3b279d-bd62-439c-83dc-f5421d6d68e3���( 0::n o t i o n - s w - 2 3 . 1 3 . 2 0 2 6 0 4 2 1 . 1 4 1 3 
+�
+notion-sw-23.13.20260421.1413$7f3b279d-bd62-439c-83dc-f5421d6d68e3���(0::notion-sw-23.13.20260421.1413
 d
-notion-sw-version$e89bd2e2-11b9-4fa5-93eb-d8f88e008275�( 0:"n o t i o n - s w - v e r s i o n https://www.notion.so/https://www.notion.so/ (
+notion-sw-version$e89bd2e2-11b9-4fa5-93eb-d8f88e008275�(0:"notion-sw-versionhttps://www.notion.so/https://www.notion.so/ (
 ```
 
 ---
@@ -93677,7 +93677,8 @@ d
 ```text
 
 k
-recibo-alfombras-v1$6c1ae005-5984-44c7-ac1b-76b52d8d3a68��<( 0:&r e c i b o - a l f o m b r a s - v 1 &https://recibo-alfombra-v2.vercel.app/&https://recibo-alfombra-v2.vercel.app/ (
+recibo-alfombras-v1$6c1ae005-5984-44c7-ac1b-76b52d8d3a68��<(0:&recibo-alfombras-v1&https://recibo-alfombra-v2.vercel.app/&https://recibo-alfombra-v2.vercel.app/ 
+(
 ```
 
 ---
@@ -93690,7 +93691,7 @@ k
 ```text
 
 K
-	cache-awc$2788cf6d-a8e3-4dcc-b0ae-228f019526b8 ( 0:c a c h e - a w c https://www.photoroom.com/https://www.photoroom.com/ *(
+	cache-awc$2788cf6d-a8e3-4dcc-b0ae-228f019526b8(0:cache-awchttps://www.photoroom.com/https://www.photoroom.com/ *(
 ```
 
 ---
@@ -93891,7 +93892,7 @@ K
 ```text
 
 I
-yt-icons$71a51fb4-b788-4e7f-8eaa-ddb323001545�@( 0:y t - i c o n s https://www.youtube.com/1https://www.youtube.com/^0https://logiscenter.com (
+yt-icons$71a51fb4-b788-4e7f-8eaa-ddb323001545�@(0:yt-iconshttps://www.youtube.com/1https://www.youtube.com/^0https://logiscenter.com (
 ```
 
 ---
@@ -93904,7 +93905,7 @@ I
 ```text
 
 H
-yt-icons$769b7dce-547d-476a-b00a-7ad217e8fd3c ( 0:y t - i c o n s https://www.youtube.com/0https://www.youtube.com/^0https://elotouch.co.uk (
+yt-icons$769b7dce-547d-476a-b00a-7ad217e8fd3c(0:yt-iconshttps://www.youtube.com/0https://www.youtube.com/^0https://elotouch.co.uk (
 ```
 
 ---
@@ -93917,7 +93918,7 @@ H
 ```text
 
 H
-yt-icons$f8c109ad-aee8-4a29-87b9-63c32ca8e83f ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$f8c109ad-aee8-4a29-87b9-63c32ca8e83f(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -93930,7 +93931,7 @@ H
 ```text
 
 H
-yt-icons$8eb8e8ba-9293-47df-bd02-0ab9f58a9115 ( 0:y t - i c o n s https://www.youtube.com/.https://www.youtube.com/^0https://elotouch.com (
+yt-icons$8eb8e8ba-9293-47df-bd02-0ab9f58a9115(0:yt-iconshttps://www.youtube.com/.https://www.youtube.com/^0https://elotouch.com (
 ```
 
 ---
@@ -95042,12 +95043,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 N
 
-pagination$ec7c6696-a213-40db-a039-45b29f0b87d5 ( 0:p a g i n a t i o n 
+pagination$ec7c6696-a213-40db-a039-45b29f0b87d5(0:pagination
 a
-acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�( 0: a c m C o n f i g u r a t i o n 
+acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�(0: acmConfiguration
 M
-	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
-( 0:p a g e P r o p s https://www.primevideo.com/https://www.primevideo.com/ (
+	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
+(0:pagePropshttps://www.primevideo.com/https://www.primevideo.com/ (
 ```
 
 ---
@@ -95059,10 +95060,10 @@ M
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -95073,7 +95074,7 @@ Q
 - **Linhas lidas:** 1
 
 ```text
-https://www.instagram.com/https://www.instagram.com/ (
+https://www.instagram.com/https://www.instagram.com/ (
 ```
 
 ---
@@ -95086,11 +95087,11 @@ Q
 ```text
 
 i
-yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���( 0:$y t - a p p s h e l l - a s s e t s 
+yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���(0:$yt-appshell-assets
 J
-yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��( 0:y t - i c o n s 
-�
-+yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693 ( 0:Vy t - p l a y e r - l o c a l - i m g : 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��(0:yt-icons
+�
++yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693(0:Vyt-player-local-img:117749193806333248929||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -95102,24 +95103,24 @@ J
 
 ```text
 
-�
-2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���( 0:d/ u / 0 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
-�
-1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���( 0:b/ _ / P h o t o s U i : b o q . P h o t o s U i . p t _ B R . T d e T 0 R F 7 W i A . 2 0 1 9 . O 
+�
+2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���(0:d/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
+�
+1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���(0:b/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O
 x
-pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066 ( 0:0p g c 1 1 6 0 7 0 5 8 4 2 5 3 4 4 0 4 8 4 7 5 8 
-�
-J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���( 0:�/ u / 0 / b / 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066(0:0pgc116070584253440484758
+�
+J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���(0:�/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8 ( 0:0p g c 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 
-�
-J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���( 0:�/ u / 0 / b / 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8(0:0pgc116504035430573639138
+�
+J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���(0:�/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1 ( 0:0p g c 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 
-�
-2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���( 0:d/ u / 1 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1(0:0pgc105541430642512009729
+�
+2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���(0:d/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b ( 0:0p g c 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 https://photos.google.com/https://photos.google.com/ (
+pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b(0:0pgc117749193806333248929https://photos.google.com/https://photos.google.com/ (
 ```
 
 ---
@@ -95132,9 +95133,9 @@ x
 ```text
 
 Q
-experiments$29048538-4b60-4aad-bc47-a6508c7196f7 ( 0:e x p e r i m e n t s 
+experiments$29048538-4b60-4aad-bc47-a6508c7196f7(0:experiments
 ]
-blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0 ( 0:b l o c k e d _ d o m a i n s https://discord.com/https://discord.com/ (
+blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0(0:blocked_domainshttps://discord.com/https://discord.com/ (
 ```
 
 ---
@@ -95147,17 +95148,17 @@ Q
 ```text
 
 |
-workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2( 0:2w o r k b o x - o f f l i n e - f a l l b a c k s 
-�
-/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ( 0:^w o r k b o x - p r e c a c h e - v 2 - h t t p s : / / a p p s . m i c r o s o f t . c o m / 
+workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2(0:2workbox-offline-fallbacks
+�
+/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ(0:^workbox-precache-v2-https://apps.microsoft.com/
 e
-static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: s t a t i c - r e s o u r c e s 
+static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: static-resources
 H
-images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:i m a g e s 
+images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:images
 C
-chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�( 0:c h r o m e 
+chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�(0:chrome
 S
-api-results$14749091-7bb5-44d0-a968-d0a4a5409573��( 0:a p i - r e s u l t s https://apps.microsoft.com/https://apps.microsoft.com/ 	(
+api-results$14749091-7bb5-44d0-a968-d0a4a5409573��(0:api-resultshttps://apps.microsoft.com/https://apps.microsoft.com/ 	(
 ```
 
 ---
@@ -95170,7 +95171,7 @@ S
 ```text
 
 J
-yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��( 0:y t - i c o n s https://studio.youtube.com/https://studio.youtube.com/ (
+yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��(0:yt-iconshttps://studio.youtube.com/https://studio.youtube.com/ (
 ```
 
 ---
@@ -95181,7 +95182,7 @@ J
 - **Linhas lidas:** 1
 
 ```text
-https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
+https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
 ```
 
 ---
@@ -95194,7 +95195,7 @@ J
 ```text
 
 H
-yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028 ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -95310,12 +95311,12 @@ Taxonomy Version: v2
 
 N
 
-pagination$ec7c6696-a213-40db-a039-45b29f0b87d5 ( 0:p a g i n a t i o n 
+pagination$ec7c6696-a213-40db-a039-45b29f0b87d5(0:pagination
 a
-acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�( 0: a c m C o n f i g u r a t i o n 
+acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�(0: acmConfiguration
 M
-	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
-( 0:p a g e P r o p s https://www.primevideo.com/https://www.primevideo.com/ (
+	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
+(0:pagePropshttps://www.primevideo.com/https://www.primevideo.com/ (
 ```
 
 ---
@@ -95327,10 +95328,10 @@ M
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -95341,7 +95342,7 @@ Q
 - **Linhas lidas:** 1
 
 ```text
-https://www.instagram.com/https://www.instagram.com/ (
+https://www.instagram.com/https://www.instagram.com/ (
 ```
 
 ---
@@ -95354,11 +95355,11 @@ Q
 ```text
 
 i
-yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���( 0:$y t - a p p s h e l l - a s s e t s 
+yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���(0:$yt-appshell-assets
 J
-yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��( 0:y t - i c o n s 
-�
-+yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693 ( 0:Vy t - p l a y e r - l o c a l - i m g : 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��(0:yt-icons
+�
++yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693(0:Vyt-player-local-img:117749193806333248929||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -95370,24 +95371,24 @@ J
 
 ```text
 
-�
-2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���( 0:d/ u / 0 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
-�
-1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���( 0:b/ _ / P h o t o s U i : b o q . P h o t o s U i . p t _ B R . T d e T 0 R F 7 W i A . 2 0 1 9 . O 
+�
+2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���(0:d/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
+�
+1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���(0:b/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O
 x
-pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066 ( 0:0p g c 1 1 6 0 7 0 5 8 4 2 5 3 4 4 0 4 8 4 7 5 8 
-�
-J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���( 0:�/ u / 0 / b / 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066(0:0pgc116070584253440484758
+�
+J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���(0:�/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8 ( 0:0p g c 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 
-�
-J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���( 0:�/ u / 0 / b / 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8(0:0pgc116504035430573639138
+�
+J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���(0:�/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1 ( 0:0p g c 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 
-�
-2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���( 0:d/ u / 1 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1(0:0pgc105541430642512009729
+�
+2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���(0:d/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b ( 0:0p g c 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 https://photos.google.com/https://photos.google.com/ (
+pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b(0:0pgc117749193806333248929https://photos.google.com/https://photos.google.com/ (
 ```
 
 ---
@@ -95400,9 +95401,9 @@ x
 ```text
 
 Q
-experiments$29048538-4b60-4aad-bc47-a6508c7196f7 ( 0:e x p e r i m e n t s 
+experiments$29048538-4b60-4aad-bc47-a6508c7196f7(0:experiments
 ]
-blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0 ( 0:b l o c k e d _ d o m a i n s https://discord.com/https://discord.com/ (
+blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0(0:blocked_domainshttps://discord.com/https://discord.com/ (
 ```
 
 ---
@@ -95415,17 +95416,17 @@ Q
 ```text
 
 |
-workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2( 0:2w o r k b o x - o f f l i n e - f a l l b a c k s 
-�
-/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ( 0:^w o r k b o x - p r e c a c h e - v 2 - h t t p s : / / a p p s . m i c r o s o f t . c o m / 
+workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2(0:2workbox-offline-fallbacks
+�
+/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ(0:^workbox-precache-v2-https://apps.microsoft.com/
 e
-static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: s t a t i c - r e s o u r c e s 
+static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: static-resources
 H
-images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:i m a g e s 
+images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:images
 C
-chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�( 0:c h r o m e 
+chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�(0:chrome
 S
-api-results$14749091-7bb5-44d0-a968-d0a4a5409573��( 0:a p i - r e s u l t s https://apps.microsoft.com/https://apps.microsoft.com/ 	(
+api-results$14749091-7bb5-44d0-a968-d0a4a5409573��(0:api-resultshttps://apps.microsoft.com/https://apps.microsoft.com/ 	(
 ```
 
 ---
@@ -95438,7 +95439,7 @@ S
 ```text
 
 J
-yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��( 0:y t - i c o n s https://studio.youtube.com/https://studio.youtube.com/ (
+yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��(0:yt-iconshttps://studio.youtube.com/https://studio.youtube.com/ (
 ```
 
 ---
@@ -95449,7 +95450,7 @@ J
 - **Linhas lidas:** 1
 
 ```text
-https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
+https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
 ```
 
 ---
@@ -95462,7 +95463,7 @@ J
 ```text
 
 H
-yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028 ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -96651,12 +96652,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$632c126e-de13-4941-a28f-de59af153a7b�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$632c126e-de13-4941-a28f-de59af153a7b�(0::wa_web_user_prefs_cache_store
 S
-wa-stickers$31eb091a-b387-40a6-b2c2-1e5337d8ec0a��_( 0:w a - s t i c k e r s 
-�
-lru-media-array-buffer-cache$a15d525b-bc79-41a0-ba27-a45d1ecf830b���( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$31eb091a-b387-40a6-b2c2-1e5337d8ec0a��_(0:wa-stickers
+�
+lru-media-array-buffer-cache$a15d525b-bc79-41a0-ba27-a45d1ecf830b���(0:8lru-media-array-buffer-cachehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -98864,10 +98865,10 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$abbef637-7d3e-40d7-a34b-d7571e082b11�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$abbef637-7d3e-40d7-a34b-d7571e082b11�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$4ee28a6e-4ede-4979-840d-3a46b258d108 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$4ee28a6e-4ede-4979-840d-3a46b258d108(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -98958,12 +98959,12 @@ Taxonomy Version: v2
 
 N
 
-pagination$ec7c6696-a213-40db-a039-45b29f0b87d5 ( 0:p a g i n a t i o n 
+pagination$ec7c6696-a213-40db-a039-45b29f0b87d5(0:pagination
 a
-acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�( 0: a c m C o n f i g u r a t i o n 
+acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�(0: acmConfiguration
 M
-	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
-( 0:p a g e P r o p s https://www.primevideo.com/https://www.primevideo.com/ (
+	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
+(0:pagePropshttps://www.primevideo.com/https://www.primevideo.com/ (
 ```
 
 ---
@@ -98975,10 +98976,10 @@ M
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -98989,7 +98990,7 @@ Q
 - **Linhas lidas:** 1
 
 ```text
-https://www.instagram.com/https://www.instagram.com/ (
+https://www.instagram.com/https://www.instagram.com/ (
 ```
 
 ---
@@ -99002,11 +99003,11 @@ Q
 ```text
 
 i
-yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���( 0:$y t - a p p s h e l l - a s s e t s 
+yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���(0:$yt-appshell-assets
 J
-yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��( 0:y t - i c o n s 
-�
-+yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693 ( 0:Vy t - p l a y e r - l o c a l - i m g : 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��(0:yt-icons
+�
++yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693(0:Vyt-player-local-img:117749193806333248929||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -99018,24 +99019,24 @@ J
 
 ```text
 
-�
-2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���( 0:d/ u / 0 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
-�
-1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���( 0:b/ _ / P h o t o s U i : b o q . P h o t o s U i . p t _ B R . T d e T 0 R F 7 W i A . 2 0 1 9 . O 
+�
+2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���(0:d/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
+�
+1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���(0:b/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O
 x
-pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066 ( 0:0p g c 1 1 6 0 7 0 5 8 4 2 5 3 4 4 0 4 8 4 7 5 8 
-�
-J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���( 0:�/ u / 0 / b / 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066(0:0pgc116070584253440484758
+�
+J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���(0:�/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8 ( 0:0p g c 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 
-�
-J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���( 0:�/ u / 0 / b / 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8(0:0pgc116504035430573639138
+�
+J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���(0:�/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1 ( 0:0p g c 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 
-�
-2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���( 0:d/ u / 1 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1(0:0pgc105541430642512009729
+�
+2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���(0:d/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b ( 0:0p g c 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 https://photos.google.com/https://photos.google.com/ (
+pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b(0:0pgc117749193806333248929https://photos.google.com/https://photos.google.com/ (
 ```
 
 ---
@@ -99048,9 +99049,9 @@ x
 ```text
 
 Q
-experiments$29048538-4b60-4aad-bc47-a6508c7196f7 ( 0:e x p e r i m e n t s 
+experiments$29048538-4b60-4aad-bc47-a6508c7196f7(0:experiments
 ]
-blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0 ( 0:b l o c k e d _ d o m a i n s https://discord.com/https://discord.com/ (
+blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0(0:blocked_domainshttps://discord.com/https://discord.com/ (
 ```
 
 ---
@@ -99063,17 +99064,17 @@ Q
 ```text
 
 |
-workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2( 0:2w o r k b o x - o f f l i n e - f a l l b a c k s 
-�
-/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ( 0:^w o r k b o x - p r e c a c h e - v 2 - h t t p s : / / a p p s . m i c r o s o f t . c o m / 
+workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2(0:2workbox-offline-fallbacks
+�
+/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ(0:^workbox-precache-v2-https://apps.microsoft.com/
 e
-static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: s t a t i c - r e s o u r c e s 
+static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: static-resources
 H
-images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:i m a g e s 
+images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:images
 C
-chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�( 0:c h r o m e 
+chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�(0:chrome
 S
-api-results$14749091-7bb5-44d0-a968-d0a4a5409573��( 0:a p i - r e s u l t s https://apps.microsoft.com/https://apps.microsoft.com/ 	(
+api-results$14749091-7bb5-44d0-a968-d0a4a5409573��(0:api-resultshttps://apps.microsoft.com/https://apps.microsoft.com/ 	(
 ```
 
 ---
@@ -99086,7 +99087,7 @@ S
 ```text
 
 J
-yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��( 0:y t - i c o n s https://studio.youtube.com/https://studio.youtube.com/ (
+yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��(0:yt-iconshttps://studio.youtube.com/https://studio.youtube.com/ (
 ```
 
 ---
@@ -99619,12 +99620,12 @@ License
 
 N
 
-pagination$ec7c6696-a213-40db-a039-45b29f0b87d5 ( 0:p a g i n a t i o n 
+pagination$ec7c6696-a213-40db-a039-45b29f0b87d5(0:pagination
 a
-acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�( 0: a c m C o n f i g u r a t i o n 
+acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�(0: acmConfiguration
 M
-	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
-( 0:p a g e P r o p s https://www.primevideo.com/https://www.primevideo.com/ (
+	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
+(0:pagePropshttps://www.primevideo.com/https://www.primevideo.com/ (
 ```
 
 ---
@@ -99636,10 +99637,10 @@ M
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -99650,7 +99651,7 @@ Q
 - **Linhas lidas:** 1
 
 ```text
-https://www.instagram.com/https://www.instagram.com/ (
+https://www.instagram.com/https://www.instagram.com/ (
 ```
 
 ---
@@ -99663,11 +99664,11 @@ Q
 ```text
 
 i
-yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���( 0:$y t - a p p s h e l l - a s s e t s 
+yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���(0:$yt-appshell-assets
 J
-yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��( 0:y t - i c o n s 
-�
-+yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693 ( 0:Vy t - p l a y e r - l o c a l - i m g : 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��(0:yt-icons
+�
++yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693(0:Vyt-player-local-img:117749193806333248929||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -99679,24 +99680,24 @@ J
 
 ```text
 
-�
-2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���( 0:d/ u / 0 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
-�
-1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���( 0:b/ _ / P h o t o s U i : b o q . P h o t o s U i . p t _ B R . T d e T 0 R F 7 W i A . 2 0 1 9 . O 
+�
+2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���(0:d/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
+�
+1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���(0:b/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O
 x
-pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066 ( 0:0p g c 1 1 6 0 7 0 5 8 4 2 5 3 4 4 0 4 8 4 7 5 8 
-�
-J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���( 0:�/ u / 0 / b / 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066(0:0pgc116070584253440484758
+�
+J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���(0:�/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8 ( 0:0p g c 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 
-�
-J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���( 0:�/ u / 0 / b / 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8(0:0pgc116504035430573639138
+�
+J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���(0:�/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1 ( 0:0p g c 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 
-�
-2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���( 0:d/ u / 1 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1(0:0pgc105541430642512009729
+�
+2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���(0:d/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b ( 0:0p g c 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 https://photos.google.com/https://photos.google.com/ (
+pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b(0:0pgc117749193806333248929https://photos.google.com/https://photos.google.com/ (
 ```
 
 ---
@@ -99709,9 +99710,9 @@ x
 ```text
 
 Q
-experiments$29048538-4b60-4aad-bc47-a6508c7196f7 ( 0:e x p e r i m e n t s 
+experiments$29048538-4b60-4aad-bc47-a6508c7196f7(0:experiments
 ]
-blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0 ( 0:b l o c k e d _ d o m a i n s https://discord.com/https://discord.com/ (
+blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0(0:blocked_domainshttps://discord.com/https://discord.com/ (
 ```
 
 ---
@@ -99724,17 +99725,17 @@ Q
 ```text
 
 |
-workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2( 0:2w o r k b o x - o f f l i n e - f a l l b a c k s 
-�
-/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ( 0:^w o r k b o x - p r e c a c h e - v 2 - h t t p s : / / a p p s . m i c r o s o f t . c o m / 
+workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2(0:2workbox-offline-fallbacks
+�
+/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ(0:^workbox-precache-v2-https://apps.microsoft.com/
 e
-static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: s t a t i c - r e s o u r c e s 
+static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: static-resources
 H
-images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:i m a g e s 
+images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:images
 C
-chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�( 0:c h r o m e 
+chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�(0:chrome
 S
-api-results$14749091-7bb5-44d0-a968-d0a4a5409573��( 0:a p i - r e s u l t s https://apps.microsoft.com/https://apps.microsoft.com/ 	(
+api-results$14749091-7bb5-44d0-a968-d0a4a5409573��(0:api-resultshttps://apps.microsoft.com/https://apps.microsoft.com/ 	(
 ```
 
 ---
@@ -99747,7 +99748,7 @@ S
 ```text
 
 J
-yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��( 0:y t - i c o n s https://studio.youtube.com/https://studio.youtube.com/ (
+yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��(0:yt-iconshttps://studio.youtube.com/https://studio.youtube.com/ (
 ```
 
 ---
@@ -99758,7 +99759,7 @@ J
 - **Linhas lidas:** 1
 
 ```text
-https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
+https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
 ```
 
 ---
@@ -99771,7 +99772,7 @@ J
 ```text
 
 H
-yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028 ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -100766,9 +100767,9 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 ```text
 
 Q
-wa-stickers$e816621d-35d7-4eb0-bf5c-3b79e8331d10 ( 0:w a - s t i c k e r s 
-�
-wa_web_user_prefs_cache_store$292f6255-b0dc-48ce-9a4f-4e059da44ad0�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$e816621d-35d7-4eb0-bf5c-3b79e8331d10(0:wa-stickers
+�
+wa_web_user_prefs_cache_store$292f6255-b0dc-48ce-9a4f-4e059da44ad0�(0::wa_web_user_prefs_cache_storehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -101276,12 +101277,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-lru-media-array-buffer-cache$e7e88ed8-0eba-4eb0-8e3f-7d8fc0741fe5 ( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e 
-�
-wa_web_user_prefs_cache_store$8dfe02e0-b52b-4627-98be-4a042a3ced80�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+lru-media-array-buffer-cache$e7e88ed8-0eba-4eb0-8e3f-7d8fc0741fe5(0:8lru-media-array-buffer-cache
+�
+wa_web_user_prefs_cache_store$8dfe02e0-b52b-4627-98be-4a042a3ced80�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$b70f0104-6e20-4cb9-8ff9-a07eaa3836b8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ 0(
+wa-stickers$b70f0104-6e20-4cb9-8ff9-a07eaa3836b8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ 0(
 ```
 
 ---
@@ -101294,11 +101295,11 @@ Q
 ```text
 
 J
-yt-icons$51084fde-c01e-49e5-8848-6bc1eec51b54��( 0:y t - i c o n s 
+yt-icons$51084fde-c01e-49e5-8848-6bc1eec51b54��(0:yt-icons
 i
-yt-appshell-assets$371b567a-5658-40a8-9725-a8ceab1a13d0���( 0:$y t - a p p s h e l l - a s s e t s 
-�
-yt-player-local-img:V81a25f90||$e728f0e9-2f2b-478a-9dfa-5429655e1c7a ( 0:>y t - p l a y e r - l o c a l - i m g : V 8 1 a 2 5 f 9 0 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-appshell-assets$371b567a-5658-40a8-9725-a8ceab1a13d0���(0:$yt-appshell-assets
+�
+yt-player-local-img:V81a25f90||$e728f0e9-2f2b-478a-9dfa-5429655e1c7a(0:>yt-player-local-img:V81a25f90||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -101311,7 +101312,7 @@ i
 ```text
 
 g
-pns-network-config$ef55c75d-0fe6-4a4b-b84d-2acb88563068�( 0:$p n s - n e t w o r k - c o n f i g https://www.tiktok.com/https://www.tiktok.com/ (
+pns-network-config$ef55c75d-0fe6-4a4b-b84d-2acb88563068�(0:$pns-network-confighttps://www.tiktok.com/https://www.tiktok.com/ (
 ```
 
 ---
@@ -101323,10 +101324,10 @@ g
 
 ```text
 
-�
-notion-sw-23.13.20260421.1413$7f3b279d-bd62-439c-83dc-f5421d6d68e3���( 0::n o t i o n - s w - 2 3 . 1 3 . 2 0 2 6 0 4 2 1 . 1 4 1 3 
+�
+notion-sw-23.13.20260421.1413$7f3b279d-bd62-439c-83dc-f5421d6d68e3���(0::notion-sw-23.13.20260421.1413
 d
-notion-sw-version$e89bd2e2-11b9-4fa5-93eb-d8f88e008275�( 0:"n o t i o n - s w - v e r s i o n https://www.notion.so/https://www.notion.so/ (
+notion-sw-version$e89bd2e2-11b9-4fa5-93eb-d8f88e008275�(0:"notion-sw-versionhttps://www.notion.so/https://www.notion.so/ (
 ```
 
 ---
@@ -101339,7 +101340,8 @@ d
 ```text
 
 k
-recibo-alfombras-v1$6c1ae005-5984-44c7-ac1b-76b52d8d3a68��<( 0:&r e c i b o - a l f o m b r a s - v 1 &https://recibo-alfombra-v2.vercel.app/&https://recibo-alfombra-v2.vercel.app/ (
+recibo-alfombras-v1$6c1ae005-5984-44c7-ac1b-76b52d8d3a68��<(0:&recibo-alfombras-v1&https://recibo-alfombra-v2.vercel.app/&https://recibo-alfombra-v2.vercel.app/ 
+(
 ```
 
 ---
@@ -101352,7 +101354,7 @@ k
 ```text
 
 K
-	cache-awc$2788cf6d-a8e3-4dcc-b0ae-228f019526b8 ( 0:c a c h e - a w c https://www.photoroom.com/https://www.photoroom.com/ *(
+	cache-awc$2788cf6d-a8e3-4dcc-b0ae-228f019526b8(0:cache-awchttps://www.photoroom.com/https://www.photoroom.com/ *(
 ```
 
 ---
@@ -101365,7 +101367,7 @@ K
 ```text
 
 I
-yt-icons$71a51fb4-b788-4e7f-8eaa-ddb323001545�@( 0:y t - i c o n s https://www.youtube.com/1https://www.youtube.com/^0https://logiscenter.com (
+yt-icons$71a51fb4-b788-4e7f-8eaa-ddb323001545�@(0:yt-iconshttps://www.youtube.com/1https://www.youtube.com/^0https://logiscenter.com (
 ```
 
 ---
@@ -101378,7 +101380,7 @@ I
 ```text
 
 H
-yt-icons$769b7dce-547d-476a-b00a-7ad217e8fd3c ( 0:y t - i c o n s https://www.youtube.com/0https://www.youtube.com/^0https://elotouch.co.uk (
+yt-icons$769b7dce-547d-476a-b00a-7ad217e8fd3c(0:yt-iconshttps://www.youtube.com/0https://www.youtube.com/^0https://elotouch.co.uk (
 ```
 
 ---
@@ -101391,7 +101393,7 @@ H
 ```text
 
 H
-yt-icons$f8c109ad-aee8-4a29-87b9-63c32ca8e83f ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$f8c109ad-aee8-4a29-87b9-63c32ca8e83f(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -101404,7 +101406,7 @@ H
 ```text
 
 H
-yt-icons$8eb8e8ba-9293-47df-bd02-0ab9f58a9115 ( 0:y t - i c o n s https://www.youtube.com/.https://www.youtube.com/^0https://elotouch.com (
+yt-icons$8eb8e8ba-9293-47df-bd02-0ab9f58a9115(0:yt-iconshttps://www.youtube.com/.https://www.youtube.com/^0https://elotouch.com (
 ```
 
 ---
@@ -102445,7 +102447,7 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 ```text
 
 H
-yt-icons$896644f7-fe26-4fe5-aa53-b4ecdb5353bb ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$896644f7-fe26-4fe5-aa53-b4ecdb5353bb(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -105105,12 +105107,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$632c126e-de13-4941-a28f-de59af153a7b�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$632c126e-de13-4941-a28f-de59af153a7b�(0::wa_web_user_prefs_cache_store
 S
-wa-stickers$31eb091a-b387-40a6-b2c2-1e5337d8ec0a��_( 0:w a - s t i c k e r s 
-�
-lru-media-array-buffer-cache$a15d525b-bc79-41a0-ba27-a45d1ecf830b���( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$31eb091a-b387-40a6-b2c2-1e5337d8ec0a��_(0:wa-stickers
+�
+lru-media-array-buffer-cache$a15d525b-bc79-41a0-ba27-a45d1ecf830b���(0:8lru-media-array-buffer-cachehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -107318,12 +107320,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$c4d99b48-6cfe-458c-9085-06033bd15f47�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$c4d99b48-6cfe-458c-9085-06033bd15f47�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$79cf9761-256f-4698-b6e3-6560935a5f09 ( 0:w a - s t i c k e r s 
-�
-lru-media-array-buffer-cache$92870aff-168a-49c0-b099-c34f244daac0��8( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$79cf9761-256f-4698-b6e3-6560935a5f09(0:wa-stickers
+�
+lru-media-array-buffer-cache$92870aff-168a-49c0-b099-c34f244daac0��8(0:8lru-media-array-buffer-cachehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -107363,8 +107365,8 @@ Taxonomy Version: v2
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$d197d4c1-6164-4f36-afb8-5613bcad681e�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e https://web.whatsapp.com/https://web.whatsapp.com/ (
+�
+wa_web_user_prefs_cache_store$d197d4c1-6164-4f36-afb8-5613bcad681e�(0::wa_web_user_prefs_cache_storehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -109515,12 +109517,12 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 N
 
-pagination$ec7c6696-a213-40db-a039-45b29f0b87d5 ( 0:p a g i n a t i o n 
+pagination$ec7c6696-a213-40db-a039-45b29f0b87d5(0:pagination
 a
-acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�( 0: a c m C o n f i g u r a t i o n 
+acmConfiguration$45be55a6-2585-4e5f-8b9c-3121578eac78�(0: acmConfiguration
 M
-	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
-( 0:p a g e P r o p s https://www.primevideo.com/https://www.primevideo.com/ (
+	pageProps$a736c478-cef9-4da6-ae70-d34a4e5804f5��
+(0:pagePropshttps://www.primevideo.com/https://www.primevideo.com/ (
 ```
 
 ---
@@ -109532,10 +109534,10 @@ M
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$7b6f71c7-7fe4-4dcf-9941-29eccc4b917d�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$8d3d885b-409c-42e1-9f7a-874501eaafc8(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -109546,7 +109548,7 @@ Q
 - **Linhas lidas:** 1
 
 ```text
-https://www.instagram.com/https://www.instagram.com/ (
+https://www.instagram.com/https://www.instagram.com/ (
 ```
 
 ---
@@ -109559,11 +109561,11 @@ Q
 ```text
 
 i
-yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���( 0:$y t - a p p s h e l l - a s s e t s 
+yt-appshell-assets$7b445605-483f-4ed3-af99-00b2a7b61f7d���(0:$yt-appshell-assets
 J
-yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��( 0:y t - i c o n s 
-�
-+yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693 ( 0:Vy t - p l a y e r - l o c a l - i m g : 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 | | https://www.youtube.com/https://www.youtube.com/ (
+yt-icons$dccee3d7-4d66-4697-aab4-3582db4eefb8��(0:yt-icons
+�
++yt-player-local-img:117749193806333248929||$6707c198-c05c-44a1-884d-51fffd258693(0:Vyt-player-local-img:117749193806333248929||https://www.youtube.com/https://www.youtube.com/ (
 ```
 
 ---
@@ -109575,24 +109577,24 @@ J
 
 ```text
 
-�
-2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���( 0:d/ u / 0 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
-�
-1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���( 0:b/ _ / P h o t o s U i : b o q . P h o t o s U i . p t _ B R . T d e T 0 R F 7 W i A . 2 0 1 9 . O 
+�
+2/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$2296fbf9-e098-45a0-a1d4-2cb86c015472���(0:d/u/0/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
+�
+1/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O$0d789b87-c87a-4aaa-9a5c-56f27ef75b6c���(0:b/_/PhotosUi:boq.PhotosUi.pt_BR.TdeT0RF7WiA.2019.O
 x
-pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066 ( 0:0p g c 1 1 6 0 7 0 5 8 4 2 5 3 4 4 0 4 8 4 7 5 8 
-�
-J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���( 0:�/ u / 0 / b / 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116070584253440484758$15f507b8-adcd-49a7-bf3d-49ef86567066(0:0pgc116070584253440484758
+�
+J/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$bb241d9b-06bb-4c9c-bc93-08eddb705017���(0:�/u/0/b/116504035430573639138/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8 ( 0:0p g c 1 1 6 5 0 4 0 3 5 4 3 0 5 7 3 6 3 9 1 3 8 
-�
-J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���( 0:�/ u / 0 / b / 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc116504035430573639138$a02fe5b7-9952-4f28-9554-bcf115d05ad8(0:0pgc116504035430573639138
+�
+J/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$c236a314-0c20-4824-9770-911bd6f5853a���(0:�/u/0/b/105541430642512009729/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1 ( 0:0p g c 1 0 5 5 4 1 4 3 0 6 4 2 5 1 2 0 0 9 7 2 9 
-�
-2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���( 0:d/ u / 1 / _ / P h o t o s U i : b o q . P h o t o s U i . e s . l Q h m 9 6 P f t s 0 . 2 0 1 9 . O 
+pgc105541430642512009729$56cbf505-8188-49fe-ae8b-8bf4b1475ed1(0:0pgc105541430642512009729
+�
+2/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O$39208819-a14d-4f74-80dd-59fef8a5b80f���(0:d/u/1/_/PhotosUi:boq.PhotosUi.es.lQhm96Pfts0.2019.O
 x
-pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b ( 0:0p g c 1 1 7 7 4 9 1 9 3 8 0 6 3 3 3 2 4 8 9 2 9 https://photos.google.com/https://photos.google.com/ (
+pgc117749193806333248929$d833b122-b36e-4da1-93ec-6ec3a370876b(0:0pgc117749193806333248929https://photos.google.com/https://photos.google.com/ (
 ```
 
 ---
@@ -109605,9 +109607,9 @@ x
 ```text
 
 Q
-experiments$29048538-4b60-4aad-bc47-a6508c7196f7 ( 0:e x p e r i m e n t s 
+experiments$29048538-4b60-4aad-bc47-a6508c7196f7(0:experiments
 ]
-blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0 ( 0:b l o c k e d _ d o m a i n s https://discord.com/https://discord.com/ (
+blocked_domains$30d2fc08-65eb-4295-9d71-682aa4100ae0(0:blocked_domainshttps://discord.com/https://discord.com/ (
 ```
 
 ---
@@ -109620,17 +109622,17 @@ Q
 ```text
 
 |
-workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2( 0:2w o r k b o x - o f f l i n e - f a l l b a c k s 
-�
-/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ( 0:^w o r k b o x - p r e c a c h e - v 2 - h t t p s : / / a p p s . m i c r o s o f t . c o m / 
+workbox-offline-fallbacks$2880ff9d-18ae-4aa8-9b22-38c27efa5657�2(0:2workbox-offline-fallbacks
+�
+/workbox-precache-v2-https://apps.microsoft.com/$e098a9f4-c54a-4b93-a301-e0b1cb12bf9f�Ҋ(0:^workbox-precache-v2-https://apps.microsoft.com/
 e
-static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: s t a t i c - r e s o u r c e s 
+static-resources$ef46b598-7b59-44da-82d5-2cd2469fda20��g(���0: static-resources
 H
-images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:i m a g e s 
+images$97f516b0-32a5-4b58-808b-dac90140d164���(���90:images
 C
-chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�( 0:c h r o m e 
+chrome$f7073587-53a4-4bbb-8d2b-30052dd5c8c0�(0:chrome
 S
-api-results$14749091-7bb5-44d0-a968-d0a4a5409573��( 0:a p i - r e s u l t s https://apps.microsoft.com/https://apps.microsoft.com/ 	(
+api-results$14749091-7bb5-44d0-a968-d0a4a5409573��(0:api-resultshttps://apps.microsoft.com/https://apps.microsoft.com/ 	(
 ```
 
 ---
@@ -109643,7 +109645,7 @@ S
 ```text
 
 J
-yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��( 0:y t - i c o n s https://studio.youtube.com/https://studio.youtube.com/ (
+yt-icons$3c0a53d8-b1cd-4486-afac-22e35ab258a5��(0:yt-iconshttps://studio.youtube.com/https://studio.youtube.com/ (
 ```
 
 ---
@@ -109654,7 +109656,7 @@ J
 - **Linhas lidas:** 1
 
 ```text
-https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
+https://youtube.googleapis.com/3https://youtube.googleapis.com/^0https://google.com (
 ```
 
 ---
@@ -109667,7 +109669,7 @@ J
 ```text
 
 H
-yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028 ( 0:y t - i c o n s https://www.youtube.com/,https://www.youtube.com/^0https://google.com (
+yt-icons$2a7924c2-c284-4da5-99c1-073a5f75d028(0:yt-iconshttps://www.youtube.com/,https://www.youtube.com/^0https://google.com (
 ```
 
 ---
@@ -110280,10 +110282,10 @@ m.string.internal.caseInsensitiveEquals=function(a,c){return a.toLowerCase()==c.
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$90e50876-24fa-4b71-b4f8-8e550188211c�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$90e50876-24fa-4b71-b4f8-8e550188211c�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$a6f9f390-4678-4298-bb0e-7836c6ef60b6 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$a6f9f390-4678-4298-bb0e-7836c6ef60b6(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -110425,12 +110427,12 @@ Q
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$e8d25d7b-36d7-4f8f-aa25-2674b56e5161�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$e8d25d7b-36d7-4f8f-aa25-2674b56e5161�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$70a1a60b-5e91-420f-bd86-6079dc3b18d5 ( 0:w a - s t i c k e r s 
-�
-lru-media-array-buffer-cache$5b3f980a-6665-4a27-bf26-a620f1b6330b��( 0:8l r u - m e d i a - a r r a y - b u f f e r - c a c h e https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$70a1a60b-5e91-420f-bd86-6079dc3b18d5(0:wa-stickers
+�
+lru-media-array-buffer-cache$5b3f980a-6665-4a27-bf26-a620f1b6330b��(0:8lru-media-array-buffer-cachehttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -110544,16 +110546,25 @@ Q
 - **Linhas lidas:** 10
 
 ```json
-��{  
-         " s c r e e n s h o t s " :     [  
-                                                 " C : \ \ U s e r s \ \ A d m i n i s t r a t o r \ \ . k i m i _ o p e n c l a w \ \ w o r k s p a c e \ \ N E X O _ D A S H B O A R D _ P R O \ \ d a t a \ \ s c r e e n s h o t s \ \ d e s k t o p \ \ 0 1 - w h a t s a p p - o p e n - 2 0 2 6 0 4 2 9 - 2 2 0 3 5 1 . p n g " ,  
-                                                 " C : \ \ U s e r s \ \ A d m i n i s t r a t o r \ \ . k i m i _ o p e n c l a w \ \ w o r k s p a c e \ \ N E X O _ D A S H B O A R D _ P R O \ \ d a t a \ \ s c r e e n s h o t s \ \ d e s k t o p \ \ 0 2 - a f t e r - c l i c k - 2 0 2 6 0 4 2 9 - 2 2 0 3 5 4 . p n g "  
-                                         ] ,  
-         " g r o u p " :     " P r o d u c t i o n   2 0 2 6 " ,  
-         " t i m e s t a m p " :     " 2 0 2 6 - 0 4 - 2 9   2 2 : 0 3 : 5 4 " ,  
-         " n o t e s " :     " W h a t s A p p   D e s k t o p   a u t o m a t i o n "  
- }  
- 
+��{
+
+    "screenshots":  [
+
+                        "C:\\Users\\Administrator\\.kimi_openclaw\\workspace\\NEXO_DASHBOARD_PRO\\data\\screenshots\\desktop\\01-whatsapp-open-20260429-220351.png",
+
+                        "C:\\Users\\Administrator\\.kimi_openclaw\\workspace\\NEXO_DASHBOARD_PRO\\data\\screenshots\\desktop\\02-after-click-20260429-220354.png"
+
+                    ],
+
+    "group":  "Production 2026",
+
+    "timestamp":  "2026-04-29 22:03:54",
+
+    "notes":  "WhatsApp Desktop automation"
+
+}
+
+
 ```
 
 ---
@@ -110578,10 +110589,10 @@ Q
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$5173bdaf-a998-49ba-8b13-ace59cca2eb7�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$5173bdaf-a998-49ba-8b13-ace59cca2eb7�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$6402b135-0f6a-42df-8521-cfd63afaa191 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$6402b135-0f6a-42df-8521-cfd63afaa191(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -110709,10 +110720,10 @@ Q
 
 ```text
 
-�
-wa_web_user_prefs_cache_store$82af8261-ef66-4446-9c75-7ca8ffd7f844�( 0::w a _ w e b _ u s e r _ p r e f s _ c a c h e _ s t o r e 
+�
+wa_web_user_prefs_cache_store$82af8261-ef66-4446-9c75-7ca8ffd7f844�(0::wa_web_user_prefs_cache_store
 Q
-wa-stickers$75543429-b386-4e28-91c7-1d6b85437e25 ( 0:w a - s t i c k e r s https://web.whatsapp.com/https://web.whatsapp.com/ (
+wa-stickers$75543429-b386-4e28-91c7-1d6b85437e25(0:wa-stickershttps://web.whatsapp.com/https://web.whatsapp.com/ (
 ```
 
 ---
@@ -112887,7 +112898,7 @@ export default App
 - **Linhas lidas:** 35
 
 ```text
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Shield } from 'lucide-react';
 
 export default function AccessBadge() {
@@ -112932,7 +112943,7 @@ export default function AccessBadge() {
 - **Linhas lidas:** 80
 
 ```text
-﻿// ============================================================
+// ============================================================
 // AutoFixPanel.tsx - Painel de Auto-Correção para Dashboard NEXO
 // Adicionar em: frontend/src/components/AutoFixPanel.tsx
 // ============================================================
@@ -113148,7 +113159,7 @@ export default function HealthTimeline() {
 - **Linhas lidas:** 31
 
 ```text
-﻿import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
 
 const data = [
   { subject: 'Código', A: 80, fullMark: 100 },
@@ -113189,7 +113200,7 @@ export default function PortfolioRadar() {
 - **Linhas lidas:** 71
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, LayoutDashboard, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, FileText, DollarSign } from 'lucide-react'
 
@@ -113270,7 +113281,7 @@ export default function CommandPalette({ open, onClose }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, DollarSign, Calendar, FileText, Repeat, Tag, Users, CheckSquare } from 'lucide-react'
 
@@ -113360,7 +113371,7 @@ export default function AddExpenseModal({ onClose, onSaved }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CreditCard, Calendar, DollarSign, FileText, User } from 'lucide-react'
 
@@ -113540,7 +113551,7 @@ export default function AlertBanner({ alerts = [], dismissible = true, onDismiss
 - **Linhas lidas:** 38
 
 ```text
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { AlertCircle } from 'lucide-react'
 
 /**
@@ -113588,7 +113599,7 @@ export default function AmountDueBadge({ amount, currency = 'EUR', isSevere = fa
 - **Linhas lidas:** 80
 
 ```text
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Wallet, TrendingUp, TrendingDown, BarChart3, ArrowRight } from 'lucide-react'
 
 /**
@@ -113678,7 +113689,7 @@ export default function CashBoxWidget({ cashBox, onViewProjection }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area
 } from 'recharts'
@@ -113768,7 +113779,7 @@ export default function CashFlowProjection({ projection = [], currency = 'EUR' }
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Pencil, Power, Ban, CreditCard } from 'lucide-react'
 import ExpenseCategoryBadge from './ExpenseCategoryBadge'
@@ -113988,7 +113999,7 @@ export default function ExpensePaidBy({ paidBy = {}, splitAmong = [] }) {
 - **Linhas lidas:** 17
 
 ```javascript
-﻿// NEXO DIGITAL — Componentes Financeiros
+// NEXO DIGITAL — Componentes Financeiros
 // Exportações centralizadas para todos os componentes do módulo financeiro
 
 export { default as PaymentCard } from './PaymentCard'
@@ -114015,7 +114026,7 @@ export { default as TransactionRow } from './TransactionRow'
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Github, Globe, FolderOpen, Plus, ArrowUpRight,
@@ -114105,7 +114116,7 @@ export default function PaymentCard({ payment, onAddTransaction, onClick }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   CreditCard, Banknote, Wallet, Smartphone, Clock, CheckCircle2
 } from 'lucide-react'
@@ -114195,7 +114206,7 @@ export default function PaymentTimeline({ transactions = [] }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Zap, Server, Brain, Code, Megaphone, MoreHorizontal, Trash2 } from 'lucide-react'
 import axios from 'axios'
@@ -114332,7 +114343,7 @@ export default function RecurringBadge({ period }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Trash2, Edit3, Check, X, Server, Brain, Code, 
@@ -114422,7 +114433,7 @@ export default function SimpleExpenses() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useMemo } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { CheckCircle2 } from 'lucide-react'
@@ -114512,7 +114523,7 @@ export default function SplitVisualizer({ revenueSplit = [], totalAmount = 0, cu
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowDownLeft, ArrowUpRight, Clock, Filter, Calendar,
@@ -114602,7 +114613,7 @@ export default function StatementSection() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   CreditCard, Banknote, Wallet, Smartphone, Clock
 } from 'lucide-react'
@@ -114745,7 +114756,7 @@ export default function MobileBottomNav() {
 - **Linhas lidas:** 57
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Bell, BellOff, BellRing } from 'lucide-react'
 import useNotifications from '../hooks/useNotifications'
 
@@ -114902,7 +114913,7 @@ function NavItem({ item, sidebarOpen }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿// ============================================================
+// ============================================================
 // StackStatus.tsx - Componente para Dashboard NEXO
 // Adicionar em: frontend/src/components/StackStatus.tsx
 // ============================================================
@@ -115132,7 +115143,7 @@ export const useToast = () => useContext(ToastContext)
 - **Exports:** export useNotifications
 
 ```javascript
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export default function useNotifications() {
   const [permission, setPermission] = useState('default')
@@ -115290,7 +115301,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Lock, Send, Clock, CheckCircle, Mail, User, MessageSquare } from 'lucide-react';
 
 export default function AccessRequest() {
@@ -115380,7 +115391,7 @@ export default function AccessRequest() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users, CheckCircle, XCircle, Shield, Clock,
   Mail, Trash2, RefreshCw, AlertTriangle
@@ -115470,7 +115481,7 @@ export default function AdminAccess() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Wallet, TrendingUp, TrendingDown, AlertTriangle,
@@ -115560,7 +115571,7 @@ export default function Caixa() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Folder, FolderOpen, FileText, Code, Image, MessageSquare, 
@@ -115650,7 +115661,7 @@ function FolderModal({ client, folderName, onClose }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Users, CheckSquare, AlertTriangle, TrendingUp, TrendingDown,
@@ -115740,7 +115751,7 @@ export default function Dashboard() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Wrench, Check, X, Terminal } from 'lucide-react'
 import axios from 'axios'
 
@@ -115830,7 +115841,7 @@ export default function Ferramentas() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Wallet,
@@ -115920,7 +115931,7 @@ const ALERT_COLORS = {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -116010,7 +116021,7 @@ const ExpenseCard = ({ expense, onPayClick }) => {
 - **Linhas lidas:** 74
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Github, GitBranch, GitCommit, GitPullRequest, ExternalLink } from 'lucide-react'
 import axios from 'axios'
 
@@ -116094,7 +116105,7 @@ export default function GitHub() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -116184,7 +116195,7 @@ export default function MeusGastos() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Activity, AlertTriangle, CheckCircle, Clock, MessageSquare,
@@ -116274,7 +116285,7 @@ function ActivityDetailModal({ change, onClose }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   FileText, Eye, CheckCircle, Clock, AlertCircle,
@@ -116364,7 +116375,7 @@ function QuoteCard({ quote, expanded, onToggle }) {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search, ArrowUpDown, Rocket } from 'lucide-react'
 import useRealtime from '../hooks/useRealtime'
@@ -116454,7 +116465,7 @@ export default function Projetos() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -116544,7 +116555,7 @@ export default function ReceitaDetalhe() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FileText, Calendar, Eye, Download, RefreshCw, 
@@ -116634,7 +116645,7 @@ const ReportCard = ({ report, index, onView, onDownload }) => {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Check, X, MessageCircle } from 'lucide-react'
 import axios from 'axios'
@@ -116724,7 +116735,7 @@ export default function Tarefas() {
 - **Linhas lidas:** 72
 
 ```text
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Triangle, ExternalLink, Globe, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 import useRealtime from '../hooks/useRealtime'
@@ -116806,7 +116817,7 @@ export default function VercelProjects() {
 - **Linhas lidas:** 80
 
 ```text
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
@@ -118030,7 +118041,7 @@ Write-Host "Iniciando servico agora..." -ForegroundColor Yellow
 - **Linhas lidas:** 78
 
 ```powershell
-﻿param(
+param(
   [switch]$DisableLegacy = $true
 )
 
@@ -118118,7 +118129,7 @@ Write-Host "  Start-ScheduledTask -TaskName Luna-Stack"
 - **Linhas lidas:** 80
 
 ```powershell
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -118208,7 +118219,7 @@ $normalizedBuffer = [ordered]@{
 - **Linhas lidas:** 23
 
 ```text
-﻿@echo off
+@echo off
 chcp 65001 >nul
 :: Chrome CDP para Luna Agent — NUNCA reinicie o Chrome PWA original!
 :: Este script lança uma segunda instância do Chrome com perfil COPIADO
@@ -118276,7 +118287,7 @@ exit
 - **Linhas lidas:** 80
 
 ```powershell
-﻿param(
+param(
   [switch]$NoOpen
 )
 

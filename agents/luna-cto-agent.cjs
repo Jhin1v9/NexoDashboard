@@ -1,5 +1,5 @@
 // ============================================================
-// LUNA v15.1 "VISION EXTRACTOR" â€” CORRIGIDO
+// LUNA v15.1 "VISION EXTRACTOR" — CORRIGIDO
 // Sem erros de sintaxe, sem fechar shell, keep-alive ativo
 // ============================================================
 
@@ -31,18 +31,18 @@ function isLidId(value = '') {
   return /@lid$/i.test(String(value));
 }
 
-// Playwright importado no topo (nÃ£o dinamicamente)
+// Playwright importado no topo (não dinamicamente)
 let chromium = null;
 try {
   chromium = require('playwright').chromium;
 } catch (e) {
-  console.error('âŒ Playwright nÃ£o instalado! Execute: npm install playwright');
+  console.error('❌ Playwright não instalado! Execute: npm install playwright');
   console.error(e.message);
-}   // â† fecha o catch (linha 20)
+}   // ← fecha o catch (linha 20)
 
 // ============================================
-// LUNA v16.0 â€” SCHEMA LOADER
-// Colar aqui: entre o catch e a CONFIGURAÃ‡ÃƒO
+// LUNA v16.0 — SCHEMA LOADER
+// Colar aqui: entre o catch e a CONFIGURAÇÃO
 // ============================================
 
 const SCHEMA_BASE = path.join(__dirname, '..', 'backend', 'data');
@@ -59,15 +59,15 @@ function loadSchema(schemaName) {
     if (fs.existsSync(configPath)) {
       return JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
-    console.warn(`[SCHEMA] âš ï¸  Schema nÃ£o encontrado: ${schemaName}`);
+    console.warn(`[SCHEMA] ⚠️  Schema não encontrado: ${schemaName}`);
     return null;
   } catch (err) {
-    console.error(`[SCHEMA] âŒ Erro ao carregar ${schemaName}:`, err.message);
+    console.error(`[SCHEMA] ❌ Erro ao carregar ${schemaName}:`, err.message);
     return null;
   }
 }
 function loadAllSchemas() {
-  console.log('[SCHEMA] ðŸ”„ Carregando schemas v16.0...');
+  console.log('[SCHEMA] 🔄 Carregando schemas v16.0...');
   
   SCHEMAS = {
     contacts: loadSchema('contacts-map'),
@@ -83,7 +83,7 @@ function loadAllSchemas() {
   };
   
   const loaded = Object.entries(SCHEMAS).filter(([k, v]) => v !== null).length;
-  console.log(`[SCHEMA] âœ… ${loaded}/10 schemas carregados`);
+  console.log(`[SCHEMA] ✅ ${loaded}/10 schemas carregados`);
   
   return SCHEMAS;
 }
@@ -93,8 +93,8 @@ SCHEMAS = loadAllSchemas();
 // Exportar para acesso global
 global.SCHEMAS = SCHEMAS;
 
-// =====================================================  â† (linha 21 original)
-// CONFIGURAÃ‡ÃƒO v15.1
+// =====================================================  ← (linha 21 original)
+// CONFIGURAÇÃO v15.1
 // =====================================================
 
 /**
@@ -190,13 +190,13 @@ function resolveChromeExecutable() {
 
 const CHROME_EXECUTABLE = resolveChromeExecutable();
 
-// Criar diretÃ³rios
+// Criar diretórios
 [CONFIG.REPORTS_DIR, CONFIG.ARTIFACTS_DIR, CONFIG.DEBUG_DIR, SESSION_DATA_PATH].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
 
 // ============================================================
-// KEEP-ALIVE â€” NÃ£o deixa o shell fechar
+// KEEP-ALIVE — Não deixa o shell fechar
 // ============================================================
 process.on('uncaughtException', (err) => {
   console.error('[KEEP-ALIVE] Uncaught Exception:', err.message);
@@ -233,7 +233,7 @@ class Logger {
   scan(m) { this._w('SCAN', m); }
   extract(m) { this._w('EXTRACT', m); }
   playwright(m) { this._w('PLAYWRIGHT', m); }
-  extraordinary(m) { console.log(`âœ¨ ${m} âœ¨`); this._w('EXTRAORDINARY', m); }
+  extraordinary(m) { console.log(`✨ ${m} ✨`); this._w('EXTRAORDINARY', m); }
   getEvents() { return this.events; }
 }
 const log = new Logger();
@@ -327,7 +327,7 @@ class CheckpointManager {
 
   resetForFullExtract() {
     this.checkpoint.fullExtractDone = false;
-    log.info('Checkpoint resetado para extraÃ§Ã£o completa');
+    log.info('Checkpoint resetado para extração completa');
   }
 }
 
@@ -343,7 +343,7 @@ class PlaywrightExtractor {
 
   async connect() {
     if (!chromium) {
-      log.error('Playwright nÃ£o disponÃ­vel. Instale com: npm install playwright');
+      log.error('Playwright não disponível. Instale com: npm install playwright');
       return false;
     }
 
@@ -412,7 +412,7 @@ class PlaywrightExtractor {
           return element;
         }
       } catch (e) {
-        log.warn(`EstratÃ©gia ${strategy.type} falhou para ${chatName}`);
+        log.warn(`Estratégia ${strategy.type} falhou para ${chatName}`);
       }
     }
 
@@ -537,7 +537,7 @@ class PlaywrightExtractor {
       }
       
       const totalUnique = allMessagesMap.size;
-      log.playwright(`Scroll ${scrollCount+1}/${CONFIG.MAX_SCROLLS} â€” ${currentMessages.length} visiveis | ${addedCount} novas | Total: ${totalUnique}`);
+      log.playwright(`Scroll ${scrollCount+1}/${CONFIG.MAX_SCROLLS} — ${currentMessages.length} visiveis | ${addedCount} novas | Total: ${totalUnique}`);
       
       if (totalUnique === lastCount) {
         stableCount++;
@@ -673,7 +673,7 @@ class PlaywrightExtractor {
   }
 }
 // DEPRECATED: resolveAuthor() movido para SmartClassifier_v16.js
-// ImportaÃ§Ã£o: const { resolveAuthor } = require('./SmartClassifier_v16.js');
+// Importação: const { resolveAuthor } = require('./SmartClassifier_v16.js');
 // ============================================================
 // ANALISADOR DE LINKS v15.1
 // ============================================================
@@ -765,7 +765,7 @@ class LinkAnalyzer {
 }
 
 // ============================================================
-// MAIN AGENT â€” v15.1
+// MAIN AGENT — v15.1
 // ============================================================
 class LunaAgent {
   constructor() {
@@ -2005,30 +2005,30 @@ class LunaAgent {
       return;
     }
 
-    let report = `ðŸŒ™ *LUNA REPORT INTELIGENTE*\n\n`;
-    report += `ðŸ“Š *O QUE VI:*\n`;
-    report += `â€¢ ${buffer.newMessages?.length || 0} mensagens novas\n`;
-    report += `â€¢ ${buffer.newTasks?.length || 0} tarefas\n`;
-    report += `â€¢ ${buffer.newIdeas?.length || 0} ideias\n`;
-    report += `â€¢ ${buffer.newLinks?.length || 0} links\n`;
-    report += `â€¢ ${buffer.newLeads?.length || 0} possiveis clientes\n`;
-    report += `â€¢ ${buffer.newNews?.length || 0} noticias\n`;
-    report += `â€¢ ${buffer.newFinance?.length || 0} sinais financeiros\n\n`;
+    let report = `🌙 *LUNA REPORT INTELIGENTE*\n\n`;
+    report += `📊 *O QUE VI:*\n`;
+    report += `• ${buffer.newMessages?.length || 0} mensagens novas\n`;
+    report += `• ${buffer.newTasks?.length || 0} tarefas\n`;
+    report += `• ${buffer.newIdeas?.length || 0} ideias\n`;
+    report += `• ${buffer.newLinks?.length || 0} links\n`;
+    report += `• ${buffer.newLeads?.length || 0} possiveis clientes\n`;
+    report += `• ${buffer.newNews?.length || 0} noticias\n`;
+    report += `• ${buffer.newFinance?.length || 0} sinais financeiros\n\n`;
 
-    report += `â“ *O QUE NAO VI:*\n`;
+    report += `❓ *O QUE NAO VI:*\n`;
     const clientMentions = buffer.newMessages?.filter(m => /santafe|paulo|superclim/.test((m.body || '').toLowerCase())) || [];
     if (clientMentions.length === 0) {
-      report += `â€¢ Nenhuma mencao a clientes principais. E o Santafe? Alguma noticia?\n`;
+      report += `• Nenhuma mencao a clientes principais. E o Santafe? Alguma noticia?\n`;
     }
     if ((buffer.newMessages?.filter(m => /pagou|fatura|caixa/.test((m.body || '').toLowerCase())) || []).length === 0) {
-      report += `â€¢ Nenhuma atualizacao financeira. O caixa esta atualizado?\n`;
+      report += `• Nenhuma atualizacao financeira. O caixa esta atualizado?\n`;
     }
     report += `\n`;
 
     if (buffer.newLeads?.length > 0) {
-      report += `ðŸŽ£ *POSSIVEIS CLIENTES:*\n`;
+      report += `🎣 *POSSIVEIS CLIENTES:*\n`;
       for (const lead of buffer.newLeads.slice(0, 3)) {
-        report += `â€¢ ${lead.name || 'Nao identificado'}: ${(lead.context || '').slice(0, 60)}...\n`;
+        report += `• ${lead.name || 'Nao identificado'}: ${(lead.context || '').slice(0, 60)}...\n`;
       }
       report += `\n`;
     }
@@ -2156,7 +2156,7 @@ class LunaAgent {
 }
 
 // ============================================================
-// EXECUCAO â€” KEEP-ALIVE ATIVO
+// EXECUCAO — KEEP-ALIVE ATIVO
 // ============================================================
 async function runAgent(options = {}) {
   const agent = new LunaAgent();
