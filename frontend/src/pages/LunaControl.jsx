@@ -30,6 +30,7 @@ export default function LunaControl() {
   const [executing, setExecuting] = useState(null)
   const [history, setHistory] = useState([])
   const [mood, setMood] = useState({ happiness: 66, energy: 80, trust: 58, excitement: 33 })
+  const [hiddenMode, setHiddenMode] = useState(false)
 
   useEffect(() => {
     fetchCommands()
@@ -55,7 +56,7 @@ export default function LunaControl() {
   const executeCommand = async (commandId) => {
     setExecuting(commandId)
     try {
-      const res = await axios.post('/api/luna/command', { command: commandId })
+      const res = await axios.post('/api/luna/command', { command: commandId, params: { hidden: hiddenMode } })
       if (res.data.success) {
         setHistory(prev => [res.data, ...prev].slice(0, 20))
         updateMood(commandId)
@@ -148,7 +149,19 @@ export default function LunaControl() {
 
       {/* Grid de Comandos */}
       <div className="flex-1 p-6 overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-6">Centro de Comando</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Centro de Comando</h2>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hiddenMode}
+              onChange={(e) => setHiddenMode(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="relative w-11 h-6 bg-nexo-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-nexo-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-nexo-primary"></div>
+            <span className="text-sm text-nexo-muted">{hiddenMode ? 'Modo Hidden' : 'Modo Normal'}</span>
+          </label>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {CATEGORIES.map(cat => (

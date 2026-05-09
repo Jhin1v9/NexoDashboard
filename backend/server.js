@@ -336,6 +336,7 @@ const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
 const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
 const REPORTS_DIR = path.join(DATA_DIR, 'reports');
 const WHATSAPP_HISTORY_FILE = path.join(DATA_DIR, 'whatsapp-history.json');
+const CLIENTS_REGISTRY_FILE = path.join(DATA_DIR, 'schema', 'clients-registry.json');
 
 // Ensure reports dir exists
 if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
@@ -482,14 +483,25 @@ function resolveAuthor(msg) {
     }
 
     // 3. Match por nome (displayName, shortName, fullName) — para mensagens do Playwright que vêm só com nome
-    const searchName = (msg.authorName || msg.pushName || rawAuthor || '').toLowerCase().trim();
+    // Estratégia 3a: extrair nome do início do texto quando autor está como 'Desconhecido'
+    let searchName = (msg.authorName || msg.pushName || rawAuthor || '').toLowerCase().trim();
+    if ((!searchName || searchName === 'desconhecido' || searchName === '?') && (msg.text || msg.body)) {
+      const text = (msg.text || msg.body).toString();
+      if (text.includes('\n')) {
+        const firstLine = text.split('\n')[0].trim();
+        if (firstLine && firstLine.length > 1 && firstLine.length < 30 && !firstLine.includes('http')) {
+          searchName = firstLine.toLowerCase();
+        }
+      }
+    }
     if (searchName && searchName !== 'desconhecido' && searchName !== '?') {
       for (const [key, c] of Object.entries(contacts)) {
         const names = [
           (c.displayName || '').toLowerCase(),
           (c.shortName || '').toLowerCase(),
           (c.fullName || '').toLowerCase(),
-          (c.codename || '').toLowerCase()
+          (c.codename || '').toLowerCase(),
+          ...(c.aliases || []).map(a => a.toLowerCase())
         ];
         // Match exato do nome ou do alias
         if (names.includes(searchName)) {
@@ -581,9 +593,11 @@ app.get('/api/whatsapp/history', (req, res) => {
       .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
       .slice(0, limit)
       .map(m => {
-        // Usa resolvedAuthor já salvo se válido; senão, resolve em tempo real
+        // Re-resolve se o author salvo for 'Desconhecido' ou inválido (permite reprocessamento após melhorias no resolver)
         const hasValidResolved = m.resolvedAuthor && m.resolvedAuthor.name && m.resolvedAuthor.name !== 'Desconhecido';
-        return { ...m, resolvedAuthor: hasValidResolved ? m.resolvedAuthor : resolveAuthor(m) };
+        const freshResolved = resolveAuthor(m);
+        const useFresh = !hasValidResolved || freshResolved.confidence > (m.resolvedAuthor?.confidence || 0);
+        return { ...m, resolvedAuthor: useFresh ? freshResolved : m.resolvedAuthor };
       });
 
     res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
@@ -2746,127 +2760,7 @@ function getEmojiForCategory(category) {
 
 const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
 
-// GET /api/leads â€” Listar todos os leads
-app.get('/api/leads', (req, res) => {
-  try {
-    const data = readJSON(LEADS_FILE) || { leads: [] };
-    const { status, source, limit = 50 } = req.query;
-    let leads = [...data.leads];
 
-    if (status) leads = leads.filter(l => l.status === status);
-    if (source) leads = leads.filter(l => l.source === source);
-    leads = leads.slice(0, parseInt(limit));
-
-    res.json({
-      success: true,
-      count: leads.length,
-      total: data.leads.length,
-      leads: leads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/leads â€” Receber novo lead (webhook do site)
-app.post('/api/leads', (req, res) => {
-  try {
-    const data = readJSON(LEADS_FILE) || { leads: [] };
-    const lead = {
-      id: generateId('lead'),
-      name: req.body.name || '',
-      email: req.body.email || '',
-      phone: req.body.phone || '',
-      company: req.body.company || '',
-      message: req.body.message || '',
-      service: req.body.service || '',
-      source: req.body.source || 'website',
-      sourceUrl: req.body.sourceUrl || '',
-      status: 'new',
-      statusLabel: 'Novo',
-      priority: 'medium',
-      assignedTo: null,
-      notes: [],
-      createdAt: nowISO(),
-      updatedAt: nowISO()
-    };
-
-    data.leads.unshift(lead);
-    writeJSON(LEADS_FILE, data);
-
-    // Criar tarefa automaticamente para follow-up
-    const tasks = readJSON(TASKS_FILE) || [];
-    tasks.unshift({
-      id: generateId('task'),
-      title: `[LEAD] Contactar ${lead.name || 'Novo lead'}`,
-      description: `Lead do site: ${lead.email}. ServiÃ§o: ${lead.service}. Mensagem: ${lead.message}`,
-      completed: false,
-      author: 'system',
-      source: 'lead-auto',
-      category: 'lead',
-      priority: 'high',
-      clientId: null,
-      leadId: lead.id,
-      createdAt: nowISO(),
-      updatedAt: nowISO()
-    });
-    writeJSON(TASKS_FILE, tasks);
-
-    // Notificar via WebSocket
-    broadcast({ type: 'lead:new', data: lead });
-
-    res.json({ success: true, lead, message: 'Lead recebido com sucesso' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// PUT /api/leads/:id/status â€” Atualizar status do lead
-app.put('/api/leads/:id/status', (req, res) => {
-  try {
-    const data = readJSON(LEADS_FILE) || { leads: [] };
-    const lead = data.leads.find(l => l.id === req.params.id);
-    if (!lead) return res.status(404).json({ error: 'Lead nÃ£o encontrado' });
-
-    lead.status = req.body.status || lead.status;
-    lead.statusLabel = req.body.statusLabel || lead.statusLabel;
-    lead.priority = req.body.priority || lead.priority;
-    lead.assignedTo = req.body.assignedTo || lead.assignedTo;
-    lead.notes.push({
-      text: req.body.note || '',
-      author: req.body.author || 'system',
-      date: nowISO()
-    });
-    lead.updatedAt = nowISO();
-
-    writeJSON(LEADS_FILE, data);
-    broadcast({ type: 'lead:updated', data: lead });
-    res.json({ success: true, lead });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/leads/stats â€” EstatÃ­sticas de leads
-app.get('/api/leads/stats', (req, res) => {
-  try {
-    const data = readJSON(LEADS_FILE) || { leads: [] };
-    const leads = data.leads;
-    const stats = {
-      total: leads.length,
-      new: leads.filter(l => l.status === 'new').length,
-      contacted: leads.filter(l => l.status === 'contacted').length,
-      qualified: leads.filter(l => l.status === 'qualified').length,
-      proposal: leads.filter(l => l.status === 'proposal').length,
-      closed: leads.filter(l => l.status === 'closed').length,
-      lost: leads.filter(l => l.status === 'lost').length,
-      conversionRate: leads.length > 0 ? ((leads.filter(l => l.status === 'closed').length / leads.length) * 100).toFixed(1) : 0
-    };
-    res.json({ success: true, stats });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 
@@ -3172,52 +3066,90 @@ app.post('/api/luna/command', async (req, res) => {
 
     let result = { executed: true };
     const agentsDir = path.join(__dirname, '..', 'agents');
+    const hidden = params.hidden === true;
+    const spawnArgs = (script, extraArgs = []) => {
+      const args = ['agents/' + script, ...extraArgs];
+      if (hidden) args.push('--headless');
+      return args;
+    };
 
     switch (cmd.action) {
-      case 'start':
-        const startProc = spawn('node', ['agents/luna-daemon.mjs'], {
+      case 'start': {
+        const startProc = spawn('node', spawnArgs('luna-daemon.mjs'), {
           cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
         });
         startProc.unref();
-        result = { pid: startProc.pid, status: 'starting' };
+        result = { pid: startProc.pid, status: 'starting', hidden };
         break;
-      case 'stop':
+      }
+      case 'stop': {
         const { exec } = require('child_process');
-        exec('tasklist /FI "IMAGENAME eq node.exe" /FO CSV', (err, stdout) => {
+        exec('ps aux | grep -E "luna-daemon|luna-scheduler" | grep -v grep | awk \'{print $2}\'', (err, stdout) => {
           const lines = (stdout || '').split(/\r?\n/).filter(Boolean);
           for (const line of lines) {
-            if (!line.includes('luna-daemon') && !line.includes('luna-scheduler')) continue;
-            const pid = Number(line.split(',').pop()?.replace(/"/g, ''));
+            const pid = Number(line.trim());
             if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch {} }
           }
         });
         result = { status: 'stopping' };
         break;
-      case 'clear-buffer':
+      }
+      case 'clear-buffer': {
         const bufferPath = path.join(agentsDir, 'luna-buffer.json');
         writeJSON(bufferPath, { messages: [], tasks: [], ideas: [], decisions: [], links: [], mentions: [], sentiment: { positive: 0, negative: 0, urgent: 0 }, lastUpdated: new Date().toISOString() });
         result = { cleared: true };
         break;
-      case 'reset-checkpoint':
+      }
+      case 'reset-checkpoint': {
         const checkpointPath = path.join(agentsDir, 'luna-checkpoint.json');
         writeJSON(checkpointPath, { hashes: [], lastScan: null, version: '16.0', resetAt: new Date().toISOString() });
         result = { reset: true };
         break;
-      case 'force-scan':
-        const scanProc = spawn('node', ['agents/luna-scheduler.mjs', '--force-scan'], {
+      }
+      case 'save-checkpoint': {
+        const cpSrc = path.join(agentsDir, 'luna-checkpoint.json');
+        const cpDest = path.join(agentsDir, `luna-checkpoint-${Date.now()}.json`);
+        if (fs.existsSync(cpSrc)) {
+          fs.copyFileSync(cpSrc, cpDest);
+          result = { saved: true, file: cpDest };
+        } else {
+          result = { saved: false, message: 'Nenhum checkpoint para salvar' };
+        }
+        break;
+      }
+      case 'force-scan': {
+        const scanProc = spawn('node', spawnArgs('luna-scheduler.mjs', ['--force-scan']), {
           cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
         });
         scanProc.unref();
-        result = { pid: scanProc.pid, action: 'scan triggered' };
+        result = { pid: scanProc.pid, action: 'scan triggered', hidden };
         break;
-      case 'force-report':
-        const reportProc = spawn('node', ['agents/luna-scheduler.mjs', '--force-report'], {
+      }
+      case 'force-report': {
+        const reportProc = spawn('node', spawnArgs('luna-scheduler.mjs', ['--force-report']), {
           cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
         });
         reportProc.unref();
-        result = { pid: reportProc.pid, action: 'report triggered' };
+        result = { pid: reportProc.pid, action: 'report triggered', hidden };
         break;
-      case 'backup-data':
+      }
+      case 'check-mentions': {
+        const mentionsProc = spawn('node', spawnArgs('luna-scheduler.mjs', ['--check-mentions']), {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
+        });
+        mentionsProc.unref();
+        result = { pid: mentionsProc.pid, action: 'check mentions triggered', hidden };
+        break;
+      }
+      case 'check-links': {
+        const linksProc = spawn('node', spawnArgs('luna-scheduler.mjs', ['--check-links']), {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: 'ignore', windowsHide: true
+        });
+        linksProc.unref();
+        result = { pid: linksProc.pid, action: 'check links triggered', hidden };
+        break;
+      }
+      case 'backup-data': {
         const backupDir = path.join(__dirname, '..', 'backups', `backup-${Date.now()}`);
         fs.mkdirSync(backupDir, { recursive: true });
         const dataDir = path.join(__dirname, '..', 'data');
@@ -3228,12 +3160,64 @@ app.post('/api/luna/command', async (req, res) => {
         });
         result = { backupDir, files: fs.readdirSync(backupDir) };
         break;
+      }
       case 'restart-backend':
         result = { message: 'Reinicio agendado — use PM2 ou reinicie manualmente' };
         break;
       case 'refresh-cache':
         result = { refreshed: true, service: params.service || 'all' };
         break;
+      case 'diagnose': {
+        const diagProc = spawn('node', ['agents/luna-cto-agent.cjs', '--diagnose'], {
+          cwd: path.join(__dirname, '..'), detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
+        });
+        let diagOutput = '';
+        diagProc.stdout.on('data', (d) => { diagOutput += d.toString(); });
+        diagProc.on('close', () => {
+          try {
+            const diagResult = JSON.parse(diagOutput);
+            broadcast({ type: 'luna:diagnose', data: diagResult });
+          } catch {}
+        });
+        result = { pid: diagProc.pid, action: 'diagnose running' };
+        break;
+      }
+      case 'autofix': {
+        // Tenta limpar checkpoint corrompido e recriar buffer
+        const fixResults = [];
+        try {
+          const cpPath = path.join(agentsDir, 'luna-checkpoint.json');
+          if (fs.existsSync(cpPath)) {
+            const cp = JSON.parse(fs.readFileSync(cpPath, 'utf8'));
+            if (!Array.isArray(cp.hashes)) {
+              writeJSON(cpPath, { hashes: [], lastScan: null, version: '16.0', fixedAt: new Date().toISOString() });
+              fixResults.push('checkpoint corrompido recriado');
+            }
+          }
+        } catch (e) { fixResults.push('checkpoint: ' + e.message); }
+        result = { fixed: fixResults.length > 0, actions: fixResults };
+        break;
+      }
+      case 'status': {
+        // Retorna status em tempo real
+        const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
+        const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
+        const history = readWhatsappHistory();
+        let checkpoint = { hashes: [], lastScan: null, version: '16.0' };
+        let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
+        if (fs.existsSync(checkpointPath)) checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+        if (fs.existsSync(bufferPath)) buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
+        result = {
+          status: 'ok',
+          version: checkpoint.version || '16.0',
+          lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
+          historyTotal: history.length,
+          bufferMessages: buffer.newMessages?.length || 0,
+          bufferTasks: buffer.newTasks?.length || 0,
+          bufferIdeas: buffer.newIdeas?.length || 0
+        };
+        break;
+      }
       default:
         result = { message: `Acao ${cmd.action} reconhecida mas nao implementada via API` };
     }

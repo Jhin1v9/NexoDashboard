@@ -217,7 +217,7 @@ export default function Dashboard() {
           ?? Forcar Scan
         </button>
       </div>
-{/\* Stats Grid \*/}
+{/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Clientes" value={clients.length} color="#6366f1" 
           onClick={() => navigate('/clientes')} />

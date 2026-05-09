@@ -509,6 +509,15 @@ class PlaywrightExtractor {
                 }
               }
             }
+
+            // Estratégia 5: nome do autor embutido no início do texto (WhatsApp Web v2.30+)
+            if (author === 'Desconhecido' && text.includes('\n')) {
+              const firstLine = text.split('\n')[0].trim();
+              if (firstLine && firstLine.length > 1 && firstLine.length < 30 && !firstLine.includes('http')) {
+                author = firstLine;
+                text = text.substring(firstLine.length + 1).trim();
+              }
+            }
             
             const timeEl = el.querySelector('[data-testid="msg-meta"], .msg-time');
             const time = timeEl ? timeEl.innerText : '';
@@ -612,6 +621,15 @@ class PlaywrightExtractor {
                 authorPhone = phoneMatch[1] + phoneMatch[2];
                 author = authorPhone;
               }
+            }
+          }
+
+          // Estratégia 5: nome do autor embutido no início do texto (WhatsApp Web v2.30+)
+          if (author === 'Desconhecido' && text.includes('\n')) {
+            const firstLine = text.split('\n')[0].trim();
+            if (firstLine && firstLine.length > 1 && firstLine.length < 30 && !firstLine.includes('http')) {
+              author = firstLine;
+              text = text.substring(firstLine.length + 1).trim();
             }
           }
           
@@ -774,14 +792,15 @@ class LunaAgent {
   }
 
   async init(options = {}) {
-    const { once = false, schedule = true, fullExtract = false } = options;
+    const { once = false, schedule = true, fullExtract = false, headless = false } = options;
+    const isHeadless = headless || process.argv.includes('--headless');
     log.extraordinary('=== LUNA v15.1 "VISION EXTRACTOR" ===');
-    log.info('whatsapp-web.js + Playwright CDP hibrido');
+    log.info(`whatsapp-web.js + Playwright CDP hibrido (headless: ${isHeadless})`);
 
     this.client = new Client({
       authStrategy: new LocalAuth({ clientId: 'luna-main', dataPath: SESSION_DATA_PATH, rmMaxRetries: 1 }),
       puppeteer: {
-        headless: false,
+        headless: isHeadless,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',

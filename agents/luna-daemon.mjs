@@ -46,8 +46,10 @@ function readPid() {
 function runScheduler() {
   return new Promise((resolve) => {
     log('🚀 Iniciando Luna Scheduler...');
+    const args = [SCHEDULER_PATH];
+    if (process.argv.includes('--headless')) args.push('--headless');
     
-    const child = spawn('node', [SCHEDULER_PATH], {
+    const child = spawn('node', args, {
       cwd: ROOT,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

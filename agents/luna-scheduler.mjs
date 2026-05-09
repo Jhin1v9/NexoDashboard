@@ -51,16 +51,18 @@ function saveReport(reportObj) {
   writeJson(REPORT_HISTORY_FILE, data);
 }
 
+const IS_HEADLESS = process.argv.includes('--headless');
+
 async function runScan(options = {}) {
   log('SCAN iniciado');
-  const result = await runAgent({ once: true, schedule: false, ...options });
+  const result = await runAgent({ once: true, schedule: false, headless: IS_HEADLESS, ...options });
   log(`SCAN concluido: status=${result?.status || 'ok'}`);
   return result;
 }
 
 async function runReport(options = {}) {
   log('REPORT iniciado');
-  const result = await runAgent({ once: true, schedule: false, fullExtract: false, ...options });
+  const result = await runAgent({ once: true, schedule: false, fullExtract: false, headless: IS_HEADLESS, ...options });
   const buffer = buildBufferFromAgentResult(result || {});
   const checkpoint = result?.checkpoint || {};
   const generated = reportEngine.generateReport(buffer, checkpoint, {});
@@ -71,14 +73,14 @@ async function runReport(options = {}) {
 
 async function runMentionsOnly() {
   log('CHECK MENTIONS iniciado');
-  const result = await runAgent(false, { mentionsOnly: true });
+  const result = await runAgent({ once: true, schedule: false, headless: IS_HEADLESS, mentionsOnly: true });
   log('CHECK MENTIONS concluido');
   return result;
 }
 
 async function runLinksOnly() {
   log('CHECK LINKS iniciado');
-  const result = await runAgent(false, { linksOnly: true });
+  const result = await runAgent({ once: true, schedule: false, headless: IS_HEADLESS, linksOnly: true });
   log('CHECK LINKS concluido');
   return result;
 }

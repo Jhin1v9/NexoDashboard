@@ -10,6 +10,8 @@ function resolveAuthorAlias(value) {
   const aliases = {
     abner: { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
     'abner gabriel': { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    'tú': { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
+    'tu': { id: 'nexo-abner-001', name: 'Abner Gabriel', fullName: 'Abner Gabriel Mendes', role: 'CEO', isNexo: true, isFounder: true },
     nonoke: { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },
     enoque: { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },
     'e.g.santos': { id: 'nexo-enoque-001', name: 'Enoque G. Santos', fullName: 'Enoque G Santos Clemente', role: 'CEO', isNexo: true, isFounder: true },

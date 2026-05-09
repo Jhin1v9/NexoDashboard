@@ -1,0 +1,214 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: "N"
+      - generic [ref=e7]: NEXO
+    - navigation [ref=e8]:
+      - link "Dashboard" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img [ref=e10]
+        - generic [ref=e15]: Dashboard
+      - button "Comunicacao" [ref=e17] [cursor=pointer]:
+        - generic [ref=e18]:
+          - img [ref=e19]
+          - generic [ref=e21]: Comunicacao
+        - img [ref=e23]
+      - button "Financeiro" [ref=e26] [cursor=pointer]:
+        - generic [ref=e27]:
+          - img [ref=e28]
+          - generic [ref=e30]: Financeiro
+        - img [ref=e32]
+      - link "Projetos" [ref=e34] [cursor=pointer]:
+        - /url: /projetos
+        - img [ref=e35]
+        - generic [ref=e37]: Projetos
+      - link "Tarefas" [ref=e38] [cursor=pointer]:
+        - /url: /tarefas
+        - img [ref=e39]
+        - generic [ref=e42]: Tarefas
+      - link "Leads" [ref=e43] [cursor=pointer]:
+        - /url: /leads
+        - img [ref=e44]
+        - generic [ref=e48]: Leads
+      - link "Operacoes" [ref=e49] [cursor=pointer]:
+        - /url: /operacoes
+        - img [ref=e50]
+        - generic [ref=e53]: Operacoes
+      - link "Luna" [ref=e54] [cursor=pointer]:
+        - /url: /luna
+        - img [ref=e55]
+        - generic [ref=e58]: Luna
+      - link "Configuracoes" [ref=e59] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e60]
+        - generic [ref=e63]: Configuracoes
+    - generic [ref=e64]: v4.0 — Command Center
+  - generic [ref=e65]:
+    - banner [ref=e66]:
+      - generic [ref=e67]:
+        - button [ref=e68] [cursor=pointer]:
+          - img [ref=e69]
+        - button "Buscar... (Ctrl+K)" [ref=e70] [cursor=pointer]:
+          - img [ref=e71]
+          - generic [ref=e74]: Buscar... (Ctrl+K)
+      - generic [ref=e75]:
+        - button "Notificacoes" [ref=e77] [cursor=pointer]:
+          - img [ref=e78]
+        - button [ref=e82] [cursor=pointer]:
+          - img [ref=e83]
+        - generic [ref=e86]:
+          - img [ref=e87]
+          - generic [ref=e91]: Online
+        - generic [ref=e92]:
+          - img [ref=e93]
+          - generic [ref=e96]: Atualizado 11:12
+        - button "Abner" [ref=e98] [cursor=pointer]:
+          - img [ref=e100]
+          - generic [ref=e103]: Abner
+    - main [ref=e104]:
+      - generic [ref=e105]:
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - generic [ref=e108]:
+              - img [ref=e110]
+              - generic [ref=e112]:
+                - heading "Luna" [level=2] [ref=e113]
+                - paragraph [ref=e114]: CTO Agent v16.0
+            - generic [ref=e115]:
+              - generic [ref=e117]:
+                - generic [ref=e118]: 😊 Felicidade
+                - generic [ref=e119]: 66%
+              - generic [ref=e122]:
+                - generic [ref=e123]: ⚡ Energia
+                - generic [ref=e124]: 80%
+              - generic [ref=e127]:
+                - generic [ref=e128]: 💙 Confianca
+                - generic [ref=e129]: 58%
+              - generic [ref=e132]:
+                - generic [ref=e133]: 🎉 Entusiasmo
+                - generic [ref=e134]: 33%
+          - generic [ref=e136]:
+            - heading "Status" [level=3] [ref=e137]
+            - generic [ref=e138]:
+              - generic [ref=e139]:
+                - generic [ref=e140]: Chrome
+                - generic [ref=e141]: Offline
+              - generic [ref=e142]:
+                - generic [ref=e143]: WhatsApp
+                - generic [ref=e144]: Offline
+              - generic [ref=e145]:
+                - generic [ref=e146]: Ultimo Scan
+                - generic [ref=e147]: Nunca
+              - generic [ref=e148]:
+                - generic [ref=e149]: Mensagens
+                - generic [ref=e150]: "0"
+          - generic [ref=e151]:
+            - heading "Historico" [level=3] [ref=e152]
+            - paragraph [ref=e154]: Nenhum comando executado ainda
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - heading "Centro de Comando" [level=2] [ref=e157]
+            - generic [ref=e158] [cursor=pointer]:
+              - checkbox "Modo Normal" [ref=e159]
+              - generic [ref=e161]: Modo Normal
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - generic [ref=e164]:
+                - img [ref=e165]
+                - heading "🌙 Estado" [level=3] [ref=e167]
+              - generic [ref=e168]:
+                - button "Acordar Inicia o daemon Luna" [ref=e169] [cursor=pointer]:
+                  - generic [ref=e170]:
+                    - img
+                    - generic [ref=e176]: Acordar
+                  - paragraph [ref=e177]: Inicia o daemon Luna
+                - button "Dormir Para o daemon Luna" [ref=e178] [cursor=pointer]:
+                  - generic [ref=e179]:
+                    - img
+                    - generic [ref=e181]: Dormir
+                  - paragraph [ref=e182]: Para o daemon Luna
+                - button "Status Verifica saude da Luna" [ref=e183] [cursor=pointer]:
+                  - generic [ref=e184]:
+                    - img
+                    - generic [ref=e186]: Status
+                  - paragraph [ref=e187]: Verifica saude da Luna
+            - generic [ref=e188]:
+              - generic [ref=e189]:
+                - img [ref=e190]
+                - heading "🧠 Memoria" [level=3] [ref=e194]
+              - generic [ref=e195]:
+                - button "Limpar Memoria Limpa o buffer de mensagens" [ref=e196] [cursor=pointer]:
+                  - generic [ref=e197]:
+                    - img
+                    - generic [ref=e200]: Limpar Memoria
+                  - paragraph [ref=e201]: Limpa o buffer de mensagens
+                - button "Esquecer Tudo Reset checkpoint (proximo scan le tudo)" [ref=e202] [cursor=pointer]:
+                  - generic [ref=e203]:
+                    - img
+                    - generic [ref=e206]: Esquecer Tudo
+                  - paragraph [ref=e207]: Reset checkpoint (proximo scan le tudo)
+                - button "Lembrar Salva estado atual como checkpoint" [ref=e208] [cursor=pointer]:
+                  - generic [ref=e209]:
+                    - img
+                    - generic [ref=e213]: Lembrar
+                  - paragraph [ref=e214]: Salva estado atual como checkpoint
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - img [ref=e217]
+                - heading "⚡ Acoes" [level=3] [ref=e219]
+              - generic [ref=e220]:
+                - button "Escanear Agora Forca scan imediato do WhatsApp" [ref=e221] [cursor=pointer]:
+                  - generic [ref=e222]:
+                    - img
+                    - generic [ref=e227]: Escanear Agora
+                  - paragraph [ref=e228]: Forca scan imediato do WhatsApp
+                - button "Gerar Relatorio Gera relatorio inteligente" [ref=e229] [cursor=pointer]:
+                  - generic [ref=e230]:
+                    - img
+                    - generic [ref=e233]: Gerar Relatorio
+                  - paragraph [ref=e234]: Gera relatorio inteligente
+                - button "Verificar Mencoes Verifica mencoes pendentes" [ref=e235] [cursor=pointer]:
+                  - generic [ref=e236]:
+                    - img
+                    - generic [ref=e239]: Verificar Mencoes
+                  - paragraph [ref=e240]: Verifica mencoes pendentes
+                - button "Verificar Links Verifica links pendentes" [ref=e241] [cursor=pointer]:
+                  - generic [ref=e242]:
+                    - img
+                    - generic [ref=e245]: Verificar Links
+                  - paragraph [ref=e246]: Verifica links pendentes
+            - generic [ref=e247]:
+              - generic [ref=e248]:
+                - img [ref=e249]
+                - heading "🔧 Sistema" [level=3] [ref=e252]
+              - generic [ref=e253]:
+                - button "Atualizar Cache Forca refresh de cache externo" [ref=e254] [cursor=pointer]:
+                  - generic [ref=e255]:
+                    - img
+                    - generic [ref=e260]: Atualizar Cache
+                  - paragraph [ref=e261]: Forca refresh de cache externo
+                - button "Reiniciar Backend Reinicia servidor Express" [ref=e262] [cursor=pointer]:
+                  - generic [ref=e263]:
+                    - img
+                    - generic [ref=e266]: Reiniciar Backend
+                  - paragraph [ref=e267]: Reinicia servidor Express
+                - button "Fazer Backup Backup dos arquivos JSON" [ref=e268] [cursor=pointer]:
+                  - generic [ref=e269]:
+                    - img
+                    - generic [ref=e273]: Fazer Backup
+                  - paragraph [ref=e274]: Backup dos arquivos JSON
+            - generic [ref=e275]:
+              - generic [ref=e276]:
+                - img
+                - heading "🩺 Diagnostico" [level=3] [ref=e280]
+              - generic [ref=e281]:
+                - button "Diagnostico Diagnostico completo do sistema" [ref=e282] [cursor=pointer]:
+                  - generic [ref=e283]:
+                    - img
+                    - generic [ref=e287]: Diagnostico
+                  - paragraph [ref=e288]: Diagnostico completo do sistema
+                - button "Autoconserto Tenta corrigir erros automaticamente" [ref=e289] [cursor=pointer]:
+                  - generic [ref=e290]:
+                    - img
+                    - generic [ref=e292]: Autoconserto
+                  - paragraph [ref=e293]: Tenta corrigir erros automaticamente

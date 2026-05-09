@@ -217,7 +217,8 @@
       "estimatedValue": 0,
       "currency": "EUR",
       "lastContact": null,
-      "createdAt": "2026-01-01T00:00:00Z"
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-05-09T09:10:48.822Z"
     },
     "jess-onadance": {
       "id": "jess-onadance",
@@ -355,7 +356,8 @@
       "estimatedValue": 0,
       "currency": "EUR",
       "lastContact": null,
-      "createdAt": "2026-01-01T00:00:00Z"
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-05-09T09:10:55.264Z"
     },
     "lucas-mapio": {
       "id": "lucas-mapio",
