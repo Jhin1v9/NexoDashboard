@@ -1646,6 +1646,49 @@ class LunaAgent {
         `🌙 Luna v16.0 | NEXO Intelligence`
       );
     }
+    else if (cmd === '/health' || cmd === '/checar' || cmd === '/estado') {
+      const { execSync } = require('child_process');
+      const checks = [];
+      try {
+        execSync('curl -s http://localhost:3456/api/nexo-state > /dev/null', { timeout: 3000 });
+        checks.push('🟢 Backend: OK');
+      } catch { checks.push('🔴 Backend: OFF'); }
+      try {
+        execSync('curl -s http://localhost:3457 > /dev/null', { timeout: 3000 });
+        checks.push('🟢 Frontend: OK');
+      } catch { checks.push('🔴 Frontend: OFF'); }
+      try {
+        execSync('curl -s http://localhost:11434/api/tags > /dev/null', { timeout: 3000 });
+        checks.push('🟢 Ollama: OK');
+      } catch { checks.push('🔴 Ollama: OFF'); }
+      try {
+        execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 3000 });
+        checks.push('🟢 Chrome CDP: OK');
+      } catch { checks.push('🔴 Chrome CDP: OFF'); }
+      try {
+        execSync('pgrep -f "luna-cto-agent.cjs" > /dev/null', { timeout: 1000 });
+        checks.push('🟢 Luna Agent: OK');
+      } catch { checks.push('🔴 Luna Agent: OFF'); }
+      const uptimeH = Math.floor(process.uptime() / 3600);
+      const uptimeM = Math.floor((process.uptime() % 3600) / 60);
+      await msg.reply(
+        `🩺 *HEALTH CHECK NEXO*\n\n` +
+        checks.join('\n') +
+        `\n\n🤖 Luna uptime: ${uptimeH}h ${uptimeM}m\n` +
+        `🧠 Modelo: qwen3:1.7b\n` +
+        `🌙 Luna v16.2 | Health Check`
+      );
+    }
+    else if (cmd === '/restart' || cmd === '/reiniciar') {
+      await msg.reply(
+        `🔄 *Reiniciando Luna...*\n\n` +
+        `Vou desligar e voltar ja, chefe.\n` +
+        `O systemd me levanta em 5 segundos.\n\n` +
+        `🌙 Luna v16.2 | Restart`
+      );
+      log.warn('[COMANDO] Reinicio solicitado pelo CEO via WhatsApp');
+      setTimeout(() => process.kill(process.pid, 'SIGTERM'), 2000);
+    }
     else {
       log.warn(`[COMANDO] Comando nao reconhecido: ${cmd}`);
       await msg.reply(
