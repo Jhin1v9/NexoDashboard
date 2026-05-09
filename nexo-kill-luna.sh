@@ -8,3 +8,7 @@ if [ -n "$PID" ] && ps -p "$PID" > /dev/null 2>&1; then
 else
   echo "⚫ Luna ja estava morta."
 fi
+# Mata processos orfaos da Luna
+pkill -f "luna-cto-agent.cjs" 2>/dev/null || true
+pkill -f "luna-scheduler.mjs" 2>/dev/null || true
+pkill -f "luna-daemon.mjs" 2>/dev/null || true

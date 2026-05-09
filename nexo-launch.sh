@@ -11,6 +11,11 @@ cd "$ROOT"
 
 echo "🚀 Iniciando NEXO Dashboard..."
 
+# Mata portas fantasmas antes de subir
+fuser -k 3456/tcp 2>/dev/null || true
+fuser -k 3457/tcp 2>/dev/null || true
+sleep 1
+
 # Backend
 setsid bash -c 'cd /home/jhin/NEXO_DASHBOARD_PRO/backend && node server.js > /home/jhin/NEXO_DASHBOARD_PRO/backend.log 2>&1' &
 echo $! > "$ROOT/backend.pid"

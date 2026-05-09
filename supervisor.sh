@@ -10,13 +10,22 @@ LOG="$ROOT/supervisor.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Supervisor iniciado" >> "$LOG"
 
+kill_port() {
+  local port=$1
+  fuser -k "${port}/tcp" 2>/dev/null || true
+}
+
 start_backend() {
+  kill_port 3456
+  sleep 1
   setsid bash -c 'cd /home/jhin/NEXO_DASHBOARD_PRO/backend && exec node server.js > /home/jhin/NEXO_DASHBOARD_PRO/backend.log 2>&1' &
   echo $! > "$ROOT/backend.pid"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend iniciado PID=$!" >> "$LOG"
 }
 
 start_frontend() {
+  kill_port 3457
+  sleep 1
   setsid bash -c 'cd /home/jhin/NEXO_DASHBOARD_PRO/frontend && exec npm run dev > /home/jhin/NEXO_DASHBOARD_PRO/frontend.log 2>&1' &
   echo $! > "$ROOT/frontend.pid"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Frontend iniciado PID=$!" >> "$LOG"
