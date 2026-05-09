@@ -877,10 +877,20 @@ class LunaAgent {
         return;
       }
 
-      // FILTRO DE PRIVACIDADE: só processar chats autorizados (grupos monitorados)
-      if (!isAuthorizedChat(msg.from)) {
-        log.info(`[PRIVACY] Ignorando mensagem de chat nao autorizado: ${msg.from}`);
-        return;
+      // COMANDOS e MENCOES sao interacoes DIRETAS dos CEOs.
+      // O filtro de privacidade protege contra SCAN passivo, NAO contra comandos diretos.
+      // CEOs tem prioridade absoluta — nunca bloquear /status, /ajuda, @luna, etc.
+      if (!isCommand && !isMention && !hasPendingAnswer) {
+        // Para mensagens normais (scan passivo), obter o ID do CHAT correto,
+        // nao o ID do remetente. msg.from pode ser @lid ou @c.us do autor,
+        // mas o chat pode ser um grupo autorizado (@g.us).
+        const chatId = (msg.from && msg.from.includes('@g.us')) ? msg.from :
+                       (msg.to && msg.to.includes('@g.us')) ? msg.to :
+                       msg.from;
+        if (!isAuthorizedChat(chatId)) {
+          log.info(`[PRIVACY] Ignorando mensagem de chat nao autorizado: chat=${chatId} | from=${msg.from} | author=${msg.author || 'n/a'}`);
+          return;
+        }
       }
 
       const messageId = msg.id?._serialized || msg.id || `${msg.from}:${msg.timestamp}:${msg.body}`;
@@ -899,6 +909,7 @@ class LunaAgent {
       }
 
       if (isCommand) {
+        log.info(`[COMANDO] Recebido de ${msg.pushname || msg.from}: ${rawBody.slice(0, 80)}`);
         await this.handleCommand(msg);
         return;
       }
@@ -1257,8 +1268,9 @@ class LunaAgent {
   }
 
   async handleCommand(msg) {
-    this.cp.reloadBuffer();
-    log.info('[BUGFIX] Buffer persistente recarregado antes do comando');
+    try {
+      this.cp.reloadBuffer();
+      log.info('[BUGFIX] Buffer persistente recarregado antes do comando');
 
     if (await this.handlePendingAnswer(msg)) return;
 
@@ -1633,6 +1645,24 @@ class LunaAgent {
         `💬 "Nao sou perfeita. Sou progressiva, analitica e obcecada em gerar clareza para a NEXO."\n\n` +
         `🌙 Luna v16.0 | NEXO Intelligence`
       );
+    }
+    else {
+      log.warn(`[COMANDO] Comando nao reconhecido: ${cmd}`);
+      await msg.reply(
+        `🌙 *Comando nao reconhecido, chefe.*\n\n` +
+        `Vi que voce mandou: *${cmd}*\n` +
+        `Mas ainda nao aprendi esse.\n\n` +
+        `Quer ver o que sei fazer? Manda */ajuda* que eu mostro o menu completo.`
+      );
+    }
+    } catch (err) {
+      log.error(`[COMANDO] Erro fatal ao processar comando: ${err.message}`);
+      log.error(err.stack);
+      try {
+        await msg.reply(`🌙 *Ops, chefia!*\n\nDeu um erro aqui ao processar seu comando. Pode tentar de novo?\n\n_Erro: ${err.message.slice(0, 120)}_`);
+      } catch (replyErr) {
+        log.error(`[COMANDO] Falha ao enviar mensagem de erro: ${replyErr.message}`);
+      }
     }
   }
   async runFullExtract() {
