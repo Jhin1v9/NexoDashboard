@@ -881,12 +881,28 @@ class LunaAgent {
       // O filtro de privacidade protege contra SCAN passivo, NAO contra comandos diretos.
       // CEOs tem prioridade absoluta — nunca bloquear /status, /ajuda, @luna, etc.
       if (!isCommand && !isMention && !hasPendingAnswer) {
-        // Para mensagens normais (scan passivo), obter o ID do CHAT correto,
-        // nao o ID do remetente. msg.from pode ser @lid ou @c.us do autor,
-        // mas o chat pode ser um grupo autorizado (@g.us).
-        const chatId = (msg.from && msg.from.includes('@g.us')) ? msg.from :
-                       (msg.to && msg.to.includes('@g.us')) ? msg.to :
-                       msg.from;
+        // Para mensagens normais (scan passivo), obter o ID do CHAT correto.
+        // msg.from pode ser @lid ou @c.us do autor individual (WhatsApp Web v2.30+).
+        // Precisamos obter o chat REAL via msg.getChat() para nunca bloquear msgs de grupo valido.
+        let chatId = (msg.from && msg.from.includes('@g.us')) ? msg.from :
+                     (msg.to && msg.to.includes('@g.us')) ? msg.to :
+                     null;
+        
+        // Se ainda nao temos o chatId do grupo, tentar obter via getChat()
+        if (!chatId && msg.getChat) {
+          try {
+            const chat = await msg.getChat();
+            if (chat && chat.id && chat.id._serialized) {
+              chatId = chat.id._serialized;
+            }
+          } catch (e) {
+            // getChat pode falhar em alguns casos, ignorar silenciosamente
+          }
+        }
+        
+        // Fallback final
+        if (!chatId) chatId = msg.from;
+        
         if (!isAuthorizedChat(chatId)) {
           log.info(`[PRIVACY] Ignorando mensagem de chat nao autorizado: chat=${chatId} | from=${msg.from} | author=${msg.author || 'n/a'}`);
           return;

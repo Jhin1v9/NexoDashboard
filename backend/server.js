@@ -2793,16 +2793,29 @@ app.get('/api/luna/status', (req, res) => {
         // Verificar se o processo do agente está rodando
         const { execSync } = require('child_process');
         let isRunning = false;
+        let agentPid = null;
         try {
-            execSync('pgrep -f "luna-scheduler"', { stdio: 'ignore' });
-            isRunning = true;
+            const pidBuf = execSync('pgrep -f "luna-cto-agent.cjs"', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            const pids = pidBuf.trim().split('\n').filter(Boolean);
+            if (pids.length > 0) {
+                isRunning = true;
+                agentPid = parseInt(pids[0], 10);
+            }
         } catch { /* não está rodando */ }
+
+        // Verificar conexão com Chrome CDP
+        let chromeConnected = false;
+        try {
+            execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
+            chromeConnected = true;
+        } catch { /* Chrome offline */ }
 
         res.json({
             status: isRunning ? 'running' : 'stopped',
+            pid: agentPid,
             version: checkpoint.version || '16.0',
-            chromeConnected: isRunning,
-            whatsappConnected: isRunning,
+            chromeConnected,
+            whatsappConnected: isRunning && chromeConnected,
             lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
             totalHashes: checkpoint.hashes?.length || 0,
             historyTotal: history.length,
@@ -2818,12 +2831,75 @@ app.get('/api/luna/status', (req, res) => {
     }
 });
 
-// 2. ForÃ§ar scan
-// 3. Extrair mensagens
-// 4. Verificar menÃ§Ãµes
-// 5. Verificar links
-// 6. ForÃ§ar relatÃ³rio
-// 7. Checkpoint
+// 2. Logs da Luna (tail)
+app.get('/api/luna/logs', (req, res) => {
+    try {
+        const logPath = path.join(__dirname, '..', 'luna-run.log');
+        const lines = parseInt(req.query.lines) || 100;
+        if (!fs.existsSync(logPath)) {
+            return res.json({ success: true, logs: [], count: 0 });
+        }
+        const content = fs.readFileSync(logPath, 'utf8');
+        const allLines = content.split('\n').filter(Boolean);
+        const recent = allLines.slice(-lines);
+        res.json({ success: true, logs: recent, count: recent.length, total: allLines.length });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Controle Start/Stop/Restart
+app.post('/api/luna/control', (req, res) => {
+    try {
+        const { action } = req.body;
+        const { execSync } = require('child_process');
+        const ROOT = path.join(__dirname, '..');
+        
+        if (action === 'stop') {
+            try {
+                execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
+                execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
+            } catch {}
+            return res.json({ success: true, action: 'stop', message: 'Luna desligada.' });
+        }
+        
+        if (action === 'start') {
+            try {
+                execSync('pgrep -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
+                return res.json({ success: true, action: 'start', message: 'Luna ja estava ligada.' });
+            } catch {
+                const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
+                execSync(script, { stdio: 'ignore' });
+                return res.json({ success: true, action: 'start', message: 'Luna iniciada.' });
+            }
+        }
+        
+        if (action === 'restart') {
+            try {
+                execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
+                execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
+            } catch {}
+            setTimeout(() => {
+                try {
+                    const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
+                    execSync(script, { stdio: 'ignore' });
+                } catch {}
+            }, 2000);
+            return res.json({ success: true, action: 'restart', message: 'Luna reiniciando em 2 segundos...' });
+        }
+        
+        res.status(400).json({ error: 'Acao invalida. Use: start, stop, restart' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 4. ForÃ§ar scan
+// 5. Extrair mensagens
+// 6. Verificar menÃ§Ãµes
+// 7. Verificar links
+// 8. ForÃ§ar relatÃ³rio
+// 9. Checkpoint
 app.get('/api/whatsapp/checkpoint', (req, res) => {
     try {
         const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
