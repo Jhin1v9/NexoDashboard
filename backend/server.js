@@ -196,19 +196,43 @@ app.get('/api/state', (req, res) => {
   res.json({ clients, tasks, users, predictions: getPredictions(clients), timestamp: new Date().toISOString() });
 });
 
-// Tasks
-app.get('/api/tasks', (req, res) => res.json(readJSON(TASKS_FILE) || []));
+// Tasks v16.3 — Evoluído com status workflow, dueDate, prioridade, tipo, comentários
+
+const isOverdue = (dueDate) => {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
+};
+
+app.get('/api/tasks', (req, res) => {
+  let tasks = readJSON(TASKS_FILE) || [];
+  const { status, assignedTo, priority, taskType, overdue } = req.query;
+
+  if (status) tasks = tasks.filter(t => t.status === status);
+  if (assignedTo) tasks = tasks.filter(t => t.assignedTo === assignedTo);
+  if (priority) tasks = tasks.filter(t => t.priority === priority);
+  if (taskType) tasks = tasks.filter(t => t.taskType === taskType);
+  if (overdue === 'true') tasks = tasks.filter(t => isOverdue(t.dueDate) && t.status !== 'completed');
+
+  res.json(tasks);
+});
 
 app.post('/api/tasks', (req, res) => {
   const tasks = readJSON(TASKS_FILE) || [];
+  const now = new Date().toISOString();
   const task = {
     id: Date.now().toString(),
-    title: req.body.title,
-    completed: req.body.completed ?? false,
+    title: req.body.title?.trim() || 'Sem título',
+    description: req.body.description?.trim() || '',
+    status: req.body.status || 'pending',
+    priority: req.body.priority || 'medium',
+    taskType: req.body.taskType || 'one_time',
+    dueDate: req.body.dueDate || null,
     addedBy: req.body.addedBy || 'sistema',
     assignedTo: req.body.assignedTo || null,
     source: req.body.source || 'manual',
-    createdAt: new Date().toISOString()
+    comments: [],
+    createdAt: now,
+    updatedAt: now
   };
   tasks.push(task);
   writeJSON(TASKS_FILE, tasks);
@@ -218,7 +242,16 @@ app.post('/api/tasks', (req, res) => {
 
 app.put('/api/tasks/:id', (req, res) => {
   let tasks = readJSON(TASKS_FILE) || [];
-  tasks = tasks.map(t => t.id === req.params.id ? { ...t, ...req.body, updatedAt: new Date().toISOString() } : t);
+  const now = new Date().toISOString();
+  tasks = tasks.map(t => {
+    if (t.id !== req.params.id) return t;
+    const updates = { ...req.body, updatedAt: now };
+    // Auto-set timestamps baseado no status
+    if (updates.status === 'in_progress' && !t.startedAt) updates.startedAt = now;
+    if (updates.status === 'completed' && !t.completedAt) updates.completedAt = now;
+    if (updates.status && updates.status !== 'completed') updates.completedAt = null;
+    return { ...t, ...updates };
+  });
   writeJSON(TASKS_FILE, tasks);
   broadcast({ type: 'tasks', data: tasks });
   res.json(tasks.find(t => t.id === req.params.id));
@@ -230,6 +263,25 @@ app.delete('/api/tasks/:id', (req, res) => {
   writeJSON(TASKS_FILE, tasks);
   broadcast({ type: 'tasks', data: tasks });
   res.json({ ok: true });
+});
+
+app.post('/api/tasks/:id/comments', (req, res) => {
+  let tasks = readJSON(TASKS_FILE) || [];
+  const task = tasks.find(t => t.id === req.params.id);
+  if (!task) return res.status(404).json({ error: 'Tarefa não encontrada' });
+
+  const comment = {
+    id: Date.now().toString(),
+    text: req.body.text?.trim() || '',
+    author: req.body.author || 'sistema',
+    createdAt: new Date().toISOString()
+  };
+  task.comments = task.comments || [];
+  task.comments.push(comment);
+  task.updatedAt = new Date().toISOString();
+  writeJSON(TASKS_FILE, tasks);
+  broadcast({ type: 'tasks', data: tasks });
+  res.json(comment);
 });
 
 // Users
