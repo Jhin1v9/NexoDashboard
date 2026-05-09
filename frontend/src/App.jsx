@@ -25,6 +25,7 @@ import Orcamentos from './pages/Orcamentos'
 import Operacoes from './pages/Operacoes'
 import Leads from './pages/Leads'
 import LunaControl from './pages/LunaControl'
+import SystemEngine from './pages/SystemEngine'
 import Settings from './pages/Settings'
 import Changelog from './pages/Changelog'
 
@@ -62,6 +63,7 @@ function App() {
             <Route path="/financeiro/gastos/meus" element={<MeusGastos />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/luna" element={<LunaControl />} />
+            <Route path="/sistema" element={<SystemEngine />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>

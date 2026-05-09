@@ -45,7 +45,6 @@ build/
 *.bat
 docker-compose.yml
 PROMPT_*.md
-AGENTS.md
 .env
 .env.local
 .env.production

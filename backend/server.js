@@ -4034,6 +4034,127 @@ app.post('/api/detect-client', (req, res) => {
   }
 });
 
+// ============================================================================
+// SYSTEM ENGINE API — Controle do Backend, Frontend e Supervisor
+// ============================================================================
+
+const ROOT_DIR = path.join(__dirname, '..');
+
+function getProcessPid(pattern) {
+    try {
+        const buf = execSync(`pgrep -f "${pattern}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+        const pids = buf.trim().split('\n').filter(Boolean);
+        return pids.length > 0 ? parseInt(pids[0], 10) : null;
+    } catch { return null; }
+}
+
+function isProcessRunning(pattern) {
+    return getProcessPid(pattern) !== null;
+}
+
+app.get('/api/system/status', (req, res) => {
+    try {
+        const backendPid = getProcessPid('node server.js');
+        const frontendPid = getProcessPid('vite --port 3457');
+        const lunaPid = getProcessPid('luna-cto-agent.cjs');
+        const supervisorPid = getProcessPid('supervisor.sh');
+        let chromeConnected = false;
+        try {
+            execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
+            chromeConnected = true;
+        } catch {}
+        let ollamaConnected = false;
+        try {
+            execSync('curl -s http://localhost:11434/api/tags > /dev/null', { timeout: 2000, stdio: 'ignore' });
+            ollamaConnected = true;
+        } catch {}
+
+        res.json({
+            success: true,
+            timestamp: new Date().toISOString(),
+            backend: { running: !!backendPid, pid: backendPid, port: 3456 },
+            frontend: { running: !!frontendPid, pid: frontendPid, port: 3457 },
+            luna: { running: !!lunaPid, pid: lunaPid },
+            supervisor: { running: !!supervisorPid, pid: supervisorPid },
+            chrome: { connected: chromeConnected, port: 9223 },
+            ollama: { connected: ollamaConnected, port: 11434 },
+            uptime: process.uptime(),
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/system/logs', (req, res) => {
+    try {
+        const service = req.query.service || 'luna'; // luna | backend | frontend | supervisor
+        const lines = parseInt(req.query.lines) || 200;
+        const logMap = {
+            luna: path.join(ROOT_DIR, 'luna-run.log'),
+            backend: path.join(ROOT_DIR, 'backend.log'),
+            frontend: path.join(ROOT_DIR, 'frontend.log'),
+            supervisor: path.join(ROOT_DIR, 'supervisor.log'),
+        };
+        const logPath = logMap[service];
+        if (!logPath || !fs.existsSync(logPath)) {
+            return res.json({ success: true, logs: [], count: 0, service });
+        }
+        const content = fs.readFileSync(logPath, 'utf8');
+        const allLines = content.split('\n').filter(Boolean);
+        const recent = allLines.slice(-lines);
+        res.json({ success: true, logs: recent, count: recent.length, total: allLines.length, service });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/system/control', (req, res) => {
+    try {
+        const { service, action } = req.body;
+        if (!['backend', 'frontend'].includes(service)) {
+            return res.status(400).json({ success: false, error: 'Servico invalido. Use: backend, frontend' });
+        }
+        if (!['start', 'stop', 'restart'].includes(action)) {
+            return res.status(400).json({ success: false, error: 'Acao invalida. Use: start, stop, restart' });
+        }
+
+        const backendScript = `cd ${ROOT_DIR}/backend && nohup node server.js > ${ROOT_DIR}/backend.log 2>&1 &`;
+        const frontendScript = `cd ${ROOT_DIR}/frontend && nohup npm run dev > ${ROOT_DIR}/frontend.log 2>&1 &`;
+
+        if (service === 'backend') {
+            if (action === 'stop' || action === 'restart') {
+                try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch {}
+            }
+            if (action === 'start' || action === 'restart') {
+                setTimeout(() => {
+                    try { execSync(backendScript, { stdio: 'ignore' }); } catch {}
+                }, action === 'restart' ? 2000 : 0);
+            }
+        }
+
+        if (service === 'frontend') {
+            if (action === 'stop' || action === 'restart') {
+                try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch {}
+            }
+            if (action === 'start' || action === 'restart') {
+                setTimeout(() => {
+                    try { execSync(frontendScript, { stdio: 'ignore' }); } catch {}
+                }, action === 'restart' ? 2000 : 0);
+            }
+        }
+
+        res.json({
+            success: true,
+            service,
+            action,
+            message: `${service} ${action === 'restart' ? 'reiniciando' : action === 'start' ? 'iniciando' : 'parando'}...`
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ============================================================================
 // Catch-all
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 

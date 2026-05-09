@@ -6,7 +6,8 @@ import {
   Stethoscope, Wrench, Terminal, Zap, Heart,
   AlertTriangle, CheckCircle, XCircle, Loader, Cpu,
   Wifi, WifiOff, MessageCircle, Chrome, Play, Square,
-  RotateCcw, Eye, EyeOff, ScrollText, Power
+  RotateCcw, Eye, EyeOff, ScrollText, Power, Send,
+  Bot, User, ClipboardList, Trash
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -17,22 +18,38 @@ const ICON_MAP = {
   AlertTriangle, CheckCircle, XCircle, Loader
 };
 
-const CATEGORIES = [
-  { id: 'estado', label: '🌙 Estado', icon: Activity, color: 'text-blue-400', commands: ['acordar', 'dormir', 'status'] },
-  { id: 'memoria', label: '🧠 Memoria', icon: Database, color: 'text-purple-400', commands: ['limpar-memoria', 'esquecer-tudo', 'lembrar'] },
-  { id: 'acoes', label: '⚡ Acoes', icon: Zap, color: 'text-yellow-400', commands: ['escanear-agora', 'gerar-relatorio', 'verificar-mencoes', 'verificar-links'] },
-  { id: 'sistema', label: '🔧 Sistema', icon: Server, color: 'text-green-400', commands: ['atualizar-cache', 'reiniciar-backend', 'fazer-backup'] },
-  { id: 'diagnostico', label: '🩺 Diagnostico', icon: Stethoscope, color: 'text-red-400', commands: ['diagnostico', 'autoconserto'] }
+const TABS = [
+  { id: 'terminal', label: 'Terminal', icon: Terminal },
+  { id: 'chat', label: 'Chat', icon: MessageCircle },
+  { id: 'comandos', label: 'Comandos', icon: Zap }
 ];
 
-const TABS = [
-  { id: 'comandos', label: 'Comandos', icon: Terminal },
-  { id: 'logs', label: 'Logs', icon: ScrollText },
-  { id: 'controle', label: 'Controle', icon: Power }
+const QUICK_COMMANDS = [
+  { id: 'escanear-agora', label: 'Escanear Agora', icon: Scan, desc: 'Forca scan do WhatsApp', color: 'text-blue-400', bg: 'hover:bg-blue-500/10 border-blue-500/30' },
+  { id: 'reescanear', label: 'Re-escanear', icon: RefreshCw, desc: 'Reset checkpoint + scan full', color: 'text-purple-400', bg: 'hover:bg-purple-500/10 border-purple-500/30' },
+  { id: 'limpar-memoria', label: 'Limpar Buffer', icon: Trash, desc: 'Limpa buffer de mensagens', color: 'text-orange-400', bg: 'hover:bg-orange-500/10 border-orange-500/30' },
+  { id: 'gerar-relatorio', label: 'Gerar Relatorio', icon: FileText, desc: 'Gera relatorio do dia', color: 'text-green-400', bg: 'hover:bg-green-500/10 border-green-500/30' },
+  { id: 'verificar-mencoes', label: 'Verificar Mencoes', icon: AtSign, desc: 'Checa @luna pendentes', color: 'text-cyan-400', bg: 'hover:bg-cyan-500/10 border-cyan-500/30' },
+  { id: 'verificar-links', label: 'Verificar Links', icon: Link, desc: 'Processa links pendentes', color: 'text-pink-400', bg: 'hover:bg-pink-500/10 border-pink-500/30' },
+  { id: 'diagnostico', label: 'Diagnostico', icon: Stethoscope, desc: 'Checa saude da Luna', color: 'text-red-400', bg: 'hover:bg-red-500/10 border-red-500/30' },
+  { id: 'autoconserto', label: 'Auto-Conserto', icon: Wrench, desc: 'Tenta corrigir erros', color: 'text-yellow-400', bg: 'hover:bg-yellow-500/10 border-yellow-500/30' },
 ];
+
+function getLogColor(line) {
+  if (line.includes('ERROR') || line.includes('FATAL') || line.includes('CRITICAL')) return 'text-red-400';
+  if (line.includes('SUCCESS') || line.includes('✅')) return 'text-green-400';
+  if (line.includes('WARN')) return 'text-yellow-400';
+  if (line.includes('COMANDO') || line.includes('MENCAO') || line.includes('MENCION')) return 'text-cyan-400';
+  if (line.includes('PRIVACY') || line.includes('PRIVACIDADE')) return 'text-orange-400';
+  if (line.includes('PLAYWRIGHT') || line.includes('CDP')) return 'text-purple-400';
+  if (line.includes('SCAN') || line.includes('EXTRACT')) return 'text-blue-400';
+  if (line.includes('CHAT') || line.includes('MENSAGEM')) return 'text-pink-400';
+  if (line.includes('>>') || line.includes('<<')) return 'text-gray-500';
+  return 'text-gray-300';
+}
 
 export default function LunaControl() {
-  const [activeTab, setActiveTab] = useState('comandos')
+  const [activeTab, setActiveTab] = useState('terminal')
   const [commands, setCommands] = useState([])
   const [status, setStatus] = useState(null)
   const [executing, setExecuting] = useState(null)
@@ -41,10 +58,12 @@ export default function LunaControl() {
   const [hiddenMode, setHiddenMode] = useState(false)
   const [logs, setLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
-  const [controlling, setControlling] = useState(false)
-  const [controlMsg, setControlMsg] = useState('')
   const logsEndRef = useRef(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef(null)
 
   useEffect(() => {
     fetchCommands()
@@ -54,9 +73,9 @@ export default function LunaControl() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'logs') {
+    if (activeTab === 'terminal') {
       fetchLogs()
-      const interval = setInterval(fetchLogs, 3000)
+      const interval = setInterval(fetchLogs, 2000)
       return () => clearInterval(interval)
     }
   }, [activeTab])
@@ -66,6 +85,12 @@ export default function LunaControl() {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [logs, autoScroll])
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
 
   const fetchCommands = async () => {
     try {
@@ -82,28 +107,10 @@ export default function LunaControl() {
   }
 
   const fetchLogs = async () => {
-    setLogsLoading(true)
     try {
-      const res = await axios.get('/api/luna/logs?lines=200')
+      const res = await axios.get('/api/luna/logs?lines=300')
       if (res.data.success) setLogs(res.data.logs)
     } catch (e) {}
-    setLogsLoading(false)
-  }
-
-  const executeControl = async (action) => {
-    setControlling(true)
-    setControlMsg('')
-    try {
-      const res = await axios.post('/api/luna/control', { action })
-      if (res.data.success) {
-        setControlMsg(res.data.message)
-        setTimeout(fetchStatus, 3000)
-      }
-    } catch (e) {
-      setControlMsg('Erro: ' + (e.response?.data?.error || e.message))
-    } finally {
-      setControlling(false)
-    }
   }
 
   const executeCommand = async (commandId) => {
@@ -122,13 +129,49 @@ export default function LunaControl() {
     }
   }
 
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return
+    const text = chatInput.trim()
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', text, time: new Date().toLocaleTimeString('pt-BR') }])
+    setChatLoading(true)
+
+    try {
+      // Se for comando, executa via API
+      if (text.startsWith('/')) {
+        const cmd = text.slice(1).split(' ')[0]
+        const res = await axios.post('/api/luna/command', { command: cmd, params: { hidden: hiddenMode } })
+        setChatMessages(prev => [...prev, {
+          role: 'luna',
+          text: res.data.success ? `✅ Comando /${cmd} executado.` : `❌ Erro: ${res.data.error || 'Falha'}`,
+          time: new Date().toLocaleTimeString('pt-BR')
+        }])
+      } else {
+        // Envia como mensagem para o agente (simulado — no futuro pode ser websocket real)
+        setChatMessages(prev => [...prev, {
+          role: 'luna',
+          text: `🌙 Recebi sua mensagem: "${text}". Ainda nao tenho resposta direta pelo dashboard, mas estou processando...`,
+          time: new Date().toLocaleTimeString('pt-BR')
+        }])
+      }
+    } catch (e) {
+      setChatMessages(prev => [...prev, {
+        role: 'luna',
+        text: `❌ Erro: ${e.message}`,
+        time: new Date().toLocaleTimeString('pt-BR')
+      }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   const updateMood = (command) => {
     setMood(prev => {
       const next = { ...prev }
       if (command === 'acordar') { next.energy = Math.min(100, next.energy + 20); next.happiness += 5; }
       if (command === 'dormir') { next.energy = Math.max(0, next.energy - 30); }
       if (command === 'limpar-memoria') { next.energy = Math.min(100, next.energy + 10); }
-      if (command === 'escanear-agora') { next.energy = Math.max(0, next.energy - 15); next.excitement += 10; }
+      if (command === 'escanear-agora' || command === 'reescanear') { next.energy = Math.max(0, next.energy - 15); next.excitement += 10; }
       if (command === 'gerar-relatorio') { next.trust = Math.min(100, next.trust + 5); }
       if (command === 'diagnostico') { next.happiness = Math.max(0, next.happiness - 5); }
       if (command === 'autoconserto') { next.happiness = Math.min(100, next.happiness + 10); next.trust += 10; }
@@ -141,7 +184,7 @@ export default function LunaControl() {
   return (
     <div className="h-full flex">
       {/* Sidebar Luna */}
-      <div className="w-80 border-r border-nexo-border flex flex-col">
+      <div className="w-80 border-r border-nexo-border flex flex-col bg-nexo-bg/80">
         {/* Header com Mood */}
         <div className="p-4 border-b border-nexo-border">
           <div className="flex items-center gap-3 mb-4">
@@ -157,7 +200,6 @@ export default function LunaControl() {
             </div>
           </div>
 
-          {/* Mood Bars */}
           <div className="space-y-2">
             <MoodBar label="😊 Felicidade" value={mood.happiness} color="bg-yellow-500" />
             <MoodBar label="⚡ Energia" value={mood.energy} color="bg-blue-500" />
@@ -215,9 +257,9 @@ export default function LunaControl() {
       </div>
 
       {/* Conteudo Principal */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-2 border-b border-nexo-border">
+        <div className="flex items-center gap-1 p-2 border-b border-nexo-border bg-nexo-bg/50">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -234,14 +276,156 @@ export default function LunaControl() {
           ))}
         </div>
 
-        {/* Conteudo das Tabs */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-hidden">
+
+          {/* TAB: TERMINAL */}
+          {activeTab === 'terminal' && (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-nexo-border bg-nexo-bg/30">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-nexo-primary" />
+                  <span className="text-sm font-medium">Terminal da Luna</span>
+                  <span className="text-xs text-nexo-muted">({logs.length} linhas)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setAutoScroll(!autoScroll)}
+                    className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors ${autoScroll ? 'bg-nexo-primary text-white' : 'bg-nexo-card text-nexo-muted'}`}>
+                    {autoScroll ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    Auto-scroll
+                  </button>
+                  <button onClick={fetchLogs}
+                    className="flex items-center gap-1 px-3 py-1 bg-nexo-card text-nexo-muted rounded text-xs hover:bg-nexo-border transition-colors">
+                    <RefreshCw className={`w-3 h-3 ${logsLoading ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </button>
+                  <button onClick={() => setLogs([])}
+                    className="flex items-center gap-1 px-3 py-1 bg-nexo-card text-nexo-muted rounded text-xs hover:bg-nexo-border transition-colors">
+                    <Eraser className="w-3 h-3" />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-black/70 overflow-y-auto p-3 font-mono text-xs leading-relaxed">
+                {logs.length === 0 && (
+                  <p className="text-nexo-muted text-center py-8">Nenhum log encontrado. Verifique se a Luna esta rodando.</p>
+                )}
+                {logs.map((line, i) => (
+                  <div key={i} className={`${getLogColor(line)} break-all whitespace-pre-wrap`}>
+                    {line}
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+
+              <div className="px-4 py-2 border-t border-nexo-border bg-nexo-bg/30 flex items-center gap-3">
+                <span className="text-xs text-nexo-muted font-mono">$</span>
+                <input
+                  type="text"
+                  placeholder="Digite um comando (ex: /status, /ajuda) ou mensagem..."
+                  className="flex-1 bg-transparent text-sm text-nexo-text placeholder-nexo-muted outline-none font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = e.target.value.trim()
+                      if (val) {
+                        setChatInput(val)
+                        sendChatMessage()
+                        e.target.value = ''
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CHAT */}
+          {activeTab === 'chat' && (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-nexo-border bg-nexo-bg/30">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-nexo-primary" />
+                  <span className="text-sm font-medium">Chat com a Luna</span>
+                  <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-nexo-success' : 'bg-nexo-danger'}`} />
+                </div>
+                <button onClick={() => setChatMessages([])}
+                  className="flex items-center gap-1 px-3 py-1 bg-nexo-card text-nexo-muted rounded text-xs hover:bg-nexo-border transition-colors">
+                  <Eraser className="w-3 h-3" />
+                  Limpar chat
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.length === 0 && (
+                  <div className="text-center py-12 text-nexo-muted">
+                    <Bot className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">Nenhuma mensagem ainda.</p>
+                    <p className="text-xs mt-1">Envie um comando (/status, /ajuda) ou uma mensagem.</p>
+                  </div>
+                )}
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      msg.role === 'user' ? 'bg-nexo-primary' : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                    }`}>
+                      {msg.role === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
+                    </div>
+                    <div className={`max-w-[70%] px-4 py-2 rounded-xl text-sm ${
+                      msg.role === 'user'
+                        ? 'bg-nexo-primary text-white rounded-tr-none'
+                        : 'bg-nexo-card text-nexo-text rounded-tl-none'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                      <span className={`text-[10px] mt-1 block ${msg.role === 'user' ? 'text-white/60' : 'text-nexo-muted'}`}>
+                        {msg.time}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-nexo-card px-4 py-2 rounded-xl rounded-tl-none">
+                      <Loader className="w-4 h-4 text-nexo-primary animate-spin" />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <div className="p-3 border-t border-nexo-border bg-nexo-bg/30">
+                <div className="flex items-center gap-2 bg-nexo-card rounded-xl px-4 py-2 border border-nexo-border">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                    placeholder="Digite /status, /ajuda ou uma mensagem..."
+                    className="flex-1 bg-transparent text-sm text-nexo-text placeholder-nexo-muted outline-none"
+                    disabled={chatLoading}
+                  />
+                  <button
+                    onClick={sendChatMessage}
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="p-2 bg-nexo-primary rounded-lg text-white hover:bg-nexo-primary/80 transition-colors disabled:opacity-50"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB: COMANDOS */}
           {activeTab === 'comandos' && (
-            <>
+            <div className="p-6 overflow-y-auto h-full">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Centro de Comando</h2>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-yellow-400" />
+                  Comandos Rapidos
+                </h2>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" checked={hiddenMode} onChange={(e) => setHiddenMode(e.target.checked)} className="sr-only peer" />
                   <div className="relative w-11 h-6 bg-nexo-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-nexo-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-nexo-primary"></div>
@@ -249,155 +433,54 @@ export default function LunaControl() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {CATEGORIES.map(cat => (
-                  <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <cat.icon className={`w-5 h-5 ${cat.color}`} />
-                      <h3 className="font-semibold">{cat.label}</h3>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {cat.commands?.map(cmdId => {
-                        const cmd = commands.find(c => c.id === cmdId)
-                        if (!cmd) return null
-                        const Icon = ICON_MAP[cmd.icon] || Zap
-                        const isExecuting = executing === cmdId
-                        return (
-                          <button key={cmdId} onClick={() => executeCommand(cmdId)} disabled={isExecuting || !isRunning}
-                            className="p-3 bg-nexo-bg hover:bg-nexo-border border border-nexo-border rounded-lg text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            <div className="flex items-center gap-2 mb-1">
-                              {isExecuting ? <Loader className="w-4 h-4 text-nexo-primary animate-spin" /> : <Icon className="w-4 h-4 text-nexo-muted" />}
-                              <span className="font-medium text-sm">{cmd.label}</span>
-                            </div>
-                            <p className="text-xs text-nexo-muted">{cmd.description}</p>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* TAB: LOGS */}
-          {activeTab === 'logs' && (
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <ScrollText className="w-6 h-6" />
-                  Logs da Luna
-                </h2>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setAutoScroll(!autoScroll)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${autoScroll ? 'bg-nexo-primary text-white' : 'bg-nexo-card text-nexo-muted'}`}>
-                    {autoScroll ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    Auto-scroll
-                  </button>
-                  <button onClick={fetchLogs}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-nexo-card text-nexo-muted rounded-lg text-xs font-medium hover:bg-nexo-border transition-colors">
-                    <RefreshCw className={`w-3 h-3 ${logsLoading ? 'animate-spin' : ''}`} />
-                    Atualizar
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 bg-black/50 rounded-xl border border-nexo-border overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1">
-                  {logs.length === 0 && (
-                    <p className="text-nexo-muted text-center py-8">Nenhum log encontrado.</p>
-                  )}
-                  {logs.map((line, i) => {
-                    let color = 'text-gray-300'
-                    if (line.includes('ERROR') || line.includes('FATAL')) color = 'text-red-400'
-                    else if (line.includes('SUCCESS')) color = 'text-green-400'
-                    else if (line.includes('WARN')) color = 'text-yellow-400'
-                    else if (line.includes('COMANDO') || line.includes('MENCAO')) color = 'text-cyan-400'
-                    else if (line.includes('PRIVACY')) color = 'text-orange-400'
-                    else if (line.includes('PLAYWRIGHT')) color = 'text-purple-400'
-                    else if (line.includes('SCAN')) color = 'text-blue-400'
-                    return (
-                      <div key={i} className={`${color} break-all`}>
-                        {line}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {QUICK_COMMANDS.map(cmd => {
+                  const isExecuting = executing === cmd.id
+                  return (
+                    <button
+                      key={cmd.id}
+                      onClick={() => executeCommand(cmd.id)}
+                      disabled={isExecuting || !isRunning}
+                      className={`p-4 bg-nexo-bg border border-nexo-border rounded-xl text-left transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed ${cmd.bg}`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        {isExecuting ? <Loader className="w-5 h-5 text-nexo-primary animate-spin" /> : <cmd.icon className={`w-5 h-5 ${cmd.color}`} />}
+                        <span className="font-semibold text-sm">{cmd.label}</span>
                       </div>
-                    )
-                  })}
-                  <div ref={logsEndRef} />
-                </div>
-                <div className="px-4 py-2 border-t border-nexo-border text-xs text-nexo-muted flex justify-between">
-                  <span>{logs.length} linhas carregadas</span>
-                  <span>Atualiza a cada 3s</span>
-                </div>
+                      <p className="text-xs text-nexo-muted">{cmd.desc}</p>
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-          )}
 
-          {/* TAB: CONTROLE */}
-          {activeTab === 'controle' && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <Power className="w-6 h-6" />
-                Painel de Controle
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* Status Card */}
-                <div className="glass-card rounded-xl p-6">
-                  <h3 className="text-sm font-medium text-nexo-muted uppercase mb-4">Status do Agente</h3>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isRunning ? 'bg-nexo-success/20' : 'bg-nexo-danger/20'}`}>
-                      {isRunning ? <Wifi className="w-8 h-8 text-nexo-success" /> : <WifiOff className="w-8 h-8 text-nexo-danger" />}
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold">{isRunning ? 'ONLINE' : 'OFFLINE'}</div>
-                      <div className="text-sm text-nexo-muted">{status?.pid ? `PID: ${status.pid}` : 'Nao iniciado'}</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <StatusRow label="Chrome CDP" active={status?.chromeConnected} />
-                    <StatusRow label="WhatsApp Web" active={status?.whatsappConnected} />
-                    <StatusRow label="Ollama LLM" active={true} />
-                  </div>
-                </div>
-
-                {/* Acoes Card */}
-                <div className="glass-card rounded-xl p-6 md:col-span-2">
-                  <h3 className="text-sm font-medium text-nexo-muted uppercase mb-4">Acoes</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <button onClick={() => executeControl('start')} disabled={controlling || isRunning}
-                      className="flex flex-col items-center gap-3 p-6 bg-nexo-bg hover:bg-nexo-success/10 border border-nexo-border hover:border-nexo-success rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Play className="w-8 h-8 text-nexo-success" />
-                      <span className="font-semibold">Ligar Luna</span>
-                      <span className="text-xs text-nexo-muted">Inicia o agente</span>
-                    </button>
-
-                    <button onClick={() => executeControl('stop')} disabled={controlling || !isRunning}
-                      className="flex flex-col items-center gap-3 p-6 bg-nexo-bg hover:bg-nexo-danger/10 border border-nexo-border hover:border-nexo-danger rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Square className="w-8 h-8 text-nexo-danger" />
-                      <span className="font-semibold">Desligar Luna</span>
-                      <span className="text-xs text-nexo-muted">Para o agente</span>
-                    </button>
-
-                    <button onClick={() => executeControl('restart')} disabled={controlling}
-                      className="flex flex-col items-center gap-3 p-6 bg-nexo-bg hover:bg-nexo-primary/10 border border-nexo-border hover:border-nexo-primary rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                      <RotateCcw className="w-8 h-8 text-nexo-primary" />
-                      <span className="font-semibold">Reiniciar Luna</span>
-                      <span className="text-xs text-nexo-muted">Stop + Start automatico</span>
-                    </button>
-                  </div>
-
-                  {controlMsg && (
-                    <div className={`mt-4 p-3 rounded-lg text-sm font-medium ${controlMsg.includes('Erro') ? 'bg-nexo-danger/10 text-nexo-danger' : 'bg-nexo-success/10 text-nexo-success'}`}>
-                      {controlMsg}
-                    </div>
-                  )}
+              {/* Controle Start/Stop/Restart Luna */}
+              <div className="mt-8">
+                <h3 className="text-sm font-medium text-nexo-muted uppercase mb-4">Controle do Agente</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <button onClick={() => axios.post('/api/luna/control', { action: 'start' }).then(fetchStatus)}
+                    disabled={isRunning}
+                    className="flex flex-col items-center gap-2 p-5 bg-nexo-bg border border-nexo-border rounded-xl hover:bg-nexo-success/10 hover:border-nexo-success transition-all disabled:opacity-50">
+                    <Play className="w-6 h-6 text-nexo-success" />
+                    <span className="font-semibold text-sm">Ligar Luna</span>
+                  </button>
+                  <button onClick={() => axios.post('/api/luna/control', { action: 'stop' }).then(fetchStatus)}
+                    disabled={!isRunning}
+                    className="flex flex-col items-center gap-2 p-5 bg-nexo-bg border border-nexo-border rounded-xl hover:bg-nexo-danger/10 hover:border-nexo-danger transition-all disabled:opacity-50">
+                    <Square className="w-6 h-6 text-nexo-danger" />
+                    <span className="font-semibold text-sm">Desligar Luna</span>
+                  </button>
+                  <button onClick={() => axios.post('/api/luna/control', { action: 'restart' }).then(() => setTimeout(fetchStatus, 3000))}
+                    className="flex flex-col items-center gap-2 p-5 bg-nexo-bg border border-nexo-border rounded-xl hover:bg-nexo-primary/10 hover:border-nexo-primary transition-all">
+                    <RotateCcw className="w-6 h-6 text-nexo-primary" />
+                    <span className="font-semibold text-sm">Reiniciar Luna</span>
+                  </button>
                 </div>
               </div>
 
               {/* Buffer Info */}
-              <div className="glass-card rounded-xl p-6">
+              <div className="mt-8 glass-card rounded-xl p-6">
                 <h3 className="text-sm font-medium text-nexo-muted uppercase mb-4">Buffer Atual</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="p-4 bg-nexo-bg rounded-lg text-center">
                     <div className="text-2xl font-bold text-nexo-primary">{status?.bufferMessages || 0}</div>
                     <div className="text-xs text-nexo-muted">Mensagens Novas</div>
@@ -413,6 +496,10 @@ export default function LunaControl() {
                   <div className="p-4 bg-nexo-bg rounded-lg text-center">
                     <div className="text-2xl font-bold text-nexo-info">{status?.bufferLinks || 0}</div>
                     <div className="text-xs text-nexo-muted">Links</div>
+                  </div>
+                  <div className="p-4 bg-nexo-bg rounded-lg text-center">
+                    <div className="text-2xl font-bold text-purple-400">{status?.bufferLeads || 0}</div>
+                    <div className="text-xs text-nexo-muted">Leads</div>
                   </div>
                 </div>
               </div>
