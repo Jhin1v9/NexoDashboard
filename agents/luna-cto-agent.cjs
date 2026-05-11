@@ -175,8 +175,23 @@ const CONFIG = {
   NEWS_FILE: path.join(__dirname, '../backend/data/nexo-news.json'),
   REPORTS_DIR: path.join(__dirname, '../backend/data/reports'),
   ARTIFACTS_DIR: path.join(__dirname, '../ARTIFACTS'),
-  DEBUG_DIR: path.join(__dirname, '../ARTIFACTS/debug')
+  DEBUG_DIR: path.join(__dirname, '../ARTIFACTS/debug'),
+
+  // MODO SILÊNCIO — Luna não envia mensagens proativas entre 22h e 8h
+  SLEEP_START_HOUR: 22,
+  SLEEP_END_HOUR: 8,
+  TIMEZONE: 'Europe/Madrid'
 };
+
+function isSleepingHours() {
+  const now = new Date();
+  const hour = parseInt(now.toLocaleString('en-GB', { timeZone: CONFIG.TIMEZONE, hour: '2-digit', hour12: false }));
+  if (CONFIG.SLEEP_START_HOUR <= CONFIG.SLEEP_END_HOUR) {
+    return hour >= CONFIG.SLEEP_START_HOUR && hour < CONFIG.SLEEP_END_HOUR;
+  }
+  // Quando o período cruza a meia-noite (22h -> 8h)
+  return hour >= CONFIG.SLEEP_START_HOUR || hour < CONFIG.SLEEP_END_HOUR;
+}
 
 function resolveChromeExecutable() {
   const candidates = [
@@ -1328,6 +1343,13 @@ class LunaAgent {
 
     log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
+    // MODO SILÊNCIO: se for horário de dormir (22h-8h), avisa que responde no outro dia
+    if (isSleepingHours()) {
+      log.info('[SLEEP] Modo silencio ativo. Menção será respondida no outro dia.');
+      await msg.reply(`🌙 *Modo silencio ativo*\n\nEstou dormindo agora (22h - 8h). 💤\n\nDeixa sua mensagem que eu respondo com carinho no outro dia! Bom descanso, chefe. 🌙`);
+      return;
+    }
+
     try {
       if (await this.handlePendingAnswer(msg)) return;
 
@@ -2217,6 +2239,11 @@ class LunaAgent {
 
   async sendMessageToGroup(text) {
     try {
+      // MODO SILÊNCIO: não enviar mensagens proativas entre 22h e 8h
+      if (isSleepingHours()) {
+        log.info('[PROACTIVE] Modo silencio ativo (22h-8h). Mensagem proativa NAO enviada.');
+        return;
+      }
       const groupId = CONFIG.GROUPS[0]?.id;
       if (!groupId) {
         log.error('[PROACTIVE] ID do grupo Production nao configurado. Mensagem NAO enviada.');
