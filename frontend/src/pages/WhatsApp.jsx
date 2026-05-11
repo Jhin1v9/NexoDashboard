@@ -121,13 +121,22 @@ function normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages =
     historyTotal: historyMessages.length
   }
   
-  // Project progress (mock baseado nos projetos reais da NEXO)
-  const projectProgress = [
-    { name: 'Tropicale (Juan)', progress: 85, status: 'Fase de entrega final', health: 'good', type: 'client' },
-    { name: 'Santafe (Paulo)', progress: 45, status: 'Pagamento pendente', health: 'warning', type: 'client' },
-    { name: 'NEXO Dashboard', progress: 75, status: 'Em desenvolvimento ativo', health: 'good', type: 'internal' },
-    { name: 'NEXO Intelligence', progress: 20, status: 'Protótipo inicial', health: 'neutral', type: 'internal' }
-  ]
+  // Project progress — carregado dinamicamente do backend via /api/projects
+  // Fallback vazio se API não responder
+  const [projectProgress, setProjectProgress] = useState([]);
+  useEffect(() => {
+    axios.get('/api/projects').then(r => {
+      if (r.data?.projects) {
+        setProjectProgress(r.data.projects.map(p => ({
+          name: p.name || p.codename,
+          progress: p.progress || 0,
+          status: p.status || 'Em andamento',
+          health: p.health || 'neutral',
+          type: p.type === 'cliente-externo' ? 'client' : 'internal'
+        })));
+      }
+    }).catch(() => setProjectProgress([]));
+  }, []);
   
   return {
     stats,

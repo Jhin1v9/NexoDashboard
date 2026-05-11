@@ -8,8 +8,16 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const cron = require('node-cron');
 const { LunaBrain } = require('./LunaBrain_v16.js');
 const { SmartClassifier, resolveAuthor } = require('./SmartClassifier_v16.js');
+const { LunaMemory } = require('./LunaMemory_v17.js');
+
+// ── LUNA v18.0 CONSCIOUS — Novos Módulos Inteligentes ──
+const { LunaOrchestrator } = require('./core/LunaOrchestrator.js');
+const { LunaReasoningEngine } = require('./core/LunaReasoningEngine.js');
+const { FeedbackLoop } = require('./proactive/FeedbackLoop.js');
+const { ProactiveEngine } = require('./proactive/ProactiveEngine.js');
 
 function normalizeWhatsAppTimestamp(value) {
   if (!value) return new Date().toISOString();
@@ -147,7 +155,7 @@ const CONFIG = {
     groupName: 'Production'
   },
   GROUPS: [
-    { name: 'Production', type: 'internal' },
+    { name: 'Production', type: 'internal', id: 'nexo-production-2026' },
     { name: 'Paulo', type: 'client' }
   ],
   SCAN_INTERVAL: 10 * 60 * 1000,
@@ -774,6 +782,17 @@ class LunaAgent {
       model: process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || process.env.LUNA_GEMMA_MODEL || 'qwen3:1.7b',
       host: process.env.OLLAMA_HOST || 'http://localhost:11434'
     });
+    this.memory = new LunaMemory(); // v17.0 — Memória contextual
+    
+    // ── LUNA v18.0 CONSCIOUS ──
+    this.orchestrator = new LunaOrchestrator(process.env.OLLAMA_HOST || 'http://localhost:11434');
+    this.orchestrator.agents.people.memory = this.memory; // Injeta memory no PeopleAgent
+    this.reasoning = new LunaReasoningEngine(this.orchestrator, this.brain);
+    this.feedback = new FeedbackLoop(); // v18.0 — Aprende com correções
+    this.proactive = new ProactiveEngine(this.orchestrator.dataAPI, this.orchestrator.kg, this.orchestrator.sm); // v18.0 — Alertas inteligentes
+    this.lastLunaResponse = {}; // Guarda última resposta por autor
+    // ────────────────────────────
+    
     this.linkAnalyzer = new LinkAnalyzer();
     this.extractor = new PlaywrightExtractor();
     this.client = null;
@@ -872,8 +891,11 @@ class LunaAgent {
       const isCommand = rawBody.trim().startsWith('/');
       const hasPendingAnswer = Boolean(this.getPendingMatch(msg));
 
-      if (msg.fromMe) {
-        log.info('[SELF] Ignorando mensagem propria para evitar loop/classificacao duplicada');
+      // Comandos e menções dos CEOs devem SEMPRE ser processados, mesmo que venham
+      // da própria sessão (msg.fromMe), porque os CEOs usam o WhatsApp da Luna.
+      // Só ignoramos mensagens próprias que NÃO são comandos/menções (evita loop no scan).
+      if (msg.fromMe && !isCommand && !isMention && !hasPendingAnswer) {
+        log.info('[SELF] Ignorando mensagem propria (nao eh comando nem mencao)');
         return;
       }
 
@@ -957,6 +979,22 @@ class LunaAgent {
 
         this.updateBufferFromClassified([classified]);
         await this.saveToHistory([classified]);
+        
+        // v17.0 — Guardar na memória contextual
+        try {
+          this.memory.storeMessage({
+            id: classified.id,
+            author: classified.author,
+            authorName: classified.authorName,
+            body: classified.body,
+            category: classification.category,
+            timestamp: classified.timestamp,
+            from: classified.from
+          });
+        } catch (memErr) {
+          log.warn(`[MEMORY] Falha ao guardar na memória: ${memErr.message}`);
+        }
+        
         this.cp.save();
         log.info(`[LIVE] Mensagem classificada em tempo real: ${classification.category}`);
 
@@ -1090,6 +1128,29 @@ class LunaAgent {
     if (!pending) return false;
 
     const answer = msg.body || '';
+    const cleanAnswer = this.cleanMentionText(answer);
+
+    // ── LUNA v18.0: Receber título de link ──
+    if (pending.type === 'waitingLinkTitle') {
+      if (cleanAnswer && cleanAnswer.length > 2) {
+        // Atualizar o link no buffer com o título fornecido
+        const url = pending.data.url;
+        const links = this.cp.buffer?.newLinks || [];
+        const link = links.find(l => l.url === url);
+        if (link) {
+          link.title = cleanAnswer;
+          link.enrichedAt = new Date().toISOString();
+        }
+        await msg.reply(`✅ Título anotado: "${cleanAnswer}" para ${url}\n\nLink enriquecido! 🧠`);
+        this.pendingQuestion = null;
+        return true;
+      } else {
+        await msg.reply('Me fala o título direitinho que eu anoto! 😊');
+        return true;
+      }
+    }
+    // ─────────────────────────────────────────
+
     if (this.isYesAnswer(answer)) {
       await this.executePendingAction(pending, true);
       await msg.reply(`Feito! ${pending.data.taskText} anotado como concluido.`);
@@ -1121,6 +1182,22 @@ class LunaAgent {
       askedToName: actor.name,
       chatId: actor.chatId,
       expiresAt: Date.now() + 120000
+    };
+  }
+
+  askLinkTitle(msg, url, authorName) {
+    const actor = this.getMessageActor(msg);
+    this.pendingQuestion = {
+      type: 'waitingLinkTitle',
+      data: {
+        url,
+        author: authorName
+      },
+      timestamp: Date.now(),
+      askedTo: actor.key,
+      askedToName: actor.name,
+      chatId: actor.chatId,
+      expiresAt: Date.now() + 300000 // 5 minutos
     };
   }
 
@@ -1172,14 +1249,19 @@ class LunaAgent {
     return { tasks, leads };
   }
 
-  buildHumanMentionReply(body = '', authorName = 'chefe') {
+  buildHumanMentionReply(body = '', authorName = 'chefe', quotedBody = '') {
     const clean = this.cleanMentionText(body);
     const lower = clean.toLowerCase();
-    const hasUrl = /https?:\/\/[^\s]+/i.test(clean);
+    const hasUrl = /https?:\/\/[^\s]+/i.test(clean) || /https?:\/\/[^\s]+/i.test(quotedBody);
     const isGreeting = /^(oi|ola|olá|opa|e ai|e aí|bom dia|boa tarde|boa noite)[!.\s]*$/i.test(clean);
     const looksLikeList = /anota|tarefas?:|clientes?|potentes|^- /im.test(clean) && clean.split(/\r?\n/).length > 2;
     const completed = /\b(consegui|fiz|terminei|consertei|corrigi|resolvi|subi|publiquei|atualizei)\b/i.test(clean);
     const ambiguousPc = /\bpc\b/i.test(clean) && clean.split(/\s+/).length <= 5;
+
+    // Se a menção está vazia mas há uma mensagem citada, não é greeting — é análise da msg citada
+    if ((isGreeting || !clean) && quotedBody) {
+      return null; // Deixa a IA analisar a mensagem citada
+    }
 
     if (isGreeting || !clean) {
       return this.buildContextGreeting(authorName);
@@ -1204,15 +1286,45 @@ class LunaAgent {
     if (hasUrl) {
       const url = clean.match(/https?:\/\/[^\s]+/i)?.[0] || 'link';
       const source = /instagram/i.test(url) ? 'Instagram' : 'link';
-      return `Link do ${source} anotado!\n\nVou tentar enriquecer com titulo quando der. Se nao rolar, ele ja fica salvo mesmo assim.\n\nQuer que eu avise se alguem comentar sobre isso depois?`;
+      // Guardar pendingQuestion para receber o título do link depois
+      this.askLinkTitle(msg, url, authorName);
+      return `🔗 Link do ${source} anotado!\n\nQual o título/nome desse link? Me fala que eu enriqueço o registro. 😊`;
     }
 
     return null;
   }
 
   async handleMention(msg) {
-    const body = msg.body || '';
-    if (!body.trim()) { log.warn('Mencao vazia ignorada'); return; }
+    let body = msg.body || '';
+    let quotedBody = '';
+    let isQuotedMention = false;
+
+    // Se a menção é em resposta a uma mensagem anterior (reply/quote),
+    // analisar o conteúdo da mensagem citada, mesmo que a menção em si esteja "vazia"
+    if (msg.hasQuotedMsg) {
+      try {
+        const quotedMsg = await msg.getQuotedMessage();
+        if (quotedMsg) {
+          quotedBody = quotedMsg.body || quotedMsg.text || '';
+          isQuotedMention = true;
+          log.info(`[MENCAO] ${msg.pushname || msg.from} marcou Luna em uma mensagem citada: "${quotedBody.slice(0, 60)}..."`);
+        }
+      } catch (e) {
+        log.warn(`[MENCAO] Falha ao obter mensagem citada: ${e.message}`);
+      }
+    }
+
+    // Se a menção em si está vazia MAS há uma mensagem citada, usar o texto da citada
+    const cleanBody = this.cleanMentionText(body);
+    if (!cleanBody && isQuotedMention && quotedBody) {
+      body = quotedBody;
+      log.info(`[MENCAO] Usando texto da mensagem citada como conteúdo da análise`);
+    }
+
+    if (!body.trim() && !quotedBody) {
+      log.warn('[MENCAO] Menção realmente vazia (sem texto e sem mensagem citada), ignorando');
+      return;
+    }
 
     log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
@@ -1221,7 +1333,26 @@ class LunaAgent {
 
       const author = resolveAuthor(msg.author || msg.pushname || msg.from);
       const authorName = author.name || msg.pushname || msg.from || 'chefe';
-      const humanReply = this.buildHumanMentionReply(body, authorName);
+      const authorKey = msg.author || msg.from;
+
+      // ── FEEDBACK LOOP v18.0: Detectar correção ──
+      if (this.feedback && this.lastLunaResponse[authorKey]) {
+        const correction = this.feedback.detectCorrection(body, this.lastLunaResponse[authorKey]);
+        if (correction && correction.isCorrection) {
+          this.feedback.recordCorrection(
+            this.lastLunaResponse[authorKey],
+            correction.value || body,
+            'response',
+            authorName
+          );
+          await msg.reply(`📝 *Anotado!* Obrigada pela correção, ${authorName.split(' ')[0]}. Vou lembrar disso da próxima vez. 🧠`);
+          log.success(`[Feedback] Correção aprendida de ${authorName}`);
+          return;
+        }
+      }
+      // ─────────────────────────────────────────────
+
+      const humanReply = this.buildHumanMentionReply(body, authorName, quotedBody);
       if (humanReply) {
         if (/\b(consegui|fiz|terminei|finalizei|consertei|corrigi|resolvi|subi|publiquei|atualizei)\b/i.test(this.cleanMentionText(body))) {
           const taskText = this.extractCompletedObject(body) || this.cleanMentionText(body);
@@ -1254,10 +1385,42 @@ class LunaAgent {
         }
       };
 
-      const response = await this.brain.generateResponse(body, context);
+      // Se há mensagem citada, incluir no contexto para a IA saber que está analisando uma msg específica
+      const textForIA = isQuotedMention && quotedBody
+        ? `[Mensagem citada por ${authorName}]: "${quotedBody}"\n\n[Comentário de ${authorName}]: ${body || '(sem comentário adicional)'}`
+        : body;
 
-      if (response && response.text) {
-        await msg.reply(response.text);
+      // ── LUNA v18.0 CONSCIOUS: Usar ReasoningEngine para perguntas factuais ──
+      let responseText = null;
+      const isFactualQuestion = /\b(como esta|status|quantas?|quanto|quem|qual|onde|quando|resumo|panorama|foco|prioridade|atrasad|pagamento|tarefa|projeto|lead|cliente)\b/i.test(textForIA);
+      
+      if (isFactualQuestion && this.reasoning) {
+        try {
+          log.info('[CONSCIOUS] Usando ReasoningEngine para resposta baseada em dados');
+          const reasoningResult = await this.reasoning.think(textForIA, { author: authorName, authorRole: author.role });
+          if (reasoningResult && reasoningResult.text) {
+            responseText = reasoningResult.text;
+            log.success('[CONSCIOUS] Resposta baseada em dados gerada!');
+          }
+        } catch (reasoningErr) {
+          log.warn(`[CONSCIOUS] ReasoningEngine falhou, fallback para LLM: ${reasoningErr.message}`);
+        }
+      }
+      
+      // Fallback para LLM tradicional se reasoning não funcionou ou não é factual
+      if (!responseText) {
+        const response = await this.brain.generateResponse(textForIA, context);
+        responseText = response?.text || null;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
+      if (responseText) {
+        await msg.reply(responseText);
+        // ── FEEDBACK LOOP v18.0: Guardar última resposta ──
+        if (this.feedback) {
+          this.lastLunaResponse[authorKey] = responseText;
+        }
+        // ───────────────────────────────────────────────────
         log.success('Resposta IA enviada!');
       } else {
         await msg.reply(
@@ -1402,8 +1565,9 @@ class LunaAgent {
         `/ideas — Ideias do time\n` +
         `/links — Links analisados\n` +
         `/leads — Oportunidades\n` +
-        `/news — Notícias do grupo\n\n` +
-        `/ignoradas — Mensagens sem sinal NEXO\n\n` +
+        `/news — Notícias do grupo\n` +
+        `/ignoradas — Mensagens sem sinal NEXO\n` +
+        `/mencoes — Minhas menções no grupo\n\n` +
         `💰 *NEGÓCIOS:*\n` +
         `/financeiro — Movimentações\n` +
         `/decisoes — Acordos do time\n\n` +
@@ -1414,13 +1578,22 @@ class LunaAgent {
         `/stats — Estatísticas do grupo\n` +
         `/sentimento — Como o time tá\n` +
         `/estado — Meu mood atual\n\n` +
+        `⚙️ *CONTROLE OPERACIONAL:*\n` +
+        `/scan — Forçar varredura do grupo\n` +
+        `/analise — Análise completa (deep scan)\n` +
+        `/buffer — Ver conteúdo do buffer\n` +
+        `/limpar — Limpar TODO o buffer\n` +
+        `/cache — Limpar cache de msgs processadas\n` +
+        `/health — Health check dos serviços\n` +
+        `/restart — Reiniciar a Luna\n` +
+        `/ping — Testar se estou online\n\n` +
         `❓ *SOBRE MIM:*\n` +
         `/ajuda — Este menu\n` +
         `/ayuda — Alias, porque somos internacionais\n` +
         `/comandos — Command Center\n` +
         `/sobre — Quem sou eu\n\n` +
         `💬 *Mencione @Luna pra conversar!*\n` +
-        `🤖 *Luna v16.1 | NEXO Digital*`
+        `🤖 *Luna v16.3 | NEXO Digital*`
       );
     }
     else if (cmd === '/ideas') {
@@ -1568,7 +1741,7 @@ class LunaAgent {
       const term = extractSearchArg(raw, '/buscar').toLowerCase();
       if (!term) {
         await msg.reply(
-          `🔍 *NEXO SEARCH*\n\nUso: /buscar [termo]\nExemplo: /buscar santafe\n\n` +
+          `🔍 *NEXO SEARCH*\n\nUso: /buscar [termo]\nExemplo: /buscar cliente\n\n` +
           `🤖 Luna v16.0 | NEXO Search`
         );
         return;
@@ -1705,6 +1878,208 @@ class LunaAgent {
       log.warn('[COMANDO] Reinicio solicitado pelo CEO via WhatsApp');
       setTimeout(() => process.kill(process.pid, 'SIGTERM'), 2000);
     }
+    // ═══════════════════════════════════════════════════════════════
+    // NOVOS COMANDOS v16.3 — Controle Operacional via WhatsApp
+    // ═══════════════════════════════════════════════════════════════
+    else if (cmd === '/limpar' || cmd === '/clear' || cmd === '/resetar') {
+      // Limpa TODO o buffer (mensagens, tarefas, links, etc.) mas mantém checkpoint
+      const antes = {
+        msgs: messages.length,
+        tasks: tasks.length,
+        ideas: ideas.length,
+        links: links.length,
+        leads: leads.length
+      };
+      this.cp.buffer = {
+        newMessages: [],
+        newTasks: [],
+        newIdeas: [],
+        newDecisions: [],
+        newLinks: [],
+        newMentions: [],
+        newNews: [],
+        newLeads: [],
+        newFinance: [],
+        newTasksDone: [],
+        lastBufferUpdate: new Date().toISOString()
+      };
+      this.cp.save();
+      this.processedMessageIds.clear();
+      await msg.reply(
+        `🧹 *BUFFER LIMPO*\n\n` +
+        `Removidos do radar:\n` +
+        `• ${antes.msgs} mensagens\n` +
+        `• ${antes.tasks} tarefas\n` +
+        `• ${antes.ideas} ideias\n` +
+        `• ${antes.links} links\n` +
+        `• ${antes.leads} leads\n\n` +
+        `🔄 Cache de mensagens processadas também zerado.\n` +
+        `Pronta para novo scan!\n\n` +
+        `🌙 Luna v16.3 | Limpeza completa`
+      );
+      log.info('[COMANDO] Buffer limpo por comando WhatsApp');
+    }
+    else if (cmd === '/cache' || cmd === '/limpar-cache') {
+      // Só limpa o cache de mensagens processadas (permite reprocessar)
+      const antes = this.processedMessageIds.size;
+      this.processedMessageIds.clear();
+      // Também limpa knownMessageHashes do checkpoint para permitir re-scan
+      const hashesAntes = this.cp.checkpoint.knownMessageHashes.length;
+      this.cp.checkpoint.knownMessageHashes = [];
+      this.cp.save();
+      await msg.reply(
+        `🗑️ *CACHE ZERADO*\n\n` +
+        `• ${antes} IDs de mensagens em memória removidos\n` +
+        `• ${hashesAntes} hashes do checkpoint apagados\n\n` +
+        `Agora posso reprocessar mensagens que já li antes.\n` +
+        `Use /scan para forçar uma nova varredura!\n\n` +
+        `🌙 Luna v16.3 | Cache limpo`
+      );
+      log.info('[COMANDO] Cache de mensagens processadas limpo');
+    }
+    else if (cmd === '/buffer' || cmd === '/ver-buffer') {
+      const b = this.cp.buffer || {};
+      const total = (b.newMessages?.length || 0) +
+                    (b.newTasks?.length || 0) +
+                    (b.newIdeas?.length || 0) +
+                    (b.newLinks?.length || 0) +
+                    (b.newLeads?.length || 0) +
+                    (b.newFinance?.length || 0) +
+                    (b.newNews?.length || 0) +
+                    (b.newDecisions?.length || 0);
+      await msg.reply(
+        `📦 *BUFFER ATUAL*\n\n` +
+        `💬 Mensagens: ${b.newMessages?.length || 0}\n` +
+        `📝 Tarefas: ${b.newTasks?.length || 0}\n` +
+        `💡 Ideias: ${b.newIdeas?.length || 0}\n` +
+        `🔗 Links: ${b.newLinks?.length || 0}\n` +
+        `🎣 Leads: ${b.newLeads?.length || 0}\n` +
+        `💰 Financeiro: ${b.newFinance?.length || 0}\n` +
+        `📰 News: ${b.newNews?.length || 0}\n` +
+        `⚖️ Decisões: ${b.newDecisions?.length || 0}\n` +
+        `✅ Tarefas feitas: ${b.newTasksDone?.length || 0}\n\n` +
+        `📊 Total: ${total} itens\n` +
+        `🕐 Última atualização: ${b.lastBufferUpdate ? relativeTime(b.lastBufferUpdate) : 'nunca'}\n\n` +
+        `🌙 Luna v16.3 | Buffer Status`
+      );
+    }
+    else if (cmd === '/scan' || cmd === '/varredura' || cmd === '/escanear') {
+      await msg.reply(
+        `🔍 *SCAN FORÇADO*\n\n` +
+        `Iniciando varredura completa do grupo agora...\n` +
+        `Isso pode levar 1-2 minutos.\n\n` +
+        `🌙 Luna v16.3 | Scan iniciado`
+      );
+      log.info('[COMANDO] Scan forçado por comando WhatsApp');
+      // Executa scan em background para não bloquear
+      setTimeout(async () => {
+        try {
+          await this.runOnce();
+          await msg.reply(
+            `✅ *SCAN CONCLUÍDO*\n\n` +
+            `Varredura finalizada!\n` +
+            `Use /buffer ou /status para ver o que encontrei.\n\n` +
+            `🌙 Luna v16.3 | Scan completo`
+          );
+        } catch (e) {
+          log.error(`[COMANDO] Erro no scan forçado: ${e.message}`);
+          await msg.reply(
+            `❌ *SCAN FALHOU*\n\n` +
+            `Erro: ${e.message.slice(0, 100)}\n` +
+            `Tente /health para verificar o estado dos serviços.\n\n` +
+            `🌙 Luna v16.3 | Scan erro`
+          );
+        }
+      }, 100);
+    }
+    else if (cmd === '/analise' || cmd === '/analizar' || cmd === '/analisar') {
+      await msg.reply(
+        `🧠 *ANÁLISE COMPLETA*\n\n` +
+        `Iniciando análise profunda de todas as mensagens do grupo...\n` +
+        `Isso pode levar 2-3 minutos.\n\n` +
+        `🌙 Luna v16.3 | Análise iniciada`
+      );
+      log.info('[COMANDO] Análise completa forçada por comando WhatsApp');
+      setTimeout(async () => {
+        try {
+          await this.runFullExtract();
+          await msg.reply(
+            `✅ *ANÁLISE COMPLETA FINALIZADA*\n\n` +
+            `Extração profunda concluída!\n` +
+            `Use /status ou /buffer para ver os resultados.\n\n` +
+            `🌙 Luna v16.3 | Análise completa`
+          );
+        } catch (e) {
+          log.error(`[COMANDO] Erro na análise completa: ${e.message}`);
+          await msg.reply(
+            `❌ *ANÁLISE FALHOU*\n\n` +
+            `Erro: ${e.message.slice(0, 100)}\n\n` +
+            `🌙 Luna v16.3 | Análise erro`
+          );
+        }
+      }, 100);
+    }
+    else if (cmd === '/mencoes' || cmd === '/menciones' || cmd === '/mentions') {
+      const mencoes = safeList(buffer.newMentions);
+      const body = mencoes.length > 0
+        ? mencoes.slice(0, 5).map((m, idx) => (
+          `${idx + 1}️⃣ ${m.author || 'Time'}: "${truncate(m.body || m.text, 70)}"\n` +
+          `   ⏰ ${relativeTime(m.time || m.timestamp)}`
+        )).join('\n\n')
+        : 'Nenhuma menção registrada no buffer atual.';
+      await msg.reply(
+        `👋 *MINHAS MENÇÕES*\n\n` +
+        `${body}\n\n` +
+        `Total: ${mencoes.length} menção(ões)\n\n` +
+        `🌙 Luna v16.3 | Menções`
+      );
+    }
+    else if (cmd === '/links' || cmd === '/analise-links') {
+      // Comando expandido — análise detalhada de links
+      const allLinks = safeList(buffer.newLinks);
+      const urlsInMsgs = [...messages, ...tasks, ...ideas, ...news]
+        .map(m => (m.body || m.text || '').match(/https?:\/\/[^\s]+/gi))
+        .filter(Boolean)
+        .flat();
+      const uniqueUrls = [...new Set(urlsInMsgs)];
+      const body = allLinks.length > 0
+        ? allLinks.slice(0, 5).map((l, idx) => (
+          `${idx + 1}️⃣ ${truncate(l.title || l.url, 50)}\n` +
+          `   🔗 ${truncate(l.url, 50)}\n` +
+          `   👤 ${l.author || 'Time'} | ${relativeTime(l.time)}\n` +
+          `   🏷️ Tipo: ${l.type || 'link'}`
+        )).join('\n\n')
+        : uniqueUrls.length > 0
+          ? `Links detectados em mensagens (não enriquecidos):\n${uniqueUrls.slice(0, 5).map(u => `• ${truncate(u, 60)}`).join('\n')}`
+          : 'Nenhum link no buffer. Use /scan para buscar novos links no grupo.';
+      await msg.reply(
+        `🔗 *ANÁLISE DE LINKS*\n\n` +
+        `${body}\n\n` +
+        `📊 Links enriquecidos: ${allLinks.length}\n` +
+        `📊 URLs brutas em mensagens: ${uniqueUrls.length}\n\n` +
+        `🌙 Luna v16.3 | Link Analysis`
+      );
+    }
+    else if (cmd === '/ping' || cmd === '/teste') {
+      const uptimeH = Math.floor(process.uptime() / 3600);
+      const uptimeM = Math.floor((process.uptime() % 3600) / 60);
+      const mem = process.memoryUsage();
+      log.info(`[COMANDO] Executando /ping para ${msg.from}`);
+      try {
+        await msg.reply(
+          `🏓 *PONG!*\n\n` +
+          `✅ Luna online e respondendo!\n\n` +
+          `⏱️ Uptime: ${uptimeH}h ${uptimeM}m\n` +
+          `💾 Memória: ${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB\n` +
+          `📨 Msgs processadas: ${this.cp.checkpoint.processedCount || 0}\n` +
+          `🧠 Cache em memória: ${this.processedMessageIds.size} IDs\n\n` +
+          `🌙 Luna v16.3 | Online`
+        );
+        log.success('[COMANDO] Resposta /ping enviada com sucesso');
+      } catch (replyErr) {
+        log.error(`[COMANDO] Falha ao enviar resposta /ping: ${replyErr.message}`);
+      }
+    }
     else {
       log.warn(`[COMANDO] Comando nao reconhecido: ${cmd}`);
       await msg.reply(
@@ -1793,6 +2168,300 @@ class LunaAgent {
       this.fullExtractRunning = false;
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FASE 1 v17.0 — PROACTIVE INTELLIGENCE
+  // A Luna deixa de ser reativa e começa a agir sozinha
+  // ═══════════════════════════════════════════════════════════════
+
+  startProactiveEngine() {
+    log.extraordinary('[PROACTIVE] Motor de inteligencia proativa iniciado');
+
+    // Morning Brief — todo dia às 8h (CET)
+    cron.schedule('0 8 * * *', () => {
+      log.info('[PROACTIVE] Disparando Morning Brief...');
+      this.sendMorningBrief();
+    }, { timezone: 'Europe/Madrid' });
+
+    // Check Tarefas Atrasadas — todo dia às 17h
+    cron.schedule('0 17 * * *', () => {
+      log.info('[PROACTIVE] Verificando tarefas atrasadas...');
+      this.checkOverdueTasks();
+    }, { timezone: 'Europe/Madrid' });
+
+    // Check Leads — todo dia às 10h e 16h
+    cron.schedule('0 10,16 * * *', () => {
+      log.info('[PROACTIVE] Verificando follow-up de leads...');
+      this.checkLeadFollowUps();
+    }, { timezone: 'Europe/Madrid' });
+
+    // Check Financial — todo dia às 9h
+    cron.schedule('0 9 * * *', () => {
+      log.info('[PROACTIVE] Verificando alertas financeiros...');
+      this.checkFinancialAlerts();
+    }, { timezone: 'Europe/Madrid' });
+
+    // Pre-meeting Briefs — a cada 15 minutos
+    cron.schedule('*/15 * * * *', () => {
+      this.sendPreMeetingBriefs();
+    }, { timezone: 'Europe/Madrid' });
+
+    // Weekly Report — todo domingo às 20h
+    cron.schedule('0 20 * * 0', () => {
+      log.info('[PROACTIVE] Enviando relatório semanal...');
+      this.sendWeeklyReport();
+    }, { timezone: 'Europe/Madrid' });
+
+    log.success('[PROACTIVE] Scheduler configurado: Morning Brief 8h, Tarefas 17h, Leads 10h/16h, Financeiro 9h, Meetings */15min');
+  }
+
+  async sendMessageToGroup(text) {
+    try {
+      const groupId = CONFIG.GROUPS[0]?.id;
+      if (!groupId) {
+        log.error('[PROACTIVE] ID do grupo Production nao configurado. Mensagem NAO enviada.');
+        return;
+      }
+      const chat = await this.client.getChatById(groupId);
+      if (!chat) {
+        log.error('[PROACTIVE] Grupo Production nao encontrado. Mensagem NAO enviada.');
+        return;
+      }
+      // SEGURANCA: verificar se o chat eh realmente o grupo Production
+      const chatName = chat.name || '';
+      if (!chatName.toLowerCase().includes('production')) {
+        log.error(`[PROACTIVE] SEGURANCA: Chat encontrado nao eh Production (nome: ${chatName}). Mensagem NAO enviada.`);
+        return;
+      }
+      await chat.sendMessage(text);
+      log.success('[PROACTIVE] Mensagem enviada ao grupo Production');
+    } catch (e) {
+      log.error(`[PROACTIVE] Falha ao enviar mensagem: ${e.message}`);
+    }
+  }
+
+  async sendMorningBrief() {
+    try {
+      // ── LUNA v18.0 CONSCIOUS: Usar ProactiveEngine ──
+      if (this.proactive) {
+        const msg = await this.proactive.generateDailyBrief();
+        await this.sendMessageToGroup(msg);
+        log.success('[PROACTIVE] Morning Brief inteligente enviado');
+        return;
+      }
+      // ────────────────────────────────────────────────
+
+      // Fallback para template antigo
+      this.cp.reloadBuffer();
+      const buffer = this.cp.buffer || {};
+      const tasks = buffer.newTasks || [];
+      const leads = buffer.newLeads || [];
+      const p0 = tasks.filter(t => (t.priority || '').toString().toUpperCase() === 'P0');
+      const p1 = tasks.filter(t => (t.priority || '').toString().toUpperCase() === 'P1');
+      let msg = `🌙 *Bom dia, chefes!*\n\n📊 *Resumo do dia:*\n\n`;
+      if (p0.length > 0 || p1.length > 0) {
+        msg += `⚠️ *TAREFAS PENDENTES:*\n→ ${p0.length} P0 | ${p1.length} P1\n\n`;
+      }
+      if (leads.length > 0) msg += `🔥 *LEADS:* ${leads.length}\n\n`;
+      msg += `🎯 *FOCO DO DIA:* ${p0.length > 0 ? 'Resolver P0s' : p1.length > 0 ? 'Avançar P1s' : 'Manter o ritmo! 💪'}\n\n_🌙 Luna v18.0 | Morning Brief_`;
+      await this.sendMessageToGroup(msg);
+      log.success('[PROACTIVE] Morning Brief enviado');
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro no Morning Brief: ${e.message}`);
+    }
+  }
+
+  async checkOverdueTasks() {
+    try {
+      this.cp.reloadBuffer();
+      const tasks = this.cp.buffer.newTasks || [];
+      const now = Date.now();
+      const overdue = tasks.filter(t => {
+        const taskTime = new Date(t.time || t.timestamp || 0).getTime();
+        const age = now - taskTime;
+        const isHighPriority = /P0|P1/i.test(t.priority || '');
+        return isHighPriority && age > 48 * 60 * 60 * 1000; // > 48h
+      });
+
+      if (overdue.length > 0) {
+        let msg = `⏰ *TAREFAS PARADAS*\n\n`;
+        msg += `Chefes, ${overdue.length} tarefa(s) P0/P1 estão sem movimento há mais de 48h:\n\n`;
+        overdue.slice(0, 3).forEach((t, i) => {
+          msg += `${i + 1}. ${t.body?.slice(0, 50) || 'Tarefa'}...\n`;
+        });
+        if (overdue.length > 3) msg += `...e mais ${overdue.length - 3}\n`;
+        msg += `\nPrecisam de ajuda ou é só priorizar? 🎯`;
+        await this.sendMessageToGroup(msg);
+        log.success(`[PROACTIVE] ${overdue.length} tarefas atrasadas alertadas`);
+      }
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro checkOverdueTasks: ${e.message}`);
+    }
+  }
+
+  async checkLeadFollowUps() {
+    try {
+      this.cp.reloadBuffer();
+      const leads = this.cp.buffer.newLeads || [];
+      const now = Date.now();
+
+      const needsFollowUp = leads.filter(l => {
+        const leadTime = new Date(l.time || l.timestamp || 0).getTime();
+        const age = now - leadTime;
+        const isHot = /quente|hot|urgente|fechar/i.test(l.context || l.body || '');
+        return isHot && age > 24 * 60 * 60 * 1000 && age < 96 * 60 * 60 * 1000;
+      });
+
+      if (needsFollowUp.length > 0) {
+        let msg = `🔥 *FOLLOW-UP DE LEADS*\n\n`;
+        msg += `${needsFollowUp.length} lead(s) quente(s) sem resposta há mais de 24h:\n\n`;
+        needsFollowUp.slice(0, 3).forEach((l, i) => {
+          msg += `${i + 1}. ${l.name || 'Lead'}: ${l.context?.slice(0, 40) || ''}...\n`;
+        });
+        msg += `\nBora não deixar esfriar! 🚀`;
+        await this.sendMessageToGroup(msg);
+      }
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro checkLeadFollowUps: ${e.message}`);
+    }
+  }
+
+  async checkFinancialAlerts() {
+    try {
+      this.cp.reloadBuffer();
+      const finance = this.cp.buffer.newFinance || [];
+      const now = Date.now();
+
+      const overduePayments = finance.filter(f => {
+        const txt = (f.body || f.text || '').toLowerCase();
+        const isPending = /pendente|nao pag|aguardando|cobrar/.test(txt);
+        const finTime = new Date(f.time || f.timestamp || 0).getTime();
+        const age = now - finTime;
+        return isPending && age > 7 * 24 * 60 * 60 * 1000; // > 7 dias
+      });
+
+      if (overduePayments.length > 0) {
+        let msg = `💰 *ALERTA FINANCEIRO*\n\n`;
+        msg += `${overduePayments.length} pagamento(s) pendente(s) há mais de 7 dias:\n\n`;
+        overduePayments.slice(0, 3).forEach((f, i) => {
+          msg += `${i + 1}. ${f.body?.slice(0, 50) || 'Pagamento'}...\n`;
+        });
+        msg += `\n_Querem que eu prepare um resumo completo do financeiro?_`;
+        await this.sendMessageToGroup(msg);
+      }
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro checkFinancialAlerts: ${e.message}`);
+    }
+  }
+
+  detectMeetingsInMessages(messages = []) {
+    const meetings = [];
+    const now = new Date();
+    const todayStr = now.toDateString();
+
+    for (const msg of messages) {
+      const text = (msg.body || msg.text || '').toLowerCase();
+      // Padrões: "call 14h", "reunião 15:30", "zoom amanhã 10h"
+      const meetingPatterns = [
+        /(call|reuni[ãa]o|zoom|meet|hangout)\s*(?:as?|às)?\s*(\d{1,2})[:h]?(\d{2})?/i,
+        /(\d{1,2})[:h](\d{2})\s*(call|reuni[ãa]o|zoom)/i,
+      ];
+
+      for (const pattern of meetingPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          const hour = parseInt(match[2] || match[1], 10);
+          const minute = parseInt(match[3] || match[2] || 0, 10) || 0;
+          if (hour >= 8 && hour <= 22) {
+            meetings.push({
+              time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+              description: msg.body?.slice(0, 60) || 'Reunião',
+              author: msg.author || 'Time'
+            });
+          }
+        }
+      }
+    }
+    return meetings;
+  }
+
+  detectMeetingsToday() {
+    try {
+      // Buscar nas mensagens recentes do histórico
+      const historyFile = path.join(__dirname, '../backend/data/whatsapp-history.json');
+      if (!fs.existsSync(historyFile)) return [];
+      const history = JSON.parse(fs.readFileSync(historyFile, 'utf8'));
+      const messages = history.messages || history || [];
+      const recentMsgs = messages.slice(-100); // últimas 100
+      return this.detectMeetingsInMessages(recentMsgs);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async sendPreMeetingBriefs() {
+    try {
+      const meetings = this.detectMeetingsToday();
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      for (const meeting of meetings) {
+        const [mHour, mMinute] = meeting.time.split(':').map(Number);
+        const diffMinutes = (mHour - currentHour) * 60 + (mMinute - currentMinute);
+
+        // Se a reunião é em 10-20 minutos
+        if (diffMinutes >= 10 && diffMinutes <= 20) {
+          // Verificar se já enviamos brief para esta reunião (evitar spam)
+          const briefKey = `brief_${meeting.time}_${now.toDateString()}`;
+          if (this.sentBriefs?.has(briefKey)) continue;
+          if (!this.sentBriefs) this.sentBriefs = new Set();
+
+          let msg = `🎯 *BRIEF PARA REUNIÃO*\n\n`;
+          msg += `📅 ${meeting.time} — ${meeting.description}\n\n`;
+          msg += `💡 *Contexto:* Última interação com ${meeting.author}\n`;
+          msg += `🎯 *Sugestão:* Preparar números e próximos passos\n\n`;
+          msg += `_Boa call, chefes! 🚀_`;
+
+          await this.sendMessageToGroup(msg);
+          this.sentBriefs.add(briefKey);
+          log.info(`[PROACTIVE] Pre-meeting brief enviado para ${meeting.time}`);
+        }
+      }
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro sendPreMeetingBriefs: ${e.message}`);
+    }
+  }
+
+  async sendWeeklyReport() {
+    try {
+      // ── LUNA v18.0 CONSCIOUS: Usar ProactiveEngine ──
+      if (this.proactive) {
+        const msg = await this.proactive.generateWeeklyReport();
+        await this.sendMessageToGroup(msg);
+        log.success('[PROACTIVE] Relatório semanal inteligente enviado');
+        return;
+      }
+      // ────────────────────────────────────────────────
+
+      // Fallback para template antigo
+      this.cp.reloadBuffer();
+      const buffer = this.cp.buffer || {};
+      const tasks = buffer.newTasks || [];
+      const tasksDone = buffer.newTasksDone || [];
+      let msg = `📊 *RELATÓRIO SEMANAL NEXO*\n\n`;
+      msg += `📝 Tarefas: ${tasks.length} total | ${tasksDone.length} concluídas\n\n`;
+      msg += `_🌙 Luna v18.0 | Relatório Semanal_`;
+      await this.sendMessageToGroup(msg);
+      log.success('[PROACTIVE] Relatório semanal enviado');
+    } catch (e) {
+      log.error(`[PROACTIVE] Erro no relatório semanal: ${e.message}`);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FIM FASE 1 — PROACTIVE INTELLIGENCE
+  // ═══════════════════════════════════════════════════════════════
 
   async runOnce() {
     if (this.running) {
@@ -1976,6 +2645,8 @@ class LunaAgent {
     if (schedule) {
       setInterval(() => this.runOnce(), CONFIG.SCAN_INTERVAL);
       setInterval(() => this.sendScheduledReport(), CONFIG.REPORT_INTERVAL);
+      // Iniciar motor proativo v17.0
+      this.startProactiveEngine();
     }
 
     return { status: 'monitoring' };
@@ -2016,9 +2687,18 @@ class LunaAgent {
     report += `• ${buffer.newFinance?.length || 0} sinais financeiros\n\n`;
 
     report += `❓ *O QUE NAO VI:*\n`;
-    const clientMentions = buffer.newMessages?.filter(m => /santafe|paulo|superclim/.test((m.body || '').toLowerCase())) || [];
-    if (clientMentions.length === 0) {
-      report += `• Nenhuma mencao a clientes principais. E o Santafe? Alguma noticia?\n`;
+    // Lista dinâmica de clientes ativos a partir do schema (não hardcoded)
+    const activeClients = Object.values(SCHEMAS.clients?.clients || {})
+      .filter(c => c.status === 'ativo' || c.status === 'em-progresso')
+      .map(c => ({ name: c.name, company: c.company, keywords: [c.name?.toLowerCase(), c.company?.toLowerCase(), c.id?.toLowerCase()].filter(Boolean) }));
+    
+    const unmentionedClients = activeClients.filter(client => {
+      return !buffer.newMessages?.some(m => client.keywords.some(kw => (m.body || '').toLowerCase().includes(kw)));
+    });
+    
+    if (unmentionedClients.length > 0) {
+      const clientNames = unmentionedClients.map(c => c.company || c.name).join(', ');
+      report += `• Nenhuma mencao a clientes ativos: ${clientNames}.\n`;
     }
     if ((buffer.newMessages?.filter(m => /pagou|fatura|caixa/.test((m.body || '').toLowerCase())) || []).length === 0) {
       report += `• Nenhuma atualizacao financeira. O caixa esta atualizado?\n`;

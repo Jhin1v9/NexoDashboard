@@ -6,6 +6,8 @@ import {
   Loader, AlertTriangle, HardDrive, Clock
 } from 'lucide-react'
 import axios from 'axios'
+import StackStatusPanel from '../components/StackStatus'
+import AutoFixPanel from '../components/AutoFixPanel'
 
 const SERVICES = [
   { key: 'backend', label: 'Backend API', icon: Server, port: 3456, log: 'backend' },
@@ -146,8 +148,7 @@ export default function SystemEngine() {
                 </div>
 
                 {/* Acoes */}
-                {svc.key !== 'luna' && svc.key !== 'supervisor' && (
-                  <div className="grid grid-cols-3 gap-1 mt-3">
+                <div className="grid grid-cols-3 gap-1 mt-3">
                     <button onClick={() => controlService(svc.key, 'start')} disabled={loading || isRunning}
                       className="flex items-center justify-center gap-1 p-1.5 bg-nexo-bg border border-nexo-border rounded text-xs hover:bg-nexo-success/10 hover:border-nexo-success transition-colors disabled:opacity-50">
                       <Play className="w-3 h-3 text-nexo-success" />
@@ -161,10 +162,15 @@ export default function SystemEngine() {
                       <RotateCcw className="w-3 h-3 text-nexo-primary" />
                     </button>
                   </div>
-                )}
               </motion.div>
             )
           })}
+        </div>
+
+        {/* Stack Status & Auto-Fix Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <StackStatusPanel />
+          <AutoFixPanel />
         </div>
 
         {/* Aux Services */}

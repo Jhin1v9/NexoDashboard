@@ -89,7 +89,7 @@
       "cooldown": 600000
     },
     "/projeto": {
-      "description": "Detalhes de um projeto específico (uso: /projeto SANTAFE)",
+      "description": "Detalhes de um projeto específico (uso: /projeto [codename])",
       "requiresAdmin": false,
       "responseType": "text",
       "aiGenerated": false,

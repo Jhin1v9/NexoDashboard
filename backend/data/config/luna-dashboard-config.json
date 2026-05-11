@@ -218,7 +218,7 @@
       "order": 6,
       "title": "👤 Clientes Status",
       "icon": "💼",
-      "description": "Paulo (SantaFe) + status de pagamento, última menção, próxima ação",
+      "description": "Status de clientes ativos: pagamento, última menção, próxima ação",
       "showFinancial": true,
       "showPipeline": true
     },
@@ -227,7 +227,7 @@
       "order": 7,
       "title": "🚀 Projetos Progress",
       "icon": "📊",
-      "description": "SantaFe, Dashboard (NEXO) com milestones e % concluído",
+      "description": "Progresso de projetos ativos com milestones e % concluído",
       "showMilestones": true,
       "showBugs": true
     },

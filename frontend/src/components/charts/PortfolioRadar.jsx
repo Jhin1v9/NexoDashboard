@@ -1,30 +1,69 @@
-﻿import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
+import { useMemo } from 'react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-const data = [
-  { subject: 'Código', A: 80, fullMark: 100 },
-  { subject: 'Design', A: 65, fullMark: 100 },
-  { subject: 'Tests', A: 45, fullMark: 100 },
-  { subject: 'Docs', A: 70, fullMark: 100 },
-  { subject: 'Deploy', A: 90, fullMark: 100 },
-  { subject: 'SEO', A: 55, fullMark: 100 },
-]
+const COLORS = {
+  pending: '#f59e0b',
+  in_progress: '#3b82f6',
+  completed: '#22c55e',
+  cancelled: '#ef4444',
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#22c55e'
+}
 
-export default function PortfolioRadar() {
+export default function PortfolioRadar({ tasks = [], view = 'status' }) {
+  const data = useMemo(() => {
+    if (!tasks || tasks.length === 0) return []
+
+    const counts = {}
+    tasks.forEach(t => {
+      const key = view === 'status' ? (t.status || 'pending') : (t.priority || 'medium')
+      counts[key] = (counts[key] || 0) + 1
+    })
+
+    return Object.entries(counts).map(([name, value]) => ({
+      name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value,
+      color: COLORS[name] || '#6366f1'
+    }))
+  }, [tasks, view])
+
+  const total = data.reduce((a, b) => a + b.value, 0)
+
   return (
     <div className="glass-card p-4">
-      <h3 className="text-sm font-medium mb-4 text-nexo-muted">Portfolio Radar</h3>
-      <ResponsiveContainer width="100%" height={200}>
-        <RadarChart data={data}>
-          <PolarGrid stroke="#1a1a2e" />
-          <PolarAngleAxis dataKey="subject" stroke="#6c757d" fontSize={11} />
-          <PolarRadiusAxis stroke="#1a1a2e" fontSize={10} />
-          <Radar name="Score" dataKey="A" stroke="#2ed573" fill="#2ed573" fillOpacity={0.2} />
-          <Tooltip
-            contentStyle={{ background: '#0f0f16', border: '1px solid #1a1a2e', borderRadius: 8 }}
-          />
-        </RadarChart>
-      </ResponsiveContainer>
+      <h3 className="text-sm font-medium mb-4 text-nexo-muted">
+        {view === 'status' ? 'Tarefas por Status' : 'Tarefas por Prioridade'}
+      </h3>
+      {data.length === 0 ? (
+        <div className="flex items-center justify-center h-[200px] text-nexo-muted text-xs">
+          Sem tarefas para analisar
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={50}
+              outerRadius={80}
+              paddingAngle={4}
+              dataKey="value"
+              stroke="none"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{ background: '#0f0f16', border: '1px solid #1a1a2e', borderRadius: 8 }}
+              formatter={(value, name) => [`${value} (${Math.round((value / total) * 100)}%)`, name]}
+            />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }
-

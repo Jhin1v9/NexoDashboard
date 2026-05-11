@@ -96,21 +96,29 @@ export default function LunaControl() {
     try {
       const res = await axios.get('/api/luna/commands')
       if (res.data.success) setCommands(res.data.commands)
-    } catch (e) {}
+    } catch (e) {
+      console.error('[LunaControl] Erro ao buscar comandos:', e.message)
+    }
   }
 
   const fetchStatus = async () => {
     try {
       const res = await axios.get('/api/luna/status')
       if (res.data) setStatus(res.data)
-    } catch (e) {}
+    } catch (e) {
+      console.error('[LunaControl] Erro ao buscar status:', e.message)
+      setStatus(prev => ({ ...prev, _error: e.message }))
+    }
   }
 
   const fetchLogs = async () => {
     try {
       const res = await axios.get('/api/luna/logs?lines=300')
       if (res.data.success) setLogs(res.data.logs)
-    } catch (e) {}
+    } catch (e) {
+      console.error('[LunaControl] Erro ao buscar logs:', e.message)
+      setLogs([{ ts: new Date().toISOString(), level: 'error', msg: 'Erro ao carregar logs: ' + e.message }])
+    }
   }
 
   const executeCommand = async (commandId) => {
@@ -147,10 +155,14 @@ export default function LunaControl() {
           time: new Date().toLocaleTimeString('pt-BR')
         }])
       } else {
-        // Envia como mensagem para o agente (simulado — no futuro pode ser websocket real)
+        // Chat direto via LLM
+        const res = await axios.post('/api/luna/chat', {
+          message: text,
+          context: chatMessages.slice(-10)
+        })
         setChatMessages(prev => [...prev, {
           role: 'luna',
-          text: `🌙 Recebi sua mensagem: "${text}". Ainda nao tenho resposta direta pelo dashboard, mas estou processando...`,
+          text: res.data.success ? res.data.reply : `❌ Erro: ${res.data.error || 'Falha no LLM'}`,
           time: new Date().toLocaleTimeString('pt-BR')
         }])
       }

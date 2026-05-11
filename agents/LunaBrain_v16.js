@@ -81,6 +81,41 @@ NO emojis, NO slang, solo hechos.
 Sigues sin poder jerárquico: informas, no ordenas.`
       },
 
+      // 🎭 MODO SOCIAL — Piadas, saudações, conversa casual
+      // PROÍBE mencionar business, tarefas, projetos
+      social: {
+        name: 'Luna Social',
+        emoji: '🎭',
+        tone: 'amiga, divertida, ZERO business',
+        energy: 90,
+        formality: 10,
+        humor: 100,
+        empathy: 80,
+        slang: 80,
+        catchphrases: [
+          'KKKKKK boa essa!',
+          'Aí sim hein! 👏',
+          'Tá maluco! 😂',
+          'Isso é OURO!',
+          'Mano, sério? KKKK'
+        ],
+        greeting: 'E aí! Bora rir um pouco? 🎭',
+        systemPrompt: `Eres Luna en modo SOCIAL / DIVERTIDO.
+REGLA ABSOLUTA #1: NUNCA, BAJO NINGUNA CIRCUNSTANCIA, hables de negocios, tareas, proyectos, leads, financeiro, P0, P1, buffer, dashboard, ou qualquer coisa relacionada ao trabalho.
+REGLA ABSOLUTA #2: Si te piden una broma, CUENTA LA BROMA. No digas "anoto como tarefa". No digas "vou verificar no buffer". Solo cuenta la broma.
+REGLA ABSOLUTA #3: Responde como una amiga en WhatsApp. Emojis, risadas, zoeira leve.
+REGLA ABSOLUTA #4: Se alguien dice "bom dia", responde "Bom dia! Como tá?". Nada más.
+REGLA ABSOLUTA #5: Se alguien pide una piada, cuenta una piada CORTA y DIVERTIDA sobre tech, startups o Barcelona.
+
+Ejemplo de respuesta CORRECTA para "@luna conta uma piada":
+"Por que o desenvolvedor foi ao psicólogo? Porque tinha muitos issues! 😂 KKKKK"
+
+Ejemplo de respuesta ERRADA (NUNCA hagas esto):
+"O que é uma piada que não seja uma tarefa? 🌙 😂 Quer que eu anote um P1 no radar?"
+
+Solo eres una amiga divertida. Nada de trabajo.`
+      },
+
       // 😂 MODO ZOEIRA — Quando o clima tá leve
       playful: {
         name: 'Luna Zueira',
@@ -859,8 +894,28 @@ RESPONDE EN JSON:
   // ============================================
   // GERAR RESPOSTA DA LUNA (para interações)
   // ============================================
+  detectSocialMode(text = '') {
+    const lower = text.toLowerCase();
+    // Padrões sociais: piadas, saudações, conversa casual
+    const socialPatterns = [
+      /^(oi|ola|olá|opa|e ai|e aí|bom dia|boa tarde|boa noite|salve|fala)[!?.\s]*$/i,
+      /(conta|conta-me|manda|diz).*(piada|joke|chiste)/i,
+      /^(kkk|haha|hehe|rs|lol|mdr)$/i,
+      /(tudo bem|como vai|que tal|beleza|blz)[?!]?$/i,
+      /(obrigad|valeu|thanks|gracias)/i,
+    ];
+    return socialPatterns.some(p => p.test(lower));
+  }
+
   async generateResponse(userMessage, context = {}) {
     await this.resolveBestGemmaModel();
+
+    // v17.0 — Detecção Social vs Business
+    const isSocial = this.detectSocialMode(userMessage);
+    if (isSocial) {
+      this.activePersonality = 'social';
+    }
+
     const personality = this.personalities[this.activePersonality];
 
     // Seletor de personalidade baseado no contexto
@@ -871,8 +926,12 @@ RESPONDE EN JSON:
       userMood: context.userMood
     });
 
-    this.activePersonality = selectedPersonality;
-    const active = this.personalities[selectedPersonality];
+    // Se não é social, usa o seletor normal. Se é social, mantém social.
+    if (!isSocial) {
+      this.activePersonality = selectedPersonality;
+    }
+
+    const active = this.personalities[this.activePersonality];
     const bufferSummary = context.bufferSummary || {};
     const highlights = context.highlights || {};
 

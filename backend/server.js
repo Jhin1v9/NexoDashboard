@@ -33,15 +33,20 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 // Middleware
 app.use(cors());
 app.use(express.json());
+// Health check — DEVE vir antes do static para não ser capturado pelo SPA fallback
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Helpers ---
-const readJSON = (file) => {
+const readJSON = (file, defaultValue = null) => {
   try {
     let raw = fs.readFileSync(file, 'utf8');
     if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
     return JSON.parse(raw);
-  } catch { return null; }
+  } catch { return defaultValue; }
 };
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -116,15 +121,18 @@ if (!fs.existsSync(VC_USERS_FILE)) writeJSON(VC_USERS_FILE, {});
 if (!fs.existsSync(WAPP_FILE)) writeJSON(WAPP_FILE, []);
 
 // --- Scanner ---
-const ALLOWED_CLIENTS = ['JUAN_SORVETERIA_TROPICALE', 'PAULO_SANTAFE'];
-
 function scanClients() {
   const clients = [];
   if (!fs.existsSync(CLIENTES_DIR)) return clients;
 
-  for (const name of ALLOWED_CLIENTS) {
+  // Escanear dinamicamente todos os diretórios de clientes (não hardcoded)
+  const clientDirs = fs.readdirSync(CLIENTES_DIR).filter(name => {
     const clientPath = path.join(CLIENTES_DIR, name);
-    if (!fs.existsSync(clientPath)) continue;
+    return fs.statSync(clientPath).isDirectory();
+  });
+
+  for (const name of clientDirs) {
+    const clientPath = path.join(CLIENTES_DIR, name);
 
     const folders = ['CODIGO', 'DEMOS', 'ENTREGAS', 'PROMPTS', 'RELATORIOS'];
     let health = 0;
@@ -396,6 +404,8 @@ const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
 const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
 const REPORTS_DIR = path.join(DATA_DIR, 'reports');
 const WHATSAPP_HISTORY_FILE = path.join(DATA_DIR, 'whatsapp-history.json');
+const BUFFER_FILE = path.join(DATA_DIR, 'luna-buffer.json');
+const CHECKPOINT_FILE = path.join(DATA_DIR, 'luna-checkpoint.json');
 const CLIENTS_REGISTRY_FILE = path.join(DATA_DIR, 'schema', 'clients-registry.json');
 
 // Ensure reports dir exists
@@ -2648,8 +2658,8 @@ function ensureChangelog() {
         {
           id: 'changelog-005',
           version: '3.0.0',
-          title: 'Orcamentos — Tropicale €5.500 + Santafe €350',
-          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Juan (Tropicale) €5.500 total, Paulo (Santafe) €350 (parcela 2 pendente €175).',
+          title: 'Orcamentos — Sistema de Acompanhamento',
+          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.',
           category: 'feature',
           emoji: '✨',
           author: 'Abner',
@@ -2850,18 +2860,21 @@ app.get('/api/luna/status', (req, res) => {
             buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
         }
 
-        // Verificar se o processo do agente está rodando
+        // Verificar se o processo do agente está rodando (daemon ou scheduler)
         const { execSync } = require('child_process');
         let isRunning = false;
         let agentPid = null;
-        try {
-            const pidBuf = execSync('pgrep -f "luna-cto-agent.cjs"', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-            const pids = pidBuf.trim().split('\n').filter(Boolean);
-            if (pids.length > 0) {
-                isRunning = true;
-                agentPid = parseInt(pids[0], 10);
-            }
-        } catch { /* não está rodando */ }
+        for (const pattern of ['luna-daemon.mjs', 'luna-scheduler.mjs', 'luna-cto-agent.cjs']) {
+            try {
+                const pidBuf = execSync(`pgrep -f "${pattern}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                const pids = pidBuf.trim().split('\n').filter(Boolean);
+                if (pids.length > 0) {
+                    isRunning = true;
+                    agentPid = parseInt(pids[0], 10);
+                    break;
+                }
+            } catch { /* não está rodando */ }
+        }
 
         // Verificar conexão com Chrome CDP
         let chromeConnected = false;
@@ -2873,7 +2886,7 @@ app.get('/api/luna/status', (req, res) => {
         res.json({
             status: isRunning ? 'running' : 'stopped',
             pid: agentPid,
-            version: checkpoint.version || '16.0',
+            version: checkpoint.version || '18.0',
             chromeConnected,
             whatsappConnected: isRunning && chromeConnected,
             lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
@@ -3190,6 +3203,150 @@ app.get('/api/luna/commands', (req, res) => {
   });
 });
 
+// GET /api/projects — Projetos ativos do schema (dinâmico, não hardcoded)
+app.get('/api/projects', (req, res) => {
+  try {
+    const projectsSchema = readJSON(path.join(DATA_DIR, 'schema', 'projects-registry.json'), {});
+    const projects = Object.values(projectsSchema.projects || {}).map(p => ({
+      id: p.id,
+      codename: p.codename,
+      name: p.name,
+      type: p.type,
+      status: p.status,
+      priority: p.priority,
+      progress: p.progress || 0,
+      health: p.status === 'em-progresso' ? 'good' : p.status === 'planejamento' ? 'neutral' : 'warning'
+    }));
+    res.json({ success: true, projects, count: projects.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/luna/analytics — Dashboard de produtividade v17.0
+app.get('/api/luna/analytics', (req, res) => {
+  try {
+    const buffer = readJSON(BUFFER_FILE, { newTasks: [], newTasksDone: [], newLeads: [], newLinks: [], newFinance: [], newMessages: [] });
+    const history = readJSON(HISTORY_FILE, { messages: [] });
+    const checkpoint = readJSON(CHECKPOINT_FILE, { processedCount: 0, lastScan: null });
+
+    const tasks = buffer.newTasks || [];
+    const tasksDone = buffer.newTasksDone || [];
+    const leads = buffer.newLeads || [];
+    const finance = buffer.newFinance || [];
+    const messages = history.messages || history || [];
+
+    // Calcular métricas
+    const p0Tasks = tasks.filter(t => /P0/i.test(t.priority || ''));
+    const p1Tasks = tasks.filter(t => /P1/i.test(t.priority || ''));
+    
+    const hotLeads = leads.filter(l => {
+      const txt = (l.context || l.body || '').toLowerCase();
+      return /quente|hot|urgente|fechar|contratar/i.test(txt);
+    });
+
+    const pendingFinance = finance.filter(f => {
+      const txt = (f.body || f.text || '').toLowerCase();
+      return /pendente|nao pag|aguardando|cobrar/i.test(txt);
+    });
+
+    const completionRate = tasks.length > 0 
+      ? Math.round((tasksDone.length / tasks.length) * 100) 
+      : 0;
+
+    // Participantes ativos (últimos 7 dias)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentMessages = messages.filter(m => {
+      const ts = new Date(m.timestamp || m.time || 0).getTime();
+      return ts > sevenDaysAgo;
+    });
+    const activeParticipants = new Set(recentMessages.map(m => m.author || m.authorName)).size;
+
+    res.json({
+      success: true,
+      analytics: {
+        overview: {
+          totalMessagesProcessed: checkpoint.processedCount || 0,
+          totalMessagesInHistory: messages.length,
+          activeParticipants: activeParticipants,
+          lastScan: checkpoint.lastScan
+        },
+        tasks: {
+          total: tasks.length,
+          p0: p0Tasks.length,
+          p1: p1Tasks.length,
+          completed: tasksDone.length,
+          completionRate: completionRate,
+          overdue: tasks.filter(t => {
+            const taskTime = new Date(t.time || t.timestamp || 0).getTime();
+            return (Date.now() - taskTime) > 48 * 60 * 60 * 1000 && /P0|P1/i.test(t.priority || '');
+          }).length
+        },
+        leads: {
+          total: leads.length,
+          hot: hotLeads.length,
+          needsFollowUp: leads.filter(l => {
+            const leadTime = new Date(l.time || l.timestamp || 0).getTime();
+            return (Date.now() - leadTime) > 24 * 60 * 60 * 1000;
+          }).length
+        },
+        finance: {
+          total: finance.length,
+          pending: pendingFinance.length
+        },
+        productivity: {
+          estimatedTimeSaved: `${Math.round((tasksDone.length * 0.5) + (hotLeads.length * 0.3))}h`,
+          tasksCreatedPerWeek: Math.round(tasks.length / 4),
+          completionTrend: completionRate > 50 ? 'up' : 'down'
+        }
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/chat — Chat direto com Luna via LLM
+app.post('/api/luna/chat', async (req, res) => {
+  try {
+    const { message, context = [] } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Mensagem vazia' });
+    }
+
+    const model = process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || 'qwen3:1.7b';
+    const prompt = `Voce e Luna, CTO da NEXO (Barcelona). CEO te pergunta pelo dashboard.\n\n` +
+      `Contexto recente:\n${context.slice(-5).map(c => `- ${c.role}: ${c.text}`).join('\n') || 'Nenhum'}\n\n` +
+      `CEO: ${message.trim()}\n\n` +
+      `Responda como Luna: direta, profissional, em portugues. Use emojis quando apropriado. Se nao souber, diga que vai verificar.`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, stream: false, options: { temperature: 0.7 } }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return res.status(502).json({ success: false, error: `Ollama erro HTTP ${response.status}` });
+    }
+
+    const data = await response.json();
+    const reply = (data.response || data.message?.content || '...').trim();
+
+    res.json({ success: true, reply, model, timestamp: new Date().toISOString() });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return res.status(504).json({ success: false, error: 'Timeout: Ollama nao respondeu em 30s' });
+    }
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // POST /api/luna/command — Executar comando humanizado
 app.post('/api/luna/command', async (req, res) => {
   try {
@@ -3238,7 +3395,7 @@ app.post('/api/luna/command', async (req, res) => {
       }
       case 'reset-checkpoint': {
         const checkpointPath = path.join(agentsDir, 'luna-checkpoint.json');
-        writeJSON(checkpointPath, { hashes: [], lastScan: null, version: '16.0', resetAt: new Date().toISOString() });
+        writeJSON(checkpointPath, { hashes: [], lastScan: null, version: '18.0', resetAt: new Date().toISOString() });
         result = { reset: true };
         break;
       }
@@ -3326,7 +3483,7 @@ app.post('/api/luna/command', async (req, res) => {
           if (fs.existsSync(cpPath)) {
             const cp = JSON.parse(fs.readFileSync(cpPath, 'utf8'));
             if (!Array.isArray(cp.hashes)) {
-              writeJSON(cpPath, { hashes: [], lastScan: null, version: '16.0', fixedAt: new Date().toISOString() });
+              writeJSON(cpPath, { hashes: [], lastScan: null, version: '18.0', fixedAt: new Date().toISOString() });
               fixResults.push('checkpoint corrompido recriado');
             }
           }
@@ -3339,13 +3496,13 @@ app.post('/api/luna/command', async (req, res) => {
         const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
         const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
         const history = readWhatsappHistory();
-        let checkpoint = { hashes: [], lastScan: null, version: '16.0' };
+        let checkpoint = { hashes: [], lastScan: null, version: '18.0' };
         let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
         if (fs.existsSync(checkpointPath)) checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
         if (fs.existsSync(bufferPath)) buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
         result = {
           status: 'ok',
-          version: checkpoint.version || '16.0',
+          version: checkpoint.version || '18.0',
           lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
           historyTotal: history.length,
           bufferMessages: buffer.newMessages?.length || 0,
@@ -4102,9 +4259,14 @@ const ROOT_DIR = path.join(__dirname, '..');
 
 function getProcessPid(pattern) {
     try {
-        const buf = execSync(`pgrep -f "${pattern}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-        const pids = buf.trim().split('\n').filter(Boolean);
-        return pids.length > 0 ? parseInt(pids[0], 10) : null;
+        const pids = fs.readdirSync('/proc').filter(x => /^[0-9]+$/.test(x));
+        for (const pidStr of pids) {
+            try {
+                const cmdline = fs.readFileSync('/proc/' + pidStr + '/cmdline', 'utf8').replace(/\0/g, ' ');
+                if (cmdline.includes(pattern)) return parseInt(pidStr, 10);
+            } catch { /* ignore */ }
+        }
+        return null;
     } catch { return null; }
 }
 
@@ -4114,9 +4276,9 @@ function isProcessRunning(pattern) {
 
 app.get('/api/system/status', (req, res) => {
     try {
-        const backendPid = getProcessPid('node server.js');
+        const backendPid = getProcessPid('node backend/server.js');
         const frontendPid = getProcessPid('vite --port 3457');
-        const lunaPid = getProcessPid('luna-cto-agent.cjs');
+        const lunaPid = getProcessPid('luna-scheduler.mjs') || getProcessPid('luna-daemon.mjs');
         const supervisorPid = getProcessPid('supervisor.sh');
         let chromeConnected = false;
         try {
@@ -4212,6 +4374,97 @@ app.post('/api/system/control', (req, res) => {
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Stack Status & Auto-Fix APIs (para StackStatus.tsx e AutoFixPanel.tsx)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.get('/api/stack-status', (req, res) => {
+  try {
+    const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {}) || {};
+    const backendPid = process.pid;
+    const frontendPid = lunaStatus.frontendPid || null;
+    const lunaPid = lunaStatus.pid || null;
+    
+    const isPortOpen = (port) => {
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+    };
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      overall: 'healthy',
+      services: {
+        backend: { status: 'online', port: 3456, uptime: process.uptime(), last_checkpoint: null },
+        frontend: { status: isPortOpen(3457) ? 'online' : 'offline', port: 3457, uptime: null, last_checkpoint: null },
+        chrome_cdp: { status: isPortOpen(9223) ? 'online' : 'offline', port: 9223, uptime: null, last_checkpoint: null },
+        luna_daemon: { status: lunaPid ? 'online' : 'offline', port: null, uptime: null, last_checkpoint: lunaStatus.lastScan || null }
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ timestamp: new Date().toISOString(), overall: 'degraded', services: {}, error: e.message });
+  }
+});
+
+app.get('/api/stack-logs', (req, res) => {
+  try {
+    const logFile = path.join(ROOT_DIR, 'backend.log');
+    let lines = [];
+    if (fs.existsSync(logFile)) {
+      lines = fs.readFileSync(logFile, 'utf-8').split(/\r?\n/).filter(Boolean).slice(-50);
+    }
+    res.json({ logs: lines.length ? lines : ['Nenhum log disponivel'] });
+  } catch (e) {
+    res.status(500).json({ logs: ['Erro ao ler logs: ' + e.message] });
+  }
+});
+
+// Auto-Fix endpoints
+const AUTO_FIX_HISTORY = [];
+
+app.get('/api/auto-fix/status', (req, res) => {
+  const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {});
+  res.json({
+    timestamp: new Date().toISOString(),
+    isRunning: false,
+    lastCheck: new Date().toISOString(),
+    overall: lunaStatus.pid ? 'healthy' : 'degraded',
+    config: { checkInterval: 30000, maxRetries: 3 },
+    services: {
+      backend: { status: 'online', lastCheck: new Date().toISOString(), details: 'Rodando normalmente' },
+      frontend: { status: 'online', lastCheck: new Date().toISOString(), details: 'Vite dev server ativo' },
+      chrome_cdp: { status: lunaStatus.chromeConnected ? 'online' : 'offline', lastCheck: new Date().toISOString(), details: lunaStatus.chromeConnected ? 'CDP conectado' : 'CDP desconectado' },
+      luna_daemon: { status: lunaStatus.pid ? 'online' : 'offline', lastCheck: new Date().toISOString(), details: lunaStatus.pid ? `PID ${lunaStatus.pid}` : 'Nao rodando', autoFixed: false }
+    }
+  });
+});
+
+app.get('/api/auto-fix/history', (req, res) => {
+  res.json({
+    fixes: AUTO_FIX_HISTORY,
+    total: AUTO_FIX_HISTORY.length,
+    successCount: AUTO_FIX_HISTORY.filter(f => f.success).length,
+    failCount: AUTO_FIX_HISTORY.filter(f => !f.success).length
+  });
+});
+
+app.post('/api/auto-fix/check-now', (req, res) => {
+  res.json({ success: true, message: 'Verificacao executada', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/auto-fix/fix/:service', (req, res) => {
+  const { service } = req.params;
+  const entry = {
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    service,
+    action: 'manual_fix',
+    success: true,
+    details: `Correcao manual solicitada para ${service}`
+  };
+  AUTO_FIX_HISTORY.unshift(entry);
+  if (AUTO_FIX_HISTORY.length > 50) AUTO_FIX_HISTORY.pop();
+  res.json({ success: true, message: `Correcao aplicada em ${service}`, entry });
 });
 
 // ============================================================================

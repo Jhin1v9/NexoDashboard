@@ -55,7 +55,9 @@ class WhatsAppSender {
       console.error('[WHATSAPP SEND] Erro:', err.message);
       throw err;
     } finally {
-      if (browser) await browser.close().catch(() => {});
+      // NÃO fechar o browser — apenas desconectar do CDP
+      // O browser é compartilhado com a Luna/MCP
+      if (browser) await browser.disconnect().catch(() => {});
     }
   }
 }

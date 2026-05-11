@@ -121,7 +121,7 @@
   ],
   "compatibility": {
     "minAgentVersion": "15.1",
-    "recommendedAgentVersion": "16.0",
+    "recommendedAgentVersion": "18.0",
     "breakingChangesWith": [
       "15.0",
       "14.0"
