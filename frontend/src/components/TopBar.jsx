@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Menu, Search, Wifi, WifiOff, Clock, User } from 'lucide-react'
-import axios from 'axios'
+import { Menu, Search, Wifi, WifiOff, Clock, User, LogOut } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import PushNotificationButton from './PushNotificationButton'
 import ChangelogBadge from './changelog/ChangelogBadge'
+import NotificationCenter from './NotificationCenter'
 import useChangelog from '../hooks/useChangelog'
 
 export default function TopBar({ onMenuClick, onSearchClick }) {
   const [connected, setConnected] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
-  const [activeUser, setActiveUser] = useState('abner')
-  const [users, setUsers] = useState({})
-  
+  const { user, logout } = useAuth()
+
   const {
     entries,
     unreadCount,
@@ -21,29 +21,11 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
   } = useChangelog()
 
   useEffect(() => {
-    fetchUsers()
     const interval = setInterval(() => setLastUpdate(new Date()), 60000)
     return () => clearInterval(interval)
   }, [])
 
-  const fetchUsers = async () => {
-    try {
-      const res = await axios.get('/api/users')
-      setActiveUser(res.data.active)
-      setUsers(res.data.users)
-    } catch {
-      setConnected(false)
-    }
-  }
-
-  const switchUser = async (user) => {
-    try {
-      await axios.post('/api/users/switch', { user })
-      setActiveUser(user)
-    } catch {}
-  }
-
-  const user = users[activeUser] || { name: 'Abner', color: '#3742fa' }
+  const activeUser = user || { name: 'Abner', color: '#3742fa' }
 
   return (
     <header className="h-14 glass flex items-center justify-between px-4 border-b border-nexo-border">
@@ -65,6 +47,7 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
           onUpdateLastVisit={updateLastVisit}
           isUnread={isUnread}
         />
+        <NotificationCenter />
         <PushNotificationButton />
         <div className="flex items-center gap-1.5 text-xs text-nexo-muted">
           {connected ? <Wifi size={14} className="text-nexo-success" /> : <WifiOff size={14} className="text-nexo-danger" />}
@@ -76,18 +59,16 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
         </div>
         <div className="relative group">
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-nexo-card transition-colors">
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ backgroundColor: user.color }}>
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ backgroundColor: activeUser.color }}>
               <User size={14} />
             </div>
-            <span className="text-sm font-medium">{user.name}</span>
+            <span className="text-sm font-medium">{activeUser.name}</span>
           </button>
           <div className="absolute right-0 top-full mt-1 w-40 glass-card py-1 hidden group-hover:block z-50">
-            {Object.entries(users).map(([key, u]) => (
-              <button key={key} onClick={() => switchUser(key)} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-nexo-card transition-colors">
-                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: u.color }} />
-                <span>{u.name}</span>
-              </button>
-            ))}
+            <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-nexo-card transition-colors">
+              <LogOut size={14} />
+              <span>Encerrar Sessão</span>
+            </button>
           </div>
         </div>
       </div>

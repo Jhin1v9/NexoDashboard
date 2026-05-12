@@ -140,26 +140,46 @@ export default function Tarefas() {
 
   const saveTask = async () => {
     if (!modalTask) return
-    await axios.put(`/api/tasks/${modalTask.id}`, editForm)
-    refetch()
-    closeModal()
+    try {
+      // Sanitiza o payload: envia apenas campos editáveis
+      const payload = {
+        title: editForm.title,
+        description: editForm.description,
+        status: editForm.status,
+        priority: editForm.priority,
+        taskType: editForm.taskType,
+        dueDate: editForm.dueDate || null,
+        assignedTo: editForm.assignedTo || null
+      }
+      await axios.put(`/api/tasks/${modalTask.id}`, payload)
+      await refetch()
+      closeModal()
+    } catch (err) {
+      console.error('Erro ao salvar tarefa:', err)
+      alert('Erro ao salvar tarefa. Tente novamente.')
+    }
   }
 
   const addComment = async () => {
     if (!newComment.trim() || !modalTask) return
-    await axios.post(`/api/tasks/${modalTask.id}/comments`, {
-      text: newComment,
-      author: activeUser
-    })
-    setNewComment('')
-    // Refresh modal data
-    const res = await axios.get('/api/tasks')
-    const updated = res.data.find(t => t.id === modalTask.id)
-    if (updated) {
-      setModalTask(updated)
-      setEditForm({ ...updated })
+    try {
+      await axios.post(`/api/tasks/${modalTask.id}/comments`, {
+        text: newComment,
+        author: activeUser
+      })
+      setNewComment('')
+      // Refresh modal data
+      const res = await axios.get('/api/tasks')
+      const updated = res.data.find(t => t.id === modalTask.id)
+      if (updated) {
+        setModalTask(updated)
+        setEditForm({ ...updated })
+      }
+      await refetch()
+    } catch (err) {
+      console.error('Erro ao adicionar comentário:', err)
+      alert('Erro ao adicionar comentário. Tente novamente.')
     }
-    refetch()
   }
 
   const getUserName = (key) => users[key]?.name || key || 'Sistema'

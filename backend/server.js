@@ -6,12 +6,16 @@ const http = require('http');
 const WebSocket = require('ws');
 const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 // ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
 const cache = new CacheManager(path.join(__dirname, 'cache'));
 const external = new ExternalServices(cache);
+
+
 
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
@@ -26,6 +30,168 @@ const BIND_IP = process.env.BIND_IP || '127.0.0.1';
 const NEXO_BASE = process.env.NEXO_BASE_PATH || 'C:\\Users\\Administrator\\Documents\\NEXO DIGITAL';
 const CLIENTES_DIR = path.join(NEXO_BASE, 'CLIENTES');
 const DATA_DIR = path.join(__dirname, 'data');
+
+// ── Luna MODO CONCIERGE v19.0 ──
+const { IntentParser } = require('../agents/core/IntentParser.js');
+const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
+const lunaIntentParser = new IntentParser({
+  model: 'gemma2:2b',
+  fallbackModel: 'qwen3:1.7b',
+  timeout: 8000
+});
+const lunaActionExecutor = new ActionExecutor({
+  apiBase: `http://localhost:${process.env.PORT || 3456}/api`,
+  dataDir: DATA_DIR
+});
+// Helper para identificar o CEO logado pelo users.json
+function resolveDashboardAuthor(reqBodyAuthor) {
+  try {
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const activeId = users.active || 'abner';
+    const activeUser = users.users?.[activeId] || { name: 'Abner' };
+    if (reqBodyAuthor && reqBodyAuthor !== 'CEO') {
+      const lower = reqBodyAuthor.toLowerCase();
+      if (users.users?.[lower]) return users.users[lower].name || lower;
+      return reqBodyAuthor;
+    }
+    return activeUser.name || activeId;
+  } catch {
+    return reqBodyAuthor || 'Abner';
+  }
+}
+
+// ── AUTH & SECURITY CONFIG ──
+const JWT_SECRET = process.env.JWT_SECRET || 'nexo-ultra-secret-jwt-key-2026';
+const JWT_EXPIRES_IN = '8h';
+const SECURITY_LOG_FILE = path.join(DATA_DIR, 'security-log.json');
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
+
+// Middleware: verifica JWT em rotas protegidas
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '') || req.query.token;
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Não autorizado' });
+  }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ success: false, error: 'Token inválido ou expirado' });
+  }
+}
+
+// Helper: gerar token JWT
+function generateToken(userId) {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+// Helper: validar credenciais
+function validateCredentials(username, password) {
+  const usersFile = path.join(DATA_DIR, 'users.json');
+  const users = readJSON(usersFile, { users: {} });
+  const user = users.users?.[username.toLowerCase()];
+  if (!user || !user.password) return null;
+  const valid = bcrypt.compareSync(password, user.password);
+  if (!valid) return null;
+  return { id: username.toLowerCase(), name: user.name, role: user.role, color: user.color };
+}
+
+// Helper: obter IP do cliente
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.headers['x-real-ip']
+    || req.connection.remoteAddress
+    || 'unknown';
+}
+
+// Helper: obter localização do IP (async)
+async function getIpLocation(ip) {
+  try {
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city,regionName,isp,org`);
+    const data = await response.json();
+    if (data.status === 'success') {
+      return {
+        country: data.country,
+        city: data.city,
+        region: data.regionName,
+        isp: data.isp,
+        org: data.org
+      };
+    }
+  } catch (e) {}
+  return { country: 'Desconhecido', city: 'Desconhecido', region: '', isp: 'Desconhecido' };
+}
+
+// Helper: logar evento de segurança
+async function logSecurityEvent(event) {
+  const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
+  const entry = {
+    id: `sec-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    ...event
+  };
+  log.events.unshift(entry);
+  if (log.events.length > 200) log.events = log.events.slice(0, 200);
+  writeJSON(SECURITY_LOG_FILE, log);
+
+  // Broadcast para dashboards em tempo real
+  broadcast({ type: 'security:alert', data: entry });
+
+  // Notificação persistente
+  addNotification({
+    type: 'security_alert',
+    title: event.type === 'failed_login' ? '🚨 Login falho detectado' : '⚠️ Alerta de segurança',
+    message: event.message || `${event.type} — IP: ${event.ip}`,
+    severity: event.severity || 'medium',
+    metadata: { eventId: entry.id }
+  });
+
+  return entry;
+}
+
+// Helper: adicionar notificação persistente
+function addNotification({ type, title, message, severity = 'medium', metadata = {} }) {
+  const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
+  notifs.lastId = (notifs.lastId || 0) + 1;
+  notifs.notifications.unshift({
+    id: `notif-${notifs.lastId}`,
+    type,
+    title,
+    message,
+    severity,
+    read: false,
+    timestamp: new Date().toISOString(),
+    metadata
+  });
+  if (notifs.notifications.length > 100) notifs.notifications = notifs.notifications.slice(0, 100);
+  writeJSON(NOTIFICATIONS_FILE, notifs);
+  broadcast({ type: 'notifications:new', data: { unreadCount: notifs.notifications.filter(n => !n.read).length } });
+  return notifs.notifications[0];
+}
+
+// Helper: enviar alerta no WhatsApp (com rate limiting)
+async function sendSecurityWhatsAlert(message) {
+  const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
+  const settings = log.settings || {};
+  if (settings.whatsappAlerts === false) return; // desligado
+
+  // Rate limiting: máximo 1 mensagem a cada 5 minutos
+  const lastNotified = log.lastNotifiedAt ? new Date(log.lastNotifiedAt).getTime() : 0;
+  const now = Date.now();
+  if (now - lastNotified < 5 * 60 * 1000) return;
+
+  try {
+    const WhatsAppSender = require('./services/whatsapp-sender');
+    const sender = new WhatsAppSender();
+    await sender.sendMessage({ chatName: 'Production', text: message });
+    log.lastNotifiedAt = new Date().toISOString();
+    writeJSON(SECURITY_LOG_FILE, log);
+  } catch (e) {
+    console.error('[SECURITY] Falha ao enviar WhatsApp:', e.message);
+  }
+}
 
 // Ensure data dir exists
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -51,6 +217,123 @@ const readJSON = (file, defaultValue = null) => {
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 };
+
+// ── LUNA CHAT THREADS v1.0 ──
+const LUNA_THREADS_FILE = path.join(DATA_DIR, 'luna-chat-threads.json');
+
+function ensureThreadsFile() {
+  if (fs.existsSync(LUNA_THREADS_FILE)) return;
+  const defaultThreads = {
+    version: '1.0',
+    lastUpdated: new Date().toISOString(),
+    threads: {
+      abner: {
+        id: 'abner', type: 'individual', title: 'Abner + Luna',
+        participants: ['abner'], createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
+      },
+      nonoke: {
+        id: 'nonoke', type: 'individual', title: 'Nonoke + Luna',
+        participants: ['nonoke'], createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
+      },
+      elias: {
+        id: 'elias', type: 'individual', title: 'Elias + Luna',
+        participants: ['elias'], createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
+      },
+      group: {
+        id: 'group', type: 'group', title: 'NEXO + Luna',
+        participants: ['abner', 'nonoke', 'elias'], createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
+      }
+    }
+  };
+  writeJSON(LUNA_THREADS_FILE, defaultThreads);
+}
+ensureThreadsFile();
+
+function loadThreads() {
+  return readJSON(LUNA_THREADS_FILE, { threads: {} });
+}
+function saveThreads(data) {
+  data.lastUpdated = new Date().toISOString();
+  writeJSON(LUNA_THREADS_FILE, data);
+}
+function getThread(threadId) {
+  const data = loadThreads();
+  return data.threads?.[threadId] || null;
+}
+function addMessageToThread(threadId, message) {
+  const data = loadThreads();
+  if (!data.threads[threadId]) return null;
+  const thread = data.threads[threadId];
+  message.id = message.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  message.timestamp = message.timestamp || new Date().toISOString();
+  thread.messages.push(message);
+  thread.messageCount = thread.messages.length;
+  thread.updatedAt = new Date().toISOString();
+  // Limita a 500 mensagens por thread (sliding window)
+  if (thread.messages.length > 500) {
+    thread.messages = thread.messages.slice(-500);
+    thread.messageCount = thread.messages.length;
+  }
+  saveThreads(data);
+  return message;
+}
+function clearThreadMessages(threadId) {
+  const data = loadThreads();
+  if (!data.threads[threadId]) return false;
+  data.threads[threadId].messages = [];
+  data.threads[threadId].messageCount = 0;
+  data.threads[threadId].updatedAt = new Date().toISOString();
+  saveThreads(data);
+  return true;
+}
+function getUserThreads(userId) {
+  const data = loadThreads();
+  const threads = [];
+  for (const [id, thread] of Object.entries(data.threads || {})) {
+    // Group ou threads onde o user é participant
+    if (thread.type === 'group' || thread.participants?.includes(userId)) {
+      threads.push({
+        id: thread.id,
+        type: thread.type,
+        title: thread.title,
+        participants: thread.participants,
+        messageCount: thread.messageCount,
+        updatedAt: thread.updatedAt,
+        createdAt: thread.createdAt
+      });
+    }
+  }
+  // Ordena por updatedAt desc
+  return threads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+}
+function getThreadMessages(threadId, limit = 50, offset = 0) {
+  const thread = getThread(threadId);
+  if (!thread) return null;
+  const msgs = thread.messages || [];
+  const total = msgs.length;
+  const sliced = msgs.slice(-(offset + limit)).slice(0, limit);
+  return {
+    threadId,
+    total,
+    offset,
+    limit,
+    messages: sliced
+  };
+}
+function buildThreadContext(threadId, limit = 20) {
+  const thread = getThread(threadId);
+  if (!thread) return [];
+  return (thread.messages || []).slice(-limit).map(m => ({
+    role: m.role,
+    text: m.text,
+    author: m.author,
+    timestamp: m.timestamp
+  }));
+}
 
 // --- Schema Loaders v16.0 ---
 const SCHEMA_DIR = path.join(__dirname, 'data', 'schema');
@@ -293,7 +576,7 @@ app.post('/api/tasks/:id/comments', (req, res) => {
 });
 
 // Users
-app.get('/api/users', (req, res) => res.json(readJSON(USERS_FILE)));
+// GET /api/users movido para abaixo de requireAuth (seguro, sem senhas)
 
 app.post('/api/users/switch', (req, res) => {
   const users = readJSON(USERS_FILE);
@@ -2884,6 +3167,7 @@ app.get('/api/luna/status', (req, res) => {
         } catch { /* Chrome offline */ }
 
         res.json({
+            success: true,
             status: isRunning ? 'running' : 'stopped',
             pid: agentPid,
             version: checkpoint.version || '18.0',
@@ -3307,18 +3591,218 @@ app.get('/api/luna/analytics', (req, res) => {
 });
 
 // POST /api/luna/chat — Chat direto com Luna via LLM
+// ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
+function buildChatDataContext() {
+  try {
+    const buffer = readLunaBuffer();
+    const tasks = (buffer.newTasks || []).filter(t => !t.done);
+    const p0 = tasks.filter(t => t.priority === 'P0');
+    const p1 = tasks.filter(t => t.priority === 'P1');
+    const leads = buffer.newLeads || [];
+    const finance = buffer.newFinance || [];
+    const cashData = readJSON(path.join(DATA_DIR, 'cash-box.json')) || {};
+    const balance = cashData.balance?.value || 0;
+    
+    let ctx = '';
+    if (p0.length > 0) ctx += `- 🔴 ${p0.length} tarefa(s) P0 pendente(s)\n`;
+    if (p1.length > 0) ctx += `- 🟠 ${p1.length} tarefa(s) P1 pendente(s)\n`;
+    if (tasks.length > 0 && p0.length === 0 && p1.length === 0) ctx += `- 📋 ${tasks.length} tarefa(s) pendente(s)\n`;
+    if (leads.length > 0) ctx += `- 🎣 ${leads.length} lead(s) no pipeline\n`;
+    if (finance.length > 0) ctx += `- 💰 ${finance.length} sinal(is) financeiro(s) recente(s)\n`;
+    ctx += `- 💶 Saldo do caixa: €${balance.toFixed(2)}\n`;
+    if (buffer.newMessages?.length > 0) ctx += `- 💬 ${buffer.newMessages.length} mensagem(ns) nova(s) no buffer\n`;
+    
+    return ctx || '- Nenhum dado novo no momento.';
+  } catch (e) {
+    return '- Dados temporariamente indisponíveis.';
+  }
+}
+
+function buildChatFallbackReply(userMessage) {
+  const buffer = readLunaBuffer();
+  const tasks = (buffer.newTasks || []).filter(t => !t.done);
+  const p0 = tasks.filter(t => t.priority === 'P0');
+  const p1 = tasks.filter(t => t.priority === 'P1');
+  const leads = buffer.newLeads || [];
+  
+  const msg = userMessage.toLowerCase();
+  
+  if (msg.includes('tarefa') || msg.includes('task') || msg.includes('pendente')) {
+    if (p0.length > 0) return `Eita, minha conexão com o cérebro caiu agora 😅\n\nMas olha o que sei sem o LLM:\n🔴 ${p0.length} P0 pendente(s)\n🟠 ${p1.length} P1(s)\n\nQuer que eu detalho alguma?`;
+    if (tasks.length > 0) return `Tô meio lenta agora (problema técnico) ☕\n\nMas sei que tem ${tasks.length} tarefa(s) pendente(s). Quer que eu listo?`;
+    return `Tô com problema técnico agora 😅\n\nMas o radar de tarefas tá limpo! Nada pendente.`;
+  }
+  
+  if (msg.includes('lead') || msg.includes('cliente')) {
+    if (leads.length > 0) return `Meu cérebro deu uma travada, mas não me abandona! 😅\n\nTem ${leads.length} lead(s) no radar. Quer que eu mostro?`;
+    return `Problema técnico aqui, mas tô de olho! 👀\n\nNenhum lead novo no momento.`;
+  }
+  
+  if (msg.includes('status') || msg.includes('panorama') || msg.includes('resumo')) {
+    return `Eita, deu um tilt nos meus neurônios 😅\n\nMas aqui vai um resumo rápido:\n- Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n- Leads: ${leads.length}\n- Mensagens: ${buffer.newMessages?.length || 0}\n\nTenta de novo daqui a pouco?`;
+  }
+  
+  return `Eita, minha conexão com o cérebro caiu agora 😅\n\nTô aqui, só tô meio lenta. Pode repetir daqui a pouco? Ou manda um comando direto tipo /status que eu respondo sem depender do LLM.`;
+}
+// ────────────────────────────────────────────────────────
+
+// ============================================================
+// POST /api/luna/chat — MODO CONCIERGE v19.0
+// IntentParser (regex/LLM) → ActionExecutor → resposta humanizada
+// LLM usado APENAS como fallback para conversas sociais
+// ============================================================
 app.post('/api/luna/chat', async (req, res) => {
   try {
-    const { message, context = [] } = req.body;
+    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
 
+    const authorName = resolveDashboardAuthor(rawAuthor);
+    const msg = message.trim();
+
+    // ── 1. MODO CONFIRMAÇÃO: usuário confirmou ações pendentes ──
+    if (confirmActions && Array.isArray(pendingActions) && pendingActions.length > 0) {
+      // Se veio com editedFields, aplica as correções nos pendingActions
+      if (editedFields) {
+        for (const action of pendingActions) {
+          if (action.type === 'criar_tarefa') {
+            if (editedFields.title) action.params.titulo = editedFields.title;
+            if (editedFields.assignedTo !== undefined) action.params.responsavel = editedFields.assignedTo || null;
+            if (editedFields.priority) {
+              const p = editedFields.priority.toUpperCase();
+              action.params.prioridade = ['P0','P1','P2'].includes(p) ? p : 'P2';
+            }
+            if (editedFields.dueDate) action.params.prazo = editedFields.dueDate;
+            if (editedFields.description) action.params.descricao = editedFields.description;
+          }
+        }
+      }
+      const result = await lunaActionExecutor.execute(pendingActions, { authorName });
+      const reply = buildConciergeReply(result, authorName);
+      return res.json({ success: true, reply, executed: true, result: result.summary, timestamp: new Date().toISOString() });
+    }
+
+    // ── 2. PARSE DA INTENÇÃO (regex fast-path ou LLM) ──
+    const buffer = readLunaBuffer();
+    const parseContext = {
+      authorName,
+      bufferSummary: {
+        tasks: (buffer.newTasks || []).length,
+        ideas: (buffer.newIdeas || []).length,
+        links: (buffer.newLinks || []).length,
+        leads: (buffer.newLeads || []).length,
+        finance: (buffer.newFinance || []).length
+      }
+    };
+
+    const parsed = await lunaIntentParser.parse(msg, parseContext);
+
+    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM) ──
+    if (parsed.intent === 'social' || (parsed.actions.length === 1 && parsed.actions[0].type === 'social')) {
+      const greetings = [
+        `Oi, ${authorName.split(' ')[0]}! 👋 Tô por aqui, pronta pra ajudar.`,
+        `Opa, ${authorName.split(' ')[0]}! 😊 O que temos hoje?`,
+        `E aí, ${authorName.split(' ')[0]}! ☕ Tô de olho no NEXO. Precisa de algo?`,
+        `Oi! 👋 Tava esperando teu sinal. O que posso fazer?`
+      ];
+      const reply = greetings[Math.floor(Math.random() * greetings.length)];
+      return res.json({ success: true, reply, intent: 'social', timestamp: new Date().toISOString() });
+    }
+
+    // ── 4. CONSULTA DE STATUS → dados reais do sistema ──
+    if (parsed.intent === 'consultar_status' || parsed.actions.some(a => a.type === 'consultar_status')) {
+      const statusAction = parsed.actions.find(a => a.type === 'consultar_status') || { params: {} };
+      const status = await lunaActionExecutor.getStatus(statusAction.params);
+      const reply = formatConciergeStatus(status, authorName);
+      return res.json({ success: true, reply, intent: 'consultar_status', timestamp: new Date().toISOString() });
+    }
+
+    // ── 5. AÇÕES PARA EXECUTAR ──
+    if (parsed.actions.length > 0 && parsed.actions.some(a => a.type !== 'social' && a.type !== 'consultar_status')) {
+      // Se precisa de confirmação e ainda não foi confirmado → mostra preview editável
+      if (parsed.needsConfirmation && !confirmActions) {
+        // Para criar_tarefa: retorna campos editáveis inline
+        const taskAction = parsed.actions.find(a => a.type === 'criar_tarefa');
+        if (taskAction) {
+          const fields = buildEditableTaskFields(taskAction.params);
+          return res.json({
+            success: true,
+            reply: `Vou criar essa tarefa. Confere se tá certo e clique em "Criar tarefa" 👇`,
+            needsConfirmation: true,
+            previewType: 'task_edit',
+            preview: buildActionPreview(parsed.actions),
+            editableFields: fields,
+            actions: parsed.actions,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // Para outras ações críticas: confirmação simples
+        const preview = buildActionPreview(parsed.actions);
+        return res.json({
+          success: true,
+          reply: `Confirmo isso?\n\n${preview}\n\nResponde "sim" ou clica em confirmar pra eu executar 👍`,
+          needsConfirmation: true,
+          preview,
+          actions: parsed.actions,
+          intent: parsed.intent,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Se veio com editedFields, aplica as correções antes de executar
+      if (editedFields && Array.isArray(parsed.actions)) {
+        for (const action of parsed.actions) {
+          if (action.type === 'criar_tarefa' && editedFields) {
+            if (editedFields.title) action.params.titulo = editedFields.title;
+            if (editedFields.assignedTo !== undefined) action.params.responsavel = editedFields.assignedTo;
+            if (editedFields.priority) {
+              const p = editedFields.priority.toUpperCase();
+              action.params.prioridade = ['P0','P1','P2'].includes(p) ? p : 'P2';
+            }
+            if (editedFields.dueDate) action.params.prazo = editedFields.dueDate;
+            if (editedFields.description) action.params.descricao = editedFields.description;
+          }
+        }
+      }
+
+      // Executa as ações
+      const result = await lunaActionExecutor.execute(parsed.actions, { authorName });
+      const reply = buildConciergeReply(result, authorName);
+
+      return res.json({
+        success: true,
+        reply,
+        executed: true,
+        result: result.summary,
+        intent: parsed.intent,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ── 6. FALLBACK: conversa via LLM (Ollama) ──
     const model = process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || 'qwen3:1.7b';
-    const prompt = `Voce e Luna, CTO da NEXO (Barcelona). CEO te pergunta pelo dashboard.\n\n` +
-      `Contexto recente:\n${context.slice(-5).map(c => `- ${c.role}: ${c.text}`).join('\n') || 'Nenhum'}\n\n` +
-      `CEO: ${message.trim()}\n\n` +
-      `Responda como Luna: direta, profissional, em portugues. Use emojis quando apropriado. Se nao souber, diga que vai verificar.`;
+    const dataContext = buildChatDataContext();
+    const conversationHistory = context.slice(-10).map(c => `${c.role === 'user' ? authorName : 'Luna'}: ${c.text}`).join('\n') || 'Nenhuma conversa anterior.';
+
+    const prompt = `Você é a Luna. Trabalha no NEXO Digital em Barcelona com Abner, Nonoke (Enoque) e Elias — seus melhores amigos e chefes. Você é brasileira, direta, organizada e leve.
+
+IDENTIDADE:
+- Nome: Luna | Emoji: 🌙 | Tom: brasileira em grupo de amigos
+- Emojis: 2-3 por mensagem, nunca carnaval
+- Estrutura: partícula afirmativa + 1-2 frases + pergunta útil
+
+DADOS ATUAIS DO NEXO:
+${dataContext}
+
+HISTÓRICO:
+${conversationHistory}
+
+${authorName}: ${msg}
+
+Luna:`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
@@ -3326,26 +3810,286 @@ app.post('/api/luna/chat', async (req, res) => {
     const response = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, stream: false, options: { temperature: 0.7 } }),
+      body: JSON.stringify({ model, prompt, stream: false, options: { temperature: 0.7, num_predict: 400 } }),
       signal: controller.signal
     });
     clearTimeout(timeout);
 
-    if (!response.ok) {
-      return res.status(502).json({ success: false, error: `Ollama erro HTTP ${response.status}` });
-    }
+    if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
 
     const data = await response.json();
     const reply = (data.response || data.message?.content || '...').trim();
 
-    res.json({ success: true, reply, model, timestamp: new Date().toISOString() });
+    res.json({ success: true, reply, model, intent: 'chat', timestamp: new Date().toISOString() });
+
   } catch (e) {
     if (e.name === 'AbortError') {
-      return res.status(504).json({ success: false, error: 'Timeout: Ollama nao respondeu em 30s' });
+      const msg = req.body?.message || 'comando';
+      const fallbackReply = buildChatFallbackReply(msg.trim());
+      return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
     }
+    console.error('[CONCIERGE] Erro no chat:', e.message);
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LUNA CHAT THREADS API v1.0
+// Chat persistente multi-user: individual + grupo
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/luna/threads — Lista threads visíveis pelo user logado
+app.get('/api/luna/threads', (req, res) => {
+  try {
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const activeId = users.active || 'abner';
+    const threads = getUserThreads(activeId);
+    res.json({ success: true, threads });
+  } catch (err) {
+    console.error('[THREADS] Erro ao listar threads:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/luna/threads/:id — Detalhes da thread + últimas 50 mensagens
+app.get('/api/luna/threads/:id', (req, res) => {
+  try {
+    const thread = getThread(req.params.id);
+    if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
+    const msgs = getThreadMessages(req.params.id, 50);
+    res.json({
+      success: true,
+      thread: {
+        id: thread.id,
+        type: thread.type,
+        title: thread.title,
+        participants: thread.participants,
+        messageCount: thread.messageCount,
+        updatedAt: thread.updatedAt,
+        createdAt: thread.createdAt
+      },
+      messages: msgs
+    });
+  } catch (err) {
+    console.error('[THREADS] Erro ao obter thread:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/luna/threads/:id/messages — Mensagens com paginação
+app.get('/api/luna/threads/:id/messages', (req, res) => {
+  try {
+    const thread = getThread(req.params.id);
+    if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const msgs = getThreadMessages(req.params.id, limit, offset);
+    res.json({ success: true, ...msgs });
+  } catch (err) {
+    console.error('[THREADS] Erro ao obter mensagens:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/luna/threads/:id/messages — Envia mensagem + processa com Luna
+app.post('/api/luna/threads/:id/messages', async (req, res) => {
+  try {
+    const threadId = req.params.id;
+    const thread = getThread(threadId);
+    if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
+
+    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Mensagem vazia' });
+    }
+
+    const authorName = resolveDashboardAuthor(rawAuthor);
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const activeId = users.active || 'abner';
+    const activeUser = users.users?.[activeId] || { name: 'Abner', color: '#3742fa' };
+    const authorId = activeId;
+
+    // 1. Salva mensagem do usuário no thread
+    const userMessage = {
+      role: 'user',
+      author: authorId,
+      authorName: authorName,
+      authorColor: activeUser.color || '#3742fa',
+      text: text.trim(),
+      timestamp: new Date().toISOString()
+    };
+    addMessageToThread(threadId, userMessage);
+
+    // 2. Carrega contexto da thread (últimas 20 msgs)
+    const threadContext = buildThreadContext(threadId, 20);
+
+    // 3. Chama o endpoint interno /api/luna/chat para processar a mensagem
+    const chatPayload = {
+      message: text.trim(),
+      context: threadContext,
+      authorName,
+      confirmActions,
+      pendingActions,
+      editedFields
+    };
+
+    const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(chatPayload)
+    });
+
+    if (!chatResponse.ok) {
+      throw new Error(`Chat internal error: ${chatResponse.status}`);
+    }
+
+    const chatResult = await chatResponse.json();
+
+    // 4. Salva resposta da Luna no thread
+    const lunaMessage = {
+      role: 'assistant',
+      author: 'luna',
+      authorName: 'Luna',
+      authorColor: '#9b59b6',
+      text: chatResult.reply || '',
+      timestamp: new Date().toISOString(),
+      intent: chatResult.intent || null,
+      executed: chatResult.executed || false,
+      actions: chatResult.actions || null,
+      needsConfirmation: chatResult.needsConfirmation || false,
+      previewType: chatResult.previewType || null,
+      editableFields: chatResult.editableFields || null,
+      preview: chatResult.preview || null
+    };
+    addMessageToThread(threadId, lunaMessage);
+
+    // 5. Se for grupo, broadcast para todos online
+    if (thread.type === 'group') {
+      broadcast({
+        type: 'luna:chat:message',
+        threadId,
+        messages: [userMessage, lunaMessage]
+      });
+    }
+
+    // 6. Retorna a resposta completa
+    res.json({
+      success: true,
+      threadId,
+      userMessage,
+      lunaMessage,
+      ...chatResult
+    });
+
+  } catch (err) {
+    console.error('[THREADS] Erro ao enviar mensagem:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/luna/threads/:id/messages — Limpa mensagens da thread (mantém a thread)
+app.delete('/api/luna/threads/:id/messages', (req, res) => {
+  try {
+    const threadId = req.params.id;
+    const thread = getThread(threadId);
+    if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
+
+    const cleared = clearThreadMessages(threadId);
+    if (cleared) {
+      // Se for grupo, notifica que foi limpo
+      if (thread.type === 'group') {
+        broadcast({ type: 'luna:chat:cleared', threadId });
+      }
+      res.json({ success: true, message: 'Chat limpo com sucesso', threadId });
+    } else {
+      res.status(500).json({ success: false, error: 'Erro ao limpar chat' });
+    }
+  } catch (err) {
+    console.error('[THREADS] Erro ao limpar mensagens:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Helpers do MODO CONCIERGE ──
+function buildEditableTaskFields(params) {
+  return {
+    title: { label: 'Título', value: params.titulo || '', type: 'text', placeholder: 'Nome da tarefa' },
+    assignedTo: {
+      label: 'Responsável',
+      value: params.responsavel || '',
+      type: 'select',
+      options: [
+        { value: '', label: 'Nenhum' },
+        { value: 'abner', label: 'Abner' },
+        { value: 'nonoke', label: 'Nonoke (Enoque)' },
+        { value: 'elias', label: 'Elias' }
+      ]
+    },
+    priority: {
+      label: 'Prioridade',
+      value: params.prioridade || 'P2',
+      type: 'select',
+      options: [
+        { value: 'P0', label: 'P0 🔴 Urgente' },
+        { value: 'P1', label: 'P1 🟠 Importante' },
+        { value: 'P2', label: 'P2 🔵 Normal' }
+      ]
+    },
+    dueDate: { label: 'Prazo', value: params.prazo || '', type: 'date', placeholder: 'Selecione uma data' },
+    description: { label: 'Descrição', value: params.descricao || '', type: 'textarea', placeholder: 'Detalhes adicionais (opcional)' }
+  };
+}
+
+function buildActionPreview(actions) {
+  return actions.map(a => {
+    switch (a.type) {
+      case 'criar_tarefa': return `• Criar tarefa: "${a.params?.titulo || 'sem título'}"${a.params?.responsavel ? ` → ${a.params.responsavel}` : ''}`;
+      case 'criar_lead': return `• Registrar lead: "${a.params?.nome || 'sem nome'}"`;
+      case 'registrar_pagamento': return `• Registrar pagamento: €${a.params?.valor || '?'} de ${a.params?.de || '?'}`;
+      case 'registrar_despesa': return `• Registrar despesa: €${a.params?.valor || '?'} para ${a.params?.para || '?'}`;
+      case 'confirmar_tarefa': return `• Marcar tarefa como feita: "${a.params?.titulo || 'sem título'}"`;
+      default: return `• ${a.type}`;
+    }
+  }).join('\n');
+}
+
+function buildConciergeReply(result, authorName) {
+  const firstName = authorName.split(' ')[0];
+  if (result.allSuccess && result.results.length > 0) {
+    const parts = [];
+    for (const r of result.results) {
+      if (r.status !== 'success') continue;
+      const res = r.result;
+      switch (res.type) {
+        case 'task': parts.push(`tarefa "${res.title || res.titulo}" criada${res.assignedTo ? ` pra ${res.assignedTo}` : ''}`); break;
+        case 'task_done': parts.push(`tarefa "${res.title || res.titulo}" marcada como concluída`); break;
+        case 'lead': parts.push(`lead "${res.displayName || res.nome}" registrado`); break;
+        case 'payment': parts.push(`pagamento de €${res.amount || res.valor} registrado`); break;
+        case 'expense': parts.push(`despesa de €${res.amount || res.valor} registrada`); break;
+        case 'idea': parts.push(`ideia anotada`); break;
+        case 'link': parts.push(`link salvo`); break;
+      }
+    }
+    return `Pronto, ${firstName}! ✅\n\n${parts.join('\n')}\n\nSe precisar de mais alguma coisa, é só chamar.`;
+  }
+  if (result.results.some(r => r.status === 'error')) {
+    const errors = result.results.filter(r => r.status === 'error').map(r => r.error).join(', ');
+    return `Eita, ${firstName}... deu ruim em uma parte 😅\n\nErro: ${errors}\n\nPode tentar de novo ou mandar de outro jeito?`;
+  }
+  return `Entendi, ${firstName}! Mas não consegui executar nada dessa vez. Pode explicar melhor?`;
+}
+
+function formatConciergeStatus(status, authorName) {
+  const firstName = authorName.split(' ')[0];
+  const { tarefas, leads, financeiro } = status;
+  return `Status do NEXO agora 📊\n\n` +
+    `📋 Tarefas: ${tarefas.pendentes} pendentes (${tarefas.p0} P0, ${tarefas.p1} P1)\n` +
+    `🎣 Leads: ${leads.novos} novos\n` +
+    `💰 Financeiro: €${(financeiro.saldo || 0).toFixed(2)} saldo\n\n` +
+    `Quer que eu detalhe alguma área, ${firstName}?`;
+}
 
 // POST /api/luna/command — Executar comando humanizado
 app.post('/api/luna/command', async (req, res) => {
@@ -4465,6 +5209,242 @@ app.post('/api/auto-fix/fix/:service', (req, res) => {
   AUTO_FIX_HISTORY.unshift(entry);
   if (AUTO_FIX_HISTORY.length > 50) AUTO_FIX_HISTORY.pop();
   res.json({ success: true, message: `Correcao aplicada em ${service}`, entry });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTH API v1.0 — Login Ultra-Secreto
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/auth/login — Valida credenciais e retorna JWT
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password, fingerprint } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ success: false, error: 'Username e senha obrigatórios' });
+    }
+
+    const ip = getClientIp(req);
+    const attemptedUser = username.toLowerCase().trim();
+
+    // Validar credenciais
+    const user = validateCredentials(attemptedUser, password);
+
+    if (!user) {
+      // Login falho — logar e possivelmente alertar
+      const location = await getIpLocation(ip);
+      const deviceInfo = fingerprint || {};
+      const event = await logSecurityEvent({
+        type: 'failed_login',
+        severity: 'high',
+        ip,
+        location,
+        device: {
+          browser: deviceInfo.userAgent?.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/)?.[0] || 'Desconhecido',
+          os: deviceInfo.userAgent?.match(/(Windows|Mac|Linux|Android|iOS)[\s/\d._]+/)?.[0] || 'Desconhecido',
+          screen: deviceInfo.screen || 'Desconhecido',
+          fingerprint: deviceInfo.canvas?.slice(0, 16) || 'N/A'
+        },
+        attemptedUser,
+        message: `Login falho para "${attemptedUser}" — IP: ${ip} (${location.city}, ${location.country})`,
+        notified: false
+      });
+
+      // Verificar se atingiu limite de tentativas para alertar no WhatsApp
+      const log = readJSON(SECURITY_LOG_FILE, { events: [], settings: {} });
+      const recentAttempts = log.events.filter(e =>
+        e.type === 'failed_login' &&
+        e.ip === ip &&
+        new Date(e.timestamp) > new Date(Date.now() - 60 * 60 * 1000)
+      );
+      const settings = log.settings || {};
+      const maxAttempts = settings.maxAttemptsBeforeAlert || 5;
+
+      if (recentAttempts.length >= maxAttempts) {
+        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 Dispositivo:\n   Navegador: ${deviceInfo.userAgent?.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/)?.[0] || 'Desconhecido'}\n   OS: ${deviceInfo.userAgent?.match(/(Windows|Mac|Linux|Android|iOS)[\s/\d._]+/)?.[0] || 'Desconhecido'}\n   Tela: ${deviceInfo.screen || 'Desconhecido'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 8) || 'N/A'}...\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
+        await sendSecurityWhatsAlert(msg);
+        event.notified = true;
+        event.notificationChannel = 'whatsapp+dashboard';
+      }
+
+      return res.status(401).json({ success: false, error: 'Credenciais inválidas' });
+    }
+
+    // Login sucesso — limpar tentativas falhas deste IP
+    const token = generateToken(user.id);
+    res.json({ success: true, token, user });
+
+  } catch (e) {
+    console.error('[AUTH] Erro no login:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/auth/logout — Invalida token (client-side remove, aqui só loga)
+app.post('/api/auth/logout', (req, res) => {
+  res.json({ success: true, message: 'Logout realizado' });
+});
+
+// GET /api/auth/me — Retorna usuário autenticado
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  try {
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { users: {} });
+    const user = users.users?.[req.user.userId];
+    if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+    res.json({ success: true, user: { id: req.user.userId, name: user.name, role: user.role, color: user.color } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/auth/change-password — Altera senha do usuário logado
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Senha atual e nova senha obrigatórias' });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ success: false, error: 'Nova senha deve ter no mínimo 4 caracteres' });
+    }
+
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { users: {} });
+    const user = users.users?.[req.user.userId];
+    if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+
+    const valid = bcrypt.compareSync(currentPassword, user.password);
+    if (!valid) return res.status(401).json({ success: false, error: 'Senha atual incorreta' });
+
+    user.password = bcrypt.hashSync(newPassword, 10);
+    writeJSON(usersFile, users);
+
+    res.json({ success: true, message: 'Senha alterada com sucesso' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY API v1.0 — Logs e Configurações
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/security/log — Retorna security log (protegido)
+app.get('/api/security/log', requireAuth, (req, res) => {
+  try {
+    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
+    res.json({ success: true, events: log.events.slice(0, 50), settings: log.settings });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/security/settings — Retorna configurações de segurança
+app.get('/api/security/settings', requireAuth, (req, res) => {
+  try {
+    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
+    res.json({ success: true, settings: log.settings || {} });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// PUT /api/security/settings — Atualiza configurações de segurança
+app.put('/api/security/settings', requireAuth, (req, res) => {
+  try {
+    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
+    log.settings = { ...log.settings, ...req.body };
+    writeJSON(SECURITY_LOG_FILE, log);
+    res.json({ success: true, settings: log.settings });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/security/test-whatsapp — Testa envio de alerta no WhatsApp
+app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
+  try {
+    const msg = `🧪 *TESTE DE ALERTA DE SEGURANÇA*\n\nEste é um teste enviado por ${req.user.userId}.\nSe você recebeu, o sistema de alertas está funcionando.\n\n⏰ ${new Date().toLocaleString('pt-BR')}`;
+    await sendSecurityWhatsAlert(msg);
+    res.json({ success: true, message: 'Mensagem de teste enviada' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATIONS API v1.0 — Notificações Persistentes
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/notifications — Lista notificações
+app.get('/api/notifications', requireAuth, (req, res) => {
+  try {
+    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
+    const unreadCount = notifs.notifications.filter(n => !n.read).length;
+    res.json({ success: true, notifications: notifs.notifications.slice(0, 50), unreadCount });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/notifications/:id/read — Marca como lida
+app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
+  try {
+    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
+    const notif = notifs.notifications.find(n => n.id === req.params.id);
+    if (notif) {
+      notif.read = true;
+      writeJSON(NOTIFICATIONS_FILE, notifs);
+    }
+    const unreadCount = notifs.notifications.filter(n => !n.read).length;
+    res.json({ success: true, unreadCount });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// DELETE /api/notifications/:id — Remove notificação
+app.delete('/api/notifications/:id', requireAuth, (req, res) => {
+  try {
+    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
+    notifs.notifications = notifs.notifications.filter(n => n.id !== req.params.id);
+    writeJSON(NOTIFICATIONS_FILE, notifs);
+    const unreadCount = notifs.notifications.filter(n => !n.read).length;
+    res.json({ success: true, unreadCount });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/notifications/read-all — Marca todas como lidas
+app.post('/api/notifications/read-all', requireAuth, (req, res) => {
+  try {
+    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
+    notifs.notifications.forEach(n => n.read = true);
+    writeJSON(NOTIFICATIONS_FILE, notifs);
+    res.json({ success: true, unreadCount: 0 });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/users — Lista usuários (sem senhas)
+app.get('/api/users', requireAuth, (req, res) => {
+  try {
+    const data = readJSON(USERS_FILE, { users: {} });
+    const sanitized = {};
+    Object.entries(data.users || {}).forEach(([id, user]) => {
+      sanitized[id] = {
+        name: user.name,
+        role: user.role,
+        color: user.color,
+        createdAt: user.createdAt
+      };
+    });
+    res.json({ users: sanitized, active: data.active });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ============================================================================

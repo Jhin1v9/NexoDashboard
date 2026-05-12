@@ -295,6 +295,95 @@ Get-Content "backend/data/cash-box.json" | ConvertFrom-Json | Select-Object -Exp
 
 ---
 
+---
+
+## 🔐 LOGIN ULTRA-SECRETO POR USUÁRIO — PEDIDO FORMAL AO CEO
+
+**Data do pedido:** 2026-05-12
+**Status:** Aguardando prompt do CEO para implementação
+**Prioridade:** ALTA — Transição obrigatória para acesso individualizado
+
+### 🎯 O que o CEO pediu:
+
+Uma **landing page de camuflagem** que:
+1. Pareça uma página profissional vendendo o sistema NEXO para empresas
+2. Esconda por trás um mecanismo de login ultra-secreto
+3. Capture inputs do teclado (sequência invisível) — nada de campos visíveis
+4. Quando a sequência correta for digitada, abra o dashboard no perfil do CEO
+5. **NUNCA revele a sequência secreta no frontend** (não pode estar no código-fonte visível)
+
+### 🔑 Sequência de login desejada pelo CEO:
+```
+[usuário digita no nada da página]
+→ "abner" + Enter + "7741" + Enter → entra no perfil Abner
+→ "nonoke" + Enter + "7741" + Enter → entra no perfil Nonoke
+→ "elias" + Enter + "7741" + Enter → entra no perfil Elias
+```
+
+### 🛡️ Requisitos de segurança:
+- Senha padrão para todos: **7741** (transição inicial)
+- Todos os perfis são **Admin** (podem se modificar livremente POR ENQUANTO)
+- A validação da sequência deve acontecer no **BACKEND** — nunca no frontend
+- O frontend só captura keystrokes e envia para o backend validar
+- A sequência secreta NÃO pode ser descoberta inspecionando o código-fonte
+
+### ⚙️ Seção CONFIG no dashboard:
+- Cada CEO pode alterar sua senha
+- Cada CEO pode alterar seus dados (nome, cor, etc.)
+- Como todos são Admin, um pode modificar o do outro (por enquanto)
+
+### 🐛 Bug a corrigir junto:
+- Cash-box: quando clica em "Salvar" manualmente, não salva de verdade (falta `refetch()` no frontend)
+
+### 📋 O que precisa ser entregue no prompt:
+O CEO deve enviar para a Kimi do PC um prompt formal contendo:
+1. **A landing page HTML** que ele quer usar como camuflagem
+2. **A estética visual** desejada (cores, layout, elementos)
+3. **Se aceita ou não** as sugestões de segurança adicionais (geofencing, device fingerprint, etc.)
+4. **Se quer ou não** o login com campos invisíveis (apenas keystrokes) ou prefere outra abordagem
+
+---
+
+## 🧠 SUGESTÕES DE ABORDAGENS (para o CEO considerar)
+
+### Abordagem A: Teclado Sequencial (a que o CEO pediu)
+- Landing page profissional de vendas
+- Captura global de keystrokes na página
+- Envia para backend a cada tecla digitada
+- Backend mantém buffer por sessão/IP
+- Detecta padrão: `nome\nsenha\n`
+- **Prós:** Exatamente o que o CEO pediu, elegante, nada visível
+- **Contras:** Se alguém estiver olhando o teclado, vê tudo
+
+### Abordagem B: Terminal Invisível (Konami Code style)
+- Mesma landing page
+- Terminal escuro aparece quando digita sequência de ativação (ex: ↑↑↓↓←→←→BA)
+- Dentro do terminal, digita login/senha normalmente
+- **Prós:** Mais camadas de camuflagem, referência cultural geek
+- **Contras:** Mais complexo, pode confundir
+
+### Abordagem C: Steganografia Visual
+- A landing page tem elementos (imagens, ícones, botões) que parecem decorativos
+- Clicar em elementos específicos na ordem certa ativa o login
+- Ex: Logo → Ícone 3 → Footer → Ícone 7
+- **Prós:** Nada de teclado, completamente invisível
+- **Contras:** Difícil lembrar a sequência, não é o que o CEO pediu
+
+### Abordagem D: Timing Attack + Sequência
+- Além da sequência correta, o timing entre keystrokes importa
+- Ex: digitar "abner" em exatamente 800ms, esperar 300ms, digitar "7741" em 500ms
+- **Prós:** Muito mais seguro, quase impossível de replicar por acidente
+- **Contras:** Frustrante se errar o timing, pode não funcionar em teclados lentos
+
+### Abordagem E: Multi-Fator (recomendada como extra)
+- Geofencing: só funciona se o IP for de Barcelona (onde os CEOs estão)
+- Device fingerprint: só funciona em dispositivos conhecidos (laptops dos 3 CEOs)
+- Horário: só funciona em horário comercial (9h-20h)
+- **Prós:** Camadas extras de segurança reais
+- **Contras:** Pode bloquear acesso legítimo em viagem
+
+---
+
 *Atualizado após evolução completa v4.0 em 2026-05-09*
-*Status: Backend ✅ | Agente ✅ | Frontend ✅*
-*Fases concluídas: 1.1, 1.2, 1.3, 1.4, 2, 3.1, 3.2, 3.3, 3.4, 4*
+*Status: Backend ✅ | Agente ✅ | Frontend ✅ | Chat Persistente ✅*
+*Fases concluídas: 1.1, 1.2, 1.3, 1.4, 2, 3.1, 3.2, 3.3, 3.4, 4, 5 (Chat Threads)*

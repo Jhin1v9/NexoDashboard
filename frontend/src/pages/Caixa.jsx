@@ -30,7 +30,7 @@ const projectionMonths = (projection) => {
 }
 
 export default function Caixa() {
-  const { data: cashBox, loading: loadingCash, error: errorCash } = useRealtime('/api/cash-box', 30000)
+  const { data: cashBox, loading: loadingCash, error: errorCash, refetch: refetchCashBox } = useRealtime('/api/cash-box', 30000)
   const { data: projection, loading: loadingProj, error: errorProj } = useRealtime('/api/cash-box/projection', 30000)
   const [editValues, setEditValues] = useState({ balance: '', monthlyIncome: '', monthlyExpenses: '' })
   const [saving, setSaving] = useState(false)
@@ -154,12 +154,16 @@ export default function Caixa() {
         monthlyExpenses: editValues.monthlyExpenses === '' ? monthlyExpenses : Number(editValues.monthlyExpenses),
         currency
       }
-      await fetch('/api/cash-box', {
+      const res = await fetch('/api/cash-box', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
+      if (!res.ok) throw new Error('Erro ao salvar caixa')
       setEditValues({ balance: '', monthlyIncome: '', monthlyExpenses: '' })
+      await refetchCashBox()
+    } catch (e) {
+      alert('Erro ao salvar: ' + e.message)
     } finally {
       setSaving(false)
     }

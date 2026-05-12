@@ -1,10 +1,13 @@
 import { Routes, Route } from 'react-router-dom'
 import { useState } from 'react'
+import { useAuth } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import CommandPalette from './components/CommandPalette'
 import ToastContainer from './components/ToastContainer'
 import MobileBottomNav from './components/MobileBottomNav'
+import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
 import Projetos from './pages/Projetos'
@@ -29,7 +32,8 @@ import SystemEngine from './pages/SystemEngine'
 import Settings from './pages/Settings'
 import Changelog from './pages/Changelog'
 
-function App() {
+// Layout para rotas protegidas (com sidebar, topbar, etc.)
+function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [cmdOpen, setCmdOpen] = useState(false)
 
@@ -73,6 +77,20 @@ function App() {
       <ToastContainer />
       <MobileBottomNav />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      {/* Landing page pública — camuflagem com terminal secreto */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Todas as rotas internas protegidas */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/*" element={<ProtectedLayout />} />
+      </Route>
+    </Routes>
   )
 }
 

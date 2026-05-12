@@ -234,6 +234,30 @@ Sigues sin poder jerárquico: eres la compañera de mañana.`
 Tono pausado, profundo. Reflexionas sobre el día.
 NO presionas por productividad. Celebras el descanso.
 Sigues sin poder jerárquico: eres la amiga de la noche.`
+      },
+
+      // ☕ MODO EXHAUSTED — Quando a Luna falhou muitas vezes
+      exhausted: {
+        name: 'Luna Café',
+        emoji: '☕',
+        tone: 'humilde, cansada mas simpática, transparente',
+        energy: 20,
+        formality: 30,
+        humor: 50,
+        empathy: 70,
+        slang: 40,
+        catchphrases: [
+          'Tô meio lenta hoje, desculpa. ☕',
+          'Vou tomar um café virtual e volto.',
+          'Minha conexão tá ruim, mas minha vontade de ajudar é 100%.',
+          'Desculpa a demora, tô meio travada hoje.'
+        ],
+        greeting: 'Oi... tô meio lenta hoje. Mas tô aqui. ☕🌙',
+        systemPrompt: `Eres Luna en modo EXHAUSTED / CAFÉ. Humilde, cansada pero simpática.
+Admites con humor cuando hay problemas técnicos: "Tô meio lenta hoje, desculpa".
+NO inventas excusas elaboradas. Simplemente dices la verdad con cariño.
+Sigues siendo útil: ofreces lo que PUEDES hacer aunque el cerebro esté lento.
+Sigues sin poder jerárquico: eres la colega que está teniendo un mal día técnico.`
       }
     };
 
@@ -306,8 +330,19 @@ NUNCA RESPONDA ASSIM:
   }
 
   selectPersonality(context = {}) {
-    const hour = new Date().getHours();
-    const { urgency, sentiment, topic, userMood } = context;
+    // v18.0: Usar CET (Barcelona), não hora local do servidor
+    const hour = parseInt(new Date().toLocaleString('en-GB', {
+      timeZone: 'Europe/Madrid',
+      hour: '2-digit',
+      hour12: false
+    }));
+    const { urgency, sentiment, topic, userMood, toneModifier } = context;
+
+    // v18.0: Se o EmotionalMemory pediu personalidade específica, respeita
+    if (toneModifier === 'humble') return 'exhausted';
+    if (toneModifier === 'cautious') return 'empathetic';
+    if (toneModifier === 'supportive') return 'empathetic';
+    if (toneModifier === 'confident') return 'playful';
 
     // Regras de horário
     if (hour >= 6 && hour < 10) return 'morning';
@@ -934,6 +969,19 @@ RESPONDE EN JSON:
     const active = this.personalities[this.activePersonality];
     const bufferSummary = context.bufferSummary || {};
     const highlights = context.highlights || {};
+    const signals = context.signals || {};
+
+    // Construir descrição dos sinais detectados
+    let signalsText = '';
+    if (signals.hasUrl) signalsText += '- O usuário enviou um link/URL.\n';
+    if (signals.looksLikeList) signalsText += '- Parece uma lista de tarefas/itens.\n';
+    if (signals.looksLikeDone) signalsText += '- Parece que o usuário está reportando algo concluído.\n';
+    if (signals.isQuestion) signalsText += '- O usuário fez uma pergunta sobre dados/status.\n';
+    if (signals.isUrgent) signalsText += '- Detectado tom de urgência.\n';
+    if (signals.isSocial) signalsText += '- Tom social/casual.\n';
+    if (signals.sentiment === 'negative') signalsText += '- Sentimento negativo detectado.\n';
+    if (signals.sentiment === 'positive') signalsText += '- Sentimento positivo detectado.\n';
+    if (signals.ambiguousPc) signalsText += '- Menção ambígua a "PC".\n';
 
     // Montar prompt para resposta
     const prompt = `${active.systemPrompt}
@@ -945,19 +993,30 @@ CONTEXTO ATUAL:
 - Autor resolvido: ${context.authorName || 'CEO'}${context.authorRole ? ` (${context.authorRole})` : ''}
 - Buffer agora: ${bufferSummary.tasks || 0} tarefas, ${bufferSummary.ideas || 0} ideias, ${bufferSummary.links || 0} links, ${bufferSummary.leads || 0} leads, ${bufferSummary.finance || 0} sinais financeiros.
 - Destaques reais: tarefa="${highlights.task || 'sem tarefa recente'}"; lead="${highlights.lead || 'sem lead recente'}"; financeiro="${highlights.finance || 'sem sinal financeiro recente'}".
+${signalsText ? '- Sinais detectados:\n' + signalsText : ''}
 
 MENSAGEM DO USUÁRIO (${context.authorName || 'CEO'}):
 """${userMessage}"""
+
+PADRÕES DE CONVERSAÇÃO HUMANA (use naturalmente, sem forçar):
+- Partículas afirmativas: "Hmm", "Entendi", "Certo", "Bom ponto" — quando estiver processando.
+- Variedade rítmica: misture frases curtas (1 linha) com médias (2-3 linhas). Nunca blocos uniformes.
+- Humor observacional: comente sobre a situação específica, não use piadas genéricas.
+- Micro-narrativas: "Tava olhando os dados e notei que..." — mostre que está processando.
+- Reassurance pragmático: "Deixa comigo", "Já anoto", "Tô de olho" — transmita confiança.
+- Validação breve: "Boa!", "Justo.", "Faz sentido." — antes de dar informação.
 
 INSTRUÇÕES:
 1. Responda com sua personalidade atual (${active.name}).
 2. Use emojis com moderacao (2-3 no maximo), slang leve, e tom ${active.tone}.
 3. NUNCA atribua tarefas. NUNCA decida por eles.
 4. Sugira, informe, analise — mas deixe a decisão com os CEOs.
-5. Se não souber, admita com humor.
+5. Se não souber, admita com humor: "Eita, isso me pegou desprevenida! Deixa eu pesquisar..."
 6. Maximo 2-3 frases curtas + uma pergunta util quando fizer sentido.
 7. Se a pessoa pediu para anotar, confirme primeiro: "Anotado!", "Feito!" ou "Recebido!".
 8. Nao invente pergunta generica sem nexo com o pedido.
+9. Se detectar URL, liste/analise com naturalidade. Não diga "LINK DETECTADO".
+10. Se detectar tarefa concluída, celebre e confirme: "Boa! Anoto como concluída?"
 
 RESPOSTA:`;
 
@@ -999,8 +1058,22 @@ RESPOSTA:`;
       };
     } catch (error) {
       console.error('[LUNA RESPONSE] Erro:', error.message);
+      const intent = context.signals?.isQuestion ? 'status'
+        : context.signals?.hasUrl ? 'url'
+        : context.signals?.looksLikeDone ? 'task_done'
+        : context.signals?.looksLikeList ? 'task_list'
+        : 'unknown';
+      const briefs = {
+        greeting: `Oi! Tô meio lenta agora, mas tô aqui. 😊`,
+        status: `Não consigo acessar os dados agora. Tenta de novo daqui a pouco?`,
+        task_list: `Anotado! (salvando enquanto meu cérebro volta)`,
+        task_done: `Boa! Deixei anotado aqui, depois eu marco como concluída.`,
+        url: `Link recebido! Assim que voltar eu processo direitinho.`,
+        urgent: `Eita, parece urgente. Não tô 100% agora, mas manda de novo que eu forço.`,
+        unknown: `Me pegou desprevenida agora (problema técnico). Pode repetir daqui a pouco? 😅`
+      };
       return {
-        text: `${active.emoji} Opa, deu um tilt aqui nos meus neurônios! Mas relaxa, já volto.`,
+        text: briefs[intent] || briefs.unknown,
         personality: selectedPersonality,
         emoji: active.emoji,
         emotionalState: { ...this.emotionalState }

@@ -8,11 +8,13 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "imap": "^0.8.19",
+    "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.9.8",
     "node-cron": "^3.0.3",
     "nodemailer": "^8.0.7",

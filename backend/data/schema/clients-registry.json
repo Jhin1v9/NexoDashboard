@@ -499,6 +499,38 @@
       "lastContact": null,
       "createdAt": "2026-01-01T00:00:00Z",
       "updatedAt": "2026-05-09T16:05:54.831Z"
+    },
+    "lead-1778572452326-y0g5": {
+      "displayName": "João da Silva,",
+      "email": "",
+      "phone": "",
+      "source": "luna",
+      "type": "lead",
+      "status": "potencial",
+      "pipelineStatus": "novo",
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "notes": "novo lead: João da Silva, telefone 654321987",
+      "assignedTo": null,
+      "tags": [],
+      "createdAt": "2026-05-12T07:54:12.326Z",
+      "lastContact": null
+    },
+    "lead-1778572632082-ifsb": {
+      "displayName": "João da Silva",
+      "email": "",
+      "phone": "",
+      "source": "luna",
+      "type": "lead",
+      "status": "potencial",
+      "pipelineStatus": "novo",
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "notes": "novo lead: João da Silva, telefone 654321987",
+      "assignedTo": null,
+      "tags": [],
+      "createdAt": "2026-05-12T07:57:12.082Z",
+      "lastContact": null
     }
   },
   "autoDetect": {
