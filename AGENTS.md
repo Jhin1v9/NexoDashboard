@@ -3,8 +3,8 @@
 # AGENTS.md — NEXO COMMAND CENTER v4.0
 # Documento de contexto para agentes de IA
 # Data: 2026-05-12
-# Última atualização: 2026-05-12 13:20
-# Último commit: 18668cc (codex/initial-nexo-dashboard-pro-v16)
+# Última atualização: 2026-05-12 18:35
+# Último commit: c8b762b (codex/initial-nexo-dashboard-pro-v16)
 # ═══════════════════════════════════════════════════════════════════
 
 ## 🏢 EMPRESA
