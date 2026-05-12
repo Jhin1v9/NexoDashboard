@@ -1145,15 +1145,17 @@ export default function LandingPage() {
     let index = 0
 
     const handler = (e) => {
-      if (e.key === konami[index]) {
+      // Sempre previne scroll das setas na landing page
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
         e.preventDefault()
+      }
+      if (e.key === konami[index]) {
         index++
         if (index === konami.length) {
           setTerminalOpen(true)
           index = 0
         }
       } else if (e.key === konami[0]) {
-        e.preventDefault()
         index = 1
       } else {
         index = 0
