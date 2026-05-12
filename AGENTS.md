@@ -2,9 +2,9 @@
 # ═══════════════════════════════════════════════════════════════════
 # AGENTS.md — NEXO COMMAND CENTER v4.0
 # Documento de contexto para agentes de IA
-# Data: 2026-05-09
-# Última atualização: 2026-05-09 02:05
-# Último commit: 93f15d6 (codex/initial-nexo-dashboard-pro-v16)
+# Data: 2026-05-12
+# Última atualização: 2026-05-12 13:20
+# Último commit: 18668cc (codex/initial-nexo-dashboard-pro-v16)
 # ═══════════════════════════════════════════════════════════════════
 
 ## 🏢 EMPRESA
@@ -186,11 +186,21 @@ NEXO_DASHBOARD_PRO/
 - [x] FASE 12: System Engine — APIs `/api/system/*` + página `SystemEngine.jsx` para controle do motor do dashboard
 - [x] FASE 13: Separação de responsabilidades — Luna (agente) vs Sistema (backend/frontend/supervisor)
 
+### Feito hoje (2026-05-12) — v17.0 (Login Ultra-Secreto)
+- [x] Sistema de autenticação JWT completo (login, me, logout, change-password)
+- [x] Landing page camuflada com terminal secreto (Konami Code)
+- [x] ProtectedRoute protege todas as rotas internas
+- [x] Settings completo: Perfil, Segurança, Usuários
+- [x] Security log com fingerprint + IP geolocation + WhatsApp alerta
+- [x] NotificationCenter com WebSocket realtime
+- [x] Caixa.jsx refetch fix após salvar
+
 ### Pendente futuro
 - [ ] Dashboard: Atividade Recente com contexto (usar history + classification)
 - [ ] Alertas: Exibir `alerts` do `/api/finance/summary` no Dashboard
 - [ ] Link Hub: enriquecimento background mais robusto (workers ou fila)
 - [ ] Cash Box: endpoint `GET /api/cash-box/entries` para listar com filtros
+- [ ] Landing page de vendas personalizada (aguardando CEO enviar HTML/JSX)
 
 ### Mojibake corrigido (2026-05-09)
 - `backend/data/cash-box.json` — 2 strings (despesa rápida, dedução do caixa)
@@ -297,90 +307,63 @@ Get-Content "backend/data/cash-box.json" | ConvertFrom-Json | Select-Object -Exp
 
 ---
 
-## 🔐 LOGIN ULTRA-SECRETO POR USUÁRIO — PEDIDO FORMAL AO CEO
+## 🔐 LOGIN ULTRA-SECRETO (TERMINAL INVISÍVEL) — IMPLEMENTADO v1.0
 
-**Data do pedido:** 2026-05-12
-**Status:** Aguardando prompt do CEO para implementação
-**Prioridade:** ALTA — Transição obrigatória para acesso individualizado
+**Data:** 2026-05-12
+**Status:** ✅ IMPLEMENTADO E TESTADO
+**Commit:** `18668cc`
 
-### 🎯 O que o CEO pediu:
+### O que foi entregue:
 
-Uma **landing page de camuflagem** que:
-1. Pareça uma página profissional vendendo o sistema NEXO para empresas
-2. Esconda por trás um mecanismo de login ultra-secreto
-3. Capture inputs do teclado (sequência invisível) — nada de campos visíveis
-4. Quando a sequência correta for digitada, abra o dashboard no perfil do CEO
-5. **NUNCA revele a sequência secreta no frontend** (não pode estar no código-fonte visível)
+#### Backend (Node.js Express)
+| Feature | Status |
+|---------|--------|
+| `POST /api/auth/login` — JWT + bcrypt + fingerprint | ✅ |
+| `GET /api/auth/me` — retorna usuário do token | ✅ |
+| `POST /api/auth/logout` — invalida token | ✅ |
+| `POST /api/auth/change-password` — altera senha com bcrypt | ✅ |
+| `GET /api/users` — lista usuários (sem expor senhas) | ✅ |
+| `GET /api/security/log` — log de eventos de segurança | ✅ |
+| `GET/PUT /api/security/settings` — config alertas | ✅ |
+| `POST /api/security/test-whatsapp` — teste de alerta | ✅ |
+| `GET /api/notifications` — notificações persistentes | ✅ |
+| Device fingerprint (canvas + WebGL + UA + screen + timezone) | ✅ |
+| IP geolocation via ip-api.com | ✅ |
+| Security log sliding window (100 eventos) | ✅ |
+| Rate limit por IP (5 tentativas / 5 min) | ✅ |
+| Alerta WhatsApp após 5 falhas (grupo Production) | ✅ |
 
-### 🔑 Sequência de login desejada pelo CEO:
-```
-[usuário digita no nada da página]
-→ "abner" + Enter + "7741" + Enter → entra no perfil Abner
-→ "nonoke" + Enter + "7741" + Enter → entra no perfil Nonoke
-→ "elias" + Enter + "7741" + Enter → entra no perfil Elias
-```
+#### Frontend (React 18 + Vite)
+| Feature | Status |
+|---------|--------|
+| `LandingPage.jsx` — camuflagem com hero, features, preços | ✅ |
+| `SecretTerminal.jsx` — terminal CRT retro (Konami Code ↑↑↓↓←→←→BA) | ✅ |
+| `AuthContext.jsx` — login/logout/token persistence + interceptador 401 | ✅ |
+| `ProtectedRoute.jsx` — protege rotas internas, redirect se não auth | ✅ |
+| `NotificationCenter.jsx` — bell icon + dropdown + WebSocket realtime | ✅ |
+| `Settings.jsx` — 3 abas: Perfil, Segurança, Usuários | ✅ |
+| `TopBar.jsx` — avatar + nome + logout (sem switchUser antigo) | ✅ |
+| `Caixa.jsx` — refetch automático após salvar (bugfix) | ✅ |
 
-### 🛡️ Requisitos de segurança:
-- Senha padrão para todos: **7741** (transição inicial)
-- Todos os perfis são **Admin** (podem se modificar livremente POR ENQUANTO)
-- A validação da sequência deve acontecer no **BACKEND** — nunca no frontend
-- O frontend só captura keystrokes e envia para o backend validar
-- A sequência secreta NÃO pode ser descoberta inspecionando o código-fonte
+### Usuários (senha padrão: `7741`)
+| ID | Nome | Role | Cor |
+|----|------|------|-----|
+| abner | Abner | Admin | #3742fa |
+| nonoke | Nonoke | Admin | #2ed573 |
+| elias | Elias | Admin | #ffa502 |
 
-### ⚙️ Seção CONFIG no dashboard:
-- Cada CEO pode alterar sua senha
-- Cada CEO pode alterar seus dados (nome, cor, etc.)
-- Como todos são Admin, um pode modificar o do outro (por enquanto)
+### Segurança:
+- JWT expira em 8h, salvo em localStorage
+- Senhas hasheadas com bcrypt (custo 10)
+- Fingerprint coletado em todo login (canvas hash, WebGL renderer, UA, screen, timezone, language)
+- Tentativas falhas logadas com IP, geolocalização, dispositivo, fingerprint
+- Alerta WhatsApp enviado no grupo Production após 5 tentativas falhas do mesmo IP em 5 min
+- Rate limit de 5 min entre alertas WhatsApp consecutivos
+- Interceptador axios 401: remove token e redireciona para landing automaticamente
 
-### 🐛 Bug a corrigir junto:
-- Cash-box: quando clica em "Salvar" manualmente, não salva de verdade (falta `refetch()` no frontend)
-
-### 📋 O que precisa ser entregue no prompt:
-O CEO deve enviar para a Kimi do PC um prompt formal contendo:
-1. **A landing page HTML** que ele quer usar como camuflagem
-2. **A estética visual** desejada (cores, layout, elementos)
-3. **Se aceita ou não** as sugestões de segurança adicionais (geofencing, device fingerprint, etc.)
-4. **Se quer ou não** o login com campos invisíveis (apenas keystrokes) ou prefere outra abordagem
-
----
-
-## 🧠 SUGESTÕES DE ABORDAGENS (para o CEO considerar)
-
-### Abordagem A: Teclado Sequencial (a que o CEO pediu)
-- Landing page profissional de vendas
-- Captura global de keystrokes na página
-- Envia para backend a cada tecla digitada
-- Backend mantém buffer por sessão/IP
-- Detecta padrão: `nome\nsenha\n`
-- **Prós:** Exatamente o que o CEO pediu, elegante, nada visível
-- **Contras:** Se alguém estiver olhando o teclado, vê tudo
-
-### Abordagem B: Terminal Invisível (Konami Code style)
-- Mesma landing page
-- Terminal escuro aparece quando digita sequência de ativação (ex: ↑↑↓↓←→←→BA)
-- Dentro do terminal, digita login/senha normalmente
-- **Prós:** Mais camadas de camuflagem, referência cultural geek
-- **Contras:** Mais complexo, pode confundir
-
-### Abordagem C: Steganografia Visual
-- A landing page tem elementos (imagens, ícones, botões) que parecem decorativos
-- Clicar em elementos específicos na ordem certa ativa o login
-- Ex: Logo → Ícone 3 → Footer → Ícone 7
-- **Prós:** Nada de teclado, completamente invisível
-- **Contras:** Difícil lembrar a sequência, não é o que o CEO pediu
-
-### Abordagem D: Timing Attack + Sequência
-- Além da sequência correta, o timing entre keystrokes importa
-- Ex: digitar "abner" em exatamente 800ms, esperar 300ms, digitar "7741" em 500ms
-- **Prós:** Muito mais seguro, quase impossível de replicar por acidente
-- **Contras:** Frustrante se errar o timing, pode não funcionar em teclados lentos
-
-### Abordagem E: Multi-Fator (recomendada como extra)
-- Geofencing: só funciona se o IP for de Barcelona (onde os CEOs estão)
-- Device fingerprint: só funciona em dispositivos conhecidos (laptops dos 3 CEOs)
-- Horário: só funciona em horário comercial (9h-20h)
-- **Prós:** Camadas extras de segurança reais
-- **Contras:** Pode bloquear acesso legítimo em viagem
+### Pendente (aguardando CEO):
+- Landing page de vendas personalizada (HTML/JSX) — substituir placeholder atual
+- Teste real de alerta WhatsApp de intruso no grupo Production
 
 ---
 
