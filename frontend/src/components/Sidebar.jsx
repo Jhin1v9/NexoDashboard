@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
-  DollarSign, Wallet, Receipt, ChevronDown, HardDrive
+  DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
+  Shield
 } from 'lucide-react'
 
 const navItems = [
@@ -35,6 +36,7 @@ const navItems = [
   { path: '/operacoes', icon: Bell, label: 'Operacoes' },
   { path: '/luna', icon: Cpu, label: 'Luna' },
   { path: '/sistema', icon: HardDrive, label: 'Sistema' },
+  { path: '/seguranca', icon: Shield, label: 'Seguranca' },
   { path: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 

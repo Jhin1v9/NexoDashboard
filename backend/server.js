@@ -100,16 +100,82 @@ function validateCredentials(username, password) {
 
 // Helper: obter IP do cliente
 function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-    || req.headers['x-real-ip']
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = forwarded.split(',').map(s => s.trim()).filter(ip => ip && !ip.startsWith('10.') && !ip.startsWith('192.168.') && !ip.startsWith('172.'));
+    if (ips.length > 0) return ips[0];
+  }
+  return req.headers['x-real-ip']
+    || req.headers['cf-connecting-ip']
     || req.connection.remoteAddress
     || 'unknown';
 }
 
+// Helper: parse robusto de User-Agent
+function parseUserAgent(ua) {
+  if (!ua || ua === 'unknown') return { browser: 'Desconhecido', os: 'Desconhecido', device: 'Desconhecido', arch: 'Desconhecido', isMobile: false };
+  
+  // Navegador
+  let browser = 'Desconhecido';
+  const chrome = ua.match(/Chrome\/[\d.]+/);
+  const firefox = ua.match(/Firefox\/[\d.]+/);
+  const safari = ua.match(/Safari\/[\d.]+/) && !chrome;
+  const edge = ua.match(/Edg\/[\d.]+/);
+  const opera = ua.match(/OPR\/[\d.]+/);
+  if (edge) browser = edge[0].replace('Edg/', 'Edge ');
+  else if (opera) browser = opera[0].replace('OPR/', 'Opera ');
+  else if (chrome) browser = chrome[0].replace('/', ' ');
+  else if (firefox) browser = firefox[0].replace('/', ' ');
+  else if (safari) browser = 'Safari';
+  
+  // Sistema Operacional
+  let os = 'Desconhecido';
+  const win = ua.match(/Windows NT [\d.]+/);
+  const mac = ua.match(/Mac OS X [\d._]+/);
+  const linux = ua.match(/Linux/);
+  const android = ua.match(/Android [\d.]+/);
+  const ios = ua.match(/iPhone OS [\d._]+/);
+  const ios2 = ua.match(/iPad;.*OS [\d._]+/);
+  if (android) os = 'Android ' + android[0].replace('Android ', '');
+  else if (ios) os = 'iOS ' + ios[0].replace('iPhone OS ', '').replace(/_/g, '.');
+  else if (ios2) os = 'iOS ' + ios2[0].match(/[\d._]+/)[0].replace(/_/g, '.');
+  else if (win) os = 'Windows ' + win[0].replace('Windows NT ', '');
+  else if (mac) os = 'macOS ' + mac[0].replace('Mac OS X ', '').replace(/_/g, '.');
+  else if (linux) os = 'Linux';
+  
+  // Dispositivo
+  let device = 'Desktop';
+  let isMobile = false;
+  if (/Mobile|Android|iPhone|iPad|iPod/.test(ua)) {
+    isMobile = true;
+    if (/iPhone/.test(ua)) device = 'iPhone';
+    else if (/iPad/.test(ua)) device = 'iPad';
+    else if (/Android/.test(ua)) {
+      const model = ua.match(/Android [\d.]+; ([^;)]+)/);
+      device = model ? model[1].trim() : 'Android';
+    }
+    else device = 'Mobile';
+  }
+  
+  // Arquitetura
+  let arch = 'Desconhecido';
+  if (/Win64|x64|x86_64/.test(ua)) arch = 'x64';
+  else if (/WOW64/.test(ua)) arch = 'x64 (WOW64)';
+  else if (/Win32|x86/.test(ua)) arch = 'x86';
+  else if (/arm64|aarch64/.test(ua)) arch = 'ARM64';
+  else if (/arm/.test(ua)) arch = 'ARM';
+  
+  return { browser, os, device, arch, isMobile };
+}
+
 // Helper: obter localização do IP (async)
 async function getIpLocation(ip) {
+  // IPs privados/locais
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+    return { country: 'Rede Local', city: 'Servidor Local', region: 'LAN', isp: 'Private Network', org: 'Local' };
+  }
   try {
-    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city,regionName,isp,org`);
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city,regionName,isp,org,lat,lon,timezone`);
     const data = await response.json();
     if (data.status === 'success') {
       return {
@@ -117,11 +183,14 @@ async function getIpLocation(ip) {
         city: data.city,
         region: data.regionName,
         isp: data.isp,
-        org: data.org
+        org: data.org,
+        lat: data.lat,
+        lon: data.lon,
+        timezone: data.timezone
       };
     }
   } catch (e) {}
-  return { country: 'Desconhecido', city: 'Desconhecido', region: '', isp: 'Desconhecido' };
+  return { country: 'Desconhecido', city: 'Desconhecido', region: '', isp: 'Desconhecido', org: '', lat: null, lon: null, timezone: null };
 }
 
 // Helper: logar evento de segurança
@@ -5233,16 +5302,27 @@ app.post('/api/auth/login', async (req, res) => {
       // Login falho — logar e possivelmente alertar
       const location = await getIpLocation(ip);
       const deviceInfo = fingerprint || {};
+      const uaParsed = parseUserAgent(deviceInfo.userAgent || '');
       const event = await logSecurityEvent({
         type: 'failed_login',
         severity: 'high',
         ip,
         location,
         device: {
-          browser: deviceInfo.userAgent?.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/)?.[0] || 'Desconhecido',
-          os: deviceInfo.userAgent?.match(/(Windows|Mac|Linux|Android|iOS)[\s/\d._]+/)?.[0] || 'Desconhecido',
+          browser: uaParsed.browser,
+          browserVersion: uaParsed.browser,
+          os: uaParsed.os,
+          device: uaParsed.device,
+          arch: uaParsed.arch,
+          isMobile: uaParsed.isMobile,
           screen: deviceInfo.screen || 'Desconhecido',
-          fingerprint: deviceInfo.canvas?.slice(0, 16) || 'N/A'
+          resolution: deviceInfo.screen || 'Desconhecido',
+          gpu: deviceInfo.webgl || 'Desconhecido',
+          timezone: deviceInfo.timezone || 'Desconhecido',
+          language: deviceInfo.language || 'Desconhecido',
+          fingerprint: deviceInfo.canvas?.slice(0, 16) || 'N/A',
+          fingerprintFull: deviceInfo.canvas || 'N/A',
+          userAgent: deviceInfo.userAgent || 'N/A'
         },
         attemptedUser,
         message: `Login falho para "${attemptedUser}" — IP: ${ip} (${location.city}, ${location.country})`,
@@ -5260,7 +5340,7 @@ app.post('/api/auth/login', async (req, res) => {
       const maxAttempts = settings.maxAttemptsBeforeAlert || 5;
 
       if (recentAttempts.length >= maxAttempts) {
-        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 Dispositivo:\n   Navegador: ${deviceInfo.userAgent?.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/)?.[0] || 'Desconhecido'}\n   OS: ${deviceInfo.userAgent?.match(/(Windows|Mac|Linux|Android|iOS)[\s/\d._]+/)?.[0] || 'Desconhecido'}\n   Tela: ${deviceInfo.screen || 'Desconhecido'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 8) || 'N/A'}...\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
+        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
         await sendSecurityWhatsAlert(msg);
         event.notified = true;
         event.notificationChannel = 'whatsapp+dashboard';

@@ -30,6 +30,7 @@ import Leads from './pages/Leads'
 import LunaControl from './pages/LunaControl'
 import SystemEngine from './pages/SystemEngine'
 import Settings from './pages/Settings'
+import Seguranca from './pages/Seguranca'
 import Changelog from './pages/Changelog'
 
 // Layout para rotas protegidas (com sidebar, topbar, etc.)
@@ -69,6 +70,7 @@ function ProtectedLayout() {
             <Route path="/luna" element={<LunaControl />} />
             <Route path="/sistema" element={<SystemEngine />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/seguranca" element={<Seguranca />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </main>
