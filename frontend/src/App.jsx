@@ -33,6 +33,8 @@ import SystemEngine from './pages/SystemEngine'
 import Settings from './pages/Settings'
 import Seguranca from './pages/Seguranca'
 import Changelog from './pages/Changelog'
+import Ideias from './pages/Ideias'
+import IdeaEditor from './pages/IdeaEditor'
 
 // Layout para rotas protegidas (com sidebar, topbar, etc.)
 function ProtectedLayout() {
@@ -53,6 +55,9 @@ function ProtectedLayout() {
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/projetos" element={<Projetos />} />
             <Route path="/tarefas" element={<Tarefas />} />
+            <Route path="/ideias" element={<Ideias />} />
+            <Route path="/ideias/nova" element={<IdeaEditor />} />
+            <Route path="/ideias/:id" element={<IdeaEditor />} />
             <Route path="/whatsapp" element={<WhatsApp />} />
             <Route path="/email" element={<EmailHub />} />
             <Route path="/instagram" element={<InstagramHub />} />

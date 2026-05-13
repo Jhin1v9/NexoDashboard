@@ -108,14 +108,26 @@ NEXO_DASHBOARD_PRO/
 
 ---
 
-## 7. Próximos Passos Sugeridos
+## 7. Sistema de Monitoramento de Reports (NOVO)
+
+### Implementado em 2026-05-13
+- **Endpoint API**: `POST /api/bugdetector/reports` (público)
+- **Pasta de reports**: `backend/data/reports/`
+- **Monitor CLI**: `node monitor-reports.cjs --watch`
+- **Integração**: Frontend intercepta localStorage e envia para backend
+
+### Arquivos criados:
+- `frontend/src/utils/bugdetector-reporter.js` — Reporter que intercepta reports
+- `monitor-reports.cjs` — Script de monitoramento em tempo real
+- `BUGDETECTOR_REPORTS.md` — Documentação completa
+
+## 8. Próximos Passos Sugeridos
 
 1. **Deploy VPN**: Configurar acesso remoto da equipe
-2. **BugDetector Cloud**: Configurar backend cloud para centralizar reports
-3. **Luna Agent**: Investigar por que WhatsApp/Chrome CDP estão offline
-4. **Performance**: O bundle JS está em ~1.4MB — considerar code-splitting
-5. **i18n**: Padronizar locale pt-BR em todos os inputs de data
-6. **Testes E2E**: Criar suite de testes com Playwright para regressão
+2. **Luna Agent**: Investigar por que WhatsApp/Chrome CDP estão offline
+3. **Performance**: O bundle JS está em ~1.4MB — considerar code-splitting
+4. **i18n**: Padronizar locale pt-BR em todos os inputs de data
+5. **Testes E2E**: Criar suite de testes com Playwright para regressão
 
 ---
 

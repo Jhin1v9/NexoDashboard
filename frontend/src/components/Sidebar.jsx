@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
-  Shield
+  Shield, Lightbulb
 } from 'lucide-react'
 
 const navItems = [
@@ -32,6 +32,7 @@ const navItems = [
   },
   { path: '/projetos', icon: Folder, label: 'Projetos' },
   { path: '/tarefas', icon: CheckSquare, label: 'Tarefas' },
+  { path: '/ideias', icon: Lightbulb, label: 'Ideias', badge: 'beta' },
   { path: '/leads', icon: Target, label: 'Leads' },
   { path: '/operacoes', icon: Bell, label: 'Operacoes' },
   { path: '/luna', icon: Cpu, label: 'Luna' },

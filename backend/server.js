@@ -2702,6 +2702,12 @@ console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
 
 
 // LUNA ACTION ROUTES (CANONICAL) — UNICO BLOCO
+// ============================================================================
+// Ideas Routes
+// ═══════════════════════════════════════════════════════════════════════════════
+const ideasRouter = require('./routes/ideas');
+app.use('/api/ideas', ideasRouter(requireAuth));
+
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──
 const QUOTES_FILE = path.join(DATA_DIR, 'quotes.json');
@@ -5522,6 +5528,109 @@ app.get('/api/users', requireAuth, (req, res) => {
       };
     });
     res.json({ users: sanitized, active: data.active });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================================
+// BugDetector Reports API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// REPORTS_DIR já definido na linha 757 (backend/data/reports)
+
+// POST /api/bugdetector/reports — Recebe report do BugDetector
+app.post('/api/bugdetector/reports', (req, res) => {
+  try {
+    const report = req.body;
+    
+    if (!report || !report.id) {
+      return res.status(400).json({ error: 'Report inválido: id é obrigatório' });
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `bug-report-${report.id}-${timestamp}.json`;
+    const filepath = path.join(REPORTS_DIR, filename);
+
+    // Adiciona metadata de recebimento
+    report._receivedAt = new Date().toISOString();
+    report._source = 'bugdetector-pro';
+
+    fs.writeFileSync(filepath, JSON.stringify(report, null, 2));
+    
+    console.log(`[BugDetector] Report recebido: ${filename}`);
+    
+    res.json({ 
+      success: true, 
+      filename,
+      id: report.id,
+      receivedAt: report._receivedAt
+    });
+  } catch (e) {
+    console.error('[BugDetector] Erro ao salvar report:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/bugdetector/reports — Lista todos os reports recebidos
+app.get('/api/bugdetector/reports', requireAuth, (req, res) => {
+  try {
+    const files = fs.readdirSync(REPORTS_DIR)
+      .filter(f => f.endsWith('.json'))
+      .map(f => {
+        const stat = fs.statSync(path.join(REPORTS_DIR, f));
+        return {
+          filename: f,
+          size: stat.size,
+          createdAt: stat.birthtime
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ reports: files, total: files.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/bugdetector/reports/:filename — Obtém um report específico
+app.get('/api/bugdetector/reports/:filename', requireAuth, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filepath = path.join(REPORTS_DIR, filename);
+    
+    // Security: prevent directory traversal
+    if (!filepath.startsWith(REPORTS_DIR)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ error: 'Report não encontrado' });
+    }
+
+    const report = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+    res.json(report);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/bugdetector/reports/:filename — Remove um report
+app.delete('/api/bugdetector/reports/:filename', requireAuth, (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filepath = path.join(REPORTS_DIR, filename);
+    
+    if (!filepath.startsWith(REPORTS_DIR)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ error: 'Report não encontrado' });
+    }
+
+    fs.unlinkSync(filepath);
+    res.json({ success: true, message: 'Report removido' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
