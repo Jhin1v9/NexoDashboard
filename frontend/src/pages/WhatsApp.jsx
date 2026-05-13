@@ -148,15 +148,15 @@ const StatCard = ({ icon: Icon, label, value, color, subtext }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="glass-card p-4 flex items-center gap-4"
+    className="glass-card p-3 flex items-center gap-3"
   >
-    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: color + '20' }}>
-      <Icon size={24} style={{ color }} />
+    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color + '20' }}>
+      <Icon size={20} style={{ color }} />
     </div>
-    <div>
-      <div className="text-2xl font-bold font-heading">{value}</div>
-      <div className="text-xs text-nexo-muted">{label}</div>
-      {subtext && <div className="text-[10px] text-nexo-success mt-0.5">{subtext}</div>}
+    <div className="min-w-0">
+      <div className="text-xl font-bold font-heading">{value}</div>
+      <div className="text-[10px] text-nexo-muted leading-tight">{label}</div>
+      {subtext && <div className="text-[10px] text-nexo-success mt-0.5 leading-tight">{subtext}</div>}
     </div>
   </motion.div>
 )
@@ -703,7 +703,7 @@ export default function WhatsApp() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatCard icon={MessageCircle} label="Mensagens" value={stats.totalMessages || 0} color="#22c55e" 
           subtext={groups.map(g => `${g.short}: ${g.messageCount}`).join(', ')} />
         <StatCard icon={CheckSquare} label="Tarefas" value={stats.totalTasks || 0} color="#f59e0b" 

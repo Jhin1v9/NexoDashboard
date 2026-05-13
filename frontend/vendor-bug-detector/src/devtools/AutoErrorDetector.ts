@@ -224,7 +224,9 @@ export class AutoErrorDetector {
         type: 'console-error',
         message: message.slice(0, 500),
       });
-      self.originalConsoleError!.apply(console, args);
+      if (self.originalConsoleError) {
+        self.originalConsoleError.apply(console, args);
+      }
     };
   }
 

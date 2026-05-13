@@ -28,7 +28,7 @@ const StatCard = ({ icon: Icon, label, value, color, subtext, onClick, trend }) 
       <Icon size={20} style={{ color }} />
     </div>
     <div className="min-w-0 flex-1">
-      <div className="text-2xl font-bold font-heading truncate">{value}</div>
+      <div className="text-2xl font-bold font-heading">{value}</div>
       <div className="text-xs text-nexo-muted">{label}</div>
       {subtext && <div className="text-[10px] mt-0.5" style={{ color }}>{subtext}</div>}
       {trend && (

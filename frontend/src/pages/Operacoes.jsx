@@ -249,7 +249,7 @@ function ExecutiveSummary({ data }) {
   // Tarefas
   const highPriorityTasks = tasks.filter?.(t => t.priority === 'high') || []
   if (highPriorityTasks.length > 0) {
-    summary.push(`🔴 ${highPriorityTasks.length} tarefa(s) de alta prioridade`)
+    summary.push(`🔴 ${highPriorityTasks.length} tarefa${highPriorityTasks.length > 1 ? 's' : ''} de alta prioridade`)
   }
 
   // WhatsApp

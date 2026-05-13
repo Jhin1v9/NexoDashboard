@@ -271,7 +271,7 @@ export default function SystemEngine() {
               <HardDrive className="w-4 h-4 text-nexo-muted" />
               <span className="text-sm font-medium">Node Version</span>
             </div>
-            <div className="text-2xl font-bold font-mono">{status ? process.version : '--'}</div>
+            <div className="text-2xl font-bold font-mono">{status ? (typeof process !== 'undefined' && process.version ? process.version : 'N/A') : '--'}</div>
           </div>
         </div>
 
