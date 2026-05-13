@@ -38,6 +38,7 @@ export default function SystemEngine() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const logsEndRef = useRef(null)
+  const logsContainerRef = useRef(null)
 
   useEffect(() => {
     fetchStatus()
@@ -52,8 +53,9 @@ export default function SystemEngine() {
   }, [activeLog])
 
   useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    if (autoScroll && logsContainerRef.current) {
+      const container = logsContainerRef.current
+      container.scrollTop = container.scrollHeight
     }
   }, [logs, autoScroll])
 
@@ -235,7 +237,7 @@ export default function SystemEngine() {
             </div>
           </div>
 
-          <div className="flex-1 bg-black/70 overflow-y-auto p-3 font-mono text-xs leading-relaxed" style={{ minHeight: '320px' }}>
+          <div ref={logsContainerRef} className="flex-1 bg-black/70 overflow-y-auto p-3 font-mono text-xs leading-relaxed" style={{ minHeight: '320px' }}>
             {logs.length === 0 && (
               <p className="text-nexo-muted text-center py-8">Nenhum log encontrado.</p>
             )}
