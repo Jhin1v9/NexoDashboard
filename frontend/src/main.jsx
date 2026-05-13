@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { BugDetectorProvider } from '@auris/bug-detector/react'
 import App from './App.jsx'
 import './styles/index.css'
 import axios from 'axios'
@@ -33,7 +34,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <App />
+          <BugDetectorProvider config={{ shortcut: 'Ctrl+Shift+D', trigger: 'keyboard-shortcut' }}>
+            <App />
+          </BugDetectorProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

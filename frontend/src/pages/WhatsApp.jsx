@@ -40,7 +40,7 @@ function extractLinksFromMessages(messages) {
   return links
 }
 
-function normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages = []) {
+function normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages = [], projects = []) {
   // Dados do agente (whatsapp-agent-data.json)
   const messages = agentData?.messages || agentData?.recentMessages || agentData?.bufferedMessages || []
   // bufferedMessages pode ser número em versões antigas
@@ -121,22 +121,13 @@ function normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages =
     historyTotal: historyMessages.length
   }
   
-  // Project progress — carregado dinamicamente do backend via /api/projects
-  // Fallback vazio se API não responder
-  const [projectProgress, setProjectProgress] = useState([]);
-  useEffect(() => {
-    axios.get('/api/projects').then(r => {
-      if (r.data?.projects) {
-        setProjectProgress(r.data.projects.map(p => ({
-          name: p.name || p.codename,
-          progress: p.progress || 0,
-          status: p.status || 'Em andamento',
-          health: p.health || 'neutral',
-          type: p.type === 'cliente-externo' ? 'client' : 'internal'
-        })));
-      }
-    }).catch(() => setProjectProgress([]));
-  }, []);
+  // Projetos — passados como parâmetro (buscados no componente principal)
+  const projectProgress = projects.length > 0 ? projects : [
+    { name: 'Tropicale (Juan)', progress: 85, status: 'Fase de entrega final', health: 'good', type: 'client' },
+    { name: 'Santafe (Paulo)', progress: 45, status: 'Pagamento pendente', health: 'warning', type: 'client' },
+    { name: 'NEXO Dashboard', progress: 75, status: 'Em desenvolvimento ativo', health: 'good', type: 'internal' },
+    { name: 'NEXO Intelligence', progress: 20, status: 'Protótipo inicial', health: 'neutral', type: 'internal' }
+  ]
   
   return {
     stats,
@@ -362,7 +353,7 @@ function ChatMessageBubble({ msg, index }) {
   )
 }
 
-function ChatView({ messages, selectedChat, setSelectedChat, historyMessages }) {
+function ChatView({ messages, selectedChat, setSelectedChat, historyMessages, fetchData }) {
   // Agrupar mensagens por chat
   const chatsMap = useMemo(() => {
     const map = {}
@@ -548,10 +539,12 @@ export default function WhatsApp() {
   const [selectedChat, setSelectedChat] = useState(null)
   const navigate = useNavigate()
 
+  const [projectList, setProjectList] = useState([])
+
   const data = useMemo(() => {
     if (!agentData) return null
-    return normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages)
-  }, [agentData, opsData, whatsappTasks, historyMessages])
+    return normalizeAgentData(agentData, opsData, whatsappTasks, historyMessages, projectList)
+  }, [agentData, opsData, whatsappTasks, historyMessages, projectList])
 
   const fetchData = async () => {
     try {
@@ -613,6 +606,20 @@ export default function WhatsApp() {
     fetchData()
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    axios.get('/api/projects').then(r => {
+      if (r.data?.projects) {
+        setProjectList(r.data.projects.map(p => ({
+          name: p.name || p.codename,
+          progress: p.progress || 0,
+          status: p.status || 'Em andamento',
+          health: p.health || 'neutral',
+          type: p.type === 'cliente-externo' ? 'client' : 'internal'
+        })))
+      }
+    }).catch(() => setProjectList([]))
   }, [])
 
   if (loading && !data) {
@@ -922,6 +929,7 @@ export default function WhatsApp() {
               selectedChat={selectedChat}
               setSelectedChat={setSelectedChat}
               historyMessages={historyMessages}
+              fetchData={fetchData}
             />
           </motion.div>
         )}
