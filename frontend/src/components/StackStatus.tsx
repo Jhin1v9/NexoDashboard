@@ -1,186 +1,236 @@
-﻿// ============================================================
-// StackStatus.tsx - Componente para Dashboard NEXO
-// Adicionar em: frontend/src/components/StackStatus.tsx
-// ============================================================
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'
+import {
+  Activity,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Server,
+  Globe,
+  Plug,
+  Bot,
+  FileText,
+  RefreshCw,
+  Loader2,
+} from 'lucide-react'
 
 interface ServiceStatus {
-  status: 'online' | 'offline' | 'stale' | 'error' | 'checking';
-  port?: number;
-  uptime?: number;
-  last_checkpoint?: string | null;
+  status: 'online' | 'offline' | 'stale' | 'error' | 'checking'
+  port?: number
+  uptime?: number
+  last_checkpoint?: string | null
 }
 
 interface StackStatus {
-  timestamp: string;
-  overall: 'healthy' | 'degraded' | 'checking';
+  timestamp: string
+  overall: 'healthy' | 'degraded' | 'checking'
   services: {
-    backend: ServiceStatus;
-    frontend: ServiceStatus;
-    chrome_cdp: ServiceStatus;
-    luna_daemon: ServiceStatus;
-  };
+    backend: ServiceStatus
+    frontend: ServiceStatus
+    chrome_cdp: ServiceStatus
+    luna_daemon: ServiceStatus
+  }
 }
 
-const StackStatusPanel: React.FC = () => {
-  const [status, setStatus] = useState<StackStatus | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const SERVICE_ICONS: Record<string, React.ReactNode> = {
+  backend: <Server size={14} className="text-nexo-muted" />,
+  frontend: <Globe size={14} className="text-nexo-muted" />,
+  chrome_cdp: <Plug size={14} className="text-nexo-muted" />,
+  luna_daemon: <Bot size={14} className="text-nexo-muted" />,
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  backend: 'Backend',
+  frontend: 'Frontend',
+  chrome_cdp: 'Chrome CDP',
+  luna_daemon: 'Luna Agent',
+}
+
+export default function StackStatusPanel() {
+  const [status, setStatus] = useState<StackStatus | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const logsEndRef = useRef<HTMLDivElement>(null)
+  const logsContainerRef = useRef<HTMLDivElement>(null)
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/stack-status');
-      if (!res.ok) throw new Error('Backend offline');
-      const data = await res.json();
-      setStatus(data);
-      setError(null);
+      const res = await fetch('/api/stack-status')
+      if (!res.ok) throw new Error('Backend offline')
+      const data = await res.json()
+      setStatus(data)
+      setError(null)
     } catch (e) {
-      setError('Não foi possível conectar ao backend');
-      setStatus(null);
+      setError('Não foi possível conectar ao backend')
+      setStatus(null)
     }
-  };
+  }
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('/api/stack-logs');
+      const res = await fetch('/api/stack-logs')
       if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
+        const data = await res.json()
+        setLogs(data.logs || [])
       }
     } catch (e) {
-      console.error('Erro ao buscar logs:', e);
+      console.error('Erro ao buscar logs:', e)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchStatus();
-    fetchLogs();
-    setLoading(false);
+    fetchStatus()
+    fetchLogs()
+    setLoading(false)
 
-    // Atualiza a cada 10 segundos
     const interval = setInterval(() => {
-      fetchStatus();
-      fetchLogs();
-    }, 10000);
+      fetchStatus()
+      fetchLogs()
+    }, 10000)
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(interval)
+  }, [])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online': return 'bg-green-500';
-      case 'offline': return 'bg-red-500';
-      case 'stale': return 'bg-yellow-500';
-      case 'error': return 'bg-red-600';
-      default: return 'bg-gray-500';
+  useEffect(() => {
+    if (logsContainerRef.current) {
+      const container = logsContainerRef.current
+      container.scrollTop = container.scrollHeight
     }
-  };
+  }, [logs])
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'online': return '✅ Online';
-      case 'offline': return '❌ Offline';
-      case 'stale': return '⚠️ Stale';
-      case 'error': return '💥 Erro';
-      default: return '⏳ Verificando...';
+  const getStatusConfig = (s: string) => {
+    switch (s) {
+      case 'online':
+        return { icon: <CheckCircle2 size={12} />, badge: 'bg-nexo-success/10 text-nexo-success border-nexo-success/20', text: 'Online' }
+      case 'offline':
+        return { icon: <XCircle size={12} />, badge: 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20', text: 'Offline' }
+      case 'stale':
+        return { icon: <AlertTriangle size={12} />, badge: 'bg-nexo-warning/10 text-nexo-warning border-nexo-warning/20', text: 'Stale' }
+      case 'error':
+        return { icon: <AlertTriangle size={12} />, badge: 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20', text: 'Erro' }
+      default:
+        return { icon: <Clock size={12} />, badge: 'bg-nexo-muted/10 text-nexo-muted border-nexo-muted/20', text: 'Verificando...' }
     }
-  };
+  }
+
+  const getOverallBadge = () => {
+    switch (status?.overall) {
+      case 'healthy':
+        return 'bg-nexo-success/10 text-nexo-success border-nexo-success/20'
+      case 'degraded':
+        return 'bg-nexo-warning/10 text-nexo-warning border-nexo-warning/20'
+      default:
+        return 'bg-nexo-muted/10 text-nexo-muted border-nexo-muted/20'
+    }
+  }
+
+  const getOverallLabel = () => {
+    switch (status?.overall) {
+      case 'healthy': return 'Tudo OK'
+      case 'degraded': return 'Degradado'
+      default: return 'Verificando'
+    }
+  }
 
   if (loading) {
     return (
-      <div className="p-4 bg-gray-800 rounded-lg">
-        <div className="animate-pulse text-white">Carregando status...</div>
+      <div className="glass-card rounded-xl p-4 border border-nexo-border">
+        <div className="flex items-center gap-2 text-nexo-muted animate-pulse">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Carregando status...</span>
+        </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+    <div className="glass-card rounded-xl border border-nexo-border overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white">🚀 NEXO Stack Status</h2>
-        <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-          status?.overall === 'healthy' ? 'bg-green-500 text-black' : 
-          status?.overall === 'degraded' ? 'bg-yellow-500 text-black' : 
-          'bg-gray-500 text-white'
-        }`}>
-          {status?.overall === 'healthy' ? '🟢 TUDO OK' : 
-           status?.overall === 'degraded' ? '🟡 DEGRADADO' : 
-           '⚪ VERIFICANDO'}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
+        <div className="flex items-center gap-2">
+          <Activity size={16} className="text-nexo-info" />
+          <h2 className="text-sm font-medium text-nexo-text">NEXO Stack Status</h2>
         </div>
+        <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getOverallBadge()}`}>
+          {getOverallLabel()}
+        </span>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-300">
+        <div className="mx-4 mt-3 p-2 rounded-lg bg-nexo-danger/10 border border-nexo-danger/20 text-nexo-danger text-xs">
           {error}
         </div>
       )}
 
       {/* Services Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {status && Object.entries(status.services).map(([name, service]) => (
-          <div key={name} className="bg-gray-800 rounded p-3 border border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-300 font-medium capitalize">
-                {name === 'chrome_cdp' ? '🔌 Chrome CDP' :
-                 name === 'luna_daemon' ? '🤖 Luna Agent' :
-                 name === 'backend' ? '⚙️ Backend' :
-                 name === 'frontend' ? '🌐 Frontend' : name}
-              </span>
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(service.status)}`} />
-            </div>
-            <div className="text-sm">
-              <span className={service.status === 'online' ? 'text-green-400' : 'text-red-400'}>
-                {getStatusText(service.status)}
-              </span>
+      <div className="grid grid-cols-2 gap-2 p-3">
+        {status && Object.entries(status.services).map(([name, service]) => {
+          const cfg = getStatusConfig(service.status)
+          return (
+            <div key={name} className="glass-card rounded-lg p-3 border border-nexo-border">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  {SERVICE_ICONS[name]}
+                  <span className="text-xs font-medium text-nexo-text">
+                    {SERVICE_LABELS[name]}
+                  </span>
+                </div>
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${cfg.badge}`}>
+                  {cfg.icon} {cfg.text}
+                </span>
+              </div>
               {service.port && (
-                <span className="text-gray-500 ml-2">:{service.port}</span>
+                <div className="text-[10px] text-nexo-muted">Porta: {service.port}</div>
               )}
               {service.uptime && (
-                <div className="text-gray-500 text-xs mt-1">
+                <div className="text-[10px] text-nexo-muted">
                   Uptime: {Math.floor(service.uptime / 60)}m {Math.floor(service.uptime % 60)}s
                 </div>
               )}
               {service.last_checkpoint && (
-                <div className="text-gray-500 text-xs mt-1">
+                <div className="text-[10px] text-nexo-muted">
                   Último scan: {new Date(service.last_checkpoint).toLocaleTimeString()}
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Logs */}
-      <div className="bg-gray-800 rounded p-3 border border-gray-700">
-        <h3 className="text-sm font-bold text-gray-300 mb-2">📄 Logs do Stack</h3>
-        <div className="bg-black rounded p-2 h-32 overflow-y-auto font-mono text-xs">
+      <div className="px-3 pb-3">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <FileText size={12} className="text-nexo-muted" />
+          <span className="text-xs text-nexo-muted">Logs do Stack</span>
+          <span className="text-[10px] text-nexo-muted/60">({logs.length} linhas)</span>
+        </div>
+        <div
+          ref={logsContainerRef}
+          className="bg-nexo-bg rounded-lg border border-nexo-border p-2 h-28 overflow-y-auto font-mono text-[10px] leading-relaxed"
+        >
           {logs.length === 0 ? (
-            <span className="text-gray-600">Nenhum log disponível...</span>
+            <span className="text-nexo-muted/40">Nenhum log disponível...</span>
           ) : (
             logs.map((log, i) => (
               <div key={i} className={`${
-                log.includes('CRASHOU') || log.includes('ERRO') ? 'text-red-400' :
-                log.includes('sucesso') || log.includes('OK') ? 'text-green-400' :
-                'text-gray-400'
+                log.includes('CRASHOU') || log.includes('ERRO') ? 'text-nexo-danger' :
+                log.includes('sucesso') || log.includes('OK') ? 'text-nexo-success' :
+                'text-nexo-muted'
               }`}>
                 {log}
               </div>
             ))
           )}
+          <div ref={logsEndRef} />
         </div>
       </div>
 
       {/* Footer */}
-      <div className="mt-3 text-xs text-gray-500 text-right">
+      <div className="px-4 py-2 border-t border-nexo-border text-[10px] text-nexo-muted/50 text-right">
         Atualizado: {status ? new Date(status.timestamp).toLocaleTimeString() : '---'}
       </div>
     </div>
-  );
-};
-
-export default StackStatusPanel;
-
+  )
+}

@@ -1,164 +1,194 @@
-﻿// ============================================================
-// AutoFixPanel.tsx - Painel de Auto-Correção para Dashboard NEXO
-// Adicionar em: frontend/src/components/AutoFixPanel.tsx
-// ============================================================
-
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react'
+import {
+  Wrench,
+  Server,
+  Globe,
+  Plug,
+  Bot,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  RefreshCw,
+  Loader2,
+  History,
+  Zap,
+} from 'lucide-react'
 
 interface FixEntry {
-  id: string;
-  timestamp: string;
-  service: string;
-  action: string;
-  success: boolean;
-  details: string;
+  id: string
+  timestamp: string
+  service: string
+  action: string
+  success: boolean
+  details: string
 }
 
 interface ServiceStatus {
-  status: 'online' | 'offline' | 'stale' | 'error';
-  lastCheck: string;
-  details: string;
-  autoFixed?: boolean;
+  status: 'online' | 'offline' | 'stale' | 'error'
+  lastCheck: string
+  details: string
+  autoFixed?: boolean
 }
 
 interface AutoFixStatus {
-  timestamp: string;
-  isRunning: boolean;
-  lastCheck: string | null;
-  services: Record<string, ServiceStatus>;
-  overall: 'healthy' | 'degraded' | 'critical';
+  timestamp: string
+  isRunning: boolean
+  lastCheck: string | null
+  services: Record<string, ServiceStatus>
+  overall: 'healthy' | 'degraded' | 'critical'
   config: {
-    checkInterval: number;
-    maxRetries: number;
-  };
+    checkInterval: number
+    maxRetries: number
+  }
 }
 
 interface FixHistory {
-  fixes: FixEntry[];
-  total: number;
-  successCount: number;
-  failCount: number;
+  fixes: FixEntry[]
+  total: number
+  successCount: number
+  failCount: number
 }
 
-const AutoFixPanel: React.FC = () => {
-  const [status, setStatus] = useState<AutoFixStatus | null>(null);
-  const [history, setHistory] = useState<FixHistory | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
+const SERVICE_ICONS: Record<string, React.ReactNode> = {
+  backend: <Server size={14} className="text-nexo-muted" />,
+  frontend: <Globe size={14} className="text-nexo-muted" />,
+  chrome_cdp: <Plug size={14} className="text-nexo-muted" />,
+  luna_daemon: <Bot size={14} className="text-nexo-muted" />,
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  backend: 'Backend',
+  frontend: 'Frontend',
+  chrome_cdp: 'Chrome CDP',
+  luna_daemon: 'Luna Agent',
+}
+
+export default function AutoFixPanel() {
+  const [status, setStatus] = useState<AutoFixStatus | null>(null)
+  const [history, setHistory] = useState<FixHistory | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isChecking, setIsChecking] = useState(false)
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/auto-fix/status');
-      if (!res.ok) throw new Error('Backend offline');
-      const data = await res.json();
-      setStatus(data);
-      setError(null);
+      const res = await fetch('/api/auto-fix/status')
+      if (!res.ok) throw new Error('Backend offline')
+      const data = await res.json()
+      setStatus(data)
+      setError(null)
     } catch (e) {
-      setError('Não foi possível conectar ao Auto-Fix');
+      setError('Não foi possível conectar ao Auto-Fix')
     }
-  }, []);
+  }, [])
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/auto-fix/history');
+      const res = await fetch('/api/auto-fix/history')
       if (res.ok) {
-        const data = await res.json();
-        setHistory(data);
+        const data = await res.json()
+        setHistory(data)
       }
     } catch (e) {
-      console.error('Erro ao buscar histórico:', e);
+      console.error('Erro ao buscar histórico:', e)
     }
-  }, []);
+  }, [])
 
   const forceCheck = async () => {
-    setIsChecking(true);
+    setIsChecking(true)
     try {
-      const res = await fetch('/api/auto-fix/check-now', { method: 'POST' });
+      const res = await fetch('/api/auto-fix/check-now', { method: 'POST' })
       if (res.ok) {
-        await fetchStatus();
-        await fetchHistory();
+        await fetchStatus()
+        await fetchHistory()
       }
     } catch (e) {
-      console.error('Erro ao forçar verificação:', e);
+      console.error('Erro ao forçar verificação:', e)
     }
-    setIsChecking(false);
-  };
+    setIsChecking(false)
+  }
 
   const forceFix = async (service: string) => {
     try {
-      const res = await fetch(`/api/auto-fix/fix/${service}`, { method: 'POST' });
+      const res = await fetch(`/api/auto-fix/fix/${service}`, { method: 'POST' })
       if (res.ok) {
-        await fetchStatus();
-        await fetchHistory();
+        await fetchStatus()
+        await fetchHistory()
       }
     } catch (e) {
-      console.error(`Erro ao forçar correção de ${service}:`, e);
+      console.error(`Erro ao forçar correção de ${service}:`, e)
     }
-  };
+  }
 
   useEffect(() => {
     const loadAll = async () => {
-      await Promise.all([fetchStatus(), fetchHistory()]);
-      setLoading(false);
-    };
-    loadAll();
+      await Promise.all([fetchStatus(), fetchHistory()])
+      setLoading(false)
+    }
+    loadAll()
 
     const interval = setInterval(() => {
-      fetchStatus();
-      fetchHistory();
-    }, 10000);
+      fetchStatus()
+      fetchHistory()
+    }, 10000)
 
-    return () => clearInterval(interval);
-  }, [fetchStatus, fetchHistory]);
+    return () => clearInterval(interval)
+  }, [fetchStatus, fetchHistory])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online': return 'bg-green-500';
-      case 'offline': return 'bg-red-500';
-      case 'stale': return 'bg-yellow-500';
-      case 'error': return 'bg-red-600';
-      default: return 'bg-gray-500';
+  const getStatusConfig = (s: string) => {
+    switch (s) {
+      case 'online':
+        return { icon: <CheckCircle2 size={12} />, badge: 'bg-nexo-success/10 text-nexo-success border-nexo-success/20', text: 'Online' }
+      case 'offline':
+        return { icon: <XCircle size={12} />, badge: 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20', text: 'Offline' }
+      case 'stale':
+        return { icon: <AlertTriangle size={12} />, badge: 'bg-nexo-warning/10 text-nexo-warning border-nexo-warning/20', text: 'Stale' }
+      default:
+        return { icon: <Clock size={12} />, badge: 'bg-nexo-muted/10 text-nexo-muted border-nexo-muted/20', text: 'Erro' }
     }
-  };
+  }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'online': return '✅';
-      case 'offline': return '❌';
-      case 'stale': return '⚠️';
-      case 'error': return '💥';
-      default: return '⏳';
+  const getOverallBadge = () => {
+    switch (status?.overall) {
+      case 'healthy':
+        return 'bg-nexo-success/10 text-nexo-success border-nexo-success/20'
+      case 'degraded':
+        return 'bg-nexo-warning/10 text-nexo-warning border-nexo-warning/20'
+      default:
+        return 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20'
     }
-  };
+  }
 
-  const getOverallColor = (overall: string) => {
-    switch (overall) {
-      case 'healthy': return 'bg-green-500 text-black';
-      case 'degraded': return 'bg-yellow-500 text-black';
-      case 'critical': return 'bg-red-600 text-white';
-      default: return 'bg-gray-500 text-white';
+  const getOverallLabel = () => {
+    switch (status?.overall) {
+      case 'healthy': return 'Tudo OK'
+      case 'degraded': return 'Degradado'
+      default: return 'Crítico'
     }
-  };
+  }
 
   if (loading) {
     return (
-      <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-        <div className="animate-pulse text-white">Carregando Auto-Fix...</div>
+      <div className="glass-card rounded-xl p-4 border border-nexo-border">
+        <div className="flex items-center gap-2 text-nexo-muted animate-pulse">
+          <Loader2 size={16} className="animate-spin" />
+          <span className="text-sm">Carregando Auto-Fix...</span>
+        </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+    <div className="glass-card rounded-xl border border-nexo-border overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🤖</span>
-          <h2 className="text-xl font-bold text-white">Auto-Fix System</h2>
+          <Wrench size={16} className="text-nexo-info" />
+          <h2 className="text-sm font-medium text-nexo-text">Auto-Fix System</h2>
           {status?.isRunning && (
-            <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full animate-pulse">
-              Verificando...
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-nexo-info/10 text-nexo-info border border-nexo-info/20 animate-pulse">
+              <RefreshCw size={10} className="animate-spin" /> Verificando...
             </span>
           )}
         </div>
@@ -166,121 +196,111 @@ const AutoFixPanel: React.FC = () => {
           <button
             onClick={forceCheck}
             disabled={isChecking}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-nexo-card text-nexo-muted text-xs rounded-md border border-nexo-border hover:border-nexo-info/50 hover:text-nexo-text transition-colors disabled:opacity-50"
           >
-            {isChecking ? '⏳ Verificando...' : '🔍 Verificar Agora'}
+            {isChecking ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Verificar
           </button>
-          <div className={`px-3 py-1 rounded-full text-sm font-bold ${getOverallColor(status?.overall || 'critical')}`}>
-            {status?.overall === 'healthy' ? '🟢 TUDO OK' : 
-             status?.overall === 'degraded' ? '🟡 DEGRADADO' : 
-             '🔴 CRÍTICO'}
-          </div>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${getOverallBadge()}`}>
+            {getOverallLabel()}
+          </span>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-300">
+        <div className="mx-4 mt-3 p-2 rounded-lg bg-nexo-danger/10 border border-nexo-danger/20 text-nexo-danger text-xs">
           {error}
         </div>
       )}
 
       {/* Config Info */}
       {status?.config && (
-        <div className="mb-3 text-xs text-gray-500 flex gap-4">
-          <span>⏱️ Verificação: a cada {status.config.checkInterval / 1000}s</span>
-          <span>🔄 Máx tentativas: {status.config.maxRetries}</span>
-          <span>📅 Última: {status.lastCheck ? new Date(status.lastCheck).toLocaleTimeString() : 'Nunca'}</span>
+        <div className="px-4 pt-2 text-[10px] text-nexo-muted/60 flex gap-3">
+          <span>Verificação: a cada {status.config.checkInterval / 1000}s</span>
+          <span>Máx tentativas: {status.config.maxRetries}</span>
+          <span>Última: {status.lastCheck ? new Date(status.lastCheck).toLocaleTimeString() : 'Nunca'}</span>
         </div>
       )}
 
       {/* Services Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {status && Object.entries(status.services).map(([name, service]) => (
-          <div key={name} className={`bg-gray-800 rounded p-3 border ${
-            service.status === 'online' ? 'border-green-600/50' : 
-            service.status === 'offline' ? 'border-red-600/50' : 
-            'border-yellow-600/50'
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-300 font-medium capitalize">
-                {name === 'chrome_cdp' ? '🔌 Chrome CDP' :
-                 name === 'luna_daemon' ? '🤖 Luna Agent' :
-                 name === 'backend' ? '⚙️ Backend' :
-                 name === 'frontend' ? '🌐 Frontend' : name}
-              </span>
-              <div className="flex items-center gap-2">
-                {service.autoFixed !== undefined && (
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    service.autoFixed ? 'bg-green-600/30 text-green-400' : 'bg-red-600/30 text-red-400'
-                  }`}>
-                    {service.autoFixed ? '🛠️ Auto-fix' : '❌ Falhou'}
+      <div className="grid grid-cols-2 gap-2 p-3">
+        {status && Object.entries(status.services).map(([name, service]) => {
+          const cfg = getStatusConfig(service.status)
+          return (
+            <div key={name} className="glass-card rounded-lg p-3 border border-nexo-border">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  {SERVICE_ICONS[name]}
+                  <span className="text-xs font-medium text-nexo-text">
+                    {SERVICE_LABELS[name]}
                   </span>
-                )}
-                <div className={`w-3 h-3 rounded-full ${getStatusColor(service.status)}`} />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {service.autoFixed !== undefined && (
+                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                      service.autoFixed ? 'bg-nexo-success/10 text-nexo-success border-nexo-success/20' : 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20'
+                    }`}>
+                      {service.autoFixed ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                      {service.autoFixed ? 'Auto-fix' : 'Falhou'}
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border ${cfg.badge}`}>
+                    {cfg.icon} {cfg.text}
+                  </span>
+                </div>
               </div>
+              <div className="text-[10px] text-nexo-muted">{service.details}</div>
+              {service.status !== 'online' && (
+                <button
+                  onClick={() => forceFix(name)}
+                  className="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1 bg-nexo-card text-nexo-warning text-[10px] rounded-md border border-nexo-warning/30 hover:bg-nexo-warning/10 transition-colors"
+                >
+                  <Zap size={10} /> Forçar Correção
+                </button>
+              )}
             </div>
-            <div className="text-sm">
-              <span className={service.status === 'online' ? 'text-green-400' : 'text-red-400'}>
-                {getStatusIcon(service.status)} {service.status.toUpperCase()}
-              </span>
-              <div className="text-gray-500 text-xs mt-1">{service.details}</div>
-            </div>
-            {service.status !== 'online' && (
-              <button
-                onClick={() => forceFix(name)}
-                className="mt-2 w-full px-2 py-1 bg-orange-600 hover:bg-orange-500 text-white text-xs rounded transition-colors"
-              >
-                🛠️ Forçar Correção Manual
-              </button>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* History */}
-      <div className="bg-gray-800 rounded p-3 border border-gray-700">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-gray-300">📋 Histórico de Correções</h3>
+      <div className="px-3 pb-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <History size={12} className="text-nexo-muted" />
+            <span className="text-xs text-nexo-muted">Histórico</span>
+          </div>
           {history && (
-            <div className="text-xs text-gray-500">
-              ✅ {history.successCount} | ❌ {history.failCount} | 📊 {history.total} total
+            <div className="text-[10px] text-nexo-muted/60 flex gap-2">
+              <span className="text-nexo-success">{history.successCount} OK</span>
+              <span className="text-nexo-danger">{history.failCount} falha</span>
+              <span>{history.total} total</span>
             </div>
           )}
         </div>
-        <div className="bg-black rounded p-2 h-40 overflow-y-auto font-mono text-xs">
+        <div className="bg-nexo-bg rounded-lg border border-nexo-border p-2 h-28 overflow-y-auto font-mono text-[10px]">
           {history && history.fixes.length > 0 ? (
             history.fixes.map((fix) => (
-              <div key={fix.id} className={`flex items-start gap-2 py-1 border-b border-gray-800 ${
-                fix.success ? 'text-green-400' : 'text-red-400'
+              <div key={fix.id} className={`flex items-start gap-2 py-0.5 border-b border-nexo-border/50 ${
+                fix.success ? 'text-nexo-success' : 'text-nexo-danger'
               }`}>
-                <span className="text-gray-600 shrink-0">
-                  {new Date(fix.timestamp).toLocaleTimeString()}
-                </span>
-                <span className="shrink-0">
-                  {fix.success ? '✅' : '❌'}
-                </span>
-                <span className="text-gray-300">
-                  [{fix.service}] {fix.action}
-                </span>
-                {fix.details && (
-                  <span className="text-gray-500">- {fix.details}</span>
-                )}
+                <span className="text-nexo-muted/40 shrink-0">{new Date(fix.timestamp).toLocaleTimeString()}</span>
+                <span className="shrink-0">{fix.success ? <CheckCircle2 size={10} /> : <XCircle size={10} />}</span>
+                <span className="text-nexo-muted">[{fix.service}] {fix.action}</span>
+                {fix.details && <span className="text-nexo-muted/50">- {fix.details}</span>}
               </div>
             ))
           ) : (
-            <span className="text-gray-600">Nenhuma correção aplicada ainda...</span>
+            <span className="text-nexo-muted/40">Nenhuma correção aplicada...</span>
           )}
         </div>
       </div>
 
       {/* Footer */}
-      <div className="mt-3 text-xs text-gray-500 text-right">
+      <div className="px-4 py-2 border-t border-nexo-border text-[10px] text-nexo-muted/50 text-right">
         Auto-Fix v1.0 | Atualizado: {status ? new Date(status.timestamp).toLocaleTimeString() : '---'}
       </div>
     </div>
-  );
-};
-
-export default AutoFixPanel;
-
+  )
+}
