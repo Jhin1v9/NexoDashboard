@@ -479,7 +479,34 @@ const WAPP_FILE = path.join(DATA_DIR, 'whatsapp-tasks.json');
 
 // Init defaults
 if (!fs.existsSync(TASKS_FILE)) writeJSON(TASKS_FILE, []);
-if (!fs.existsSync(USERS_FILE)) writeJSON(USERS_FILE, { active: 'abner', users: { abner: { name: 'Abner', role: 'Admin', color: '#3742fa' }, nonoke: { name: 'Nonoke', role: 'Admin', color: '#2ed573' }, elias: { name: 'Elias', role: 'Admin', color: '#ffa502' } } });
+
+// Ensure users.json exists with default passwords (7741 for all)
+const DEFAULT_PASSWORD_HASH = '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla'; // hash de '7741'
+if (!fs.existsSync(USERS_FILE)) {
+  writeJSON(USERS_FILE, {
+    active: 'abner',
+    users: {
+      abner: { name: 'Abner', role: 'Admin', color: '#3742fa', password: DEFAULT_PASSWORD_HASH },
+      nonoke: { name: 'Nonoke', role: 'Admin', color: '#2ed573', password: DEFAULT_PASSWORD_HASH },
+      elias: { name: 'Elias', role: 'Admin', color: '#ffa502', password: DEFAULT_PASSWORD_HASH }
+    }
+  });
+} else {
+  // Garante que usuários existentes tenham senha (proteção contra deploys parciais)
+  const usersData = readJSON(USERS_FILE, { users: {} });
+  let changed = false;
+  for (const key of ['abner', 'nonoke', 'elias']) {
+    if (!usersData.users[key]) {
+      usersData.users[key] = { name: key.charAt(0).toUpperCase() + key.slice(1), role: 'Admin', color: '#3742fa', password: DEFAULT_PASSWORD_HASH };
+      changed = true;
+    } else if (!usersData.users[key].password) {
+      usersData.users[key].password = DEFAULT_PASSWORD_HASH;
+      changed = true;
+    }
+  }
+  if (changed) writeJSON(USERS_FILE, usersData);
+}
+
 if (!fs.existsSync(GH_USERS_FILE)) writeJSON(GH_USERS_FILE, {});
 if (!fs.existsSync(VC_USERS_FILE)) writeJSON(VC_USERS_FILE, {});
 if (!fs.existsSync(WAPP_FILE)) writeJSON(WAPP_FILE, []);
