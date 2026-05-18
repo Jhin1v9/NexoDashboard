@@ -3,14 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
-import { BugDetectorProvider } from '@auris/bug-detector/react'
-import { setupBugDetectorReporter, bugDetectorReporterConfig } from './utils/bugdetector-reporter.js'
 import App from './App.jsx'
 import './styles/index.css'
 import axios from 'axios'
-
-// Ativa o reporter que envia reports para o backend
-setupBugDetectorReporter()
 
 // Interceptador global: adiciona token em todas as requisições
 axios.interceptors.request.use(config => {
@@ -38,13 +33,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <BugDetectorProvider config={{ 
-            shortcut: 'Ctrl+Shift+D', 
-            trigger: 'keyboard-shortcut',
-            ...bugDetectorReporterConfig
-          }}>
             <App />
-          </BugDetectorProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

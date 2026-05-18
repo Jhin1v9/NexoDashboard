@@ -73,7 +73,7 @@ export default function Settings() {
       setSecuritySettings(res.data.settings)
       showMessage('Configuração atualizada')
     } catch (e) {
-      showMessage('Erro ao atualizar', 'error')
+      showMessage(e.response?.data?.error || 'Erro ao atualizar', 'error')
     }
   }
 
@@ -83,9 +83,12 @@ export default function Settings() {
       const res = await axios.post('/api/security/test-whatsapp')
       if (res.data.success) {
         showMessage('Mensagem de teste enviada no WhatsApp!')
+      } else {
+        showMessage(res.data.error || 'Erro ao enviar teste', 'error')
       }
     } catch (e) {
-      showMessage('Erro ao enviar teste', 'error')
+      const errMsg = e.response?.data?.error || 'Erro ao enviar teste'
+      showMessage(errMsg, 'error')
     } finally {
       setLoading(false)
     }

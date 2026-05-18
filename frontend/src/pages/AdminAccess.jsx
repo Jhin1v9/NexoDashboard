@@ -15,8 +15,8 @@ export default function AdminAccess() {
     setLoading(true);
     try {
       const [reqRes, usersRes] = await Promise.all([
-        fetch('http://localhost:3456/api/access-requests'),
-        fetch('http://localhost:3456/api/access-users')
+        fetch('/api/access-requests'),
+        fetch('/api/access-users')
       ]);
       const reqData = await reqRes.json();
       const usersData = await usersRes.json();
@@ -33,7 +33,7 @@ export default function AdminAccess() {
 
   const handleAction = async (id, action, request) => {
     try {
-      const res = await fetch(`http://localhost:3456/api/access-requests/${id}`, {
+      const res = await fetch(`/api/access-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,7 +53,7 @@ export default function AdminAccess() {
   const handleRevoke = async (email, name) => {
     if (!confirm(`Revogar acesso de ${name}?`)) return;
     try {
-      const res = await fetch(`http://localhost:3456/api/access-users/${encodeURIComponent(email)}`, {
+      const res = await fetch(`/api/access-users/${encodeURIComponent(email)}`, {
         method: 'DELETE'
       });
       if (res.ok) {

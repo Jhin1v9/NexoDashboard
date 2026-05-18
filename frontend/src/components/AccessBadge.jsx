@@ -7,7 +7,7 @@ export default function AccessBadge() {
   useEffect(() => {
     const fetchPending = async () => {
       try {
-        const res = await fetch('http://localhost:3456/api/access-requests?status=pending');
+        const res = await fetch('/api/access-requests?status=pending');
         const data = await res.json();
         setPendingCount(data.pending || 0);
       } catch (err) {

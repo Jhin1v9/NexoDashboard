@@ -13,7 +13,7 @@ export default function AccessRequest() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:3456/api/access-request', {
+      const res = await fetch('/api/access-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)

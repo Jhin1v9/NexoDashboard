@@ -18,7 +18,7 @@ const SERVICES = [
 
 const AUX_SERVICES = [
   { key: 'chrome', label: 'Chrome CDP', port: 9223 },
-  { key: 'ollama', label: 'Ollama LLM', port: 11434 },
+  { key: 'gemini', label: 'Gemini API', port: null },
 ]
 
 function getLogColor(line) {

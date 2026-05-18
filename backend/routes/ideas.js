@@ -1,7 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { GoogleGenAI } = require('@google/genai');
+const { genAI } = require('../services/gemini-client');
 
 const router = express.Router();
 
@@ -16,9 +16,8 @@ const PROJECTS_FILE = path.join(SCHEMA_DIR, 'projects-registry.json');
 const TASKS_FILE = path.join(DATA_DIR, 'company-tasks.json');
 
 // ============================================================================
-// GEMINI
+// GEMINI (via multi-key client)
 // ============================================================================
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // ============================================================================
 // CONSTANTS
@@ -45,7 +44,10 @@ const AI_MODES = ['brainstorm', 'estrategia', 'redator', 'precificacao', 'pesqui
 const USER_NAMES = {
   'nexo-abner-001': 'Abner',
   'nexo-enoque-001': 'Nonoke',
-  'nexo-elias-pessoal': 'Elias'
+  'nexo-elias-pessoal': 'Elias',
+  'abner': 'Abner',
+  'nonoke': 'Nonoke',
+  'elias': 'Elias'
 };
 const USER_IDS = Object.keys(USER_NAMES);
 
@@ -230,17 +232,17 @@ function parseSuggestionToBlocks(content, type) {
 // ============================================================================
 // PROMPT BUILDER
 // ============================================================================
-function buildBrainstormPrompt(idea, client, history, userQuestion, mode) {
+function buildBrainstormPrompt(idea, client, history, userQuestion, mode, allIdeasList, templatesList) {
   const modeInstructions = {
-    brainstorm: 'Gere 3-5 ideias criativas e concretas. Use exemplos reais do mercado. Estruture com markdown.',
-    'estrategia': 'Analise como abordar/vender. Estruture em: Problema \u2192 Oportunidade \u2192 Solucao \u2192 Proximo Passo.',
-    'redator': 'Ajude a escrever proposta, email ou pitch. Mantenha tom profissional mas proximo. Retorne texto pronto para copiar.',
-    'precificacao': 'Sugira faixa de preco baseada no tipo de projeto. NUNCA prometa valor exato. Explique o raciocinio.',
-    'pesquisa': 'Busque na web solucoes similares, benchmarks, tendencias atuais. Use grounding com Google Search.'
+    brainstorm: 'Gere 3-5 ideias criativas e concretas. Use exemplos reais. Responda em ate 5 paragrafos curtos.',
+    'estrategia': 'Analise como abordar/vender. Estruture em: Problema > Oportunidade > Solucao > Proximo Passo. Maximo 4 paragrafos.',
+    'redator': 'Escreva proposta, email ou pitch pronto para usar. Texto direto, sem floreios. Maximo 300 palavras.',
+    'precificacao': 'Sugira faixa de preco. NUNCA prometa valor exato. Explique o raciocinio em 2-3 paragrafos.',
+    'pesquisa': 'Busque benchmarks e tendencias. Liste 3-5 achados com fontes quando possivel. Maximo 4 paragrafos.'
   };
 
   const contextoCliente = client
-    ? `Nome: ${client.name || 'Nao informado'}\n    Empresa: ${client.company || 'Nao informado'}\n    Servicos atuais: ${(client.services || []).join(', ') || 'Nenhum'}\n    Pipeline: ${client.pipeline || 'Novo'}`
+    ? `Nome: ${client.name || 'Nao informado'}\nEmpresa: ${client.company || 'Nao informado'}\nServicos: ${(client.services || []).join(', ') || 'Nenhum'}\nPipeline: ${client.pipeline || 'Novo'}`
     : 'Nenhum cliente vinculado.';
 
   const historicoIdeias = history && history.length > 0
@@ -256,32 +258,80 @@ function buildBrainstormPrompt(idea, client, history, userQuestion, mode) {
         ? idea.blocks.filter(b => b.type === 'paragraph').map(b => b.content).join('\n')
         : 'Sem conteudo');
 
-  return `Voce e o NEXO Creative Partner \u2014 estrategista criativo e consultor de vendas da NEXO Digital.
-NEXO Digital e uma agencia tech de Barcelona que cria sites, apps, automacoes e solucoes digitais.
+  // Lista de todas as ideias para contexto completo
+  const todasIdeias = allIdeasList && allIdeasList.length > 0
+    ? allIdeasList.slice(-20).map(i => `- ${i.id}: ${i.title} [${i.status}, ${i.type}, ${i.priority}]`).join('\n')
+    : 'Nenhuma outra ideia no workspace.';
 
-CONTEXTO DO CLIENTE VINCULADO:
+  // Templates disponiveis
+  const templatesDisp = templatesList && templatesList.length > 0
+    ? templatesList.map(t => `- ${t.id}: ${t.name} (${t.type || 'geral'})`).join('\n')
+    : 'Nenhum template disponivel.';
+
+  return `Voce e um assistente direto e pratico do workspace IDEIAS da NEXO Digital. NAO se apresente. NAO diga "Oi" ou "Sou o assistente". Va DIRETO ao ponto.
+
+=== CONTEXTO DO CLIENTE ===
 ${contextoCliente}
 
-HISTORICO DE IDEIAS DESTE CLIENTE:
-${historicoIdeias}
-
-IDEIA ATUAL:
+=== IDEIA ATUAL ===
+ID: ${idea.id}
 Titulo: ${idea.title}
+Status: ${idea.status}
+Tipo: ${idea.type}
+Prioridade: ${idea.priority}
 Conteudo: ${conteudoIdeia}
 
-MODO ATUAL: ${mode.toUpperCase()}
-INSTRUCOES ESPECIFICAS: ${modeInstructions[mode] || modeInstructions.brainstorm}
+=== HISTORICO DESTE CLIENTE ===
+${historicoIdeias}
 
-PERGUNTA DO USUARIO: ${userQuestion}
+=== TODAS AS IDEIAS DO WORKSPACE ===
+${todasIdeias}
 
-REGRAS GLOBAIS:
+=== TEMPLATES DISPONIVEIS ===
+${templatesDisp}
+
+=== MODO ATUAL ===
+${mode.toUpperCase()}: ${modeInstructions[mode] || modeInstructions.brainstorm}
+
+=== FERRAMENTAS DISPONIVEIS ===
+Use-as quando o usuario pedir uma acao concreta. NUNCA peca confirmacao. Execute direto.
+
+1. create_idea(title, type, priority, content?, tags?, linkedTo?)
+   Cria nova ideia. type em: proposta-comercial, brainstorm, prd, pipeline, briefing, outro. priority em: baixa, media, alta, urgente.
+
+2. update_idea(ideaId, title?, content?, status?, priority?, tags?)
+   Atualiza campos de uma ideia. Use o ID completo (ex: idea-004).
+
+3. delete_idea(ideaId)
+   Arquiva uma ideia (soft delete).
+
+4. list_ideas(status?, type?, search?)
+   Lista ideias. Use para responder "quais ideias temos..."
+
+5. add_comment(ideaId, text)
+   Adiciona comentario em uma ideia.
+
+6. change_status(ideaId, status)
+   Muda status. Status validos: rascunho, em-discussao, aprovada, em-andamento, concluida, rejeitada, arquivada.
+
+7. convert_to_task(ideaId)
+   Converte ideia em tarefa do sistema.
+
+FORMATO DE CHAMADA:
+<TOOL_CALL>
+{"tool": "nome_da_funcao", "params": {"param1": "valor1"}}
+</TOOL_CALL>
+
+=== PERGUNTA DO USUARIO ===
+${userQuestion}
+
+=== REGRAS ===
 1. Responda em portugues brasileiro.
-2. Seja CRIATIVO mas PRATICO \u2014 so sugira o que a NEXO pode executar.
-3. NUNCA prometa prazos ou valores sem contexto suficiente.
-4. NUNCA assuma que a NEXO faz algo fora do escopo.
-5. Se relevante, mencione tendencias atuais do mercado espanhol/catalao.
-6. Estruture respostas com markdown para facil conversao em blocos.
-7. Seja conciso mas completo. Maximo 1500 tokens.`;
+2. NUNCA se apresente. NUNCA diga "Oi, sou...". Va direto ao ponto.
+3. Maximo 150 palavras por resposta. Seja EXTREMAMENTE conciso.
+4. Se for executar uma acao, use TOOL_CALL imediatamente e depois confirme brevemente.
+5. NAO use markdown excessiveo. Texto limpo e direto.
+6. Se o usuario pedir para criar, editar, apagar, mudar status, comentar ou converter em tarefa -> use a ferramenta correspondente.`;
 }
 
 function extractSuggestions(text, mode) {
@@ -300,6 +350,275 @@ function extractSuggestions(text, mode) {
   if (currentSugg) suggestions.push(currentSugg.trim());
 
   return suggestions.slice(0, 5);
+}
+
+// ============================================================================
+// TOOL CALLING - Parser e Executor
+// ============================================================================
+
+function parseToolCalls(response) {
+  const toolCalls = [];
+  const regex = /<TOOL_CALL>\s*(\{[\s\S]*?\})\s*<\/TOOL_CALL>/g;
+  let match;
+  while ((match = regex.exec(response)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed.tool) {
+        toolCalls.push({
+          tool: parsed.tool,
+          params: parsed.params || {}
+        });
+      }
+    } catch (e) {
+      console.error('[IDEAS] Failed to parse tool call:', match[1], e.message);
+    }
+  }
+  return toolCalls;
+}
+
+function executeToolCall(toolCall, currentIdeaId, reqUser) {
+  const { tool, params } = toolCall;
+  const ideasData = readJSON(IDEAS_FILE, {});
+  const now = new Date().toISOString();
+
+  switch (tool) {
+    case 'create_idea': {
+      if (!params.title || params.title.trim().length < 3) {
+        return { success: false, error: 'Titulo obrigatorio, minimo 3 caracteres' };
+      }
+      const type = params.type || 'outro';
+      if (!VALID_TYPES.includes(type)) {
+        return { success: false, error: `Tipo invalido: ${type}` };
+      }
+      const ideasArray = ideasData.ideas ? Object.values(ideasData.ideas) : [];
+      const newId = generateSequentialId(ideasArray, 'idea-');
+
+      let linkedTo = { clientId: null, clientName: null, leadId: null, projectId: null };
+      if (params.linkedTo) {
+        linkedTo = { ...linkedTo, ...params.linkedTo };
+        if (linkedTo.clientId) {
+          const clientsData = readJSON(CLIENTS_FILE, {});
+          const client = clientsData.data && clientsData.data[linkedTo.clientId];
+          linkedTo.clientName = client ? (client.name || client.company || 'Desconhecido') : 'Desconhecido';
+        }
+      }
+
+      const newIdea = {
+        id: newId,
+        title: params.title.trim(),
+        status: 'rascunho',
+        type: type,
+        priority: params.priority || 'media',
+        linkedTo: linkedTo,
+        content: { blocks: params.content ? parseSuggestionToBlocks(params.content, type) : [] },
+        aiContext: { brainstormHistory: [], aiSuggestions: [], aiInsights: [] },
+        tags: params.tags || [],
+        createdBy: reqUser.id || reqUser.userId,
+        createdByName: getUserName(reqUser.id || reqUser.userId),
+        createdAt: now,
+        updatedAt: now,
+        collaborators: [],
+        comments: [],
+        attachments: [],
+        versionHistory: [{
+          version: 1,
+          snapshot: { title: params.title.trim(), status: 'rascunho', content: { blocks: [] } },
+          changedBy: reqUser.id || reqUser.userId,
+          changedAt: now,
+          changeSummary: 'Ideia criada via IA'
+        }]
+      };
+
+      if (!ideasData.ideas) ideasData.ideas = {};
+      ideasData.ideas[newId] = newIdea;
+      if (ideasData._meta) {
+        ideasData._meta.totalIdeas = (ideasData._meta.totalIdeas || 0) + 1;
+        ideasData._meta.lastIdeaId = newId;
+      }
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'create_idea', ideaId: newId, message: `Ideia "${newIdea.title}" criada (${newId})` };
+    }
+
+    case 'update_idea': {
+      const targetId = params.ideaId || currentIdeaId;
+      const idea = ideasData.ideas && ideasData.ideas[targetId];
+      if (!idea) return { success: false, error: `Ideia ${targetId} nao encontrada` };
+
+      const oldSnapshot = { title: idea.title, status: idea.status, content: { blocks: JSON.parse(JSON.stringify(idea.content && idea.content.blocks || [])) } };
+
+      if (params.title !== undefined) {
+        if (params.title.trim().length < 3) return { success: false, error: 'Titulo minimo 3 caracteres' };
+        idea.title = params.title.trim();
+      }
+      if (params.status !== undefined) {
+        if (!VALID_STATUSES.includes(params.status)) return { success: false, error: 'Status invalido' };
+        idea.status = params.status;
+      }
+      if (params.priority !== undefined) {
+        if (!VALID_PRIORITIES.includes(params.priority)) return { success: false, error: 'Prioridade invalida' };
+        idea.priority = params.priority;
+      }
+      if (params.tags !== undefined) idea.tags = params.tags;
+      if (params.content !== undefined) {
+        idea.content = idea.content || { blocks: [] };
+        idea.content.blocks = parseSuggestionToBlocks(params.content, idea.type);
+      }
+
+      idea.updatedAt = now;
+      const lastVersion = idea.versionHistory ? idea.versionHistory.length : 0;
+      idea.versionHistory = idea.versionHistory || [];
+      idea.versionHistory.push({
+        version: lastVersion + 1,
+        snapshot: oldSnapshot,
+        changedBy: reqUser.id || reqUser.userId,
+        changedAt: now,
+        changeSummary: `Atualizada via IA: ${params.title ? 'titulo ' : ''}${params.status ? 'status ' : ''}${params.content ? 'conteudo' : ''}`
+      });
+
+      ideasData.ideas[targetId] = idea;
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'update_idea', ideaId: targetId, message: `Ideia "${idea.title}" atualizada` };
+    }
+
+    case 'delete_idea': {
+      const targetId = params.ideaId || currentIdeaId;
+      const idea = ideasData.ideas && ideasData.ideas[targetId];
+      if (!idea) return { success: false, error: `Ideia ${targetId} nao encontrada` };
+      if (idea.status === 'arquivada') return { success: false, error: 'Ideia ja esta arquivada' };
+
+      idea.status = 'arquivada';
+      idea.updatedAt = now;
+      const lastVersion = idea.versionHistory ? idea.versionHistory.length : 0;
+      idea.versionHistory = idea.versionHistory || [];
+      idea.versionHistory.push({
+        version: lastVersion + 1,
+        snapshot: { title: idea.title, status: 'arquivada' },
+        changedBy: reqUser.id || reqUser.userId,
+        changedAt: now,
+        changeSummary: 'Ideia arquivada via IA'
+      });
+      ideasData.ideas[targetId] = idea;
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'delete_idea', ideaId: targetId, message: `Ideia "${idea.title}" arquivada` };
+    }
+
+    case 'list_ideas': {
+      let ideas = ideasData.ideas ? Object.values(ideasData.ideas) : [];
+      if (params.status) ideas = ideas.filter(i => i.status === params.status);
+      if (params.type) ideas = ideas.filter(i => i.type === params.type);
+      if (params.search) {
+        const term = params.search.toLowerCase();
+        ideas = ideas.filter(i => i.title && i.title.toLowerCase().includes(term));
+      }
+      const list = ideas.slice(0, 20).map(i => ({ id: i.id, title: i.title, status: i.status, type: i.type, priority: i.priority }));
+      return { success: true, action: 'list_ideas', count: list.length, ideas: list, message: `${list.length} ideia(s) encontrada(s)` };
+    }
+
+    case 'add_comment': {
+      const targetId = params.ideaId || currentIdeaId;
+      const idea = ideasData.ideas && ideasData.ideas[targetId];
+      if (!idea) return { success: false, error: `Ideia ${targetId} nao encontrada` };
+      if (!params.text || params.text.trim().length === 0) return { success: false, error: 'Texto do comentario obrigatorio' };
+
+      const newComment = {
+        id: `cmt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        author: reqUser.id || reqUser.userId,
+        authorName: getUserName(reqUser.id || reqUser.userId),
+        text: params.text.trim(),
+        timestamp: now,
+        reactions: [],
+        mentions: []
+      };
+      idea.comments = idea.comments || [];
+      idea.comments.push(newComment);
+      idea.updatedAt = now;
+      ideasData.ideas[targetId] = idea;
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'add_comment', ideaId: targetId, message: 'Comentario adicionado' };
+    }
+
+    case 'change_status': {
+      const targetId = params.ideaId || currentIdeaId;
+      const idea = ideasData.ideas && ideasData.ideas[targetId];
+      if (!idea) return { success: false, error: `Ideia ${targetId} nao encontrada` };
+      if (!params.status || !VALID_STATUSES.includes(params.status)) return { success: false, error: 'Status invalido' };
+
+      idea.status = params.status;
+      idea.updatedAt = now;
+      const lastVersion = idea.versionHistory ? idea.versionHistory.length : 0;
+      idea.versionHistory = idea.versionHistory || [];
+      idea.versionHistory.push({
+        version: lastVersion + 1,
+        snapshot: { title: idea.title, status: params.status },
+        changedBy: reqUser.id || reqUser.userId,
+        changedAt: now,
+        changeSummary: `Status alterado para ${params.status} via IA`
+      });
+      ideasData.ideas[targetId] = idea;
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'change_status', ideaId: targetId, message: `Status alterado para "${params.status}"` };
+    }
+
+    case 'convert_to_task': {
+      const targetId = params.ideaId || currentIdeaId;
+      const idea = ideasData.ideas && ideasData.ideas[targetId];
+      if (!idea) return { success: false, error: `Ideia ${targetId} nao encontrada` };
+
+      const tasksData = readJSON(TASKS_FILE, { tasks: {} });
+      const tasksArray = tasksData.tasks ? Object.values(tasksData.tasks) : [];
+      const existingTask = tasksArray.find(t => t.ideaId === targetId);
+      if (existingTask) return { success: false, error: 'Ideia ja convertida em tarefa', task: existingTask };
+
+      const newTaskId = generateSequentialId(tasksArray, 'task-');
+      const descriptionBlocks = (idea.content && idea.content.blocks)
+        ? idea.content.blocks.filter(b => b.type === 'paragraph').map(b => b.content).join(' ')
+        : '';
+      const description = `Convertido da ideia ${idea.id}: ${descriptionBlocks.slice(0, 200)}${descriptionBlocks.length > 200 ? '...' : ''}`;
+
+      const newTask = {
+        id: newTaskId,
+        title: idea.title,
+        description: description,
+        status: 'pendente',
+        priority: idea.priority || 'media',
+        assignedTo: reqUser.id || reqUser.userId,
+        projectId: idea.linkedTo && idea.linkedTo.projectId || 'GERAL',
+        ideaId: idea.id,
+        createdAt: now,
+        updatedAt: now,
+        dueDate: null
+      };
+      if (!tasksData.tasks) tasksData.tasks = {};
+      tasksData.tasks[newTaskId] = newTask;
+      backupJSON(TASKS_FILE);
+      writeJSON(TASKS_FILE, tasksData);
+
+      idea.status = 'em-andamento';
+      idea.updatedAt = now;
+      idea.convertedTo = { taskId: newTaskId, convertedAt: now };
+      const lastVersion = idea.versionHistory ? idea.versionHistory.length : 0;
+      idea.versionHistory = idea.versionHistory || [];
+      idea.versionHistory.push({
+        version: lastVersion + 1,
+        snapshot: { title: idea.title, status: 'em-andamento' },
+        changedBy: reqUser.id || reqUser.userId,
+        changedAt: now,
+        changeSummary: `Convertida em tarefa ${newTaskId} via IA`
+      });
+      ideasData.ideas[targetId] = idea;
+      backupJSON(IDEAS_FILE);
+      writeJSON(IDEAS_FILE, ideasData);
+      return { success: true, action: 'convert_to_task', ideaId: targetId, taskId: newTaskId, message: `Ideia convertida em tarefa ${newTaskId}` };
+    }
+
+    default:
+      return { success: false, error: `Ferramenta desconhecida: ${tool}` };
+  }
 }
 
 // ============================================================================
@@ -811,8 +1130,8 @@ module.exports = function(requireAuth) {
   router.get('/:id', requireAuth, (req, res) => {
     try {
       const ideaId = req.params.id;
-      const ideasData = readJSON(IDEAS_FILE, {});
-      const idea = ideasData.ideas && ideasData.ideas[ideaId];
+      let ideasData = readJSON(IDEAS_FILE, {});
+      let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
         return res.status(404).json({ success: false, error: 'Ideia nao encontrada' });
@@ -855,8 +1174,8 @@ module.exports = function(requireAuth) {
       const ideaId = req.params.id;
       const body = req.body;
 
-      const ideasData = readJSON(IDEAS_FILE, {});
-      const idea = ideasData.ideas && ideasData.ideas[ideaId];
+      let ideasData = readJSON(IDEAS_FILE, {});
+      let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
         return res.status(404).json({ success: false, error: 'Ideia nao encontrada' });
@@ -1225,7 +1544,7 @@ module.exports = function(requireAuth) {
   });
 
   // ==========================================================================
-  // 9. POST /api/ideas/:id/ai-chat - Chat com Gemini
+  // 9. POST /api/ideas/:id/ai-chat - Chat com Gemini + Tool Calling
   // ==========================================================================
   router.post('/:id/ai-chat', requireAuth, async (req, res) => {
     try {
@@ -1240,8 +1559,8 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: `Modo invalido. Validos: ${AI_MODES.join(', ')}` });
       }
 
-      const ideasData = readJSON(IDEAS_FILE, {});
-      const idea = ideasData.ideas && ideasData.ideas[ideaId];
+      let ideasData = readJSON(IDEAS_FILE, {});
+      let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
         return res.status(404).json({ success: false, error: 'Ideia nao encontrada' });
@@ -1264,8 +1583,12 @@ module.exports = function(requireAuth) {
           .map(i => ({ title: i.title, status: i.status, type: i.type }));
       }
 
-      // Construir prompt
-      const prompt = buildBrainstormPrompt(idea, client, history, message, mode);
+      // Carregar TODAS as ideias para contexto completo
+      const allIdeasList = ideasData.ideas ? Object.values(ideasData.ideas) : [];
+      const templatesList = ideasData.templates ? Object.values(ideasData.templates) : [];
+
+      // Construir prompt com contexto expandido
+      const prompt = buildBrainstormPrompt(idea, client, history, message, mode, allIdeasList, templatesList);
 
       // Configurar tools (grounding para modo pesquisa)
       let toolsConfig = undefined;
@@ -1273,18 +1596,72 @@ module.exports = function(requireAuth) {
         toolsConfig = [{ googleSearchRetrieval: {} }];
       }
 
-      // Chamar Gemini
-      const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: prompt,
-        config: {
-          temperature: 0.8,
-          maxOutputTokens: 2048,
-          tools: toolsConfig
-        }
-      });
+      // Chamar Gemini com fallback de modelo
+      const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+      let aiResponse = '';
+      let lastError = null;
 
-      const aiResponse = result.text;
+      for (const modelName of MODELS) {
+        try {
+          const result = await genAI.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              temperature: 0.7,
+              maxOutputTokens: 1024,
+              tools: toolsConfig
+            }
+          });
+          aiResponse = result.text;
+          if (aiResponse) break;
+        } catch (err) {
+          lastError = err;
+          const isUnavailable = err.message && err.message.includes('UNAVAILABLE');
+          const isQuota = err.message && err.message.includes('Resource exhausted');
+          if (isUnavailable || isQuota) {
+            console.warn(`[IDEAS] Modelo ${modelName} indisponivel, tentando proximo...`);
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!aiResponse) {
+        throw lastError || new Error('Todos os modelos Gemini falharam');
+      }
+
+      // Parsear tool calls da resposta
+      const toolCalls = parseToolCalls(aiResponse);
+      const actionsExecuted = [];
+
+      if (toolCalls.length > 0) {
+        // Executar cada tool call
+        for (const tc of toolCalls) {
+          const execResult = executeToolCall(tc, ideaId, req.user);
+          actionsExecuted.push(execResult);
+        }
+
+        // Remover blocos TOOL_CALL da resposta visivel
+        aiResponse = aiResponse.replace(/<TOOL_CALL>[\s\S]*?<\/TOOL_CALL>/g, '').trim();
+
+        // Se a IA nao deixou texto apos as tool calls, gerar confirmacao breve
+        if (aiResponse.length < 10) {
+          const okActions = actionsExecuted.filter(a => a.success);
+          if (okActions.length > 0) {
+            aiResponse = okActions.map(a => a.message).join('. ') + '.';
+          } else {
+            const errActions = actionsExecuted.filter(a => !a.success);
+            aiResponse = 'Erro: ' + errActions.map(a => a.error).join('. ');
+          }
+        }
+
+        // RELER ideasData do disco porque executeToolCall pode ter modificado o arquivo
+        ideasData = readJSON(IDEAS_FILE, {});
+        const reloadedIdea = ideasData.ideas && ideasData.ideas[ideaId];
+        if (reloadedIdea) {
+          idea = reloadedIdea;
+        }
+      }
 
       // Salvar mensagens no historico
       const now = new Date().toISOString();
@@ -1309,10 +1686,11 @@ module.exports = function(requireAuth) {
         content: aiResponse,
         timestamp: now,
         model: 'gemini-2.5-flash-lite',
-        groundingUsed: mode === 'pesquisa'
+        groundingUsed: mode === 'pesquisa',
+        actionsExecuted: actionsExecuted.length > 0 ? actionsExecuted : undefined
       });
 
-      // Extrair sugestoes estruturadas
+      // Extrair sugestoes estruturadas (apenas do texto limpo, nao das tool calls)
       const suggestions = extractSuggestions(aiResponse, mode);
       suggestions.forEach(sugg => {
         idea.aiContext.aiSuggestions.push({
@@ -1334,12 +1712,23 @@ module.exports = function(requireAuth) {
         data: {
           response: aiResponse,
           suggestions: suggestions,
+          actionsExecuted: actionsExecuted,
           history: idea.aiContext.brainstormHistory.slice(-10)
         }
       });
 
     } catch (err) {
       console.error('[IDEAS] AI Chat error:', err);
+      if (err.code === 'GEMINI_ALL_KEYS_EXHAUSTED') {
+        const resetTime = err.resetTime || '09:00';
+        const resetDate = err.resetDate || 'amanhã';
+        return res.status(429).json({
+          success: false,
+          error: `Limite diário do Gemini atingido. A quota reseta às ${resetTime} (${resetDate}).`,
+          quotaExhausted: true,
+          resetAt: err.resetAt
+        });
+      }
       res.status(500).json({ success: false, error: err.message });
     }
   });

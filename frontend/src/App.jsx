@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from './context/AuthContext'
-import { BugDetectorFloatingButton } from '@auris/bug-detector/react'
 import ProtectedRoute from './components/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -84,7 +83,6 @@ function ProtectedLayout() {
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <ToastContainer />
       <MobileBottomNav />
-      <BugDetectorFloatingButton position="bottom-right" color="#06b6d4" />
     </div>
   )
 }

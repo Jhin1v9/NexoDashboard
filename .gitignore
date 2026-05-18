@@ -71,3 +71,6 @@ temp/
 *.tmp
 /data/
 public/whatsapp-qr-code.png
+backend/public/
+frontend/dist/
+.env

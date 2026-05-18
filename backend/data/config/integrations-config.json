@@ -272,6 +272,23 @@
     "editedBy": null,
     "note": "SLOT RESERVADO. Ative quando tiver formulário no site nexo-digital.app."
   },
+  "whatsapp": {
+    "enabled": true,
+    "ignored": false,
+    "ignoreMentions": false,
+    "ignoreLinks": false,
+    "ignoreMessages": true,
+    "editableFields": [
+      "enabled",
+      "ignored",
+      "ignoreMentions",
+      "ignoreLinks",
+      "ignoreMessages"
+    ],
+    "lastEdited": "2026-05-18T11:00:00Z",
+    "editedBy": "system",
+    "note": "Quando 'ignored' é true, a Luna não processa mensagens do WhatsApp no dashboard nem nas respostas do chat."
+  },
   "notion": {
     "enabled": false,
     "accessMethod": "playwright",

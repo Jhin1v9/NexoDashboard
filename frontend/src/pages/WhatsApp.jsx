@@ -4,7 +4,7 @@ import {
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
   TrendingUp, Users, Clock, Zap, BarChart3, ChevronDown, ChevronUp,
   Target, ArrowUpRight, CheckCircle2, Circle, AlertCircle,
-  RefreshCw, ExternalLink, Link2, FileText
+  RefreshCw, ExternalLink, Link2, FileText, AtSign
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -658,10 +658,12 @@ export default function WhatsApp() {
   const links = data?.links || []
   const ignoredMessages = data?.ignoredMessages || []
 
+  const mentionMessages = messages.filter(m => /@(?:luna|kimi|kimiclaw)/i.test(m.text || ''))
+  
   const tabs = [
     { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
     { id: 'tasks', label: `Tarefas (${tasks.length})`, icon: CheckSquare },
-    { id: 'projects', label: 'Projetos', icon: Target },
+    { id: 'mentions', label: `Menções (${mentionMessages.length})`, icon: AtSign },
     { id: 'messages', label: `Mensagens (${messages.length})`, icon: MessageCircle },
     { id: 'ignored', label: `Ignoradas (${ignoredMessages.length})`, icon: AlertCircle },
     { id: 'links', label: `Links (${links.length})`, icon: Link2 },
@@ -735,19 +737,6 @@ export default function WhatsApp() {
       <AnimatePresence mode="wait">
         {activeTab === 'overview' && (
           <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-            {/* Progresso dos Projetos */}
-            <div>
-              <h2 className="text-lg font-bold font-heading mb-4 flex items-center gap-2">
-                <TrendingUp size={20} className="text-nexo-success" />
-                Progresso dos Projetos
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects.map((proj, i) => (
-                  <ProgressBar key={i} {...proj} />
-                ))}
-              </div>
-            </div>
-
             {/* Grupos Monitorados */}
             <div>
               <h2 className="text-lg font-bold font-heading mb-4 flex items-center gap-2">
@@ -853,72 +842,20 @@ export default function WhatsApp() {
           </motion.div>
         )}
 
-        {activeTab === 'projects' && (
-          <motion.div key="projects" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-            {/* Barra de Progresso Geral */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-bold mb-4">Progresso Geral da Empresa</h3>
-              <div className="space-y-4">
-                {projects.map((proj, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{proj.name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${proj.type === 'client' ? 'bg-nexo-success/20 text-nexo-success' : 'bg-nexo-info/20 text-nexo-info'}`}>
-                          {proj.type === 'client' ? '👤 Cliente' : '⚙️ Interno'}
-                        </span>
-                      </div>
-                      <span className="text-sm font-bold" style={{ color: proj.health === 'good' ? '#22c55e' : proj.health === 'warning' ? '#f59e0b' : '#3b82f6' }}>
-                        {proj.progress}%
-                      </span>
-                    </div>
-                    <div className="w-full h-3 bg-nexo-card rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${proj.progress}%` }}
-                        transition={{ duration: 1.2, ease: "easeOut", delay: i * 0.1 }}
-                        className="h-full rounded-full"
-                        style={{ 
-                          backgroundColor: proj.health === 'good' ? '#22c55e' : proj.health === 'warning' ? '#f59e0b' : '#3b82f6'
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs text-nexo-muted">{proj.status}</p>
-                  </div>
+        {activeTab === 'mentions' && (
+          <motion.div key="mentions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+            {mentionMessages.length > 0 ? (
+              <div className="space-y-3">
+                {mentionMessages.map((msg, i) => (
+                  <MessageBubble key={msg.id || i} msg={msg} index={i} />
                 ))}
               </div>
-              
-              {/* Média Geral */}
-              <div className="mt-6 pt-4 border-t border-nexo-border">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Média Geral</span>
-                  <span className="text-2xl font-bold text-nexo-info">
-                    {Math.round(projects.reduce((a, p) => a + p.progress, 0) / Math.max(projects.length, 1))}%
-                  </span>
-                </div>
+            ) : (
+              <div className="text-center text-nexo-muted py-12">
+                <AtSign size={48} className="mx-auto mb-4 opacity-30" />
+                <p>Nenhuma menção encontrada</p>
               </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-bold mb-4">Linha do Tempo</h3>
-              <div className="space-y-4">
-                {projects.map((proj, i) => (
-                  <div key={i} className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: proj.progress >= 60 ? '#22c55e20' : proj.progress >= 30 ? '#f59e0b20' : '#3b82f620' }}>
-                      {proj.progress >= 60 ? <CheckCircle2 size={16} className="text-nexo-success" /> :
-                       proj.progress >= 30 ? <Clock size={16} className="text-nexo-warning" /> :
-                       <Circle size={16} className="text-nexo-info" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{proj.name}</p>
-                      <p className="text-xs text-nexo-muted">{proj.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </motion.div>
         )}
 

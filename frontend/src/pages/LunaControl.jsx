@@ -8,7 +8,7 @@ import {
   Wifi, WifiOff, MessageCircle, Chrome, Play, Square,
   RotateCcw, Eye, EyeOff, ScrollText, Power, Send,
   Bot, User, ClipboardList, Trash,
-  ChevronDown, Users
+  ChevronDown, Users, Sparkles
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -253,11 +253,8 @@ export default function LunaControl() {
   }, [logs, autoScroll])
 
   useEffect(() => {
-    const currentMessages = threadMessages[activeThreadId] || []
-    const hasPreview = currentMessages.some(m => m.previewType === 'task_edit')
-    if (hasPreview && previewCardRef.current) {
-      previewCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else if (chatEndRef.current) {
+    // Sempre mantém o scroll no final do chat — nunca sobe sozinho
+    if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [threadMessages, activeThreadId])
@@ -435,13 +432,24 @@ export default function LunaControl() {
       if (text.startsWith('/')) {
         const cmd = text.slice(1).split(' ')[0]
         const res = await axios.post('/api/luna/command', { command: cmd, params: { hidden: hiddenMode } })
+        let cmdText = ''
+        if (res.data.success) {
+          const result = res.data.result || {}
+          if (cmd === 'status') {
+            cmdText = `📊 Status da Luna\n\nVersão: ${result.version || '—'}\nÚltimo scan: ${result.lastScan ? new Date(result.lastScan).toLocaleString('pt-BR') : 'Nunca'}\nMensagens no histórico: ${result.historyTotal || 0}\nMsgs no buffer: ${result.bufferMessages || 0}\nTarefas no buffer: ${result.bufferTasks || 0}\nIdeias no buffer: ${result.bufferIdeas || 0}`
+          } else {
+            cmdText = `Pronto! Comando /${cmd} executado. ☕\n\n${result.message || JSON.stringify(result, null, 2)}`
+          }
+        } else {
+          cmdText = `Eita, deu erro no /${cmd}: ${res.data.error || 'Falha'} 😅`
+        }
         const lunaMsg = {
           id: 'cmd_' + Date.now(),
           role: 'assistant',
           author: 'luna',
           authorName: 'Luna',
           authorColor: '#9b59b6',
-          text: res.data.success ? `Pronto! Comando /${cmd} executado. ☕` : `Eita, deu erro no /${cmd}: ${res.data.error || 'Falha'} 😅`,
+          text: cmdText,
           timestamp: new Date().toISOString()
         }
         setThreadMessages(prev => {
@@ -463,7 +471,9 @@ export default function LunaControl() {
             needsConfirmation: data.needsConfirmation || false,
             previewType: data.previewType || null,
             editableFields: data.editableFields || null,
-            actions: data.actions || null
+            actions: data.actions || null,
+            quotaExhausted: data.quotaExhausted || false,
+            resetAt: data.resetAt || null
           })
         }
         if (data.needsConfirmation && data.actions) {
@@ -540,13 +550,20 @@ export default function LunaControl() {
           authorColor: '#9b59b6',
           text: data.success ? data.reply : `Eita, deu erro: ${data.error || 'Falha'} 😅`,
           executed: true,
+          quotaExhausted: data.quotaExhausted || false,
+          resetAt: data.resetAt || null,
           timestamp: new Date().toISOString()
         })
       }
-      setThreadMessages(prev => ({
-        ...prev,
-        [activeThreadId]: [...(prev[activeThreadId] || []), ...newMsgs]
-      }))
+      setThreadMessages(prev => {
+        const msgs = (prev[activeThreadId] || []).map(m => {
+          if (m.previewType === 'task_edit' && m.needsConfirmation) {
+            return { ...m, needsConfirmation: false, executed: true }
+          }
+          return m
+        })
+        return { ...prev, [activeThreadId]: [...msgs, ...newMsgs] }
+      })
     } catch (e) {
       setThreadMessages(prev => ({
         ...prev,
@@ -748,6 +765,10 @@ export default function LunaControl() {
               <div className="flex items-center justify-between px-4 py-2 border-b border-nexo-border bg-nexo-bg/30">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-nexo-primary" />
+                  {/* Badge Gemini */}
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-nexo-info/10 text-nexo-info border border-nexo-info/20">
+                    <Sparkles className="w-3 h-3" /> Gemini
+                  </span>
                   {/* Dropdown de threads */}
                   <div className="relative" ref={dropdownRef}>
                     <button
@@ -841,6 +862,13 @@ export default function LunaControl() {
                                   />
                                 </div>
                               )}
+                              {/* Tarefa já executada — mostra confirmação visual */}
+                              {!msg.needsConfirmation && msg.executed && msg.previewType === 'task_edit' && (
+                                <div className="mt-2 px-3 py-2 bg-nexo-success/10 border border-nexo-success/20 rounded-lg text-xs text-nexo-success flex items-center gap-2">
+                                  <CheckCircle className="w-4 h-4" />
+                                  Tarefa criada com sucesso!
+                                </div>
+                              )}
                               {/* Botões de confirmação simples (pagamentos, despesas, etc) */}
                               {msg.needsConfirmation && msg.previewType !== 'task_edit' && (
                                 <div className="flex gap-2 mt-3">
@@ -862,6 +890,11 @@ export default function LunaControl() {
                                 {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                                 {msg.fallback && <span className="ml-2 text-yellow-400">⚡ modo rápido</span>}
                                 {msg.executed && <span className="ml-2 text-green-400">✅ executado</span>}
+                                {msg.quotaExhausted && (
+                                  <span className="ml-2 text-orange-400" title={msg.resetAt ? `Reseta em ${new Date(msg.resetAt).toLocaleString('pt-BR')}` : ''}>
+                                    ⏸️ quota esgotada
+                                  </span>
+                                )}
                               </span>
                             </div>
                           </div>

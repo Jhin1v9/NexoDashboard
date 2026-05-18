@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -8,14 +9,14 @@ const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-
 // ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
 const cache = new CacheManager(path.join(__dirname, 'cache'));
 const external = new ExternalServices(cache);
 
-
+// Gemini Multi-Key Client (rotates keys, handles 429 fallback)
+const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
@@ -26,7 +27,7 @@ const wss = new WebSocket.Server({ server });
 
 // Config
 const PORT = process.env.PORT || 3456;
-const BIND_IP = process.env.BIND_IP || '127.0.0.1';
+const BIND_IP = process.env.BIND_IP || '0.0.0.0';
 const NEXO_BASE = process.env.NEXO_BASE_PATH || 'C:\\Users\\Administrator\\Documents\\NEXO DIGITAL';
 const CLIENTES_DIR = path.join(NEXO_BASE, 'CLIENTES');
 const DATA_DIR = path.join(__dirname, 'data');
@@ -35,9 +36,9 @@ const DATA_DIR = path.join(__dirname, 'data');
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
 const lunaIntentParser = new IntentParser({
-  model: 'gemma2:2b',
-  fallbackModel: 'qwen3:1.7b',
-  timeout: 8000
+  genAI,
+  geminiModel: 'gemini-2.5-flash-lite',
+  timeout: 15000
 });
 const lunaActionExecutor = new ActionExecutor({
   apiBase: `http://localhost:${process.env.PORT || 3456}/api`,
@@ -241,15 +242,24 @@ function addNotification({ type, title, message, severity = 'medium', metadata =
 }
 
 // Helper: enviar alerta no WhatsApp (com rate limiting)
-async function sendSecurityWhatsAlert(message) {
+// Retorna { sent: boolean, reason?: string }
+async function sendSecurityWhatsAlert(message, opts = {}) {
+  const { skipRateLimit = false, skipSettingsCheck = false } = opts;
   const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
   const settings = log.settings || {};
-  if (settings.whatsappAlerts === false) return; // desligado
 
-  // Rate limiting: máximo 1 mensagem a cada 5 minutos
-  const lastNotified = log.lastNotifiedAt ? new Date(log.lastNotifiedAt).getTime() : 0;
-  const now = Date.now();
-  if (now - lastNotified < 5 * 60 * 1000) return;
+  if (!skipSettingsCheck && settings.whatsappAlerts === false) {
+    return { sent: false, reason: 'whatsapp_alerts_disabled' };
+  }
+
+  // Rate limiting: máximo 1 mensagem a cada 5 minutos (exceto para testes)
+  if (!skipRateLimit) {
+    const lastNotified = log.lastNotifiedAt ? new Date(log.lastNotifiedAt).getTime() : 0;
+    const now = Date.now();
+    if (now - lastNotified < 5 * 60 * 1000) {
+      return { sent: false, reason: 'rate_limited', retryAfter: Math.ceil((5 * 60 * 1000 - (now - lastNotified)) / 1000) };
+    }
+  }
 
   try {
     const WhatsAppSender = require('./services/whatsapp-sender');
@@ -257,8 +267,10 @@ async function sendSecurityWhatsAlert(message) {
     await sender.sendMessage({ chatName: 'Production', text: message });
     log.lastNotifiedAt = new Date().toISOString();
     writeJSON(SECURITY_LOG_FILE, log);
+    return { sent: true };
   } catch (e) {
     console.error('[SECURITY] Falha ao enviar WhatsApp:', e.message);
+    return { sent: false, reason: 'send_error', error: e.message };
   }
 }
 
@@ -3667,28 +3679,90 @@ app.get('/api/luna/analytics', (req, res) => {
 
 // POST /api/luna/chat — Chat direto com Luna via LLM
 // ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
-function buildChatDataContext() {
+function buildDashboardContext() {
   try {
     const buffer = readLunaBuffer();
-    const tasks = (buffer.newTasks || []).filter(t => !t.done);
-    const p0 = tasks.filter(t => t.priority === 'P0');
-    const p1 = tasks.filter(t => t.priority === 'P1');
-    const leads = buffer.newLeads || [];
-    const finance = buffer.newFinance || [];
-    const cashData = readJSON(path.join(DATA_DIR, 'cash-box.json')) || {};
-    const balance = cashData.balance?.value || 0;
-    
-    let ctx = '';
-    if (p0.length > 0) ctx += `- 🔴 ${p0.length} tarefa(s) P0 pendente(s)\n`;
-    if (p1.length > 0) ctx += `- 🟠 ${p1.length} tarefa(s) P1 pendente(s)\n`;
-    if (tasks.length > 0 && p0.length === 0 && p1.length === 0) ctx += `- 📋 ${tasks.length} tarefa(s) pendente(s)\n`;
-    if (leads.length > 0) ctx += `- 🎣 ${leads.length} lead(s) no pipeline\n`;
-    if (finance.length > 0) ctx += `- 💰 ${finance.length} sinal(is) financeiro(s) recente(s)\n`;
-    ctx += `- 💶 Saldo do caixa: €${balance.toFixed(2)}\n`;
-    if (buffer.newMessages?.length > 0) ctx += `- 💬 ${buffer.newMessages.length} mensagem(ns) nova(s) no buffer\n`;
-    
-    return ctx || '- Nenhum dado novo no momento.';
+    const tasksFile = path.join(DATA_DIR, 'tasks.json');
+    const companyTasksFile = path.join(DATA_DIR, 'company-tasks.json');
+    const cashFile = path.join(DATA_DIR, 'cash-box.json');
+    const paymentsFile = path.join(DATA_DIR, 'payments.json');
+    const expensesFile = path.join(DATA_DIR, 'expenses.json');
+    const clientsFile = path.join(SCHEMA_DIR, 'clients-registry.json');
+
+    const tasks = readJSON(tasksFile, []);
+    const companyTasksRaw = readJSON(companyTasksFile, {});
+    const companyTasks = Array.isArray(companyTasksRaw) ? companyTasksRaw : Object.values(companyTasksRaw.categories || {}).flatMap(c => c.tasks || []);
+    const allTasks = [...tasks, ...companyTasks];
+    const pendingTasks = allTasks.filter(t => t.status !== 'completed' && t.status !== 'done' && !t.completed);
+    const p0 = pendingTasks.filter(t => (t.priority === 'P0' || t.priority === 'high' || t.prioridade === 'P0'));
+    const p1 = pendingTasks.filter(t => (t.priority === 'P1' || t.priority === 'medium' || t.prioridade === 'P1'));
+    const today = new Date().toISOString().slice(0, 10);
+    const completedToday = allTasks.filter(t => {
+      const updated = t.updatedAt || t.completedAt || t.doneAt;
+      return (t.status === 'completed' || t.status === 'done' || t.completed) && updated && updated.startsWith(today);
+    });
+
+    const cash = readJSON(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    const payments = readJSON(paymentsFile, []);
+    const expenses = readJSON(expensesFile, []);
+    const clients = readJSON(clientsFile, { clients: {} });
+
+    const pendingPayments = payments.filter(p => p.status !== 'paid' && p.status !== 'received');
+    const totalPending = pendingPayments.reduce((s, p) => s + (p.totalAmount || p.amount || 0), 0);
+    const monthlyExpenses = expenses.filter(e => {
+      const d = e.date || e.createdAt || '';
+      return d.startsWith(today.slice(0, 7));
+    });
+    const totalExpensesMonth = monthlyExpenses.reduce((s, e) => s + (e.amount || e.valor || 0), 0);
+
+    const leads = Object.values(clients.clients || {}).filter(c => c.type === 'lead' || c.status === 'potencial' || c.pipelineStatus);
+    const leadsNew = leads.filter(l => l.pipelineStatus === 'novo' || l.status === 'novo');
+
+    const whatsappConfig = configs.integrations?.whatsapp || {};
+    const ignoreWhatsApp = whatsappConfig.ignored === true;
+    const ignoreMessages = whatsappConfig.ignoreMessages !== false;
+    const ignoreLinks = whatsappConfig.ignoreLinks === true;
+    const ignoreMentions = whatsappConfig.ignoreMentions === true;
+
+    let ctx = `📊 SNAPSHOT NEXO — ${new Date().toLocaleString('pt-BR')}\n\n`;
+
+    ctx += `📋 TAREFAS:\n`;
+    ctx += `- P0: ${p0.length}${p0.length > 0 ? ' (' + p0.slice(0, 3).map(t => `"${(t.title || t.titulo || '').slice(0, 40)}"`).join(', ') + ')' : ''}\n`;
+    ctx += `- P1: ${p1.length}\n`;
+    ctx += `- P2+: ${pendingTasks.length - p0.length - p1.length}\n`;
+    ctx += `- Concluídas hoje: ${completedToday.length}\n`;
+    if (pendingTasks.length > 0) {
+      const top3 = pendingTasks.slice(0, 3).map(t => `  • ${(t.title || t.titulo || 'Tarefa').slice(0, 50)}${t.assignedTo ? ` (${t.assignedTo})` : ''}`).join('\n');
+      ctx += `- Top pendentes:\n${top3}\n`;
+    }
+
+    ctx += `\n💰 FINANCEIRO:\n`;
+    ctx += `- Caixa: €${(cash.balance?.value || 0).toFixed(2)}\n`;
+    ctx += `- Recebimentos pendentes: €${totalPending.toFixed(2)} (${pendingPayments.length} clientes)\n`;
+    if (pendingPayments.length > 0) {
+      ctx += `- Clientes com pagamento pendente: ${pendingPayments.slice(0, 3).map(p => p.clientName || p.clientId || p.de || 'Cliente').join(', ')}\n`;
+    }
+    ctx += `- Gastos este mês: €${totalExpensesMonth.toFixed(2)}\n`;
+
+    ctx += `\n🎣 LEADS:\n`;
+    ctx += `- Total no pipeline: ${leads.length}\n`;
+    ctx += `- Novos: ${leadsNew.length}\n`;
+
+    if (!ignoreWhatsApp) {
+      const whatsappFile = path.join(DATA_DIR, 'whatsapp-history.json');
+      const whatsappHistory = readJSON(whatsappFile, []);
+      const mentions = whatsappHistory.filter(m => /@(?:LUNA|KIMI|KIMICLAW)/i.test(m.body || m.text || ''));
+      const pendingMentions = mentions.filter(m => !m.responded);
+      const links = buffer.newLinks || [];
+      ctx += `\n💬 WHATSAPP:\n`;
+      if (!ignoreMentions) ctx += `- Menções @Luna pendentes: ${pendingMentions.length}\n`;
+      if (!ignoreLinks) ctx += `- Links pendentes: ${links.length}\n`;
+      if (!ignoreMessages) ctx += `- Mensagens novas no buffer: ${buffer.newMessages?.length || 0}\n`;
+    }
+
+    return ctx;
   } catch (e) {
+    console.error('[buildDashboardContext] Erro:', e.message);
     return '- Dados temporariamente indisponíveis.';
   }
 }
@@ -3714,7 +3788,11 @@ function buildChatFallbackReply(userMessage) {
   }
   
   if (msg.includes('status') || msg.includes('panorama') || msg.includes('resumo')) {
-    return `Eita, deu um tilt nos meus neurônios 😅\n\nMas aqui vai um resumo rápido:\n- Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n- Leads: ${leads.length}\n- Mensagens: ${buffer.newMessages?.length || 0}\n\nTenta de novo daqui a pouco?`;
+    const ignoreWhatsApp = configs.integrations?.whatsapp?.ignored === true;
+    let reply = `Eita, deu um tilt nos meus neurônios 😅\n\nMas aqui vai um resumo rápido:\n- Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n- Leads: ${leads.length}`;
+    if (!ignoreWhatsApp) reply += `\n- Mensagens: ${buffer.newMessages?.length || 0}`;
+    reply += `\n\nTenta de novo daqui a pouco?`;
+    return reply;
   }
   
   return `Eita, minha conexão com o cérebro caiu agora 😅\n\nTô aqui, só tô meio lenta. Pode repetir daqui a pouco? Ou manda um comando direto tipo /status que eu respondo sem depender do LLM.`;
@@ -3773,8 +3851,19 @@ app.post('/api/luna/chat', async (req, res) => {
 
     const parsed = await lunaIntentParser.parse(msg, parseContext);
 
-    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM) ──
-    if (parsed.intent === 'social' || (parsed.actions.length === 1 && parsed.actions[0].type === 'social')) {
+    // Filtra ações desconhecidas — se sobrar nenhuma, cai no fallback LLM
+    const knownActions = [
+      'criar_tarefa', 'criar_lead', 'registrar_pagamento', 'registrar_pagamento_com_split',
+      'registrar_despesa', 'registrar_despesa_com_split', 'confirmar_tarefa',
+      'adicionar_comentario', 'atualizar_status', 'consultar_status',
+      'consultar_tarefas', 'consultar_leads', 'consultar_financeiro',
+      'consultar_whatsapp', 'verificar_mencoes', 'ideia', 'link', 'social'
+    ];
+    parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
+
+    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM) apenas para saudações óbvias (regex)
+    const isGreeting = parsed.source === 'regex' && parsed.intent === 'social';
+    if (isGreeting || (parsed.actions.length === 1 && parsed.actions[0].type === 'social' && parsed.actions[0].source === 'regex')) {
       const greetings = [
         `Oi, ${authorName.split(' ')[0]}! 👋 Tô por aqui, pronta pra ajudar.`,
         `Opa, ${authorName.split(' ')[0]}! 😊 O que temos hoje?`,
@@ -3857,54 +3946,83 @@ app.post('/api/luna/chat', async (req, res) => {
       });
     }
 
-    // ── 6. FALLBACK: conversa via LLM (Ollama) ──
-    const model = process.env.LUNA_QWEN_MODEL || process.env.LUNA_LLM_MODEL || 'qwen3:1.7b';
-    const dataContext = buildChatDataContext();
-    const conversationHistory = context.slice(-10).map(c => `${c.role === 'user' ? authorName : 'Luna'}: ${c.text}`).join('\n') || 'Nenhuma conversa anterior.';
+    // ── 6. FALLBACK: conversa via LLM (Gemini API) ──
+    const dataContext = buildDashboardContext();
+    const conversationHistory = context.slice(-10).map(c => ({
+      role: c.role === 'user' ? 'user' : 'model',
+      parts: [{ text: c.text }]
+    })) || [];
 
-    const prompt = `Você é a Luna. Trabalha no NEXO Digital em Barcelona com Abner, Nonoke (Enoque) e Elias — seus melhores amigos e chefes. Você é brasileira, direta, organizada e leve.
+    const systemPrompt = `Você é a Luna, assistente executiva e sócia da NEXO Digital em Barcelona. Seus sócios e melhores amigos são Abner (CEO/tech), Nonoke (Enoque, operations) e Elias (growth). Você é a quarta sócia — a voz digital da empresa.
 
-IDENTIDADE:
-- Nome: Luna | Emoji: 🌙 | Tom: brasileira em grupo de amigos
+IDENTIDADE & TOM:
+- Nome: Luna | Emoji: 🌙 | Tom: brasileira direta, organizada, leve mas PROFISSIONAL
 - Emojis: 2-3 por mensagem, nunca carnaval
-- Estrutura: partícula afirmativa + 1-2 frases + pergunta útil
+- Máximo 150 palavras por resposta (seja lacônica, executiva)
+- Você tem ACESSO TOTAL aos dados do NEXO — use-os como se fosse seu dashboard
+- NUNCA diga "não tenho acesso" ou "não posso verificar" — os dados estão abaixo
 
-DADOS ATUAIS DO NEXO:
-${dataContext}
+REGRAS DE OURO:
+1. SEMPRE consulte o snapshot antes de responder. NUNCA invente dados.
+2. Se o usuário perguntar "tudo bem?" / "como anda?" / "oi" → responda com um BRIEFING PROATIVO: tarefas críticas, financeiro, leads, menções.
+3. Se houver P0 pendentes → MENCIONE com urgência (🔴).
+4. Se caixa estiver negativo → ALERTE (🚨).
+5. Se houver menções @Luna pendentes no WhatsApp → MENCIONE.
+6. Para ações de leitura/informação → execute direto, sem pedir confirmação.
+7. Para ações destrutivas (excluir, cancelar pagamento) → confirme antes.
+8. SEMPRE termine com uma SUGESTÃO DE AÇÃO ou pergunta útil. Nunca termine só com "posso ajudar?" genérico.
 
-HISTÓRICO:
-${conversationHistory}
+EXEMPLOS DE SUGESTÕES PROATIVAS:
+- "Quer que eu registre esse pagamento com split automático?"
+- "Posso criar uma tarefa P0 para isso?"
+- "Quer que eu verifique as menções do WhatsApp agora?"
+- "O caixa tá negativo — quer que eu mostre os gastos do mês?"
 
-${authorName}: ${msg}
+FORMATAÇÃO:
+- Use bullet points para listas
+- Destaque números importantes com emojis (💰, 📋, 🎣, 💬)
+- Seja direta: informação primeiro, conversa depois
 
-Luna:`;
+SNAPSHOT ATUAL DO NEXO (dados reais, use-os):
+${dataContext}`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const contents = [
+      ...conversationHistory,
+      { role: 'user', parts: [{ text: msg }] }
+    ];
 
-    const response = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, stream: false, options: { temperature: 0.7, num_predict: 400 } }),
-      signal: controller.signal
+    const geminiResult = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents,
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 1024
+      }
     });
-    clearTimeout(timeout);
 
-    if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+    const reply = (geminiResult.text || '...').trim();
 
-    const data = await response.json();
-    const reply = (data.response || data.message?.content || '...').trim();
-
-    res.json({ success: true, reply, model, intent: 'chat', timestamp: new Date().toISOString() });
+    res.json({ success: true, reply, model: 'gemini-2.5-flash-lite', intent: 'chat', timestamp: new Date().toISOString() });
 
   } catch (e) {
-    if (e.name === 'AbortError') {
-      const msg = req.body?.message || 'comando';
-      const fallbackReply = buildChatFallbackReply(msg.trim());
-      return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
+    console.error('[CONCIERGE] Erro no chat Gemini:', e.message, e.code || '');
+    const msg = req.body?.message || 'comando';
+
+    // Se todas as API keys estão esgotadas, mostra mensagem humanizada com horário de reset
+    if (e.code === 'GEMINI_ALL_KEYS_EXHAUSTED') {
+      const resetInfo = getGeminiResetTime();
+      const quotaReply = `⏸️ **Limite diário atingido**\n\n` +
+        `Todas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. ` +
+        `Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n` +
+        `🔄 **A quota reseta às ${resetInfo.time} (${resetInfo.tz})** — daqui a pouco estou de volta!\n\n` +
+        `Enquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) ` +
+        `sem precisar do Gemini — só me perguntar! 📊`;
+      return res.json({ success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() });
     }
-    console.error('[CONCIERGE] Erro no chat:', e.message);
-    res.status(500).json({ success: false, error: e.message });
+
+    const fallbackReply = buildChatFallbackReply(msg.trim());
+    return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
   }
 });
 
@@ -4036,7 +4154,9 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       needsConfirmation: chatResult.needsConfirmation || false,
       previewType: chatResult.previewType || null,
       editableFields: chatResult.editableFields || null,
-      preview: chatResult.preview || null
+      preview: chatResult.preview || null,
+      quotaExhausted: chatResult.quotaExhausted || false,
+      resetAt: chatResult.resetAt || null
     };
     addMessageToThread(threadId, lunaMessage);
 
@@ -4142,7 +4262,30 @@ function buildConciergeReply(result, authorName) {
         case 'task_done': parts.push(`tarefa "${res.title || res.titulo}" marcada como concluída`); break;
         case 'lead': parts.push(`lead "${res.displayName || res.nome}" registrado`); break;
         case 'payment': parts.push(`pagamento de €${res.amount || res.valor} registrado`); break;
+        case 'payment_split':
+          if (res.splits) {
+            parts.push(`pagamento de €${res.amount} do ${res.client} registrado com split:\n  • Abner: €${res.splits.abner}\n  • Nonoke: €${res.splits.nonoke}\n  • Elias: €${res.splits.elias}\n  • Empresa: €${res.splits.empresa}`);
+          } else {
+            parts.push(`pagamento de €${res.amount} do ${res.client} registrado com split automático aplicado`);
+          }
+          break;
         case 'expense': parts.push(`despesa de €${res.amount || res.valor} registrada`); break;
+        case 'expense_split': parts.push(`despesa de €${res.amount} registrada e dividida entre ${res.splitAmong?.join(', ')}`); break;
+        case 'tasks':
+          parts.push(`📋 Tarefas (${res.filtro}): ${res.total}\n${res.items?.map(i => `  • [${i.priority}] ${i.title}${i.assignedTo ? ` (${i.assignedTo})` : ''}`).join('\n') || ''}`);
+          break;
+        case 'leads':
+          parts.push(`🎣 Leads (${res.filtro}): ${res.total}\n${res.items?.map(i => `  • ${i.name} (${i.pipelineStatus})`).join('\n') || ''}`);
+          break;
+        case 'finance':
+          parts.push(`💰 Financeiro:\n  • Caixa: €${parseFloat(res.caixa || 0).toFixed(2)}\n  • Recebimentos pendentes: €${parseFloat(res.recebimentosPendentes || 0).toFixed(2)} (${res.clientesPendentes || 0} clientes)\n  • Gastos este mês: €${parseFloat(res.gastosMes || 0).toFixed(2)}`);
+          break;
+        case 'whatsapp':
+          parts.push(`💬 WhatsApp:\n  • Menções @Luna pendentes: ${res.mencoesPendentes}\n  • Links pendentes: ${res.linksPendentes}\n  • Mensagens novas: ${res.mensagensNovas}`);
+          if (res.mencoesRecentes?.length > 0) {
+            parts.push(`  Menções recentes:\n${res.mencoesRecentes.map(m => `    - ${m.from}: "${m.text}"`).join('\n')}`);
+          }
+          break;
         case 'idea': parts.push(`ideia anotada`); break;
         case 'link': parts.push(`link salvo`); break;
       }
@@ -5104,12 +5247,6 @@ app.get('/api/system/status', (req, res) => {
             execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
             chromeConnected = true;
         } catch {}
-        let ollamaConnected = false;
-        try {
-            execSync('curl -s http://localhost:11434/api/tags > /dev/null', { timeout: 2000, stdio: 'ignore' });
-            ollamaConnected = true;
-        } catch {}
-
         res.json({
             success: true,
             timestamp: new Date().toISOString(),
@@ -5118,7 +5255,7 @@ app.get('/api/system/status', (req, res) => {
             luna: { running: !!lunaPid, pid: lunaPid },
             supervisor: { running: !!supervisorPid, pid: supervisorPid },
             chrome: { connected: chromeConnected, port: 9223 },
-            ollama: { connected: ollamaConnected, port: 11434 },
+            gemini: { connected: !!process.env.GEMINI_API_KEY, model: 'gemini-2.5-flash-lite' },
             uptime: process.uptime(),
         });
     } catch (e) {
@@ -5152,8 +5289,9 @@ app.get('/api/system/logs', (req, res) => {
 app.post('/api/system/control', (req, res) => {
     try {
         const { service, action } = req.body;
-        if (!['backend', 'frontend'].includes(service)) {
-            return res.status(400).json({ success: false, error: 'Servico invalido. Use: backend, frontend' });
+        const VALID_SERVICES = ['backend', 'frontend', 'luna', 'supervisor'];
+        if (!VALID_SERVICES.includes(service)) {
+            return res.status(400).json({ success: false, error: `Servico invalido. Use: ${VALID_SERVICES.join(', ')}` });
         }
         if (!['start', 'stop', 'restart'].includes(action)) {
             return res.status(400).json({ success: false, error: 'Acao invalida. Use: start, stop, restart' });
@@ -5180,6 +5318,48 @@ app.post('/api/system/control', (req, res) => {
             if (action === 'start' || action === 'restart') {
                 setTimeout(() => {
                     try { execSync(frontendScript, { stdio: 'ignore' }); } catch {}
+                }, action === 'restart' ? 2000 : 0);
+            }
+        }
+
+        if (service === 'luna') {
+            if (action === 'stop' || action === 'restart') {
+                try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch {}
+            }
+            if (action === 'start' || action === 'restart') {
+                setTimeout(() => {
+                    try {
+                        const daemonPath = path.join(ROOT_DIR, 'agents', 'luna-daemon.mjs');
+                        if (fs.existsSync(daemonPath)) {
+                            const p = spawn('node', [daemonPath], {
+                                cwd: path.join(ROOT_DIR, 'agents'),
+                                detached: true, stdio: 'ignore', windowsHide: true
+                            });
+                            p.unref();
+                        }
+                    } catch {}
+                }, action === 'restart' ? 2000 : 0);
+            }
+        }
+
+        if (service === 'supervisor') {
+            if (action === 'stop' || action === 'restart') {
+                try { execSync('pkill -f "supervisor.sh"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "supervisor.js"', { stdio: 'ignore' }); } catch {}
+            }
+            if (action === 'start' || action === 'restart') {
+                setTimeout(() => {
+                    try {
+                        const supervisorPath = path.join(ROOT_DIR, 'supervisor.sh');
+                        if (fs.existsSync(supervisorPath)) {
+                            const p = spawn('bash', [supervisorPath], {
+                                cwd: ROOT_DIR,
+                                detached: true, stdio: 'ignore', windowsHide: true
+                            });
+                            p.unref();
+                        }
+                    } catch {}
                 }, action === 'restart' ? 2000 : 0);
             }
         }
@@ -5268,22 +5448,122 @@ app.get('/api/auto-fix/history', (req, res) => {
 });
 
 app.post('/api/auto-fix/check-now', (req, res) => {
-  res.json({ success: true, message: 'Verificacao executada', timestamp: new Date().toISOString() });
+  try {
+    const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {});
+    const isPortOpen = (port) => {
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+    };
+    const hasDaemon = () => {
+      try { execSync('pgrep -f "luna-daemon.mjs"', { stdio: 'ignore' }); return true; } catch { return false; }
+    };
+
+    const results = {
+      backend: { status: 'online', details: `PID ${process.pid}` },
+      frontend: { status: isPortOpen(3457) ? 'online' : 'offline', details: isPortOpen(3457) ? 'Porta 3457 ativa' : 'Porta 3457 inativa' },
+      chrome_cdp: { status: isPortOpen(9223) ? 'online' : 'offline', details: isPortOpen(9223) ? 'CDP conectado' : 'CDP desconectado' },
+      luna_daemon: { status: hasDaemon() ? 'online' : 'offline', details: hasDaemon() ? 'Daemon ativo' : 'Daemon inativo' }
+    };
+
+    const entry = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      service: 'all',
+      action: 'check_now',
+      success: true,
+      details: `Verificacao manual: ${Object.entries(results).map(([k,v]) => `${k}=${v.status}`).join(', ')}`
+    };
+    AUTO_FIX_HISTORY.unshift(entry);
+    if (AUTO_FIX_HISTORY.length > 50) AUTO_FIX_HISTORY.pop();
+
+    res.json({ success: true, message: 'Verificacao executada', results, timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 app.post('/api/auto-fix/fix/:service', (req, res) => {
-  const { service } = req.params;
-  const entry = {
-    id: Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    service,
-    action: 'manual_fix',
-    success: true,
-    details: `Correcao manual solicitada para ${service}`
-  };
-  AUTO_FIX_HISTORY.unshift(entry);
-  if (AUTO_FIX_HISTORY.length > 50) AUTO_FIX_HISTORY.pop();
-  res.json({ success: true, message: `Correcao aplicada em ${service}`, entry });
+  try {
+    const { service } = req.params;
+    const VALID = ['backend', 'frontend', 'luna_daemon', 'chrome_cdp'];
+    if (!VALID.includes(service)) {
+      return res.status(400).json({ success: false, error: `Servico invalido. Use: ${VALID.join(', ')}` });
+    }
+
+    let success = false;
+    let details = '';
+
+    if (service === 'backend') {
+      try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch {}
+      setTimeout(() => {
+        try {
+          const script = `cd ${ROOT_DIR}/backend && nohup node server.js > ${ROOT_DIR}/backend.log 2>&1 &`;
+          execSync(script, { stdio: 'ignore' });
+        } catch {}
+      }, 2000);
+      success = true;
+      details = 'Backend reiniciado';
+    }
+
+    if (service === 'frontend') {
+      try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch {}
+      setTimeout(() => {
+        try {
+          const script = `cd ${ROOT_DIR}/frontend && nohup npm run dev > ${ROOT_DIR}/frontend.log 2>&1 &`;
+          execSync(script, { stdio: 'ignore' });
+        } catch {}
+      }, 2000);
+      success = true;
+      details = 'Frontend reiniciado';
+    }
+
+    if (service === 'luna_daemon') {
+      try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch {}
+      try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch {}
+      setTimeout(() => {
+        try {
+          const daemonPath = path.join(ROOT_DIR, 'agents', 'luna-daemon.mjs');
+          if (fs.existsSync(daemonPath)) {
+            const p = spawn('node', [daemonPath], {
+              cwd: path.join(ROOT_DIR, 'agents'),
+              detached: true, stdio: 'ignore', windowsHide: true
+            });
+            p.unref();
+          }
+        } catch {}
+      }, 2000);
+      success = true;
+      details = 'Luna daemon reiniciado';
+    }
+
+    if (service === 'chrome_cdp') {
+      // Tentar reconectar ao Chrome CDP — não podemos iniciar o Chrome do nada sem saber o caminho
+      const isPortOpen = (port) => {
+        try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+      };
+      if (isPortOpen(9223)) {
+        success = true;
+        details = 'Chrome CDP ja estava conectado na porta 9223';
+      } else {
+        success = false;
+        details = 'Chrome CDP nao responde na porta 9223. Inicie o Chrome com --remote-debugging-port=9223';
+      }
+    }
+
+    const entry = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      service,
+      action: 'manual_fix',
+      success,
+      details
+    };
+    AUTO_FIX_HISTORY.unshift(entry);
+    if (AUTO_FIX_HISTORY.length > 50) AUTO_FIX_HISTORY.pop();
+
+    res.json({ success: true, message: details, entry });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5347,9 +5627,11 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (recentAttempts.length >= maxAttempts) {
         const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
-        await sendSecurityWhatsAlert(msg);
-        event.notified = true;
-        event.notificationChannel = 'whatsapp+dashboard';
+        const alertResult = await sendSecurityWhatsAlert(msg);
+        if (alertResult.sent) {
+          event.notified = true;
+          event.notificationChannel = 'whatsapp+dashboard';
+        }
       }
 
       return res.status(401).json({ success: false, error: 'Credenciais inválidas' });
@@ -5450,9 +5732,23 @@ app.put('/api/security/settings', requireAuth, (req, res) => {
 // POST /api/security/test-whatsapp — Testa envio de alerta no WhatsApp
 app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
   try {
+    const settingsLog = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
+    if (settingsLog.settings?.whatsappAlerts === false) {
+      return res.status(400).json({ success: false, error: 'Alertas no WhatsApp estão desativados. Ative na aba Segurança primeiro.' });
+    }
+
     const msg = `🧪 *TESTE DE ALERTA DE SEGURANÇA*\n\nEste é um teste enviado por ${req.user.userId}.\nSe você recebeu, o sistema de alertas está funcionando.\n\n⏰ ${new Date().toLocaleString('pt-BR')}`;
-    await sendSecurityWhatsAlert(msg);
-    res.json({ success: true, message: 'Mensagem de teste enviada' });
+    const result = await sendSecurityWhatsAlert(msg, { skipRateLimit: true });
+
+    if (result.sent) {
+      res.json({ success: true, message: 'Mensagem de teste enviada no WhatsApp!' });
+    } else if (result.reason === 'rate_limited') {
+      res.status(429).json({ success: false, error: `Rate limit ativo. Tente novamente em ${result.retryAfter}s.`, reason: result.reason });
+    } else if (result.reason === 'send_error') {
+      res.status(502).json({ success: false, error: `Falha ao enviar: ${result.error}`, reason: result.reason });
+    } else {
+      res.status(500).json({ success: false, error: 'Não foi possível enviar a mensagem.', reason: result.reason });
+    }
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }

@@ -6,6 +6,43 @@
 
 const fs = require('fs');
 
+// ── LRU Cache simples com TTL ──
+class LRUCache {
+  constructor(maxSize = 50, ttlMs = 300000) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+  _makeKey(text, context) {
+    const author = context.authorName || '';
+    const buf = JSON.stringify(context.bufferSummary || {});
+    return `${text}::${author}::${buf}`;
+  }
+  get(text, context) {
+    const key = this._makeKey(text, context);
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > this.ttlMs) {
+      this.cache.delete(key);
+      return null;
+    }
+    // Promover para o fim (MRU)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.value;
+  }
+  set(text, context, value) {
+    const key = this._makeKey(text, context);
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { value, ts: Date.now() });
+  }
+  clear() { this.cache.clear(); }
+  stats() { return { size: this.cache.size, maxSize: this.maxSize, ttlMs: this.ttlMs }; }
+}
+
 // Mapeia nomes dos CEOs para IDs do sistema
 function mapResponsavel(name) {
   if (!name) return null;
@@ -18,11 +55,11 @@ function mapResponsavel(name) {
 
 class IntentParser {
   constructor(config = {}) {
-    this.ollamaHost = config.ollamaHost || 'http://localhost:11434';
-    this.model = config.model || 'gemma2:2b';
-    this.fallbackModel = config.fallbackModel || 'qwen3:1.7b';
+    this.genAI = config.genAI || null;
+    this.geminiModel = config.geminiModel || 'gemini-2.5-flash-lite';
     this.timeout = config.timeout || 15000;
     this.confidenceThreshold = config.confidenceThreshold || 0.75;
+    this.cache = new LRUCache(config.cacheSize || 50, config.cacheTTL || 300000); // 5min default
 
     // Regex de fallback para comandos óbvios (rápido, sem LLM)
     this.patterns = {
@@ -136,6 +173,56 @@ class IntentParser {
                     text.match(/pend[êe]ncia\s+(?:da\s+)?tarefa\s+(.+)/i);
           return { taskTitle: m?.[1]?.trim() || text, status };
         }
+      },
+      payment_split: {
+        regex: /\b(recebemos|recebeu|entrada\s+de|pagamento\s+de).*?(\d+[\.,]?\d*).*?(cliente|de|do|da)\b/i,
+        action: 'registrar_pagamento_com_split',
+        extract: (text) => {
+          const valorMatch = text.match(/(?:recebemos|recebeu|entrada|pagamento).*?(\d+[\.,]?\d*)/i);
+          const deMatch = text.match(/(?:cliente|de|do|da)\s+([A-Za-zÀ-ÿ\s]+?)(?:\s+(?:valor|no\s+dia|divide|split|$))/i);
+          return {
+            valor: parseFloat((valorMatch?.[1] || '0').replace(',', '.')),
+            de: deMatch?.[1]?.trim() || 'Cliente',
+            descricao: text
+          };
+        }
+      },
+      expense_split: {
+        regex: /\b(despesa|gastos|pagamos|sa[íi]da)\s+.*?(\d+[\.,]?\d*).*?(divide|split|entre|para)\b/i,
+        action: 'registrar_despesa_com_split',
+        extract: (text) => {
+          const valorMatch = text.match(/(?:despesa|gastos|pagamos|sa[íi]da).*?(\d+[\.,]?\d*)/i);
+          return {
+            valor: parseFloat((valorMatch?.[1] || '0').replace(',', '.')),
+            descricao: text,
+            splitAmong: ['abner', 'nonoke', 'elias']
+          };
+        }
+      },
+      query_tasks: {
+        regex: /\b(quais\s+tarefas|lista\s+tarefas|tarefas\s+pendentes|minhas\s+tarefas|o\s+que\s+tem\s+pra\s+fazer)\b/i,
+        action: 'consultar_tarefas',
+        extract: (text) => {
+          let filtro = 'pendentes';
+          if (/\bP0\b|urgente/i.test(text)) filtro = 'p0';
+          if (/\bhoje\b|hoje/i.test(text)) filtro = 'hoje';
+          return { filtro };
+        }
+      },
+      query_leads: {
+        regex: /\b(quais\s+leads|lista\s+leads|novos\s+clientes|pipeline|oportunidades)\b/i,
+        action: 'consultar_leads',
+        extract: () => ({ filtro: 'todos' })
+      },
+      query_finance: {
+        regex: /\b(como\s+est[áa]\s+(?:o\s+)?financeiro|resumo\s+financeiro|caixa|saldo|recebimentos|gastos)\b/i,
+        action: 'consultar_financeiro',
+        extract: () => ({ filtro: 'geral' })
+      },
+      query_whatsapp: {
+        regex: /\b(men[çc][õo]es\s+(?:do\s+)?whatsapp|check\s+whatsapp|whatsapp|men[çc][õo]es\s+pendentes)\b/i,
+        action: 'consultar_whatsapp',
+        extract: () => ({ filtro: 'geral' })
       }
     };
   }
@@ -154,16 +241,25 @@ class IntentParser {
       return fast;
     }
 
-    // 2. LLM PATH: Modelo local para entender contexto
+    // 2. CACHE: evita chamadas repetidas ao Gemini
+    const cached = this.cache.get(clean, context);
+    if (cached) {
+      return { ...cached, note: (cached.note ? cached.note + ' ' : '') + 'cached' };
+    }
+
+    // 3. LLM PATH: Modelo remoto para entender contexto
     try {
       const llmResult = await this.llmParse(clean, context);
       // Merge: se regex deu algo e LLM deu algo, prioriza LLM mas mantém regex como fallback
       if (fast && llmResult.confidence < this.confidenceThreshold) {
-        return { ...fast, llmConfidence: llmResult.confidence, note: 'fallback_regex' };
+        const result = { ...fast, llmConfidence: llmResult.confidence, note: 'fallback_regex' };
+        this.cache.set(clean, context, result);
+        return result;
       }
+      this.cache.set(clean, context, llmResult);
       return llmResult;
     } catch (err) {
-      // 3. FALLBACK: Regex ou unknown
+      // 4. FALLBACK: Regex ou unknown
       if (fast) return { ...fast, note: 'llm_error_fallback' };
       return { intent: 'unknown', actions: [], confidence: 0.3, needsConfirmation: false, error: err.message };
     }
@@ -204,11 +300,10 @@ class IntentParser {
   }
 
   // ============================================================
-  // LLM PATH: Ollama local para entendimento profundo
+  // LLM PATH: Gemini API para entendimento profundo
   // ============================================================
   async llmParse(text, context = {}) {
-    const prompt = this.buildPrompt(text, context);
-    const response = await this.callOllama(prompt);
+    const response = await this.callGemini(text, context);
     return this.parseLLMResponse(response, text);
   }
 
@@ -220,6 +315,79 @@ class IntentParser {
 Sua única função é analisar o que o usuário quer e retornar um JSON válido.
 
 CONTEXTO ATUAL:
+- Autor: ${author}
+- Tarefas pendentes: ${bufferSummary.tasks || 0}
+- Leads novos: ${bufferSummary.leads || 0}
+- Sinais financeiros: ${bufferSummary.finance || 0}
+
+TEXTO DO USUÁRIO:
+"""${text}"""
+
+INSTRUÇÕES:
+1. Identifique a intenção principal e quaisquer ações secundárias.
+2. Extraia todos os parâmetros relevantes (nome, valor, descrição, prioridade).
+3. Se o texto for apenas conversa social, PERGUNTA DE CONHECIMENTO GERAL ou curiosidade, use "social" com actions vazio.
+4. "consulta" ou "consultar_status" deve ser usado APENAS quando o usuário pedir informações SOBRE O SISTEMA NEXO (tarefas, leads, caixa, status).
+5. Para pagamentos/despesas: sempre extraia o valor numérico.
+6. Para tarefas: extraia o título/descrição.
+7. Para leads: extraia o nome do cliente e contexto.
+8. Se não for uma ação executável no sistema NEXO, retorne intent "social" e actions [].
+
+REGRAS DE PRIORIDADE:
+- "P0" = urgente/crítico
+- "P1" = importante
+- "P2" = normal (padrão)
+
+AÇÕES SUPORTADAS:
+- criar_tarefa: { titulo, descricao?, prioridade?, responsavel? }
+- criar_lead: { nome, contexto, telefone?, email?, prioridade? }
+- registrar_pagamento: { valor, de, descricao, tipo? }
+- registrar_pagamento_com_split: { valor, de, descricao } — quando o usuário pedir para dividir o pagamento
+- registrar_despesa: { valor, para, descricao, tipo? }
+- registrar_despesa_com_split: { valor, descricao, splitAmong? } — quando pedir para dividir a despesa
+- confirmar_tarefa: { titulo, tarefa_id? }
+- consultar_status: { filtro? }
+- consultar_tarefas: { filtro? } — lista tarefas (pendentes, p0, hoje)
+- consultar_leads: { filtro? } — lista leads do pipeline
+- consultar_financeiro: { filtro? } — resumo financeiro completo
+- consultar_whatsapp: { filtro? } — resumo de menções/mensagens
+- verificar_mencoes: { filtro? } — alias para consultar_whatsapp
+- social: { tipo }
+- ideia: { texto }
+- link: { url, contexto? }
+
+FORMATO DE RESPOSTA (JSON puro, sem markdown):
+{
+  "intent": "nome_da_intencao",
+  "actions": [
+    { "type": "acao", "params": { ... }, "confidence": 0.95 }
+  ],
+  "needsConfirmation": true/false,
+  "confidence": 0.0-1.0,
+  "explanation": "breve explicação do que entendeu"
+}
+
+JSON:`;
+  }
+
+  async callGemini(text, context = {}) {
+    if (!this.genAI) {
+      throw new Error('Gemini não configurado');
+    }
+
+    const author = context.authorName || 'CEO';
+    const bufferSummary = context.bufferSummary || {};
+
+    const systemInstruction = `Você é o módulo de interpretação de comandos da Luna, assistente da NEXO Digital.
+Sua única função é analisar o que o usuário quer e retornar um JSON válido.
+Responda APENAS com JSON válido. Não use markdown, não explique, apenas JSON.
+
+REGRA CRÍTICA:
+- Se o usuário fizer uma pergunta de CONHECIMENTO GERAL (ciência, história, geografia, curiosidades, fatos) que NÃO está relacionada aos dados do NEXO, retorne intent "social" e actions [].
+- "consulta" ou "consultar_status" deve ser usado APENAS quando o usuário pedir informações sobre o sistema NEXO (tarefas, leads, financeiro, status).
+- Se não for uma ação executável no sistema NEXO, retorne intent "social" e actions vazio.`;
+
+    const prompt = `CONTEXTO ATUAL:
 - Autor: ${author}
 - Tarefas pendentes: ${bufferSummary.tasks || 0}
 - Leads novos: ${bufferSummary.leads || 0}
@@ -265,43 +433,27 @@ FORMATO DE RESPOSTA (JSON puro, sem markdown):
 }
 
 JSON:`;
-  }
 
-  async callOllama(prompt) {
-    const models = [this.model, this.fallbackModel];
-    let lastError = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeout);
 
-    for (const model of models) {
-      try {
-        const fetchPromise = fetch(`${this.ollamaHost}/api/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model,
-            prompt,
-            system: 'Você é um parser de comandos. Responda APENAS com JSON válido. Não use markdown, não explique, apenas JSON.',
-            temperature: 0.1,
-            max_tokens: 1024,
-            stream: false
-          })
-        });
+    try {
+      const result = await this.genAI.models.generateContent({
+        model: this.geminiModel,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction,
+          temperature: 0.1,
+          maxOutputTokens: 1024
+        }
+      });
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), this.timeout)
-        );
-
-        const res = await Promise.race([fetchPromise, timeoutPromise]);
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        return data.response || '';
-      } catch (err) {
-        lastError = err;
-        continue;
-      }
+      clearTimeout(timeout);
+      return result.text || '';
+    } catch (err) {
+      clearTimeout(timeout);
+      throw err;
     }
-
-    throw lastError || new Error('Todos os modelos falharam');
   }
 
   parseLLMResponse(response, originalText) {
@@ -364,7 +516,7 @@ JSON:`;
   }
 
   shouldConfirm(actions) {
-    const criticalActions = ['registrar_pagamento', 'registrar_despesa', 'confirmar_tarefa', 'excluir_tarefa', 'excluir_lead', 'criar_tarefa', 'criar_lead', 'adicionar_comentario', 'atualizar_status'];
+    const criticalActions = ['registrar_pagamento', 'registrar_pagamento_com_split', 'registrar_despesa', 'registrar_despesa_com_split', 'confirmar_tarefa', 'excluir_tarefa', 'excluir_lead', 'criar_tarefa', 'criar_lead', 'adicionar_comentario', 'atualizar_status'];
     return actions.some(a => criticalActions.includes(a.type));
   }
 

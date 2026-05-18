@@ -21,6 +21,21 @@ class ActionExecutor {
       cash: null,
       lastFetch: 0
     };
+
+    // Config de integrações (para flags como ignoreWhatsApp)
+    this.integrations = this._loadIntegrationsConfig();
+  }
+
+  _loadIntegrationsConfig() {
+    try {
+      const configPath = path.join(this.dataDir, 'config', 'integrations-config.json');
+      if (fs.existsSync(configPath)) {
+        return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      }
+    } catch (e) {
+      console.error('[ActionExecutor] Erro ao ler integrations-config:', e.message);
+    }
+    return {};
   }
 
   // ============================================================
@@ -55,8 +70,12 @@ class ActionExecutor {
         return await this.createLead(action.params, authorName);
       case 'registrar_pagamento':
         return await this.createPayment(action.params, authorName);
+      case 'registrar_pagamento_com_split':
+        return await this.createPaymentWithSplit(action.params, authorName);
       case 'registrar_despesa':
         return await this.createExpense(action.params, authorName);
+      case 'registrar_despesa_com_split':
+        return await this.createExpenseWithSplit(action.params, authorName);
       case 'confirmar_tarefa':
         return await this.completeTask(action.params, authorName);
       case 'adicionar_comentario':
@@ -65,6 +84,16 @@ class ActionExecutor {
         return await this.updateTaskStatus(action.params, authorName);
       case 'consultar_status':
         return await this.getStatus(action.params);
+      case 'consultar_tarefas':
+        return await this.queryTasks(action.params);
+      case 'consultar_leads':
+        return await this.queryLeads(action.params);
+      case 'consultar_financeiro':
+        return await this.queryFinance(action.params);
+      case 'consultar_whatsapp':
+        return await this.queryWhatsApp(action.params);
+      case 'verificar_mencoes':
+        return await this.checkMentions(action.params);
       case 'ideia':
         return await this.saveIdea(action.params, authorName);
       case 'link':
@@ -458,6 +487,228 @@ class ActionExecutor {
       leads: { total: leads.length, novos: leads.filter(l => l.pipelineStatus === 'novo' || l.status === 'novo').length },
       financeiro: { saldo }
     };
+  }
+
+  // ============================================================
+  // AÇÕES: Consultas avançadas (Consciência do Dashboard)
+  // ============================================================
+  async queryTasks(params) {
+    const tasksFile = path.join(this.dataDir, 'tasks.json');
+    const companyTasksFile = path.join(this.dataDir, 'company-tasks.json');
+    const tasks = this.readJson(tasksFile, []);
+    const companyTasksRaw = this.readJson(companyTasksFile, {});
+    const companyTasks = Array.isArray(companyTasksRaw) ? companyTasksRaw : Object.values(companyTasksRaw.categories || {}).flatMap(c => c.tasks || []);
+    const all = [...tasks, ...companyTasks];
+    const filtro = params.filtro || 'pendentes';
+
+    let result = all;
+    if (filtro === 'pendentes') result = all.filter(t => t.status !== 'completed' && t.status !== 'done' && !t.completed);
+    if (filtro === 'p0') result = all.filter(t => (t.priority === 'P0' || t.priority === 'high' || t.prioridade === 'P0'));
+    if (filtro === 'hoje') {
+      const today = new Date().toISOString().slice(0, 10);
+      result = all.filter(t => t.dueDate && t.dueDate.startsWith(today));
+    }
+
+    return {
+      type: 'tasks',
+      filtro,
+      total: result.length,
+      items: result.slice(0, 10).map(t => ({
+        id: t.id,
+        title: t.title || t.titulo || 'Sem título',
+        priority: t.priority || t.prioridade || 'P2',
+        status: t.status || 'pending',
+        assignedTo: t.assignedTo || t.responsavel || null
+      }))
+    };
+  }
+
+  async queryLeads(params) {
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const clients = this.readJson(clientsFile, { clients: {} });
+    const all = Object.values(clients.clients || {});
+    const leads = all.filter(c => c.type === 'lead' || c.status === 'potencial' || c.pipelineStatus);
+    const filtro = params.filtro || 'todos';
+
+    let result = leads;
+    if (filtro === 'novos') result = leads.filter(l => l.pipelineStatus === 'novo' || l.status === 'novo');
+    if (filtro === 'proposta') result = leads.filter(l => l.pipelineStatus === 'proposta' || l.status === 'proposta');
+
+    return {
+      type: 'leads',
+      filtro,
+      total: result.length,
+      items: result.slice(0, 10).map(l => ({
+        id: l.id,
+        name: l.name || l.nome || 'Lead',
+        pipelineStatus: l.pipelineStatus || l.status || 'novo'
+      }))
+    };
+  }
+
+  async queryFinance(params) {
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const paymentsFile = path.join(this.dataDir, 'payments.json');
+    const expensesFile = path.join(this.dataDir, 'expenses.json');
+
+    const cash = this.readJson(cashFile, { balance: { value: 0 }, history: [] });
+    const payments = this.readJson(paymentsFile, []);
+    const expenses = this.readJson(expensesFile, []);
+
+    const pendingPayments = payments.filter(p => p.status !== 'paid' && p.status !== 'received');
+    const totalPending = pendingPayments.reduce((s, p) => s + parseFloat(p.totalAmount || p.amount || 0), 0);
+
+    const today = new Date();
+    const monthPrefix = today.toISOString().slice(0, 7);
+    const monthlyExpenses = expenses.filter(e => {
+      const d = e.date || e.createdAt || '';
+      return d.startsWith(monthPrefix);
+    });
+    const totalExpenses = monthlyExpenses.reduce((s, e) => s + parseFloat(e.amount || e.valor || 0), 0);
+
+    return {
+      type: 'finance',
+      caixa: cash.balance?.value || 0,
+      recebimentosPendentes: totalPending,
+      clientesPendentes: pendingPayments.length,
+      gastosMes: totalExpenses,
+      transacoes: cash.history?.slice(-5).map(h => ({
+        type: h.type,
+        amount: h.amount,
+        description: h.description || h.note || ''
+      })) || []
+    };
+  }
+
+  async queryWhatsApp(params) {
+    const wcfg = this.integrations.whatsapp || {};
+    const ignoreAll = wcfg.ignored === true;
+    const ignoreMessages = wcfg.ignoreMessages !== false;
+    const ignoreLinks = wcfg.ignoreLinks === true;
+    const ignoreMentions = wcfg.ignoreMentions === true;
+
+    if (ignoreAll) {
+      return { type: 'whatsapp', ignored: true, mensagensNovas: 0, linksPendentes: 0, mencoesTotais: 0, mencoesPendentes: 0, mencoesRecentes: [] };
+    }
+
+    const bufferFile = path.join(this.dataDir, 'luna-buffer.json');
+    const historyFile = path.join(this.dataDir, 'whatsapp-history.json');
+    const buffer = this.readJson(bufferFile, { newMessages: [], newLinks: [], mentions: [] });
+    const history = this.readJson(historyFile, []);
+
+    const mentions = history.filter(m => /@(?:LUNA|KIMI|KIMICLAW)/i.test(m.body || m.text || ''));
+    const pendingMentions = mentions.filter(m => !m.responded);
+
+    return {
+      type: 'whatsapp',
+      mensagensNovas: ignoreMessages ? 0 : (buffer.newMessages?.length || 0),
+      linksPendentes: ignoreLinks ? 0 : (buffer.newLinks?.length || 0),
+      mencoesTotais: ignoreMentions ? 0 : mentions.length,
+      mencoesPendentes: ignoreMentions ? 0 : pendingMentions.length,
+      mencoesRecentes: ignoreMentions ? [] : pendingMentions.slice(0, 5).map(m => ({
+        from: m.author || m.from || 'Desconhecido',
+        text: (m.body || m.text || '').slice(0, 100)
+      }))
+    };
+  }
+
+  async checkMentions(params) {
+    const wcfg = this.integrations.whatsapp || {};
+    if (wcfg.ignored === true) {
+      return { type: 'whatsapp', ignored: true, mensagensNovas: 0, linksPendentes: 0, mencoesTotais: 0, mencoesPendentes: 0, mencoesRecentes: [] };
+    }
+    return await this.queryWhatsApp(params);
+  }
+
+  // ============================================================
+  // AÇÕES: Financeiro Avançado (Split Automático)
+  // ============================================================
+  async createPaymentWithSplit(params, authorName) {
+    const amount = parseFloat(params.valor) || 0;
+    const client = params.de || params.cliente || params.from || 'Cliente';
+    const description = params.descricao || `Pagamento de ${client}`;
+    if (amount <= 0) throw new Error('Valor inválido');
+
+    const entry = {
+      amount,
+      description,
+      source: client,
+      date: new Date().toISOString().slice(0, 10),
+      applyImmediately: true,
+      note: `Registrado por ${authorName} via Luna (com split automático)`
+    };
+
+    const apiResult = await this.apiPost('/cash-box/payments', entry);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'payment_split', amount, client, applied: true, source: 'api', id: apiResult.id || apiResult.entry?.id };
+    }
+
+    // Fallback: escreve no cash-box.json manualmente com split
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0 }, history: [] });
+    const share = parseFloat((amount / 4).toFixed(2));
+    const remaining = parseFloat((amount - share * 3).toFixed(2));
+
+    cash.balance.value = parseFloat(((cash.balance?.value || 0) + remaining).toFixed(2));
+    cash.history.push({
+      type: 'payment_received',
+      amount,
+      description: `${description} (split 25%)`,
+      date: new Date().toISOString(),
+      recordedBy: authorName,
+      distribution: [
+        { recipient: 'Abner', amount: share, type: 'founder_share' },
+        { recipient: 'Nonoke', amount: share, type: 'founder_share' },
+        { recipient: 'Elias', amount: share, type: 'founder_share' },
+        { recipient: 'NEXO Digital', amount: remaining, type: 'reinvestment' }
+      ]
+    });
+    this.writeJson(cashFile, cash);
+
+    return { type: 'payment_split', amount, client, applied: true, source: 'file', splits: { abner: share, nonoke: share, elias: share, empresa: remaining } };
+  }
+
+  async createExpenseWithSplit(params, authorName) {
+    const amount = parseFloat(params.valor) || 0;
+    const description = params.descricao || params.para || 'Despesa';
+    const splitAmong = params.splitAmong || ['abner', 'nonoke', 'elias'];
+    if (amount <= 0) throw new Error('Valor inválido');
+
+    const entry = {
+      name: description,
+      amount,
+      description,
+      date: new Date().toISOString().slice(0, 10),
+      type: 'one_time',
+      splitAmong,
+      paidBy: {},
+      autoDeductFromCashBox: true,
+      note: `Registrado por ${authorName} via Luna`
+    };
+
+    splitAmong.forEach(pid => {
+      entry.paidBy[pid] = { paid: false, amount: parseFloat((amount / splitAmong.length).toFixed(2)), paidAt: null, method: null };
+    });
+
+    const apiResult = await this.apiPost('/expenses', entry);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'expense_split', amount, description, splitAmong, source: 'api', id: apiResult.id || apiResult.expense?.id };
+    }
+
+    // Fallback: cash-box.json
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0 }, history: [] });
+    cash.balance.value = parseFloat(((cash.balance?.value || 0) - amount).toFixed(2));
+    cash.history.push({
+      type: 'expense',
+      amount,
+      description: `${description} (split entre ${splitAmong.join(', ')})`,
+      date: new Date().toISOString(),
+      recordedBy: authorName
+    });
+    this.writeJson(cashFile, cash);
+
+    return { type: 'expense_split', amount, description, splitAmong, source: 'file' };
   }
 
   // ============================================================

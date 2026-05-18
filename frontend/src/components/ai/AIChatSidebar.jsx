@@ -124,6 +124,7 @@ export default function AIChatSidebar({ ideaId, idea, onApplySuggestion }) {
       if (res.data.success) {
         const aiResponse = res.data.data?.response || 'Sem resposta'
         const aiSuggestions = res.data.data?.suggestions || []
+        const aiActions = res.data.data?.actionsExecuted || []
 
         setMessages(prev => [
           ...prev,
@@ -132,6 +133,7 @@ export default function AIChatSidebar({ ideaId, idea, onApplySuggestion }) {
             content: aiResponse,
             mode: activeMode,
             suggestions: aiSuggestions,
+            actionsExecuted: aiActions,
           },
         ])
 
@@ -294,7 +296,7 @@ export default function AIChatSidebar({ ideaId, idea, onApplySuggestion }) {
               </div>
 
               {/* Message bubble */}
-              <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+              <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'bg-nexo-primary text-white'
                   : msg.isError
@@ -302,6 +304,29 @@ export default function AIChatSidebar({ ideaId, idea, onApplySuggestion }) {
                     : 'glass-card text-nexo-text border border-nexo-border/50'
               }`}>
                 {msg.content}
+
+                {/* Actions executed inside AI message */}
+                {msg.role === 'assistant' && msg.actionsExecuted && msg.actionsExecuted.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-nexo-border/30 space-y-1">
+                    {msg.actionsExecuted.map((action, ai) => (
+                      <div
+                        key={ai}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg text-[10px] ${
+                          action.success
+                            ? 'bg-nexo-success/10 text-nexo-success border border-nexo-success/20'
+                            : 'bg-nexo-danger/10 text-nexo-danger border border-nexo-danger/20'
+                        }`}
+                      >
+                        {action.success ? (
+                          <Check className="w-3 h-3 flex-shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 flex-shrink-0" />
+                        )}
+                        <span className="flex-1">{action.message || action.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Suggestions inside AI message */}
                 {msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (

@@ -6,6 +6,7 @@ import {
   Trash2, CheckCircle, X, LayoutGrid, List
 } from 'lucide-react'
 import axios from 'axios'
+import LeadModal from '../components/leads/LeadModal'
 
 const PIPELINE_COLUMNS = [
   { id: 'novo', label: 'Novo', color: '#6B7280', icon: '🔵' },
@@ -287,6 +288,10 @@ export default function Leads() {
                 console.error('Erro ao atualizar lead:', e)
               }
             }}
+            onDelete={(id) => {
+              deleteLead(id)
+              setSelectedLead(null)
+            }}
           />
         )}
       </AnimatePresence>
@@ -374,171 +379,5 @@ function StatusBadge({ status }) {
     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: (col?.color || '#6B7280') + '20', color: col?.color || '#6B7280' }}>
       {col?.icon} {col?.label || status}
     </span>
-  )
-}
-
-function LeadModal({ lead, onClose, onSave }) {
-  const [form, setForm] = useState({
-    displayName: lead?.displayName || '',
-    email: lead?.email || '',
-    phone: lead?.phone || '',
-    source: lead?.source || 'referral',
-    pipelineStatus: lead?.pipelineStatus || 'novo',
-    estimatedValue: lead?.estimatedValue || '',
-    notes: lead?.notes || '',
-    assignedTo: lead?.assignedTo || '',
-    tags: lead?.tags?.join(', ') || ''
-  })
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSave({
-      ...form,
-      estimatedValue: Number(form.estimatedValue) || 0,
-      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean)
-    })
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="w-full max-w-lg bg-nexo-card border border-nexo-border rounded-2xl overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="p-4 border-b border-nexo-border flex items-center justify-between">
-          <h3 className="font-semibold">{lead ? 'Editar Lead' : 'Novo Lead'}</h3>
-          <button onClick={onClose} className="text-nexo-muted hover:text-nexo-text">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          <div>
-            <label className="text-xs text-nexo-muted block mb-1">Nome *</label>
-            <input
-              required
-              value={form.displayName}
-              onChange={e => setForm({ ...form, displayName: e.target.value })}
-              className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Telefone</label>
-              <input
-                value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Fonte</label>
-              <select
-                value={form.source}
-                onChange={e => setForm({ ...form, source: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              >
-                <option value="referral">Indicação</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="email">Email</option>
-                <option value="instagram">Instagram</option>
-                <option value="prospeccao-interna">Prospecção Interna</option>
-                <option value="lead-detectado">Detectado pela Luna</option>
-                <option value="manual">Manual</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Status</label>
-              <select
-                value={form.pipelineStatus}
-                onChange={e => setForm({ ...form, pipelineStatus: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              >
-                {PIPELINE_COLUMNS.map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Valor Estimado (€)</label>
-              <input
-                type="number"
-                value={form.estimatedValue}
-                onChange={e => setForm({ ...form, estimatedValue: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-nexo-muted block mb-1">Responsável</label>
-              <select
-                value={form.assignedTo}
-                onChange={e => setForm({ ...form, assignedTo: e.target.value })}
-                className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-              >
-                <option value="">Não atribuído</option>
-                {FOUNDERS.map(f => (
-                  <option key={f.id} value={f.id}>{f.emoji} {f.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-nexo-muted block mb-1">Tags (separadas por vírgula)</label>
-            <input
-              value={form.tags}
-              onChange={e => setForm({ ...form, tags: e.target.value })}
-              placeholder="site, ecommerce, urgente"
-              className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-nexo-muted block mb-1">Notas</label>
-            <textarea
-              value={form.notes}
-              onChange={e => setForm({ ...form, notes: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary resize-none"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-nexo-muted hover:text-nexo-text text-sm transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-nexo-primary rounded-lg text-sm hover:opacity-90 transition-opacity"
-            >
-              {lead ? 'Salvar' : 'Criar Lead'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
   )
 }
