@@ -83,7 +83,7 @@ function SecretTerminal({ isOpen, onClose }) {
           setMode('success')
           await login(data.token)
           setTimeout(() => {
-            window.location.href = '/'
+            window.location.href = '/dashboard'
           }, 1000)
         } else {
           setLines(prev => [
