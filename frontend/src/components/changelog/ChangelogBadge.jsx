@@ -131,7 +131,7 @@ export default function ChangelogBadge({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 top-full mt-2 w-[380px] max-h-[500px] bg-nexo-card border border-nexo-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50"
+            className="absolute right-0 top-full mt-2 w-[380px] max-h-[500px] bg-nexo-card border border-nexo-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-[9990]"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">

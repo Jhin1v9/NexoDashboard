@@ -376,7 +376,7 @@ export default function CommentsSection({ ideaId, comments: initialComments = []
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.9, y: 4 }}
                               transition={{ duration: 0.1 }}
-                              className="absolute z-50 bottom-full left-0 mb-1 flex items-center gap-0.5 p-1.5 bg-nexo-card border border-nexo-border rounded-xl shadow-xl shadow-black/20"
+                              className="absolute z-[9990] bottom-full left-0 mb-1 flex items-center gap-0.5 p-1.5 bg-nexo-card border border-nexo-border rounded-xl shadow-xl shadow-black/20"
                             >
                               {EMOJI_REACTIONS.map((reaction) => {
                                 const Icon = reaction.icon
@@ -437,7 +437,7 @@ export default function CommentsSection({ ideaId, comments: initialComments = []
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
-                    className="absolute bottom-full left-0 mb-1 w-48 bg-nexo-card border border-nexo-border rounded-xl shadow-xl overflow-hidden z-10"
+                    className="absolute bottom-full left-0 mb-1 w-48 bg-nexo-card border border-nexo-border rounded-xl shadow-xl overflow-hidden z-[9990]"
                   >
                     {filteredMentions.map(user => (
                       <button

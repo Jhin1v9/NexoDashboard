@@ -42,7 +42,7 @@ export default function PushNotificationButton() {
       </button>
       
       {showTooltip && (
-        <div className="absolute right-0 top-full mt-1 w-48 glass-card p-2 text-xs text-nexo-muted z-50">
+        <div className="absolute right-0 top-full mt-1 w-48 glass-card p-2 text-xs text-nexo-muted z-[9990]">
           {permission === 'granted' 
             ? '🔔 Notificações ativas. Clique para testar.' 
             : permission === 'denied' 

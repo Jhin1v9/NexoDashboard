@@ -86,7 +86,7 @@ function AccordionSection({ item, isActive, sidebarOpen }) {
           <item.icon size={20} />
         </button>
         {expanded && (
-          <div className="absolute left-full top-0 ml-2 w-48 glass-card rounded-lg border border-nexo-border shadow-xl z-50 py-1">
+          <div className="absolute left-full top-0 ml-2 w-48 glass-card rounded-lg border border-nexo-border shadow-xl z-[9990] py-1">
             <div className="px-3 py-2 text-xs font-semibold text-nexo-muted border-b border-nexo-border">{item.label}</div>
             {item.children.map(child => (
               <NavLink

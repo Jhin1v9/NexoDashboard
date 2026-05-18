@@ -64,7 +64,7 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
             </div>
             <span className="text-sm font-medium">{activeUser.name}</span>
           </button>
-          <div className="absolute right-0 top-full mt-1 w-40 glass-card py-1 hidden group-hover:block z-50">
+          <div className="absolute right-0 top-full mt-1 w-40 glass-card py-1 hidden group-hover:block z-[9990]">
             <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-nexo-card transition-colors">
               <LogOut size={14} />
               <span>Encerrar Sessão</span>

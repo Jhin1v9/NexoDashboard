@@ -180,7 +180,7 @@ export default function LinkedClientPicker({ value, onChange }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.12 }}
-            className="absolute z-50 mt-1 w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-xl shadow-black/20 overflow-hidden"
+            className="absolute z-[9990] mt-1 w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-xl shadow-black/20 overflow-hidden"
           >
             {/* Search input */}
             <div className="p-2 border-b border-nexo-border/50">

@@ -776,7 +776,7 @@ export default function LunaControl() {
                       {activeThreadId === 'group' && <Users className="w-3 h-3 text-nexo-muted" />}
                     </button>
                     {showThreadDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-56 bg-nexo-card border border-nexo-border rounded-lg shadow-xl z-50 py-1">
+                      <div className="absolute top-full left-0 mt-1 w-56 bg-nexo-card border border-nexo-border rounded-lg shadow-xl z-[9990] py-1">
                         {threads.map(t => (
                           <button
                             key={t.id}

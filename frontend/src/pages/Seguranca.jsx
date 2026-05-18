@@ -3,8 +3,148 @@ import axios from 'axios'
 import {
   Shield, AlertTriangle, Globe, Monitor, Smartphone, Cpu,
   MapPin, Clock, Fingerprint, X, Filter, ChevronDown,
-  Eye, Trash2, Lock, Wifi, Server, HardDrive
+  Eye, Trash2, Lock, Wifi, Server, HardDrive,
+  Navigation, Radio, Flag, AlertOctagon
 } from 'lucide-react'
+
+// Mapeamento de países para emoji de bandeira
+const COUNTRY_FLAGS = {
+  'Portugal': '🇵🇹', 'Spain': '🇪🇸', 'Brazil': '🇧🇷',
+  'United States': '🇺🇸', 'United Kingdom': '🇬🇧',
+  'France': '🇫🇷', 'Germany': '🇩🇪', 'Italy': '🇮🇹',
+  'Netherlands': '🇳🇱', 'Belgium': '🇧🇪',
+  'Switzerland': '🇨🇭', 'Austria': '🇦🇹',
+  'Poland': '🇵🇱', 'Czech Republic': '🇨🇿',
+  'Hungary': '🇭🇺', 'Romania': '🇷🇴',
+  'Bulgaria': '🇧🇬', 'Croatia': '🇭🇷',
+  'Greece': '🇬🇷', 'Cyprus': '🇨🇾',
+  'Malta': '🇲🇹', 'Ireland': '🇮🇪',
+  'Denmark': '🇩🇰', 'Sweden': '🇸🇪',
+  'Norway': '🇳🇴', 'Finland': '🇫🇮',
+  'Iceland': '🇮🇸', 'Estonia': '🇪🇪',
+  'Latvia': '🇱🇻', 'Lithuania': '🇱🇹',
+  'Ukraine': '🇺🇦', 'Russia': '🇷🇺',
+  'Turkey': '🇹🇷', 'Serbia': '🇷🇸',
+  'Bosnia and Herzegovina': '🇧🇦', 'Montenegro': '🇲🇪',
+  'North Macedonia': '🇲🇰', 'Albania': '🇦🇱',
+  'Moldova': '🇲🇩', 'Belarus': '🇧🇾',
+  'Georgia': '🇬🇪', 'Armenia': '🇦🇲',
+  'Azerbaijan': '🇦🇿', 'Kazakhstan': '🇰🇿',
+  'Uzbekistan': '🇺🇿',
+  'China': '🇨🇳', 'Japan': '🇯🇵',
+  'South Korea': '🇰🇷', 'India': '🇮🇳',
+  'Pakistan': '🇵🇰', 'Bangladesh': '🇧🇩',
+  'Sri Lanka': '🇱🇰', 'Nepal': '🇳🇵',
+  'Afghanistan': '🇦🇫', 'Iran': '🇮🇷',
+  'Iraq': '🇮🇶', 'Syria': '🇸🇾',
+  'Lebanon': '🇱🇧', 'Jordan': '🇯🇴',
+  'Israel': '🇮🇱', 'Palestine': '🇵🇸',
+  'Saudi Arabia': '🇸🇦', 'Yemen': '🇾🇪',
+  'Oman': '🇴🇲', 'United Arab Emirates': '🇦🇪',
+  'Qatar': '🇶🇦', 'Bahrain': '🇧🇭',
+  'Kuwait': '🇰🇼', 'Egypt': '🇪🇬',
+  'Libya': '🇱🇾', 'Tunisia': '🇹🇳',
+  'Algeria': '🇩🇿', 'Morocco': '🇲🇦',
+  'Mauritania': '🇲🇷', 'Mali': '🇲🇱',
+  'Niger': '🇳🇪', 'Chad': '🇹🇩',
+  'Sudan': '🇸🇩', 'South Sudan': '🇸🇸',
+  'Cameroon': '🇨🇲', 'Nigeria': '🇳🇬',
+  'Benin': '🇧🇯', 'Togo': '🇹🇬',
+  'Ghana': '🇬🇭', 'Ivory Coast': '🇨🇮',
+  'Liberia': '🇱🇷', 'Sierra Leone': '🇸🇱',
+  'Guinea': '🇬🇳', 'Guinea-Bissau': '🇬🇼',
+  'Gambia': '🇬🇲', 'Senegal': '🇸🇳',
+  'Cape Verde': '🇨🇻', 'Burkina Faso': '🇧🇫',
+  'Equatorial Guinea': '🇬🇶', 'Gabon': '🇬🇦',
+  'Congo': '🇨🇩', 'Democratic Republic of the Congo': '🇨🇩',
+  'Angola': '🇦🇴', 'Zambia': '🇿🇲',
+  'Zimbabwe': '🇿🇼', 'Malawi': '🇲🇼',
+  'Mozambique': '🇲🇿', 'Madagascar': '🇲🇬',
+  'Seychelles': '🇸🇨', 'Mauritius': '🇲🇺',
+  'Comoros': '🇰🇲', 'South Africa': '🇿🇦',
+  'Namibia': '🇳🇦', 'Botswana': '🇧🇼',
+  'Lesotho': '🇱🇸', 'Eswatini': '🇸🇿',
+  'Argentina': '🇦🇷', 'Chile': '🇨🇱',
+  'Uruguay': '🇺🇾', 'Paraguay': '🇵🇾',
+  'Bolivia': '🇧🇴', 'Peru': '🇵🇪',
+  'Ecuador': '🇪🇨', 'Colombia': '🇨🇴',
+  'Venezuela': '🇻🇪', 'Guyana': '🇬🇾',
+  'Suriname': '🇸🇷', 'Panama': '🇵🇦',
+  'Costa Rica': '🇨🇷', 'Nicaragua': '🇳🇮',
+  'Honduras': '🇭🇳', 'El Salvador': '🇸🇻',
+  'Guatemala': '🇬🇹', 'Belize': '🇧🇿',
+  'Mexico': '🇲🇽', 'Cuba': '🇨🇺',
+  'Jamaica': '🇯🇲', 'Haiti': '🇭🇹',
+  'Dominican Republic': '🇩🇴', 'Puerto Rico': '🇵🇷',
+  'Trinidad and Tobago': '🇹🇹', 'Barbados': '🇧🇧',
+  'Saint Lucia': '🇱🇨', 'Saint Vincent and the Grenadines': '🇻🇨',
+  'Grenada': '🇬🇩', 'Antigua and Barbuda': '🇦🇬',
+  'Dominica': '🇩🇲', 'Saint Kitts and Nevis': '🇰🇳',
+  'Bahamas': '🇧🇸', 'Canada': '🇨🇦',
+  'Australia': '🇦🇺', 'New Zealand': '🇳🇿',
+  'Fiji': '🇫🇯', 'Papua New Guinea': '🇵🇬',
+  'Solomon Islands': '🇸🇧', 'Vanuatu': '🇻🇺',
+  'Samoa': '🇼🇸', 'Tonga': '🇹🇴',
+  'Kiribati': '🇰🇮', 'Tuvalu': '🇹🇻',
+  'Nauru': '🇳🇷', 'Palau': '🇵🇼',
+  'Marshall Islands': '🇲🇭', 'Micronesia': '🇫🇲',
+  'Guam': '🇬🇺', 'Northern Mariana Islands': '🇲🇵',
+  'American Samoa': '🇦🇸', 'Cook Islands': '🇨🇰',
+  'French Polynesia': '🇵🇫', 'New Caledonia': '🇳🇨',
+  'Wallis and Futuna': '🇼🇫', 'Norfolk Island': '🇳🇫',
+  'Pitcairn Islands': '🇵🇳', 'Tokelau': '🇹🇰',
+  'Niue': '🇳🇺', 'Cocos Islands': '🇨🇨',
+  'Christmas Island': '🇨🇽', 'Antarctica': '🇦🇶',
+  'Greenland': '🇬🇱', 'Faroe Islands': '🇫🇴',
+  'Svalbard and Jan Mayen': '🇸🇯', 'Bouvet Island': '🇧🇻',
+  'South Georgia and the South Sandwich Islands': '🇬🇸',
+  'Falkland Islands': '🇫🇰',
+  'British Indian Ocean Territory': '🇮🇴',
+  'Cayman Islands': '🇰🇾', 'Bermuda': '🇧🇲',
+  'Turks and Caicos Islands': '🇹🇨',
+  'British Virgin Islands': '🇻🇬', 'Anguilla': '🇦🇮',
+  'Montserrat': '🇲🇸', 'Saint Helena': '🇸🇽',
+  'Gibraltar': '🇬🇮', 'Guernsey': '🇬🇬',
+  'Jersey': '🇯🇪', 'Isle of Man': '🇮🇲',
+  'Andorra': '🇦🇩', 'Monaco': '🇲🇨',
+  'Liechtenstein': '🇱🇮', 'San Marino': '🇸🇲',
+  'Vatican City': '🇻🇦', 'Luxembourg': '🇱🇺',
+  'Singapore': '🇸🇬', 'Brunei': '🇧🇳',
+  'Malaysia': '🇲🇾', 'Indonesia': '🇮🇩',
+  'Philippines': '🇵🇭', 'Thailand': '🇹🇭',
+  'Vietnam': '🇻🇳', 'Laos': '🇱🇦',
+  'Cambodia': '🇰🇭', 'Myanmar': '🇲🇲',
+  'Mongolia': '🇲🇳', 'North Korea': '🇰🇵',
+  'Taiwan': '🇹🇼',
+  'Rede Local': '🏠', 'Desconhecido': '❓', 'LAN': '🏠',
+  'Servidor Local': '🏠', 'Private Network': '🏠', 'Local': '🏠'
+};
+
+function getCountryFlag(country) {
+  if (!country) return '❓';
+  return COUNTRY_FLAGS[country] || '🌐';
+}
+
+function isLocalIp(ip) {
+  if (!ip) return true;
+  if (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') return true;
+  if (ip.startsWith('192.168.') || ip.startsWith('10.')) return true;
+  if (ip.startsWith('169.254.') || ip.startsWith('fc00:') || ip.startsWith('fe80:')) return true;
+  if (ip.startsWith('172.')) {
+    const parts = ip.split('.');
+    if (parts.length >= 2) {
+      const octet = parseInt(parts[1], 10);
+      if (octet >= 16 && octet <= 31) return true;
+    }
+  }
+  return false;
+}
+
+function isSuspiciousLocation(location) {
+  if (!location || !location.country) return false;
+  const suspicious = ['Russia', 'China', 'North Korea', 'Iran', 'Syria', 'Belarus', 'Myanmar', 'Cuba', 'Venezuela'];
+  return suspicious.includes(location.country);
+}
 
 export default function Seguranca() {
   const [events, setEvents] = useState([])
@@ -12,7 +152,7 @@ export default function Seguranca() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, failed_login, alert
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [stats, setStats] = useState({ total: 0, uniqueIps: 0, today: 0, alerted: 0 })
+  const [stats, setStats] = useState({ total: 0, uniqueIps: 0, today: 0, alerted: 0, externalIps: 0 })
 
   useEffect(() => {
     fetchData()
@@ -37,7 +177,8 @@ export default function Seguranca() {
         return d.toDateString() === now.toDateString()
       }).length
       const alerted = evts.filter(e => e.notified).length
-      setStats({ total: evts.length, uniqueIps, today, alerted })
+      const externalIps = evts.filter(e => !isLocalIp(e.ip)).length
+      setStats({ total: evts.length, uniqueIps, today, alerted, externalIps })
     } catch (e) {}
     setLoading(false)
   }
@@ -97,13 +238,35 @@ export default function Seguranca() {
         </button>
       </div>
 
+      {/* Alert Banner — IPs externos */}
+      {stats.externalIps > 0 && (
+        <div className={`mb-4 p-4 rounded-xl border flex items-center gap-3 ${
+          events.some(e => !isLocalIp(e.ip) && isSuspiciousLocation(e.location))
+            ? 'bg-red-500/10 border-red-500/30 text-red-400'
+            : 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+        }`}>
+          <AlertOctagon className="w-5 h-5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-bold">
+              {stats.externalIps} tentativa{stats.externalIps > 1 ? 's' : ''} de acesso detectada{stats.externalIps > 1 ? 's' : ''} de IPs externos
+            </p>
+            <p className="text-xs opacity-80">
+              {events.some(e => !isLocalIp(e.ip) && isSuspiciousLocation(e.location))
+                ? 'Atenção: origens de países de alto risco identificadas'
+                : 'Monitoramento ativo — nenhuma origem de alto risco detectada'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
           { icon: AlertTriangle, label: 'Eventos Totais', value: stats.total, color: 'text-orange-400' },
           { icon: Globe, label: 'IPs Únicos', value: stats.uniqueIps, color: 'text-blue-400' },
           { icon: Clock, label: 'Hoje', value: stats.today, color: 'text-green-400' },
           { icon: Shield, label: 'Alertas Enviados', value: stats.alerted, color: 'text-red-400' },
+          { icon: Radio, label: 'IPs Externos', value: stats.externalIps, color: 'text-amber-400' },
         ].map((s, i) => (
           <div key={i} className="glass-card p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -149,7 +312,13 @@ export default function Seguranca() {
           {filteredEvents.map(event => (
             <div
               key={event.id}
-              className="glass-card p-4 hover:border-nexo-primary/30 transition-all cursor-pointer"
+              className={`p-4 hover:border-nexo-primary/30 transition-all cursor-pointer rounded-xl border ${
+                !isLocalIp(event.ip)
+                  ? isSuspiciousLocation(event.location)
+                    ? 'bg-red-500/5 border-red-500/20'
+                    : 'bg-amber-500/5 border-amber-500/20'
+                  : 'glass-card'
+              }`}
               onClick={() => setSelectedEvent(event)}
             >
               <div className="flex items-start gap-4">
@@ -168,6 +337,18 @@ export default function Seguranca() {
                         ALERTA ENVIADO
                       </span>
                     )}
+                    {!isLocalIp(event.ip) && (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Radio className="w-3 h-3" />
+                        IP EXTERNO
+                      </span>
+                    )}
+                    {isSuspiciousLocation(event.location) && (
+                      <span className="text-[10px] bg-red-600/30 text-red-400 px-2 py-0.5 rounded flex items-center gap-1">
+                        <AlertOctagon className="w-3 h-3" />
+                        RISCO
+                      </span>
+                    )}
                     <span className="text-xs text-nexo-muted ml-auto">{formatDate(event.timestamp)}</span>
                   </div>
 
@@ -175,14 +356,21 @@ export default function Seguranca() {
 
                   {/* Quick details */}
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-nexo-muted">
-                    <span className="flex items-center gap-1">
+                    <span className={`flex items-center gap-1 ${!isLocalIp(event.ip) ? 'text-amber-400 font-medium' : ''}`}>
                       <Globe className="w-3 h-3" />
                       {event.ip}
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
-                      {event.location?.city || '?'}, {event.location?.country || '?'}
+                      <span className="text-base leading-none">{getCountryFlag(event.location?.country)}</span>
+                      <span>{event.location?.city || '?'}, {event.location?.country || '?'}</span>
                     </span>
+                    {event.location?.isp && !isLocalIp(event.ip) && (
+                      <span className="flex items-center gap-1" title={event.location.isp}>
+                        <Wifi className="w-3 h-3" />
+                        <span className="max-w-[120px] truncate">{event.location.isp}</span>
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Monitor className="w-3 h-3" />
                       {event.device?.browser || '?'}
@@ -276,14 +464,34 @@ export default function Seguranca() {
                   <Globe className="w-4 h-4" />
                   IP & Localização
                 </h3>
+
+                {/* Alertas de localização */}
+                {!isLocalIp(selectedEvent.ip) && (
+                  <div className="mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-xs text-amber-400 font-medium">IP externo detectado — fora da rede local</span>
+                  </div>
+                )}
+                {isSuspiciousLocation(selectedEvent.location) && (
+                  <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                    <AlertOctagon className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <span className="text-xs text-red-400 font-medium">Origem de país de alto risco identificada</span>
+                  </div>
+                )}
+
                 <div className="bg-nexo-bg rounded-lg p-4 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-nexo-muted">Endereço IP</span>
-                    <span className="text-sm font-mono font-medium">{selectedEvent.ip}</span>
+                    <span className={`text-sm font-mono font-medium ${!isLocalIp(selectedEvent.ip) ? 'text-amber-400' : ''}`}>
+                      {selectedEvent.ip}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-nexo-muted">País</span>
-                    <span className="text-sm font-medium">{selectedEvent.location?.country || 'Desconhecido'}</span>
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <span className="text-lg">{getCountryFlag(selectedEvent.location?.country)}</span>
+                      {selectedEvent.location?.country || 'Desconhecido'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-nexo-muted">Cidade</span>
@@ -302,9 +510,17 @@ export default function Seguranca() {
                     <span className="text-sm font-medium">{selectedEvent.location?.org || 'Desconhecido'}</span>
                   </div>
                   {(selectedEvent.location?.lat && selectedEvent.location?.lon) && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-sm text-nexo-muted">Coordenadas</span>
-                      <span className="text-sm font-mono">{selectedEvent.location.lat}, {selectedEvent.location.lon}</span>
+                      <a
+                        href={`https://www.google.com/maps?q=${selectedEvent.location.lat},${selectedEvent.location.lon}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                      >
+                        <Navigation className="w-3 h-3" />
+                        {selectedEvent.location.lat}, {selectedEvent.location.lon}
+                      </a>
                     </div>
                   )}
                 </div>
