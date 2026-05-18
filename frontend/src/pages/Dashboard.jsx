@@ -97,8 +97,8 @@ export default function Dashboard() {
   const pendingTasks = tasks.filter(t => !t.completed).length
   const avgHealth = clients.length > 0 ? Math.round(clients.reduce((a, c) => a + c.health, 0) / clients.length) : 0
   const moneyValue = (value, fallback = 0) => {
-    if (typeof value === 'number') return value
-    if (value && typeof value.value === 'number') return value.value
+    if (typeof value === 'number') return isNaN(value) ? fallback : value
+    if (value && typeof value.value === 'number') return isNaN(value.value) ? fallback : value.value
     return fallback
   }
 
