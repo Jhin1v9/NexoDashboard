@@ -10,7 +10,8 @@ export function useLinks() {
 
   // Conectar WebSocket para updates em tempo real
   useEffect(() => {
-    const wsUrl = `ws://${window.location.host}`
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 

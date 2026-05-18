@@ -32,7 +32,8 @@ function NotificationCenter() {
 
   // Escutar WebSocket para notificações em tempo real
   useEffect(() => {
-    const ws = new WebSocket(`ws://${window.location.host}/ws`)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`)
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
