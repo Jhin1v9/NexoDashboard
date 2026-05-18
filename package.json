@@ -5,7 +5,9 @@
   "scripts": {
     "build": "cd frontend && npm install && npm run build && rm -rf ../backend/public && cp -r dist ../backend/public",
     "start": "cd backend && npm install && node server.js",
-    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\""
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "brain:sync": "node scripts/brain-sync.js",
+    "brain:sync:principal": "node scripts/brain-sync.js"
   },
   "engines": {
     "node": ">=18.0.0"

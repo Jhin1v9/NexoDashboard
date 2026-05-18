@@ -4959,11 +4959,257 @@ app.put('/api/links/:id', (req, res) => {
   }
 });
 
-// Email Hub API
+// Email Hub API — NEXO Mail (Gmail OAuth2 + Gmail API REST)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const EmailAgent = require('./services/email-agent');
 const emailAgent = new EmailAgent();
+const gmailOAuth = require('./services/gmail-oauth');
+const gmailAPI = require('./services/gmail-api');
+const emailAI = require('./services/email-ai');
+
+// ── AUTH: OAuth2 Gmail ──
+
+app.get('/api/email/auth/url', (req, res) => {
+  try {
+    const url = gmailOAuth.getAuthUrl();
+    res.json({ success: true, authUrl: url });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/auth/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ success: false, error: 'Código de autorização ausente' });
+    const result = await gmailOAuth.exchangeCode(code);
+    if (!result.success) return res.status(400).json(result);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/auth/revoke', async (req, res) => {
+  try {
+    const result = await gmailOAuth.revokeAccess();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/auth/status', (req, res) => {
+  try {
+    const status = gmailOAuth.getStatus();
+    res.json({ success: true, ...status });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── MESSAGES: Gmail API REST ──
+
+app.get('/api/email/messages', async (req, res) => {
+  try {
+    const { labelIds, q, maxResults, pageToken } = req.query;
+    const result = await gmailAPI.listMessages({
+      labelIds: labelIds ? labelIds.split(',') : undefined,
+      q,
+      maxResults: maxResults ? parseInt(maxResults) : 50,
+      pageToken,
+    });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/messages/:id', async (req, res) => {
+  try {
+    const message = await gmailAPI.getMessage(req.params.id, 'full');
+    res.json({ success: true, message });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/threads/:id', async (req, res) => {
+  try {
+    const thread = await gmailAPI.getThread(req.params.id);
+    res.json({ success: true, thread });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/modify', async (req, res) => {
+  try {
+    const { addLabelIds, removeLabelIds } = req.body;
+    const result = await gmailAPI.modifyMessage(req.params.id, { addLabelIds, removeLabelIds });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/read', async (req, res) => {
+  try {
+    const result = await gmailAPI.markAsRead(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/unread', async (req, res) => {
+  try {
+    const result = await gmailAPI.markAsUnread(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/star', async (req, res) => {
+  try {
+    const result = await gmailAPI.toggleStar(req.params.id, true);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/unstar', async (req, res) => {
+  try {
+    const result = await gmailAPI.toggleStar(req.params.id, false);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/archive', async (req, res) => {
+  try {
+    const result = await gmailAPI.archive(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/trash', async (req, res) => {
+  try {
+    const result = await gmailAPI.trash(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/:id/spam', async (req, res) => {
+  try {
+    const result = await gmailAPI.spam(req.params.id);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/messages/send', async (req, res) => {
+  try {
+    const { to, subject, text, html, cc, bcc, attachments, threadId, inReplyTo } = req.body;
+    if (!to || !subject) return res.status(400).json({ success: false, error: 'Destinatario e assunto obrigatorios' });
+    const result = await gmailAPI.sendEmail({ to, subject, text, html, cc, bcc, attachments, threadId, inReplyTo });
+    broadcast({ type: 'email:sent', data: result });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/drafts', async (req, res) => {
+  try {
+    const { to, subject, text, html, cc, bcc } = req.body;
+    const result = await gmailAPI.createDraft({ to, subject, text, html, cc, bcc });
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/labels', async (req, res) => {
+  try {
+    const labels = await gmailAPI.listLabels();
+    res.json({ success: true, labels });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/email/profile', async (req, res) => {
+  try {
+    const profile = await gmailAPI.getProfile();
+    res.json({ success: true, profile });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── AI: Luna Email Assistant ──
+
+app.post('/api/email/ai/suggest-reply', async (req, res) => {
+  try {
+    const { threadMessages, clientContext } = req.body;
+    if (!threadMessages || !Array.isArray(threadMessages)) {
+      return res.status(400).json({ success: false, error: 'threadMessages é obrigatório (array)' });
+    }
+    const result = await emailAI.suggestReply(threadMessages, clientContext);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/ai/draft', async (req, res) => {
+  try {
+    const { threadMessages, instructions, clientContext } = req.body;
+    if (!threadMessages || !instructions) {
+      return res.status(400).json({ success: false, error: 'threadMessages e instructions são obrigatórios' });
+    }
+    const result = await emailAI.createDraft(threadMessages, instructions, clientContext);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/ai/summarize', async (req, res) => {
+  try {
+    const { threadMessages } = req.body;
+    if (!threadMessages || !Array.isArray(threadMessages)) {
+      return res.status(400).json({ success: false, error: 'threadMessages é obrigatório' });
+    }
+    const result = await emailAI.summarizeThread(threadMessages);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/email/ai/analyze', async (req, res) => {
+  try {
+    const { emailData } = req.body;
+    if (!emailData) return res.status(400).json({ success: false, error: 'emailData é obrigatório' });
+    const result = await emailAI.analyzeEmail(emailData);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── LEGACY: rotas antigas IMAP/SMTP (mantidas para compatibilidade) ──
 
 app.get('/api/emails/config', (req, res) => {
   try {
