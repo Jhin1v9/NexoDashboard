@@ -11,6 +11,7 @@ import {
   ChevronDown, Users, Sparkles
 } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 
 const ICON_MAP = {
   Sun, Moon, Activity, Trash2, Eraser, Save, Scan,
