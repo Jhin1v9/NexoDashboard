@@ -1145,17 +1145,24 @@ export default function LandingPage() {
     let index = 0
 
     const handler = (e) => {
-      // Sempre previne scroll das setas na landing page
-      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
-        e.preventDefault()
+      // Ignore if user is typing in an input/textarea
+      const tag = e.target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
+        return
       }
+      // Check if current key matches next in sequence
       if (e.key === konami[index]) {
+        // Prevent default for ALL konami keys to avoid page interaction
+        e.preventDefault()
+        e.stopPropagation()
         index++
         if (index === konami.length) {
           setTerminalOpen(true)
           index = 0
         }
       } else if (e.key === konami[0]) {
+        e.preventDefault()
+        e.stopPropagation()
         index = 1
       } else {
         index = 0
