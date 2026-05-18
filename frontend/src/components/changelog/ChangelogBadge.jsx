@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, BellRing, X, CheckCheck, Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -124,15 +125,17 @@ export default function ChangelogBadge({
 
       {/* Panel slide-out */}
       <AnimatePresence>
-        {open && (
-          <motion.div
-            ref={panelRef}
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 top-full mt-2 w-[380px] max-h-[500px] bg-nexo-card border border-nexo-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-[9990]"
-          >
+        {open && createPortal(
+          <>
+            <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+            <motion.div
+              ref={panelRef}
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="fixed right-4 top-14 mt-2 w-[380px] max-h-[500px] bg-nexo-card border border-nexo-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-[9999]"
+            >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
               <div className="flex items-center gap-2">
@@ -239,7 +242,9 @@ export default function ChangelogBadge({
               </button>
             </div>
           </motion.div>
-        )}
+        </>,
+        document.body
+      )}
       </AnimatePresence>
     </div>
   );
