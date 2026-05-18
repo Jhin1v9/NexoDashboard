@@ -20,6 +20,7 @@ backend/data/.reset-backup-*/
 backend/data/*.json
 !backend/data/schema/*.json
 !backend/data/config/*.json
+!backend/data/users.json
 backend/cache/
 backend/node_modules/
 agents/node_modules/
