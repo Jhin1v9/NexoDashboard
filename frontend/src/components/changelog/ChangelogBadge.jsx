@@ -57,6 +57,7 @@ export default function ChangelogBadge({
   isUnread,
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 56, right: 16 });
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -70,6 +71,16 @@ export default function ChangelogBadge({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [open]);
 
   const handleOpen = () => {
     setOpen(!open);

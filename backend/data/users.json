@@ -1,5 +1,4 @@
 {
-  "active": "abner",
   "users": {
     "abner": {
       "name": "Abner",
@@ -19,5 +18,6 @@
       "color": "#ffa502",
       "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm"
     }
-  }
+  },
+  "active": "abner"
 }
