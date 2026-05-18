@@ -54,6 +54,8 @@ function NotificationCenter() {
         top: rect.bottom + 8,
         right: window.innerWidth - rect.right
       })
+      // Auto-mark all as read when opening
+      markAllAsRead()
     }
   }, [open])
 

@@ -89,6 +89,8 @@ export default function ChangelogBadge({
     }
   };
 
+  const systemVersion = entries?.[0]?.version || '';
+
   const handleMarkAsRead = (e, id) => {
     e.stopPropagation();
     onMarkAsRead(id);
@@ -153,6 +155,11 @@ export default function ChangelogBadge({
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-nexo-accent" />
                 <span className="font-semibold text-sm">Atualizacoes</span>
+                {systemVersion && (
+                  <span className="px-1.5 py-0.5 bg-nexo-accent/20 text-nexo-accent text-[10px] font-bold rounded">
+                    v{systemVersion}
+                  </span>
+                )}
                 {unreadCount > 0 && (
                   <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-full">
                     {unreadCount} novo{unreadCount > 1 ? 's' : ''}
