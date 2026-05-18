@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
+import EditablePreviewCard from './EditablePreviewCard'
 
 const LUNA_AVATAR = '/luna-avatar.png'
 
@@ -253,7 +254,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     }
   }
 
-  const confirmPendingActions = async (confirm) => {
+  const confirmPendingActions = async (confirm, editedFields = null) => {
     if (!confirm) {
       setPendingConfirmation(null)
       const cancelMsg = {
@@ -274,12 +275,16 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     if (!pendingConfirmation) return
     setChatLoading(true)
     try {
-      const res = await axios.post(`/api/luna/threads/${activeThreadId}/messages`, {
+      const payload = {
         text: 'sim',
         authorName: activeUser,
         confirmActions: true,
         pendingActions: pendingConfirmation.actions
-      })
+      }
+      if (editedFields) {
+        payload.editedFields = editedFields
+      }
+      const res = await axios.post(`/api/luna/threads/${activeThreadId}/messages`, payload)
       const data = res.data
       if (data.success && data.messages) {
         setThreadMessages(prev => ({
@@ -471,11 +476,34 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                       )}
                       <p className="whitespace-pre-wrap">{msg.text}</p>
 
-                      {/* Confirmation buttons */}
-                      {msg.needsConfirmation && (
+                      {/* Editable Preview Card (tarefas, pagamentos, despesas, leads, deleções) */}
+                      {msg.needsConfirmation && msg.editableFields && (
+                        <EditablePreviewCard
+                          fields={msg.editableFields}
+                          title={
+                            msg.previewType === 'task_edit' ? 'Editar tarefa' :
+                            msg.previewType === 'payment_edit' ? 'Editar pagamento' :
+                            msg.previewType === 'expense_edit' ? 'Editar despesa' :
+                            msg.previewType === 'lead_edit' ? 'Editar lead' :
+                            msg.previewType === 'delete_confirm' ? 'Confirmar exclusão' :
+                            'Confirmar'
+                          }
+                          onSubmit={(edited) => {
+                            setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
+                            confirmPendingActions(true, edited)
+                          }}
+                          onCancel={() => confirmPendingActions(false)}
+                        />
+                      )}
+
+                      {/* Confirmation buttons para ações sem editableFields */}
+                      {msg.needsConfirmation && !msg.editableFields && (
                         <div className="flex gap-2 mt-3">
                           <button
-                            onClick={() => confirmPendingActions(true)}
+                            onClick={() => {
+                              setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
+                              confirmPendingActions(true)
+                            }}
                             className="px-3 py-1.5 bg-nexo-success text-white text-xs rounded-lg hover:bg-nexo-success/80 transition-colors font-medium"
                           >
                             ✅ Confirmar

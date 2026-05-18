@@ -118,13 +118,16 @@ class IntentParser {
         }
       },
       expense: {
-        regex: /\b(pagamos|gastou|despesa|saida|saída|compramos)\s+.*?\b(\d+[\.,]?\d*)\b/i,
+        regex: /\b(pagamos|pagou|gastou|gastamos|despesa|sa[ií]da|sa[ií]da\s+de|compramos|comprou|investimos|investiu)\s+.*?\b(\d+[\.,]?\d*)\b/i,
         action: 'registrar_despesa',
         extract: (text) => {
-          const valorMatch = text.match(/(?:pagamos|pagou|gastou|despesa).*?(\d+[\.,]?\d*)/i);
+          const valorMatch = text.match(/(?:pagamos|pagou|gastou|gastamos|despesa|sa[ií]da|compramos|comprou|investimos|investiu).*?(\d+[\.,]?\d*)/i);
+          // Extrair descrição: tudo depois do valor ou palavras-chave como "com", "de", "para"
+          const descMatch = text.match(/(?:com|de|para|no|na)\s+(.+?)(?:\s+(?:valor|no\s+dia|em|$))/i) ||
+                           text.match(/(?:despesa|gasto)\s+(?:de\s+)?.*?\d+[\.,]?\d*\s*(?:euro|eur|€)?\s*(?:com|para|de)?\s*(.+)/i);
           return {
             valor: parseFloat((valorMatch?.[1] || '0').replace(',', '.')),
-            descricao: text,
+            descricao: descMatch?.[1]?.trim() || text,
             tipo: 'despesa'
           };
         }
@@ -219,6 +222,46 @@ class IntentParser {
         action: 'consultar_financeiro',
         extract: () => ({ filtro: 'geral' })
       },
+      delete_task: {
+        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i,
+        action: 'excluir_tarefa',
+        extract: (text) => {
+          const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i);
+          return { titulo: m?.[1]?.trim() || text };
+        }
+      },
+      delete_payment: {
+        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+)?(?:pagamento|recibo|entrada|recebimento)\s*(?:"|'| do | de |:)?\s*(.+)/i,
+        action: 'excluir_pagamento',
+        extract: (text) => {
+          const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+)?(?:pagamento|recibo|entrada|recebimento)\s*(?:"|'| do | de |:)?\s*(.+)/i);
+          return { id: m?.[1]?.trim() || text, confirmar: true };
+        }
+      },
+      delete_expense: {
+        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+)?(?:despesa|gasto|sa[ií]da)\s*(?:"|'| do | de |:)?\s*(.+)/i,
+        action: 'excluir_despesa',
+        extract: (text) => {
+          const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+)?(?:despesa|gasto|sa[ií]da)\s*(?:"|'| do | de |:)?\s*(.+)/i);
+          return { id: m?.[1]?.trim() || text, confirmar: true };
+        }
+      },
+      delete_lead: {
+        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+|a\s+|esta\s+|essa\s+)?(?:lead|cliente|potencial)\s*(?:"|'| do | da | de |:)?\s*(.+)/i,
+        action: 'excluir_lead',
+        extract: (text) => {
+          const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+|a\s+|esta\s+|essa\s+)?(?:lead|cliente|potencial)\s*(?:"|'| do | da | de |:)?\s*(.+)/i);
+          return { nome: m?.[1]?.trim() || text, confirmar: true };
+        }
+      },
+      query_email: {
+        regex: /\b(emails?|caixa\s+de\s+entrada|inbox|ver\s+emails?|checar\s+emails?|responder\s+emails?|novos?\s+emails?)\b/i,
+        action: 'consultar_emails',
+        extract: (text) => {
+          const unreadOnly = /\b(não\s+lido|nao\s+lido|novo|novos|pendente)\b/i.test(text);
+          return { filtro: unreadOnly ? 'nao_lidos' : 'todos' };
+        }
+      },
       query_whatsapp: {
         regex: /\b(men[çc][õo]es\s+(?:do\s+)?whatsapp|check\s+whatsapp|whatsapp|men[çc][õo]es\s+pendentes)\b/i,
         action: 'consultar_whatsapp',
@@ -294,7 +337,13 @@ class IntentParser {
       intent,
       actions,
       confidence: maxConfidence,
-      needsConfirmation: actions.some(a => ['registrar_pagamento', 'registrar_despesa', 'confirmar_tarefa', 'criar_tarefa', 'criar_lead', 'adicionar_comentario', 'atualizar_status'].includes(a.type)),
+      needsConfirmation: actions.some(a => [
+        'registrar_pagamento', 'registrar_pagamento_com_split',
+        'registrar_despesa', 'registrar_despesa_com_split',
+        'confirmar_tarefa', 'criar_tarefa', 'criar_lead',
+        'adicionar_comentario', 'atualizar_status',
+        'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead'
+      ].includes(a.type)),
       source: 'regex'
     };
   }
@@ -516,7 +565,13 @@ JSON:`;
   }
 
   shouldConfirm(actions) {
-    const criticalActions = ['registrar_pagamento', 'registrar_pagamento_com_split', 'registrar_despesa', 'registrar_despesa_com_split', 'confirmar_tarefa', 'excluir_tarefa', 'excluir_lead', 'criar_tarefa', 'criar_lead', 'adicionar_comentario', 'atualizar_status'];
+    const criticalActions = [
+      'registrar_pagamento', 'registrar_pagamento_com_split',
+      'registrar_despesa', 'registrar_despesa_com_split',
+      'confirmar_tarefa', 'criar_tarefa', 'criar_lead',
+      'adicionar_comentario', 'atualizar_status',
+      'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead'
+    ];
     return actions.some(a => criticalActions.includes(a.type));
   }
 

@@ -72,6 +72,7 @@ export default function IdeaEditor() {
   const [type, setType] = useState('proposta-comercial')
   const [priority, setPriority] = useState('media')
   const [status, setStatus] = useState('rascunho')
+  const [assignedTo, setAssignedTo] = useState('')
   const [linkedTo, setLinkedTo] = useState({})
   const [tags, setTags] = useState([])
   const [tagInput, setTagInput] = useState('')
@@ -99,6 +100,7 @@ export default function IdeaEditor() {
         setType(data.type || 'proposta-comercial')
         setPriority(data.priority || 'media')
         setStatus(data.status || 'rascunho')
+        setAssignedTo(data.assignedTo || '')
         setLinkedTo(data.linkedTo || {})
         setTags(data.tags || [])
         setComments(data.comments || [])
@@ -135,7 +137,7 @@ export default function IdeaEditor() {
     }, 30000)
 
     return () => clearInterval(autoSaveRef.current)
-  }, [title, editorContent, status, priority, type, tags, linkedTo])
+  }, [title, editorContent, status, priority, type, tags, linkedTo, assignedTo])
 
   const autoSave = async () => {
     if (!title.trim()) return
@@ -165,6 +167,7 @@ export default function IdeaEditor() {
       type,
       priority,
       status,
+      assignedTo,
       linkedTo,
       tags,
       content: { blocks }
@@ -331,6 +334,19 @@ export default function IdeaEditor() {
               {VALID_PRIORITIES.map(p => (
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
+            </select>
+
+            {/* Assigned To */}
+            <select
+              value={assignedTo}
+              onChange={e => setAssignedTo(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-nexo-card text-nexo-text border border-nexo-border outline-none cursor-pointer"
+              title="Designar para"
+            >
+              <option value="">Todos</option>
+              <option value="abner">Abner</option>
+              <option value="nonoke">Nonoke</option>
+              <option value="elias">Elias</option>
             </select>
 
             {/* AI Toggle */}

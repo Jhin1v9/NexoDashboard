@@ -98,6 +98,16 @@ class ActionExecutor {
         return await this.saveIdea(action.params, authorName);
       case 'link':
         return await this.saveLink(action.params, authorName);
+      case 'excluir_tarefa':
+        return await this.deleteTask(action.params, authorName);
+      case 'excluir_pagamento':
+        return await this.deletePayment(action.params, authorName);
+      case 'excluir_despesa':
+        return await this.deleteExpense(action.params, authorName);
+      case 'excluir_lead':
+        return await this.deleteLead(action.params, authorName);
+      case 'consultar_emails':
+        return await this.queryEmails(action.params);
       default:
         throw new Error(`Ação não suportada: ${action.type}`);
     }
@@ -285,8 +295,8 @@ class ActionExecutor {
       return { type: 'lead', id: apiResult.lead?.id || apiResult.id, displayName, source: 'api' };
     }
 
-    // Fallback: salvar no clients-registry
-    const clientsFile = path.join(this.dataDir, 'clients-registry.json');
+    // Fallback: salvar no clients-registry (schema dir)
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
     const registry = this.readJson(clientsFile, { clients: {}, schema: { version: '16.1.0' } });
     const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     registry.clients[id] = {
@@ -332,7 +342,27 @@ class ActionExecutor {
 
     const apiResult = await this.apiPost('/cash-box/payments', entry);
     if (apiResult && !apiResult.error && apiResult.success !== false) {
-      return { type: 'payment', id: apiResult.entry?.id || apiResult.id, amount, de, source: 'api' };
+      const entryData = apiResult.entry || {};
+      const dist = entryData.distribution || {};
+      const splits = {};
+      if (dist.splits && Array.isArray(dist.splits)) {
+        dist.splits.forEach(s => {
+          let key = s.recipientId;
+          if (key === 'nexo-digital') key = 'empresa';
+          else if (key === 'nexo-abner-001') key = 'abner';
+          else if (key === 'nexo-enoque-001') key = 'nonoke';
+          else if (key === 'nexo-elias-pessoal') key = 'elias';
+          if (key) splits[key] = s.amount;
+        });
+      }
+      return {
+        type: 'payment',
+        id: entryData.id || apiResult.id,
+        amount,
+        de,
+        source: 'api',
+        splits: Object.keys(splits).length > 0 ? splits : undefined
+      };
     }
 
     // Fallback manual com distribuição 4-way
@@ -365,7 +395,14 @@ class ActionExecutor {
     });
     this.writeJson(cashFile, cash);
 
-    return { type: 'payment', id, amount, de, source: 'file' };
+    return {
+      type: 'payment',
+      id,
+      amount,
+      de,
+      source: 'file',
+      splits: { abner: share, nonoke: share, elias: share, empresa: share }
+    };
   }
 
   async createExpense(params, authorName) {
@@ -460,13 +497,134 @@ class ActionExecutor {
   }
 
   // ============================================================
+  // AÇÕES: Destrutivas (Delete)
+  // ============================================================
+  async deleteTask(params, authorName) {
+    const titulo = params.titulo || params.id || '';
+    if (!titulo) throw new Error('Informe a tarefa para excluir');
+
+    const tasksFile = path.join(this.dataDir, 'tasks.json');
+    const tasks = this.readJson(tasksFile, []);
+
+    const idx = tasks.findIndex(t => {
+      if (params.id && t.id === params.id) return true;
+      const taskTitle = (t.titulo || t.title || '').toLowerCase();
+      const searchTitle = titulo.toLowerCase();
+      return taskTitle.includes(searchTitle) || searchTitle.includes(taskTitle.slice(0, 30));
+    });
+
+    if (idx === -1) throw new Error(`Tarefa "${titulo}" não encontrada`);
+
+    const removed = tasks.splice(idx, 1)[0];
+    this.writeJson(tasksFile, tasks);
+
+    return { type: 'task_deleted', id: removed.id, titulo: removed.title || removed.titulo, source: 'file' };
+  }
+
+  async deletePayment(params, authorName) {
+    const search = params.id || params.de || params.cliente || '';
+    if (!search) throw new Error('Informe o pagamento para excluir');
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+
+    const idx = cash.history.findIndex(h => {
+      if (h.id === search) return true;
+      const src = (h.source || h.description || '').toLowerCase();
+      return src.includes(search.toLowerCase());
+    });
+
+    if (idx === -1) throw new Error(`Pagamento "${search}" não encontrado`);
+
+    const removed = cash.history.splice(idx, 1)[0];
+    // Reverte o saldo
+    if (removed.type === 'payment_received') {
+      cash.balance.value = parseFloat(((cash.balance?.value || 0) - removed.amount).toFixed(2));
+    }
+    this.writeJson(cashFile, cash);
+
+    return { type: 'payment_deleted', id: removed.id, amount: removed.amount, source: 'file' };
+  }
+
+  async deleteExpense(params, authorName) {
+    const search = params.id || params.para || params.descricao || '';
+    if (!search) throw new Error('Informe a despesa para excluir');
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+
+    const idx = cash.history.findIndex(h => {
+      if (h.id === search) return true;
+      const src = (h.source || h.description || '').toLowerCase();
+      return src.includes(search.toLowerCase());
+    });
+
+    if (idx === -1) throw new Error(`Despesa "${search}" não encontrada`);
+
+    const removed = cash.history.splice(idx, 1)[0];
+    // Reverte o saldo
+    if (removed.type === 'expense') {
+      cash.balance.value = parseFloat(((cash.balance?.value || 0) + removed.amount).toFixed(2));
+    }
+    this.writeJson(cashFile, cash);
+
+    return { type: 'expense_deleted', id: removed.id, amount: removed.amount, source: 'file' };
+  }
+
+  async deleteLead(params, authorName) {
+    const search = params.nome || params.id || '';
+    if (!search) throw new Error('Informe o lead para excluir');
+
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const registry = this.readJson(clientsFile, { clients: {}, schema: { version: '16.1.0' } });
+
+    const idToDelete = Object.keys(registry.clients || {}).find(id => {
+      if (id === search) return true;
+      const c = registry.clients[id];
+      const name = (c.displayName || c.name || '').toLowerCase();
+      return name.includes(search.toLowerCase());
+    });
+
+    if (!idToDelete) throw new Error(`Lead "${search}" não encontrado`);
+
+    const removed = registry.clients[idToDelete];
+    delete registry.clients[idToDelete];
+    this.writeJson(clientsFile, registry);
+
+    return { type: 'lead_deleted', id: idToDelete, nome: removed.displayName || removed.name, source: 'file' };
+  }
+
+  async queryEmails(params) {
+    const apiResult = await this.apiGet('/email/messages?maxResults=10');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult.messages)) {
+      const unread = apiResult.messages.filter(m => !m.read);
+      return {
+        type: 'emails',
+        filtro: params.filtro || 'todos',
+        total: apiResult.messages.length,
+        naoLidos: unread.length,
+        items: apiResult.messages.slice(0, 5).map(m => ({
+          id: m.id,
+          subject: m.subject || '(sem assunto)',
+          from: m.from || 'Desconhecido',
+          snippet: m.snippet || m.body?.slice(0, 100) || '',
+          unread: !m.read
+        }))
+      };
+    }
+
+    // Fallback: retorna vazio se API falhar
+    return { type: 'emails', filtro: params.filtro || 'todos', total: 0, naoLidos: 0, items: [], source: 'fallback' };
+  }
+
+  // ============================================================
   // AÇÕES: Status/Consulta
   // ============================================================
   async getStatus(params) {
     const filtro = params.filtro || 'geral';
 
     const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const clientsFile = path.join(this.dataDir, 'clients-registry.json');
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
     const cashFile = path.join(this.dataDir, 'cash-box.json');
 
     const tasks = this.readJson(tasksFile, []);
@@ -640,7 +798,28 @@ class ActionExecutor {
 
     const apiResult = await this.apiPost('/cash-box/payments', entry);
     if (apiResult && !apiResult.error && apiResult.success !== false) {
-      return { type: 'payment_split', amount, client, applied: true, source: 'api', id: apiResult.id || apiResult.entry?.id };
+      const entryData = apiResult.entry || {};
+      const dist = entryData.distribution || {};
+      const splits = {};
+      if (dist.splits && Array.isArray(dist.splits)) {
+        dist.splits.forEach(s => {
+          let key = s.recipientId;
+          if (key === 'nexo-digital') key = 'empresa';
+          else if (key === 'nexo-abner-001') key = 'abner';
+          else if (key === 'nexo-enoque-001') key = 'nonoke';
+          else if (key === 'nexo-elias-pessoal') key = 'elias';
+          if (key) splits[key] = s.amount;
+        });
+      }
+      return {
+        type: 'payment_split',
+        amount,
+        client,
+        applied: true,
+        source: 'api',
+        id: entryData.id || apiResult.id,
+        splits: Object.keys(splits).length > 0 ? splits : undefined
+      };
     }
 
     // Fallback: escreve no cash-box.json manualmente com split
@@ -845,6 +1024,24 @@ class ActionExecutor {
           break;
         case 'link':
           parts.push(`link salvo`);
+          break;
+        case 'task_deleted':
+          parts.push(`tarefa "${res.titulo || res.title}" excluída`);
+          break;
+        case 'payment_deleted':
+          parts.push(`pagamento de €${res.amount} excluído`);
+          break;
+        case 'expense_deleted':
+          parts.push(`despesa de €${res.amount} excluída`);
+          break;
+        case 'lead_deleted':
+          parts.push(`lead "${res.nome || res.displayName}" excluído`);
+          break;
+        case 'emails':
+          parts.push(`📧 Emails: ${res.total} total (${res.naoLidos} não lidos)`);
+          if (res.items?.length > 0) {
+            parts.push(res.items.map(e => `  • ${e.unread ? '🆕 ' : ''}${e.from}: "${e.subject}"`).join('\n'));
+          }
           break;
         case 'comment':
           parts.push(`comentário na tarefa "${res.taskTitle || res.title || res.titulo}"`);

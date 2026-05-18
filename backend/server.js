@@ -3888,7 +3888,9 @@ app.post('/api/luna/chat', async (req, res) => {
       'registrar_despesa', 'registrar_despesa_com_split', 'confirmar_tarefa',
       'adicionar_comentario', 'atualizar_status', 'consultar_status',
       'consultar_tarefas', 'consultar_leads', 'consultar_financeiro',
-      'consultar_whatsapp', 'verificar_mencoes', 'ideia', 'link', 'social'
+      'consultar_whatsapp', 'consultar_emails', 'verificar_mencoes',
+      'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead',
+      'ideia', 'link', 'social'
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
 
@@ -3917,7 +3919,6 @@ app.post('/api/luna/chat', async (req, res) => {
     if (parsed.actions.length > 0 && parsed.actions.some(a => a.type !== 'social' && a.type !== 'consultar_status')) {
       // Se precisa de confirmação e ainda não foi confirmado → mostra preview editável
       if (parsed.needsConfirmation && !confirmActions) {
-        // Para criar_tarefa: retorna campos editáveis inline
         const taskAction = parsed.actions.find(a => a.type === 'criar_tarefa');
         if (taskAction) {
           const fields = buildEditableTaskFields(taskAction.params);
@@ -3926,6 +3927,71 @@ app.post('/api/luna/chat', async (req, res) => {
             reply: `Vou criar essa tarefa. Confere se tá certo e clique em "Criar tarefa" 👇`,
             needsConfirmation: true,
             previewType: 'task_edit',
+            preview: buildActionPreview(parsed.actions),
+            editableFields: fields,
+            actions: parsed.actions,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        const paymentAction = parsed.actions.find(a => a.type === 'registrar_pagamento' || a.type === 'registrar_pagamento_com_split');
+        if (paymentAction) {
+          const fields = buildEditablePaymentFields(paymentAction.params);
+          return res.json({
+            success: true,
+            reply: `Vou registrar esse pagamento. Confere os dados 👇`,
+            needsConfirmation: true,
+            previewType: 'payment_edit',
+            preview: buildActionPreview(parsed.actions),
+            editableFields: fields,
+            actions: parsed.actions,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        const expenseAction = parsed.actions.find(a => a.type === 'registrar_despesa' || a.type === 'registrar_despesa_com_split');
+        if (expenseAction) {
+          const fields = buildEditableExpenseFields(expenseAction.params);
+          return res.json({
+            success: true,
+            reply: `Vou registrar essa despesa. Confere os dados 👇`,
+            needsConfirmation: true,
+            previewType: 'expense_edit',
+            preview: buildActionPreview(parsed.actions),
+            editableFields: fields,
+            actions: parsed.actions,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        const leadAction = parsed.actions.find(a => a.type === 'criar_lead');
+        if (leadAction) {
+          const fields = buildEditableLeadFields(leadAction.params);
+          return res.json({
+            success: true,
+            reply: `Vou registrar esse lead. Confere os dados 👇`,
+            needsConfirmation: true,
+            previewType: 'lead_edit',
+            preview: buildActionPreview(parsed.actions),
+            editableFields: fields,
+            actions: parsed.actions,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        const deleteAction = parsed.actions.find(a => a.type?.startsWith('excluir_'));
+        if (deleteAction) {
+          const fields = buildEditableDeleteFields(deleteAction.params, deleteAction.type);
+          const typeNames = { excluir_tarefa: 'tarefa', excluir_pagamento: 'pagamento', excluir_despesa: 'despesa', excluir_lead: 'lead' };
+          return res.json({
+            success: true,
+            reply: `⚠️ Tem certeza que quer excluir essa ${typeNames[deleteAction.type] || 'item'}?\n\nEssa ação não pode ser desfeita.`,
+            needsConfirmation: true,
+            previewType: 'delete_confirm',
             preview: buildActionPreview(parsed.actions),
             editableFields: fields,
             actions: parsed.actions,
@@ -3950,7 +4016,8 @@ app.post('/api/luna/chat', async (req, res) => {
       // Se veio com editedFields, aplica as correções antes de executar
       if (editedFields && Array.isArray(parsed.actions)) {
         for (const action of parsed.actions) {
-          if (action.type === 'criar_tarefa' && editedFields) {
+          if (!editedFields) continue;
+          if (action.type === 'criar_tarefa') {
             if (editedFields.title) action.params.titulo = editedFields.title;
             if (editedFields.assignedTo !== undefined) action.params.responsavel = editedFields.assignedTo;
             if (editedFields.priority) {
@@ -3959,6 +4026,22 @@ app.post('/api/luna/chat', async (req, res) => {
             }
             if (editedFields.dueDate) action.params.prazo = editedFields.dueDate;
             if (editedFields.description) action.params.descricao = editedFields.description;
+          }
+          if (action.type === 'registrar_pagamento' || action.type === 'registrar_pagamento_com_split') {
+            if (editedFields.valor) action.params.valor = parseFloat(editedFields.valor);
+            if (editedFields.de) action.params.de = editedFields.de;
+            if (editedFields.descricao) action.params.descricao = editedFields.descricao;
+          }
+          if (action.type === 'registrar_despesa' || action.type === 'registrar_despesa_com_split') {
+            if (editedFields.valor) action.params.valor = parseFloat(editedFields.valor);
+            if (editedFields.para) action.params.para = editedFields.para;
+            if (editedFields.descricao) action.params.descricao = editedFields.descricao;
+          }
+          if (action.type === 'criar_lead') {
+            if (editedFields.nome) action.params.nome = editedFields.nome;
+            if (editedFields.telefone) action.params.telefone = editedFields.telefone;
+            if (editedFields.email) action.params.email = editedFields.email;
+            if (editedFields.contexto) action.params.contexto = editedFields.contexto;
           }
         }
       }
@@ -4241,7 +4324,7 @@ app.delete('/api/luna/threads/:id/messages', (req, res) => {
 // ── Helpers do MODO CONCIERGE ──
 function buildEditableTaskFields(params) {
   return {
-    title: { label: 'Título', value: params.titulo || '', type: 'text', placeholder: 'Nome da tarefa' },
+    title: { label: 'Título', value: params.titulo || '', type: 'text', placeholder: 'Nome da tarefa', required: true },
     assignedTo: {
       label: 'Responsável',
       value: params.responsavel || '',
@@ -4265,6 +4348,52 @@ function buildEditableTaskFields(params) {
     },
     dueDate: { label: 'Prazo', value: params.prazo || '', type: 'date', placeholder: 'Selecione uma data' },
     description: { label: 'Descrição', value: params.descricao || '', type: 'textarea', placeholder: 'Detalhes adicionais (opcional)' }
+  };
+}
+
+function buildEditablePaymentFields(params) {
+  return {
+    valor: { label: 'Valor (€)', value: String(params.valor || ''), type: 'text', placeholder: '0.00', required: true },
+    de: { label: 'De', value: params.de || '', type: 'text', placeholder: 'Nome do cliente', required: true },
+    descricao: { label: 'Descrição', value: params.descricao || '', type: 'textarea', placeholder: 'Detalhes do pagamento' },
+    split: { label: 'Dividir em 4 (25% cada)', value: true, type: 'checkbox' }
+  };
+}
+
+function buildEditableExpenseFields(params) {
+  return {
+    valor: { label: 'Valor (€)', value: String(params.valor || ''), type: 'text', placeholder: '0.00', required: true },
+    para: { label: 'Para', value: params.para || params.descricao || '', type: 'text', placeholder: 'Descrição da despesa', required: true },
+    descricao: { label: 'Descrição', value: params.descricao || '', type: 'textarea', placeholder: 'Detalhes adicionais' },
+    split: { label: 'Dividir entre sócios', value: true, type: 'checkbox' }
+  };
+}
+
+function buildEditableLeadFields(params) {
+  return {
+    nome: { label: 'Nome', value: params.nome || '', type: 'text', placeholder: 'Nome do lead', required: true },
+    telefone: { label: 'Telefone', value: params.telefone || '', type: 'text', placeholder: '+34 ...' },
+    email: { label: 'Email', value: params.email || '', type: 'text', placeholder: 'email@exemplo.com' },
+    contexto: { label: 'Contexto', value: params.contexto || '', type: 'textarea', placeholder: 'Detalhes do lead' }
+  };
+}
+
+function buildEditableDeleteFields(params, type) {
+  const names = {
+    'excluir_tarefa': 'tarefa',
+    'excluir_pagamento': 'pagamento',
+    'excluir_despesa': 'despesa',
+    'excluir_lead': 'lead'
+  };
+  const itemName = params.titulo || params.id || params.nome || params.de || params.para || 'item';
+  return {
+    confirmText: {
+      label: `Digite "${itemName}" para confirmar`,
+      value: '',
+      type: 'text',
+      placeholder: `Digite o nome do ${names[type] || 'item'}`,
+      required: true
+    }
   };
 }
 
@@ -4292,7 +4421,13 @@ function buildConciergeReply(result, authorName) {
         case 'task': parts.push(`tarefa "${res.title || res.titulo}" criada${res.assignedTo ? ` pra ${res.assignedTo}` : ''}`); break;
         case 'task_done': parts.push(`tarefa "${res.title || res.titulo}" marcada como concluída`); break;
         case 'lead': parts.push(`lead "${res.displayName || res.nome}" registrado`); break;
-        case 'payment': parts.push(`pagamento de €${res.amount || res.valor} registrado`); break;
+        case 'payment':
+          if (res.splits) {
+            parts.push(`pagamento de €${res.amount || res.valor} de ${res.de || 'cliente'} registrado com split:\n  • Abner: €${res.splits.abner}\n  • Nonoke: €${res.splits.nonoke}\n  • Elias: €${res.splits.elias}\n  • Empresa: €${res.splits.empresa}`);
+          } else {
+            parts.push(`pagamento de €${res.amount || res.valor} registrado`);
+          }
+          break;
         case 'payment_split':
           if (res.splits) {
             parts.push(`pagamento de €${res.amount} do ${res.client} registrado com split:\n  • Abner: €${res.splits.abner}\n  • Nonoke: €${res.splits.nonoke}\n  • Elias: €${res.splits.elias}\n  • Empresa: €${res.splits.empresa}`);
@@ -4319,6 +4454,16 @@ function buildConciergeReply(result, authorName) {
           break;
         case 'idea': parts.push(`ideia anotada`); break;
         case 'link': parts.push(`link salvo`); break;
+        case 'task_deleted': parts.push(`🗑️ Tarefa "${res.titulo || res.title}" excluída`); break;
+        case 'payment_deleted': parts.push(`🗑️ Pagamento de €${res.amount} excluído`); break;
+        case 'expense_deleted': parts.push(`🗑️ Despesa de €${res.amount} excluída`); break;
+        case 'lead_deleted': parts.push(`🗑️ Lead "${res.nome || res.displayName}" excluído`); break;
+        case 'emails':
+          parts.push(`📧 Emails (${res.filtro}): ${res.total} total, ${res.naoLidos} não lidos`);
+          if (res.items?.length > 0) {
+            parts.push(res.items.map(e => `  • ${e.unread ? '🆕 ' : ''}${e.from}: "${e.subject}"`).join('\n'));
+          }
+          break;
       }
     }
     return `Pronto, ${firstName}! ✅\n\n${parts.join('\n')}\n\nSe precisar de mais alguma coisa, é só chamar.`;
