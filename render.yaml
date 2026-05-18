@@ -18,3 +18,5 @@ services:
         generateValue: true
       - key: ROOT_DIR
         value: /opt/render/project/src
+      - key: DATABASE_URL
+        sync: false  # Set this in Render dashboard after creating Neon DB

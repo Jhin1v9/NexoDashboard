@@ -20,6 +20,7 @@ const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
+const { restoreAllFromPG, syncFileToPG } = require('./pg-sync');
 
 const app = express();
 const server = http.createServer(app);
@@ -297,6 +298,9 @@ const readJSON = (file, defaultValue = null) => {
 };
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  if (process.env.DATABASE_URL) {
+    syncFileToPG(file, data).catch(e => console.error('[pg-sync]', e.message));
+  }
 };
 
 // ── LUNA CHAT THREADS v1.0 ──
@@ -5968,9 +5972,31 @@ app.get('*', (req, res) => {
 });
 
 // Start
-server.listen(PORT, BIND_IP, () => {
-  console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
-});
+async function startServer() {
+  if (process.env.DATABASE_URL) {
+    try {
+      // Check if database is empty (first deploy)
+      const db = require('./db');
+      const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+      if (parseInt(userCount?.count || 0) === 0) {
+        console.log('🆕 Database is empty. Migrating JSON data to PostgreSQL...');
+        const { execSync } = require('child_process');
+        execSync('node scripts/migrate-json-to-sql.js', { cwd: __dirname, stdio: 'inherit' });
+        console.log('✅ Initial migration complete.');
+      } else {
+        console.log('🔄 Restoring data from PostgreSQL to JSON files...');
+        await restoreAllFromPG();
+      }
+    } catch (err) {
+      console.error('❌ Database setup failed:', err.message);
+    }
+  }
+  server.listen(PORT, BIND_IP, () => {
+    console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+  });
+}
+
+startServer();
 
 // ── Background Refresh: tools a cada 10 min ──
 setInterval(() => {
