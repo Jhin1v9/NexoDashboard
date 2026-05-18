@@ -28,6 +28,7 @@ import Orcamentos from './pages/Orcamentos'
 import Operacoes from './pages/Operacoes'
 import Leads from './pages/Leads'
 import LunaControl from './pages/LunaControl'
+import LunaChatPanel from './components/luna/LunaChatPanel'
 import SystemEngine from './pages/SystemEngine'
 import Settings from './pages/Settings'
 import Seguranca from './pages/Seguranca'
@@ -39,10 +40,11 @@ import IdeaEditor from './pages/IdeaEditor'
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [cmdOpen, setCmdOpen] = useState(false)
+  const [lunaChatOpen, setLunaChatOpen] = useState(false)
 
   return (
     <div className="flex h-screen bg-nexo-bg text-nexo-text overflow-hidden">
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} onLunaChatClick={() => setLunaChatOpen(true)} />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} onSearchClick={() => setCmdOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6">
@@ -83,6 +85,7 @@ function ProtectedLayout() {
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <ToastContainer />
       <MobileBottomNav />
+      <LunaChatPanel isOpen={lunaChatOpen} onClose={() => setLunaChatOpen(false)} />
     </div>
   )
 }

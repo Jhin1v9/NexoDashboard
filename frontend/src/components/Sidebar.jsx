@@ -5,8 +5,10 @@ import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
-  Shield, Lightbulb
+  Shield, Lightbulb, Bot, Terminal
 } from 'lucide-react'
+
+const LUNA_AVATAR = '/luna-avatar.png'
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -35,7 +37,6 @@ const navItems = [
   { path: '/ideias', icon: Lightbulb, label: 'Ideias', badge: 'beta' },
   { path: '/leads', icon: Target, label: 'Leads' },
   { path: '/operacoes', icon: Bell, label: 'Operacoes' },
-  { path: '/luna', icon: Cpu, label: 'Luna' },
   { path: '/sistema', icon: HardDrive, label: 'Sistema' },
   { path: '/seguranca', icon: Shield, label: 'Seguranca' },
   { path: '/settings', icon: Settings, label: 'Configuracoes' },
@@ -144,16 +145,70 @@ function AccordionSection({ item, isActive, sidebarOpen }) {
   )
 }
 
-export default function Sidebar({ open }) {
+function LunaChatSidebarItem({ sidebarOpen, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="nav-item group relative"
+      title={!sidebarOpen ? 'Luna Chat' : ''}
+    >
+      {sidebarOpen ? (
+        <div className="flex items-center gap-3 w-full">
+          <div className="relative w-5 h-5 flex-shrink-0">
+            <img
+              src={LUNA_AVATAR}
+              alt="Luna"
+              className="w-5 h-5 rounded-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none'
+                e.target.nextSibling.style.display = 'block'
+              }}
+            />
+            <Bot className="w-5 h-5 text-nexo-primary absolute inset-0 hidden" />
+          </div>
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-medium text-nexo-text group-hover:text-nexo-primary transition-colors">Luna Chat</span>
+            <span className="text-[10px] text-nexo-muted">Assistente AI</span>
+          </div>
+          <span className="ml-auto w-2 h-2 rounded-full bg-nexo-success animate-pulse" />
+        </div>
+      ) : (
+        <div className="relative w-5 h-5 flex-shrink-0">
+          <img
+            src={LUNA_AVATAR}
+            alt="Luna"
+            className="w-5 h-5 rounded-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none'
+              e.target.nextSibling.style.display = 'block'
+            }}
+          />
+          <Bot className="w-5 h-5 text-nexo-primary absolute inset-0 hidden" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-nexo-success border border-nexo-bg" />
+        </div>
+      )}
+    </button>
+  )
+}
+
+export default function Sidebar({ open, setOpen, onLunaChatClick }) {
   return (
     <aside className={`${open ? 'w-60' : 'w-16'} glass flex flex-col transition-all duration-300`}>
       <div className="p-4 flex items-center gap-3 border-b border-nexo-border">
         <div className="w-8 h-8 rounded-lg bg-nexo-info flex items-center justify-center font-bold text-white text-sm">N</div>
         {open && <span className="font-heading font-bold text-lg">NEXO</span>}
       </div>
+
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {navItems.map(item => <NavItem key={item.path || item.id} item={item} sidebarOpen={open} />)}
+
+        {/* Separator */}
+        <div className="my-2 border-t border-nexo-border/50" />
+
+        {/* Luna Chat — Special Item */}
+        <LunaChatSidebarItem sidebarOpen={open} onClick={onLunaChatClick} />
       </nav>
+
       <div className="p-4 border-t border-nexo-border text-xs text-nexo-muted text-center">
         {open && <span>v4.0 — Command Center</span>}
       </div>
