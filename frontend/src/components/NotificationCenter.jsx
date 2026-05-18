@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell, X, Check, AlertTriangle, Shield, Info } from 'lucide-react'
 import axios from 'axios'
@@ -13,7 +13,8 @@ function NotificationCenter() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [pos, setPos] = useState({ top: 56, right: 16 })
+  const buttonRef = useRef(null)
 
   const fetchNotifications = async () => {
     try {
@@ -46,6 +47,16 @@ function NotificationCenter() {
     return () => ws.close()
   }, [])
 
+  useEffect(() => {
+    if (open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      })
+    }
+  }, [open])
+
   const markAsRead = async (id) => {
     try {
       await axios.post(`/api/notifications/${id}/read`)
@@ -72,6 +83,7 @@ function NotificationCenter() {
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setOpen(!open)}
         className="relative p-2 text-nexo-muted hover:text-nexo-text transition-colors"
       >
@@ -86,7 +98,10 @@ function NotificationCenter() {
       {open && createPortal(
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
-          <div className="fixed right-4 top-14 mt-2 w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-2xl z-[9999] overflow-hidden">
+          <div
+            className="fixed w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+            style={{ top: pos.top, right: pos.right }}
+          >
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
               <h3 className="font-semibold text-sm">Notificações</h3>
               {unreadCount > 0 && (
