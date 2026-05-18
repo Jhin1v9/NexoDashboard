@@ -206,7 +206,8 @@ export default function LunaControl() {
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const [activeUser, setActiveUser] = useState('Abner')
+  const { user: authUser } = useAuth()
+  const [activeUser, setActiveUser] = useState(authUser?.name || 'Abner')
   const [pendingConfirmation, setPendingConfirmation] = useState(null)
   const [editingPreview, setEditingPreview] = useState(null)
   const chatEndRef = useRef(null)
@@ -221,15 +222,10 @@ export default function LunaControl() {
   const dropdownRef = useRef(null)
 
   useEffect(() => {
-    // Busca usuário ativo do backend
-    axios.get('/api/users')
-      .then(res => {
-        const active = res.data.active || 'abner'
-        const user = res.data.users?.[active]
-        setActiveUser(user?.name || active)
-      })
-      .catch(() => setActiveUser('Abner'))
-  }, [])
+    if (authUser?.name) {
+      setActiveUser(authUser.name)
+    }
+  }, [authUser])
 
   useEffect(() => {
     fetchCommands()

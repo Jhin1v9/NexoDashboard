@@ -672,7 +672,7 @@ app.post('/api/tasks/:id/comments', (req, res) => {
   const comment = {
     id: Date.now().toString(),
     text: req.body.text?.trim() || '',
-    author: req.body.author || 'sistema',
+    author: req.user?.userId || req.user?.id || req.body.author || 'sistema',
     createdAt: new Date().toISOString()
   };
   task.comments = task.comments || [];
@@ -5850,7 +5850,7 @@ app.get('/api/users', requireAuth, (req, res) => {
         createdAt: user.createdAt
       };
     });
-    res.json({ users: sanitized, active: data.active });
+    res.json({ users: sanitized, currentUser: req.user.userId });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

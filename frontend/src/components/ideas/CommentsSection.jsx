@@ -6,6 +6,7 @@ import {
   X
 } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../../context/AuthContext'
 
 /**
  * CommentsSection - Lista de comentarios da ideia
@@ -39,6 +40,7 @@ const MENTION_USERS = [
 ]
 
 export default function CommentsSection({ ideaId, comments: initialComments = [], onUpdate }) {
+  const { user: authUser } = useAuth()
   const [comments, setComments] = useState(initialComments)
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(false)
@@ -229,13 +231,7 @@ export default function CommentsSection({ ideaId, comments: initialComments = []
   }
 
   const getCurrentUserId = () => {
-    // Try to get from localStorage or return default
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      return user.id || user.userId || 'unknown'
-    } catch {
-      return 'unknown'
-    }
+    return authUser?.id || authUser?.userId || 'unknown'
   }
 
   const isCurrentUser = (authorId) => {

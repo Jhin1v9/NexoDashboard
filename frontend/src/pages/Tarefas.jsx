@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import useRealtime from '../hooks/useRealtime'
+import { useAuth } from '../context/AuthContext'
 
 const STATUS_CONFIG = {
   pending: { label: 'Pendente', color: 'bg-gray-500', text: 'text-gray-400', border: 'border-gray-500', icon: Clock },
@@ -32,8 +33,9 @@ export default function Tarefas() {
   const { data, refetch } = useRealtime('/api/tasks', 15000)
   const tasks = data || []
 
+  const { user: authUser } = useAuth()
   const [users, setUsers] = useState({})
-  const [activeUser, setActiveUser] = useState('abner')
+  const [activeUser, setActiveUser] = useState(authUser?.id || 'abner')
 
   // Create form
   const [newTask, setNewTask] = useState('')
@@ -62,7 +64,7 @@ export default function Tarefas() {
     try {
       const res = await axios.get('/api/users')
       setUsers(res.data.users || {})
-      setActiveUser(res.data.active || 'abner')
+      if (authUser?.id) setActiveUser(authUser.id)
     } catch (e) {}
   }
 

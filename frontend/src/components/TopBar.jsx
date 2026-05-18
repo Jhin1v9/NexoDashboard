@@ -25,7 +25,7 @@ export default function TopBar({ onMenuClick, onSearchClick }) {
     return () => clearInterval(interval)
   }, [])
 
-  const activeUser = user || { name: 'Abner', color: '#3742fa' }
+  const activeUser = user || { name: 'Usuário', color: '#6366f1' }
 
   return (
     <header className="h-14 glass flex items-center justify-between px-4 border-b border-nexo-border">

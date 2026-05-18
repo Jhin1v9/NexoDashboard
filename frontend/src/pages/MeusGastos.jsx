@@ -6,6 +6,7 @@ import {
   CreditCard, TrendingDown, TrendingUp
 } from 'lucide-react'
 import useRealtime from '../hooks/useRealtime'
+import { useAuth } from '../context/AuthContext'
 
 const PEOPLE = {
   abner: 'Abner',
@@ -15,17 +16,17 @@ const PEOPLE = {
 
 export default function MeusGastos() {
   const navigate = useNavigate()
-  const [currentUser, setCurrentUser] = useState('abner') // default fallback
+  const { user: authUser } = useAuth()
+  const [currentUser, setCurrentUser] = useState(authUser?.id || 'abner')
   const [payingExpenseId, setPayingExpenseId] = useState(null)
 
-  const { data: userData } = useRealtime('/api/users', 60000)
   const { data: expensesData, loading, error } = useRealtime('/api/expenses', 30000)
 
   useEffect(() => {
-    if (userData?.currentUser?.id) {
-      setCurrentUser(userData.currentUser.id)
+    if (authUser?.id) {
+      setCurrentUser(authUser.id)
     }
-  }, [userData])
+  }, [authUser])
 
   const expenses = expensesData?.expenses || expensesData || []
   const userName = PEOPLE[currentUser] || currentUser
