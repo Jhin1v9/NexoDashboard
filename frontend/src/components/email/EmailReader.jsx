@@ -176,14 +176,16 @@ export default function EmailReader({ thread, onAction, onReplySent }) {
                   )}
 
                   {/* HTML / Texto */}
-                  {msg.body?.html ? (
-                    <div
-                      className="prose prose-invert prose-sm max-w-none text-nexo-text"
-                      dangerouslySetInnerHTML={{ __html: msg.body.html }}
-                    />
-                  ) : (
-                    <pre className="whitespace-pre-wrap text-sm text-nexo-text font-sans">{msg.body?.text || msg.snippet || '(sem conteúdo)'}</pre>
-                  )}
+                  {(() => {
+                    const body = msg.body
+                    if (typeof body === 'string') {
+                      return <div className="prose prose-invert prose-sm max-w-none text-nexo-text" dangerouslySetInnerHTML={{ __html: body }} />
+                    }
+                    if (body?.html) {
+                      return <div className="prose prose-invert prose-sm max-w-none text-nexo-text" dangerouslySetInnerHTML={{ __html: body.html }} />
+                    }
+                    return <pre className="whitespace-pre-wrap text-sm text-nexo-text font-sans">{body?.text || msg.snippet || '(sem conteúdo)'}</pre>
+                  })()}
 
                   {/* Ações da mensagem */}
                   <div className="flex items-center gap-2 mt-4 pt-3 border-t border-nexo-border/50">
