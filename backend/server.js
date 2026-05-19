@@ -3022,7 +3022,8 @@ function updateCashBoxFromTransactions(transactions) {
 // CHANGELOG / RELEASE NOTES API
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const CHANGELOG_FILE = path.join(DATA_DIR, 'changelog.json');
+const CHANGELOG_FILE = path.join(__dirname, 'changelog.json');
+const CHANGELOG_DATA_FILE = path.join(DATA_DIR, 'changelog.json');
 const LINKS_INDEX_FILE = path.join(DATA_DIR, 'links-index.json');
 if (!fs.existsSync(LINKS_INDEX_FILE)) {
   writeJSON(LINKS_INDEX_FILE, { links: [], lastUpdated: new Date().toISOString() });
@@ -3030,7 +3031,7 @@ if (!fs.existsSync(LINKS_INDEX_FILE)) {
 
 function ensureChangelog() {
   // Cria apenas se o arquivo não existe — não sobrescreve dados existentes
-  if (!fs.existsSync(CHANGELOG_FILE)) {
+  if (!fs.existsSync(CHANGELOG_DATA_FILE)) {
     const initialData = {
       version: '1.0',
       lastUpdated: new Date().toISOString(),
@@ -3128,7 +3129,7 @@ function ensureChangelog() {
         },
       ]
     };
-    writeJSON(CHANGELOG_FILE, initialData);
+    writeJSON(CHANGELOG_DATA_FILE, initialData);
   }
 }
 
