@@ -6,6 +6,16 @@
 
 ---
 
+## 0. Princípio Fundamental
+
+> **FOCO É QUALIDADE, NÃO VELOCIDADE.**
+>
+> O usuário quer escolher a melhor solução de uma vez e não ficar mudando depois.
+> SEMPRE priorizar qualidade, robustez e manutenibilidade sobre rapidez de implementação.
+> NUNCA sugerir "começar rápido e evoluir depois" sem que o usuário peça explicitamente.
+
+---
+
 ## 0. Instance Identity
 
 ```yaml

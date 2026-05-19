@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText,
+  Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText, Brain,
   Filter, CheckCheck, Clock, Tag, ArrowLeft, Bell
 } from 'lucide-react';
 import useChangelog from '../hooks/useChangelog';
@@ -14,6 +14,7 @@ const CATEGORY_CONFIG = {
   performance: { icon: Zap, label: 'Performance', color: 'bg-yellow-500', textColor: 'text-yellow-400', borderColor: 'border-yellow-500/30' },
   whatsapp: { icon: Smartphone, label: 'WhatsApp', color: 'bg-emerald-600', textColor: 'text-emerald-400', borderColor: 'border-emerald-600/30' },
   finance: { icon: DollarSign, label: 'Financeiro', color: 'bg-amber-500', textColor: 'text-amber-400', borderColor: 'border-amber-500/30' },
+  ai: { icon: Brain, label: 'Inteligência Artificial', color: 'bg-pink-500', textColor: 'text-pink-400', borderColor: 'border-pink-500/30' },
 };
 
 const TIER_CONFIG = {

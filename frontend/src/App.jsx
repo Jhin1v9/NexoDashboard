@@ -9,6 +9,7 @@ import TopBar from './components/TopBar'
 import CommandPalette from './components/CommandPalette'
 import ToastContainer from './components/ToastContainer'
 import MobileBottomNav from './components/MobileBottomNav'
+import LunaFloatingButton from './components/luna/LunaFloatingButton'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
@@ -90,6 +91,7 @@ function ProtectedLayout() {
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <ToastContainer />
       <MobileBottomNav />
+      <LunaFloatingButton />
     </div>
   )
 }

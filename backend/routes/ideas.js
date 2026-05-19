@@ -1544,7 +1544,7 @@ module.exports = function(requireAuth) {
   });
 
   // ==========================================================================
-  // 9. POST /api/ideas/:id/ai-chat - Chat com Gemini + Tool Calling
+  // 9. POST /api/ideas/:id/ai-chat — UNIFICADO: chama /api/luna/chat internamente
   // ==========================================================================
   router.post('/:id/ai-chat', requireAuth, async (req, res) => {
     try {
@@ -1555,9 +1555,6 @@ module.exports = function(requireAuth) {
       if (!message || message.trim().length === 0) {
         return res.status(400).json({ success: false, error: 'Mensagem obrigatoria' });
       }
-      if (!AI_MODES.includes(mode)) {
-        return res.status(400).json({ success: false, error: `Modo invalido. Validos: ${AI_MODES.join(', ')}` });
-      }
 
       let ideasData = readJSON(IDEAS_FILE, {});
       let idea = ideasData.ideas && ideasData.ideas[ideaId];
@@ -1566,131 +1563,74 @@ module.exports = function(requireAuth) {
         return res.status(404).json({ success: false, error: 'Ideia nao encontrada' });
       }
 
-      // Carregar cliente vinculado
-      let client = null;
-      if (idea.linkedTo && idea.linkedTo.clientId) {
-        const clientsData = readJSON(CLIENTS_FILE, {});
-        client = clientsData.data && clientsData.data[idea.linkedTo.clientId];
+      // Montar contexto de conversa a partir do histórico da ideia
+      const brainstormHistory = idea.aiContext?.brainstormHistory || [];
+      const context = brainstormHistory.slice(-10).map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        text: m.content || ''
+      }));
+
+      // Adicionar instrução de contexto como primeira mensagem do sistema
+      const systemContext = {
+        role: 'model',
+        text: `[CONTEXTO: Você está conversando sobre a ideia "${idea.title || ideaId}" (status: ${idea.status || 'rascunho'}, tipo: ${idea.type || 'outro'}). Modo: ${mode}. Use as ações de ideias quando apropriado.]`
+      };
+      context.unshift(systemContext);
+
+      // Chamar /api/luna/chat internamente
+      const PORT = process.env.PORT || 3456;
+      const lunaResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          authorName: getUserName(req.user?.id || req.user?.userId),
+          context,
+          contextModule: 'ideas',
+          contextId: ideaId
+        })
+      });
+
+      if (!lunaResponse.ok) {
+        const errText = await lunaResponse.text().catch(() => 'Erro interno');
+        throw new Error(`Luna chat falhou: ${errText}`);
       }
 
-      // Carregar historico de ideias do mesmo cliente
-      let history = [];
-      if (client && idea.linkedTo && idea.linkedTo.clientId) {
-        const allIdeas = ideasData.ideas ? Object.values(ideasData.ideas) : [];
-        history = allIdeas
-          .filter(i => i.linkedTo && i.linkedTo.clientId === idea.linkedTo.clientId && i.id !== ideaId)
-          .slice(-5)
-          .map(i => ({ title: i.title, status: i.status, type: i.type }));
-      }
+      const lunaData = await lunaResponse.json();
+      const aiResponse = lunaData.reply || lunaData.data?.reply || 'Sem resposta';
+      const actionsExecuted = lunaData.result?.results
+        ? lunaData.result.results.filter(r => r.status === 'success').map(r => ({
+            success: true,
+            action: r.action?.type,
+            message: r.result?.type || 'Ação executada'
+          }))
+        : [];
 
-      // Carregar TODAS as ideias para contexto completo
-      const allIdeasList = ideasData.ideas ? Object.values(ideasData.ideas) : [];
-      const templatesList = ideasData.templates ? Object.values(ideasData.templates) : [];
-
-      // Construir prompt com contexto expandido
-      const prompt = buildBrainstormPrompt(idea, client, history, message, mode, allIdeasList, templatesList);
-
-      // Configurar tools (grounding para modo pesquisa)
-      let toolsConfig = undefined;
-      if (mode === 'pesquisa') {
-        toolsConfig = [{ googleSearchRetrieval: {} }];
-      }
-
-      // Chamar Gemini com fallback de modelo
-      const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-pro'];
-      let aiResponse = '';
-      let lastError = null;
-
-      for (const modelName of MODELS) {
-        try {
-          const result = await genAI.models.generateContent({
-            model: modelName,
-            contents: prompt,
-            config: {
-              temperature: 0.7,
-              maxOutputTokens: 1024,
-              tools: toolsConfig
-            }
-          });
-          aiResponse = result.text;
-          if (aiResponse) break;
-        } catch (err) {
-          lastError = err;
-          const isUnavailable = err.message && err.message.includes('UNAVAILABLE');
-          const isQuota = err.message && err.message.includes('Resource exhausted');
-          if (isUnavailable || isQuota) {
-            console.warn(`[IDEAS] Modelo ${modelName} indisponivel, tentando proximo...`);
-            continue;
-          }
-          throw err;
-        }
-      }
-
-      if (!aiResponse) {
-        throw lastError || new Error('Todos os modelos Gemini falharam');
-      }
-
-      // Parsear tool calls da resposta
-      const toolCalls = parseToolCalls(aiResponse);
-      const actionsExecuted = [];
-
-      if (toolCalls.length > 0) {
-        // Executar cada tool call
-        for (const tc of toolCalls) {
-          const execResult = executeToolCall(tc, ideaId, req.user);
-          actionsExecuted.push(execResult);
-        }
-
-        // Remover blocos TOOL_CALL da resposta visivel
-        aiResponse = aiResponse.replace(/<TOOL_CALL>[\s\S]*?<\/TOOL_CALL>/g, '').trim();
-
-        // Se a IA nao deixou texto apos as tool calls, gerar confirmacao breve
-        if (aiResponse.length < 10) {
-          const okActions = actionsExecuted.filter(a => a.success);
-          if (okActions.length > 0) {
-            aiResponse = okActions.map(a => a.message).join('. ') + '.';
-          } else {
-            const errActions = actionsExecuted.filter(a => !a.success);
-            aiResponse = 'Erro: ' + errActions.map(a => a.error).join('. ');
-          }
-        }
-
-        // RELER ideasData do disco porque executeToolCall pode ter modificado o arquivo
-        ideasData = readJSON(IDEAS_FILE, {});
-        const reloadedIdea = ideasData.ideas && ideasData.ideas[ideaId];
-        if (reloadedIdea) {
-          idea = reloadedIdea;
-        }
-      }
-
-      // Salvar mensagens no historico
+      // Salvar mensagens no histórico da ideia
       const now = new Date().toISOString();
 
       idea.aiContext = idea.aiContext || { brainstormHistory: [], aiSuggestions: [], aiInsights: [] };
       idea.aiContext.brainstormHistory = idea.aiContext.brainstormHistory || [];
       idea.aiContext.aiSuggestions = idea.aiContext.aiSuggestions || [];
 
-      // Mensagem do usuario
       idea.aiContext.brainstormHistory.push({
         id: `ai-msg-${Date.now()}`,
         role: 'user',
         content: message,
         timestamp: now,
-        model: 'gemini-2.5-flash-lite'
+        model: 'luna-unified'
       });
 
-      // Resposta da IA
       idea.aiContext.brainstormHistory.push({
         id: `ai-msg-${Date.now()}-resp`,
         role: 'assistant',
         content: aiResponse,
         timestamp: now,
-        model: 'gemini-2.5-flash-lite',
-        groundingUsed: mode === 'pesquisa',
+        model: 'luna-unified',
         actionsExecuted: actionsExecuted.length > 0 ? actionsExecuted : undefined
       });
 
-      // Extrair sugestoes estruturadas (apenas do texto limpo, nao das tool calls)
+      // Extrair sugestões estruturadas
       const suggestions = extractSuggestions(aiResponse, mode);
       suggestions.forEach(sugg => {
         idea.aiContext.aiSuggestions.push({
@@ -1713,7 +1653,8 @@ module.exports = function(requireAuth) {
           response: aiResponse,
           suggestions: suggestions,
           actionsExecuted: actionsExecuted,
-          history: idea.aiContext.brainstormHistory.slice(-10)
+          history: idea.aiContext.brainstormHistory.slice(-10),
+          unified: true
         }
       });
 

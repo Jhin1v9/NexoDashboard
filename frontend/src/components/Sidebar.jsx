@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
-  Shield, Lightbulb, Bot, Terminal, FolderOpen
+  Shield, Lightbulb, Bot, Terminal, FolderOpen, FileText
 } from 'lucide-react'
 
 const navItems = [
@@ -39,6 +39,7 @@ const navItems = [
   { path: '/sistema', icon: HardDrive, label: 'Sistema' },
   { path: '/seguranca', icon: Shield, label: 'Seguranca' },
   { path: '/luna', icon: Bot, label: 'Luna', badge: 'AI' },
+  { path: '/changelog', icon: FileText, label: 'Atualizacoes', badge: 'v3.2' },
   { path: '/settings', icon: Settings, label: 'Configuracoes' },
 ]
 
@@ -61,7 +62,16 @@ function NavItem({ item, sidebarOpen }) {
         title={!sidebarOpen ? item.label : ''}
       >
         <item.icon size={20} />
-        {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+        {sidebarOpen && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-sm font-medium truncate">{item.label}</span>
+            {item.badge && (
+              <span className="flex-shrink-0 px-1.5 py-0.5 bg-nexo-accent/20 text-nexo-accent text-[10px] font-bold rounded">
+                {item.badge}
+              </span>
+            )}
+          </div>
+        )}
       </NavLink>
     )
   }

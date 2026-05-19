@@ -164,6 +164,130 @@ class ActionExecutor {
         return await this.replyEmail(action.params, authorName);
       case 'gerar_rascunho_email':
         return await this.draftEmail(action.params, authorName);
+      case 'listar_tarefas_por_filtro':
+        return await this.listTasksByFilter(action.params);
+      case 'excluir_projeto':
+        return await this.deleteProject(action.params);
+      case 'listar_pagamentos':
+        return await this.listPayments(action.params);
+      case 'atualizar_pagamento':
+        return await this.updatePayment(action.params);
+      case 'adicionar_transacao':
+        return await this.addTransaction(action.params);
+      case 'receber_split':
+        return await this.receiveSplit(action.params);
+      case 'listar_despesas':
+        return await this.listExpenses(action.params);
+      case 'atualizar_despesa':
+        return await this.updateExpense(action.params);
+      case 'pagar_despesa':
+        return await this.payExpense(action.params);
+      case 'criar_template_despesa':
+        return await this.createExpenseTemplate(action.params);
+      case 'ajustar_caixa':
+        return await this.adjustCashBox(action.params);
+      case 'adicionar_entrada_caixa':
+        return await this.addCashBoxEntry(action.params);
+      case 'listar_historico_caixa':
+        return await this.listCashBoxHistory(action.params);
+      case 'projecao_caixa':
+        return await this.projectCashBox(action.params);
+      case 'reconciliar_caixa':
+        return await this.reconcileCashBox(action.params);
+      case 'comentar_ideia':
+        return await this.commentIdea(action.params, authorName);
+      case 'criar_ideia_de_template':
+        return await this.createIdeaFromTemplate(action.params, authorName);
+      case 'listar_templates_ideias':
+        return await this.listIdeaTemplates(action.params);
+      case 'escanear_whatsapp':
+        return await this.scanWhatsApp(action.params);
+      case 'limpar_buffer_whatsapp':
+        return await this.clearWhatsAppBuffer(action.params);
+      case 'ver_historico_whatsapp':
+        return await this.viewWhatsAppHistory(action.params);
+      case 'ver_classificacoes':
+        return await this.viewClassifications(action.params);
+      case 'corrigir_classificacao':
+        throw new Error('Correção de classificação deve ser feita manualmente pela interface de classificação.');
+      case 'marcar_email_lido':
+        return await this.markEmailRead(action.params);
+      case 'marcar_email_nao_lido':
+        return await this.markEmailUnread(action.params);
+      case 'favoritar_email':
+        return await this.starEmail(action.params);
+      case 'arquivar_email':
+        return await this.archiveEmail(action.params);
+      case 'mover_para_lixeira':
+        return await this.trashEmail(action.params);
+      case 'marcar_spam':
+        return await this.spamEmail(action.params);
+      case 'aprovar_rascunho':
+        return await this.approveDraft(action.params);
+      case 'rejeitar_rascunho':
+        return await this.rejectDraft(action.params);
+      case 'sugerir_resposta_email':
+        return await this.suggestEmailReply(action.params);
+      case 'resumir_thread_email':
+        return await this.summarizeEmailThread(action.params);
+      case 'analizar_email':
+        return await this.analyzeEmail(action.params);
+      case 'listar_mensagens_instagram':
+        return await this.listInstagramMessages(action.params);
+      case 'importar_mensagem_instagram':
+        return await this.importInstagramMessage(action.params);
+      case 'listar_links':
+        return await this.listLinks(action.params);
+      case 'adicionar_link':
+        return await this.addLink(action.params, authorName);
+      case 'excluir_link':
+        return await this.deleteLink(action.params);
+      case 'enriquecer_link':
+        return await this.enrichLink(action.params);
+      case 'sincronizar_links':
+        return await this.syncLinks(action.params);
+      case 'criar_alerta_operacao':
+        return await this.createOpsAlert(action.params, authorName);
+      case 'excluir_alerta_operacao':
+        return await this.deleteOpsAlert(action.params);
+      case 'registrar_mudanca':
+        return await this.registerChange(action.params, authorName);
+      case 'ver_logs_stack':
+        return await this.viewStackLogs(action.params);
+      case 'verificar_stack':
+        return await this.checkStack(action.params);
+      case 'consultar_log_seguranca':
+        return await this.querySecurityLog(action.params);
+      case 'atualizar_config_seguranca':
+        return await this.updateSecurityConfig(action.params);
+      case 'testar_whatsapp_seguranca':
+        return await this.testWhatsAppSecurity(action.params);
+      case 'listar_notificacoes':
+        return await this.listNotifications(action.params);
+      case 'marcar_notificacao_lida':
+        return await this.markNotificationRead(action.params);
+      case 'marcar_todas_lidas':
+        return await this.markAllNotificationsRead(action.params);
+      case 'excluir_notificacao':
+        return await this.deleteNotification(action.params);
+      case 'consultar_usuarios':
+        return await this.listUsers(action.params);
+      case 'trocar_usuario':
+        return await this.switchUser(action.params);
+      case 'alterar_senha':
+        throw new Error('Alteração de senha não é permitida via chat. Use a interface de configurações de conta.');
+      case 'listar_repos_github':
+        return await this.listGitHubRepos(action.params);
+      case 'listar_projetos_vercel':
+        return await this.listVercelProjects(action.params);
+      case 'executar_comando':
+        throw new Error('Execução de comandos não é permitida por segurança.');
+      case 'fazer_git_push':
+        throw new Error('Git push não é permitido via chat por segurança.');
+      case 'listar_relatorios_bug':
+        return await this.listBugReports(action.params);
+      case 'excluir_relatorio_bug':
+        return await this.deleteBugReport(action.params);
       case 'controlar_servico':
         return await this.controlService(action.params);
       default:
@@ -1643,6 +1767,864 @@ class ActionExecutor {
   }
 
   // ============================================================
+  // AÇÕES: Tarefas Avançadas
+  // ============================================================
+  async listTasksByFilter(params) {
+    const status = params.status;
+    const priority = params.prioridade || params.priority;
+    const assignedTo = params.responsavel || params.assignedTo;
+    const dateFrom = params.data_de;
+    const dateTo = params.data_ate;
+
+    const apiResult = await this.apiGet('/tasks');
+    let items = [];
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      items = apiResult;
+    } else {
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      items = this.readJson(tasksFile, []);
+    }
+
+    if (status) items = items.filter(t => t.status === status);
+    if (priority) items = items.filter(t => t.priority === priority || t.prioridade === priority);
+    if (assignedTo) items = items.filter(t => (t.assignedTo || t.responsavel || '').toLowerCase() === assignedTo.toLowerCase());
+    if (dateFrom) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') >= dateFrom);
+    if (dateTo) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') <= dateTo);
+
+    return { type: 'tasks_filtered', total: items.length, items: items.slice(0, 20), source: 'api' };
+  }
+
+  // ============================================================
+  // AÇÕES: Projetos Avançadas
+  // ============================================================
+  async deleteProject(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do projeto é obrigatório');
+
+    const registryFile = path.join(this.dataDir, 'schema', 'projects-registry.json');
+    const registry = this.readJson(registryFile, { projects: {} });
+    const name = registry.projects[id]?.name;
+    delete registry.projects[id];
+    this.writeJson(registryFile, registry);
+    return { type: 'project_deleted', id, name, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Financeiro — Receitas
+  // ============================================================
+  async listPayments(params) {
+    const apiResult = await this.apiGet('/payments');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'payments', items: apiResult, total: apiResult.length, source: 'api' };
+    }
+    const paymentsFile = path.join(this.dataDir, 'payments.json');
+    const data = this.readJson(paymentsFile, []);
+    return { type: 'payments', items: data, total: data.length, source: 'file' };
+  }
+
+  async updatePayment(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do pagamento é obrigatório');
+    const updates = {
+      amount: params.valor !== undefined ? parseFloat(params.valor) : params.amount !== undefined ? parseFloat(params.amount) : undefined,
+      description: params.descricao || params.description,
+      client: params.cliente || params.client,
+      status: params.status,
+      date: params.data || params.date,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const apiResult = await this.apiPut(`/payments/${id}`, updates);
+    if (apiResult && !apiResult.error) {
+      return { type: 'payment_updated', id, changes: Object.keys(updates), source: 'api' };
+    }
+
+    const paymentsFile = path.join(this.dataDir, 'payments.json');
+    const data = this.readJson(paymentsFile, []);
+    const idx = data.findIndex(p => p.id === id);
+    if (idx === -1) throw new Error(`Pagamento ${id} não encontrado`);
+    data[idx] = { ...data[idx], ...updates };
+    this.writeJson(paymentsFile, data);
+    return { type: 'payment_updated', id, changes: Object.keys(updates), source: 'file' };
+  }
+
+  async addTransaction(params, authorName) {
+    const paymentId = params.id_pagamento || params.paymentId;
+    if (!paymentId) throw new Error('ID do pagamento é obrigatório');
+    const transaction = {
+      id: `txn_${Date.now()}`,
+      amount: parseFloat(params.valor || params.amount || 0),
+      description: params.descricao || params.description || 'Transação',
+      date: params.data || new Date().toISOString(),
+      createdBy: authorName?.toLowerCase() || 'sistema'
+    };
+
+    const apiResult = await this.apiPost(`/payments/${paymentId}/transactions`, transaction);
+    if (apiResult && !apiResult.error) {
+      return { type: 'transaction_added', paymentId, amount: transaction.amount, source: 'api' };
+    }
+
+    const paymentsFile = path.join(this.dataDir, 'payments.json');
+    const data = this.readJson(paymentsFile, []);
+    const idx = data.findIndex(p => p.id === paymentId);
+    if (idx === -1) throw new Error(`Pagamento ${paymentId} não encontrado`);
+    data[idx].transactions = data[idx].transactions || [];
+    data[idx].transactions.push(transaction);
+    this.writeJson(paymentsFile, data);
+    return { type: 'transaction_added', paymentId, amount: transaction.amount, source: 'file' };
+  }
+
+  async receiveSplit(params, authorName) {
+    const paymentId = params.id_pagamento || params.paymentId;
+    const personId = params.id_pessoa || params.personId;
+    if (!paymentId || !personId) throw new Error('ID do pagamento e ID da pessoa são obrigatórios');
+
+    const apiResult = await this.apiPost(`/payments/${paymentId}/split/${personId}/receive`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'split_received', paymentId, personId, source: 'api' };
+    }
+
+    const paymentsFile = path.join(this.dataDir, 'payments.json');
+    const data = this.readJson(paymentsFile, []);
+    const payment = data.find(p => p.id === paymentId);
+    if (!payment) throw new Error(`Pagamento ${paymentId} não encontrado`);
+    payment.split = payment.split || [];
+    const split = payment.split.find(s => s.personId === personId || s.id === personId);
+    if (!split) throw new Error(`Split ${personId} não encontrado`);
+    split.received = true;
+    split.receivedAt = new Date().toISOString();
+    this.writeJson(paymentsFile, data);
+    return { type: 'split_received', paymentId, personId, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Financeiro — Despesas
+  // ============================================================
+  async listExpenses(params) {
+    const apiResult = await this.apiGet('/expenses');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'expenses', items: apiResult, total: apiResult.length, source: 'api' };
+    }
+    const expensesFile = path.join(this.dataDir, 'expenses.json');
+    const data = this.readJson(expensesFile, []);
+    return { type: 'expenses', items: data, total: data.length, source: 'file' };
+  }
+
+  async updateExpense(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID da despesa é obrigatório');
+    const updates = {
+      amount: params.valor !== undefined ? parseFloat(params.valor) : params.amount !== undefined ? parseFloat(params.amount) : undefined,
+      description: params.descricao || params.description,
+      vendor: params.fornecedor || params.vendor,
+      status: params.status,
+      date: params.data || params.date,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const apiResult = await this.apiPut(`/expenses/${id}`, updates);
+    if (apiResult && !apiResult.error) {
+      return { type: 'expense_updated', id, changes: Object.keys(updates), source: 'api' };
+    }
+
+    const expensesFile = path.join(this.dataDir, 'expenses.json');
+    const data = this.readJson(expensesFile, []);
+    const idx = data.findIndex(e => e.id === id);
+    if (idx === -1) throw new Error(`Despesa ${id} não encontrada`);
+    data[idx] = { ...data[idx], ...updates };
+    this.writeJson(expensesFile, data);
+    return { type: 'expense_updated', id, changes: Object.keys(updates), source: 'file' };
+  }
+
+  async payExpense(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID da despesa é obrigatório');
+
+    const apiResult = await this.apiPost(`/expenses/${id}/pay`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'expense_paid', id, source: 'api' };
+    }
+
+    const expensesFile = path.join(this.dataDir, 'expenses.json');
+    const data = this.readJson(expensesFile, []);
+    const idx = data.findIndex(e => e.id === id);
+    if (idx === -1) throw new Error(`Despesa ${id} não encontrada`);
+    data[idx].status = 'paid';
+    data[idx].paidAt = new Date().toISOString();
+    this.writeJson(expensesFile, data);
+    return { type: 'expense_paid', id, source: 'file' };
+  }
+
+  async createExpenseTemplate(params, authorName) {
+    const template = {
+      id: `tmpl_${Date.now()}`,
+      name: params.nome || params.name || 'Template',
+      description: params.descricao || params.description || '',
+      amount: parseFloat(params.valor || params.amount || 0),
+      vendor: params.fornecedor || params.vendor || '',
+      category: params.categoria || params.category || 'geral',
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/expenses/templates', template);
+    if (apiResult && !apiResult.error) {
+      return { type: 'expense_template', id: template.id, name: template.name, source: 'api' };
+    }
+
+    const templatesFile = path.join(this.dataDir, 'expense-templates.json');
+    const data = this.readJson(templatesFile, []);
+    data.push(template);
+    this.writeJson(templatesFile, data);
+    return { type: 'expense_template', id: template.id, name: template.name, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Financeiro — Caixa
+  // ============================================================
+  async adjustCashBox(params) {
+    const amount = parseFloat(params.valor) || 0;
+    const reason = params.motivo || params.reason || 'Ajuste manual';
+
+    const apiResult = await this.apiPost('/cash-box/adjust', { amount, reason });
+    if (apiResult && !apiResult.error) {
+      return { type: 'cash_adjusted', amount, reason, source: 'api' };
+    }
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    cash.balance.value = parseFloat((cash.balance.value + amount).toFixed(2));
+    cash.history.push({ type: 'adjustment', amount, reason, date: new Date().toISOString() });
+    this.writeJson(cashFile, cash);
+    return { type: 'cash_adjusted', amount, reason, source: 'file' };
+  }
+
+  async addCashBoxEntry(params) {
+    const amount = parseFloat(params.valor) || 0;
+    const description = params.descricao || params.description || 'Entrada';
+    const type = params.tipo || 'income';
+
+    const apiResult = await this.apiPost('/cash-box/entries', { amount, description, type });
+    if (apiResult && !apiResult.error) {
+      return { type: 'cash_entry', amount, description, type, source: 'api' };
+    }
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    cash.balance.value = parseFloat((cash.balance.value + amount).toFixed(2));
+    cash.history.push({ type, amount, description, date: new Date().toISOString() });
+    this.writeJson(cashFile, cash);
+    return { type: 'cash_entry', amount, description, type, source: 'file' };
+  }
+
+  async listCashBoxHistory(params) {
+    const limit = parseInt(params.limite) || 50;
+
+    const apiResult = await this.apiGet('/cash-box/history');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'cash_history', items: apiResult.slice(0, limit), total: apiResult.length, source: 'api' };
+    }
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    return { type: 'cash_history', items: cash.history.slice(0, limit), total: cash.history.length, source: 'file' };
+  }
+
+  async projectCashBox(params) {
+    const months = parseInt(params.meses) || 6;
+
+    const apiResult = await this.apiGet('/cash-box/projection');
+    if (apiResult && !apiResult.error) {
+      return { type: 'cash_projection', months, data: apiResult, source: 'api' };
+    }
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    const currentBalance = cash.balance.value;
+    const projection = [];
+    for (let i = 1; i <= months; i++) {
+      projection.push({ month: i, projectedBalance: currentBalance });
+    }
+    return { type: 'cash_projection', months, data: projection, source: 'file' };
+  }
+
+  async reconcileCashBox(params) {
+    const targetBalance = parseFloat(params.saldo_alvo || params.targetBalance || 0);
+    const reason = params.motivo || params.reason || 'Reconciliação';
+
+    const apiResult = await this.apiPost('/cash-box/reconcile', { targetBalance, reason });
+    if (apiResult && !apiResult.error) {
+      return { type: 'cash_reconciled', targetBalance, reason, source: 'api' };
+    }
+
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    const diff = parseFloat((targetBalance - cash.balance.value).toFixed(2));
+    cash.balance.value = targetBalance;
+    cash.history.push({ type: 'reconciliation', amount: diff, reason, date: new Date().toISOString() });
+    this.writeJson(cashFile, cash);
+    return { type: 'cash_reconciled', targetBalance, diff, reason, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Ideias Avançadas
+  // ============================================================
+  async commentIdea(params, authorName) {
+    const id = params.id;
+    const text = params.texto || params.text || params.comentario;
+    if (!id || !text) throw new Error('ID da ideia e texto do comentário são obrigatórios');
+
+    const comment = {
+      id: `cmt_${Date.now()}`,
+      text,
+      author: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: {} });
+    if (!data.ideas[id]) throw new Error(`Ideia ${id} não encontrada`);
+    data.ideas[id].comments = data.ideas[id].comments || [];
+    data.ideas[id].comments.push(comment);
+    this.writeJson(ideasFile, data);
+    return { type: 'idea_commented', id, commentId: comment.id, source: 'file' };
+  }
+
+  async createIdeaFromTemplate(params, authorName) {
+    const templateId = params.id_template || params.templateId;
+    if (!templateId) throw new Error('ID do template é obrigatório');
+
+    const templatesFile = path.join(this.dataDir, 'idea-templates.json');
+    const templates = this.readJson(templatesFile, []);
+    const tmpl = templates.find(t => t.id === templateId);
+    if (!tmpl) throw new Error(`Template ${templateId} não encontrado`);
+
+    const idea = {
+      id: `idea_${Date.now()}`,
+      title: params.titulo || params.title || tmpl.name || 'Ideia de template',
+      description: params.descricao || params.description || tmpl.description || '',
+      status: params.status || 'nova',
+      tags: params.tags || tmpl.tags || [],
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: {} });
+    data.ideas[idea.id] = idea;
+    this.writeJson(ideasFile, data);
+    return { type: 'idea_from_template', id: idea.id, title: idea.title, templateId, source: 'file' };
+  }
+
+  async listIdeaTemplates(params) {
+    const templatesFile = path.join(this.dataDir, 'idea-templates.json');
+    const data = this.readJson(templatesFile, []);
+    return { type: 'idea_templates', items: data, total: data.length, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: WhatsApp Avançadas
+  // ============================================================
+  async scanWhatsApp(params) {
+    const apiResult = await this.apiPost('/whatsapp-agent/refresh', {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'whatsapp_scan', source: 'api' };
+    }
+    throw new Error('Não foi possível escanear WhatsApp');
+  }
+
+  async clearWhatsAppBuffer(params) {
+    const apiResult = await this.apiDelete('/whatsapp/buffer');
+    if (apiResult && !apiResult.error) {
+      return { type: 'whatsapp_buffer_cleared', source: 'api' };
+    }
+    const bufferFile = path.join(this.dataDir, 'luna-buffer.json');
+    if (fs.existsSync(bufferFile)) {
+      this.writeJson(bufferFile, { newMessages: [], newLinks: [], mentions: [] });
+    }
+    return { type: 'whatsapp_buffer_cleared', source: 'file' };
+  }
+
+  async viewWhatsAppHistory(params) {
+    const limit = parseInt(params.limite) || 50;
+    const apiResult = await this.apiGet(`/whatsapp/history?limit=${limit}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'whatsapp_history', items: apiResult.messages || apiResult, total: (apiResult.messages || apiResult).length, source: 'api' };
+    }
+    const historyFile = path.join(this.dataDir, 'whatsapp-history.json');
+    const data = this.readJson(historyFile, []);
+    return { type: 'whatsapp_history', items: data.slice(0, limit), total: data.length, source: 'file' };
+  }
+
+  async viewClassifications(params) {
+    const apiResult = await this.apiGet('/whatsapp/buffer');
+    if (apiResult && !apiResult.error) {
+      return { type: 'classifications', items: apiResult, source: 'api' };
+    }
+    const bufferFile = path.join(this.dataDir, 'luna-buffer.json');
+    const data = this.readJson(bufferFile, { mentions: [] });
+    return { type: 'classifications', items: data.mentions || [], source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Email Avançadas
+  // ============================================================
+  async markEmailRead(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/read`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_marked_read', id, source: 'api' };
+    }
+    throw new Error('Não foi possível marcar email como lido');
+  }
+
+  async markEmailUnread(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/unread`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_marked_unread', id, source: 'api' };
+    }
+    throw new Error('Não foi possível marcar email como não lido');
+  }
+
+  async starEmail(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/star`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_starred', id, source: 'api' };
+    }
+    throw new Error('Não foi possível favoritar email');
+  }
+
+  async archiveEmail(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/archive`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_archived', id, source: 'api' };
+    }
+    throw new Error('Não foi possível arquivar email');
+  }
+
+  async trashEmail(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/trash`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_trashed', id, source: 'api' };
+    }
+    throw new Error('Não foi possível mover email para lixeira');
+  }
+
+  async spamEmail(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiPost(`/email/messages/${id}/spam`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_spam', id, source: 'api' };
+    }
+    throw new Error('Não foi possível marcar email como spam');
+  }
+
+  async approveDraft(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do rascunho necessário');
+    const apiResult = await this.apiPost(`/email/drafts/${id}/approve`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'draft_approved', id, source: 'api' };
+    }
+    throw new Error('Não foi possível aprovar rascunho');
+  }
+
+  async rejectDraft(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do rascunho necessário');
+    const apiResult = await this.apiPost(`/email/drafts/${id}/reject`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'draft_rejected', id, source: 'api' };
+    }
+    throw new Error('Não foi possível rejeitar rascunho');
+  }
+
+  async suggestEmailReply(params) {
+    const threadMessages = params.mensagens || params.threadMessages;
+    const instructions = params.instrucoes || params.instructions || 'Sugira uma resposta profissional.';
+    if (!threadMessages) throw new Error('Mensagens da thread são obrigatórias');
+
+    const apiResult = await this.apiPost('/email/ai/draft', { threadMessages, instructions });
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_reply_suggestion', draft: apiResult.draft, source: 'api' };
+    }
+    throw new Error('Não foi possível gerar sugestão de resposta');
+  }
+
+  async summarizeEmailThread(params) {
+    const threadMessages = params.mensagens || params.threadMessages;
+    if (!threadMessages) throw new Error('Mensagens da thread são obrigatórias');
+
+    const apiResult = await this.apiPost('/email/ai/summarize', { threadMessages });
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_thread_summary', summary: apiResult.summary, source: 'api' };
+    }
+    throw new Error('Não foi possível resumir thread');
+  }
+
+  async analyzeEmail(params) {
+    const emailId = params.id;
+    if (!emailId) throw new Error('ID do email necessário');
+
+    const apiResult = await this.apiPost('/email/ai/analyze', { emailId });
+    if (apiResult && !apiResult.error) {
+      return { type: 'email_analyzed', id: emailId, analysis: apiResult.analysis, source: 'api' };
+    }
+    throw new Error('Não foi possível analisar email');
+  }
+
+  // ============================================================
+  // AÇÕES: Instagram
+  // ============================================================
+  async listInstagramMessages(params) {
+    const apiResult = await this.apiGet('/instagram/messages');
+    if (apiResult && !apiResult.error) {
+      return { type: 'instagram_messages', items: apiResult.messages || apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível listar mensagens do Instagram');
+  }
+
+  async importInstagramMessage(params) {
+    const messageId = params.id;
+    if (!messageId) throw new Error('ID da mensagem é obrigatório');
+    const apiResult = await this.apiPost('/instagram/messages/import', { messageId });
+    if (apiResult && !apiResult.error) {
+      return { type: 'instagram_imported', id: messageId, source: 'api' };
+    }
+    throw new Error('Não foi possível importar mensagem do Instagram');
+  }
+
+  // ============================================================
+  // AÇÕES: Links
+  // ============================================================
+  async listLinks(params) {
+    const apiResult = await this.apiGet('/links');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'links', items: apiResult, total: apiResult.length, source: 'api' };
+    }
+    const linksFile = path.join(this.dataDir, 'links.json');
+    const data = this.readJson(linksFile, []);
+    return { type: 'links', items: data, total: data.length, source: 'file' };
+  }
+
+  async addLink(params, authorName) {
+    const link = {
+      id: `link_${Date.now()}`,
+      url: params.url,
+      title: params.titulo || params.title || 'Link',
+      description: params.descricao || params.description || '',
+      tags: params.tags || [],
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+    if (!link.url) throw new Error('URL é obrigatória');
+
+    const apiResult = await this.apiPost('/links', link);
+    if (apiResult && !apiResult.error) {
+      return { type: 'link_added', id: link.id, url: link.url, source: 'api' };
+    }
+
+    const linksFile = path.join(this.dataDir, 'links.json');
+    const data = this.readJson(linksFile, []);
+    data.push(link);
+    this.writeJson(linksFile, data);
+    return { type: 'link_added', id: link.id, url: link.url, source: 'file' };
+  }
+
+  async deleteLink(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do link é obrigatório');
+
+    const apiResult = await this.apiDelete(`/links/${id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'link_deleted', id, source: 'api' };
+    }
+
+    const linksFile = path.join(this.dataDir, 'links.json');
+    const data = this.readJson(linksFile, []);
+    const filtered = data.filter(l => l.id !== id);
+    if (filtered.length === data.length) throw new Error(`Link ${id} não encontrado`);
+    this.writeJson(linksFile, filtered);
+    return { type: 'link_deleted', id, source: 'file' };
+  }
+
+  async enrichLink(params) {
+    const url = params.url;
+    if (!url) throw new Error('URL é obrigatória');
+    const apiResult = await this.apiPost('/links/enrich', { url });
+    if (apiResult && !apiResult.error) {
+      return { type: 'link_enriched', url, source: 'api' };
+    }
+    throw new Error('Não foi possível enriquecer link');
+  }
+
+  async syncLinks(params) {
+    const apiResult = await this.apiPost('/links/sync', {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'links_synced', source: 'api' };
+    }
+    throw new Error('Não foi possível sincronizar links');
+  }
+
+  // ============================================================
+  // AÇÕES: Operações
+  // ============================================================
+  async createOpsAlert(params, authorName) {
+    const alert = {
+      id: `alert_${Date.now()}`,
+      title: params.titulo || params.title || 'Alerta',
+      description: params.descricao || params.description || '',
+      severity: params.severidade || params.severity || 'medium',
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/ops/alerts', alert);
+    if (apiResult && !apiResult.error) {
+      return { type: 'ops_alert', id: alert.id, title: alert.title, source: 'api' };
+    }
+
+    const opsFile = path.join(this.dataDir, 'ops-alerts.json');
+    const data = this.readJson(opsFile, []);
+    data.push(alert);
+    this.writeJson(opsFile, data);
+    return { type: 'ops_alert', id: alert.id, title: alert.title, source: 'file' };
+  }
+
+  async deleteOpsAlert(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do alerta é obrigatório');
+
+    const apiResult = await this.apiDelete(`/ops/alerts/${id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'ops_alert_deleted', id, source: 'api' };
+    }
+
+    const opsFile = path.join(this.dataDir, 'ops-alerts.json');
+    const data = this.readJson(opsFile, []);
+    const filtered = data.filter(a => a.id !== id);
+    if (filtered.length === data.length) throw new Error(`Alerta ${id} não encontrado`);
+    this.writeJson(opsFile, filtered);
+    return { type: 'ops_alert_deleted', id, source: 'file' };
+  }
+
+  async registerChange(params, authorName) {
+    const change = {
+      id: `chg_${Date.now()}`,
+      description: params.descricao || params.description || 'Mudança registrada',
+      system: params.sistema || params.system || 'geral',
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/ops/changes', change);
+    if (apiResult && !apiResult.error) {
+      return { type: 'ops_change', id: change.id, description: change.description, source: 'api' };
+    }
+
+    const changesFile = path.join(this.dataDir, 'ops-changes.json');
+    const data = this.readJson(changesFile, []);
+    data.push(change);
+    this.writeJson(changesFile, data);
+    return { type: 'ops_change', id: change.id, description: change.description, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Sistema Avançado
+  // ============================================================
+  async viewStackLogs(params) {
+    const lines = parseInt(params.linhas) || 100;
+    const apiResult = await this.apiGet(`/stack-logs?lines=${lines}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'stack_logs', lines, source: 'api' };
+    }
+    throw new Error('Não foi possível obter logs do stack');
+  }
+
+  async checkStack(params) {
+    const apiResult = await this.apiGet('/stack-status');
+    if (apiResult && !apiResult.error) {
+      return { type: 'stack_status', status: apiResult.status, services: apiResult.services, source: 'api' };
+    }
+    throw new Error('Não foi possível verificar status do stack');
+  }
+
+  // ============================================================
+  // AÇÕES: Segurança
+  // ============================================================
+  async querySecurityLog(params) {
+    const limit = parseInt(params.limite) || 50;
+    const apiResult = await this.apiGet(`/security/log?limit=${limit}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'security_log', items: apiResult.logs || apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível consultar log de segurança');
+  }
+
+  async updateSecurityConfig(params) {
+    const updates = {
+      twoFactorEnabled: params.dois_fatores,
+      alertOnLogin: params.alerta_login,
+      alertOnFail: params.alerta_falha,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const apiResult = await this.apiPut('/security/settings', updates);
+    if (apiResult && !apiResult.error) {
+      return { type: 'security_config_updated', changes: Object.keys(updates), source: 'api' };
+    }
+    throw new Error('Não foi possível atualizar configuração de segurança');
+  }
+
+  async testWhatsAppSecurity(params) {
+    const apiResult = await this.apiPost('/security/test-whatsapp', {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'security_whatsapp_test', result: apiResult.result, source: 'api' };
+    }
+    throw new Error('Não foi possível testar WhatsApp de segurança');
+  }
+
+  // ============================================================
+  // AÇÕES: Notificações
+  // ============================================================
+  async listNotifications(params) {
+    const apiResult = await this.apiGet('/notifications');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'notifications', items: apiResult, total: apiResult.length, source: 'api' };
+    }
+    const notifFile = path.join(this.dataDir, 'notifications.json');
+    const data = this.readJson(notifFile, []);
+    return { type: 'notifications', items: data, total: data.length, source: 'file' };
+  }
+
+  async markNotificationRead(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID da notificação é obrigatório');
+
+    const apiResult = await this.apiPost(`/notifications/${id}/read`, {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'notification_read', id, source: 'api' };
+    }
+
+    const notifFile = path.join(this.dataDir, 'notifications.json');
+    const data = this.readJson(notifFile, []);
+    const idx = data.findIndex(n => n.id === id);
+    if (idx === -1) throw new Error(`Notificação ${id} não encontrada`);
+    data[idx].read = true;
+    data[idx].readAt = new Date().toISOString();
+    this.writeJson(notifFile, data);
+    return { type: 'notification_read', id, source: 'file' };
+  }
+
+  async markAllNotificationsRead(params) {
+    const apiResult = await this.apiPost('/notifications/read-all', {});
+    if (apiResult && !apiResult.error) {
+      return { type: 'all_notifications_read', source: 'api' };
+    }
+
+    const notifFile = path.join(this.dataDir, 'notifications.json');
+    const data = this.readJson(notifFile, []);
+    data.forEach(n => { n.read = true; n.readAt = new Date().toISOString(); });
+    this.writeJson(notifFile, data);
+    return { type: 'all_notifications_read', source: 'file' };
+  }
+
+  async deleteNotification(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID da notificação é obrigatório');
+
+    const apiResult = await this.apiDelete(`/notifications/${id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'notification_deleted', id, source: 'api' };
+    }
+
+    const notifFile = path.join(this.dataDir, 'notifications.json');
+    const data = this.readJson(notifFile, []);
+    const filtered = data.filter(n => n.id !== id);
+    if (filtered.length === data.length) throw new Error(`Notificação ${id} não encontrada`);
+    this.writeJson(notifFile, filtered);
+    return { type: 'notification_deleted', id, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Usuários
+  // ============================================================
+  async listUsers(params) {
+    const apiResult = await this.apiGet('/state');
+    if (apiResult && !apiResult.error && apiResult.users) {
+      return { type: 'users', items: apiResult.users, total: apiResult.users.length, source: 'api' };
+    }
+    const usersFile = path.join(this.dataDir, 'users.json');
+    const data = this.readJson(usersFile, []);
+    return { type: 'users', items: data, total: data.length, source: 'file' };
+  }
+
+  async switchUser(params) {
+    const userId = params.id || params.userId;
+    if (!userId) throw new Error('ID do usuário é obrigatório');
+
+    const apiResult = await this.apiPost('/users/switch', { userId });
+    if (apiResult && !apiResult.error) {
+      return { type: 'user_switched', userId, source: 'api' };
+    }
+    throw new Error('Não foi possível trocar de usuário');
+  }
+
+  // ============================================================
+  // AÇÕES: External Tools
+  // ============================================================
+  async listGitHubRepos(params) {
+    const apiResult = await this.apiGet('/github-repos');
+    if (apiResult && !apiResult.error) {
+      return { type: 'github_repos', items: apiResult.repos || apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível listar repositórios GitHub');
+  }
+
+  async listVercelProjects(params) {
+    const apiResult = await this.apiGet('/vercel-projects');
+    if (apiResult && !apiResult.error) {
+      return { type: 'vercel_projects', items: apiResult.projects || apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível listar projetos Vercel');
+  }
+
+  // ============================================================
+  // AÇÕES: BugDetector
+  // ============================================================
+  async listBugReports(params) {
+    const apiResult = await this.apiGet('/bugdetector/reports');
+    if (apiResult && !apiResult.error) {
+      return { type: 'bug_reports', items: apiResult.reports || apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível listar relatórios de bug');
+  }
+
+  async deleteBugReport(params) {
+    const filename = params.filename || params.id;
+    if (!filename) throw new Error('Nome do arquivo é obrigatório');
+
+    const apiResult = await this.apiDelete(`/bugdetector/reports/${filename}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'bug_report_deleted', filename, source: 'api' };
+    }
+    throw new Error('Não foi possível excluir relatório de bug');
+  }
+
+  // ============================================================
   // AÇÕES EXPANDIDAS: Sistema
   // ============================================================
   async controlService(params) {
@@ -1767,6 +2749,180 @@ class ActionExecutor {
           break;
         case 'email_draft':
           parts.push(`📧 rascunho criado para ${res.to}: "${res.subject}"`);
+          break;
+        case 'tasks_filtered':
+          parts.push(`${res.total} tarefa(s) encontrada(s) no filtro`);
+          break;
+        case 'project_deleted':
+          parts.push(`projeto ${res.id}${res.name ? ` "${res.name}"` : ''} excluído`);
+          break;
+        case 'payments':
+          parts.push(`${res.total} pagamento(s) listado(s)`);
+          break;
+        case 'payment_updated':
+          parts.push(`pagamento ${res.id} atualizado (${res.changes?.join(', ')})`);
+          break;
+        case 'transaction_added':
+          parts.push(`transação de €${res.amount} adicionada ao pagamento ${res.paymentId}`);
+          break;
+        case 'split_received':
+          parts.push(`split do pagamento ${res.paymentId} marcado como recebido`);
+          break;
+        case 'expenses':
+          parts.push(`${res.total} despesa(s) listada(s)`);
+          break;
+        case 'expense_updated':
+          parts.push(`despesa ${res.id} atualizada (${res.changes?.join(', ')})`);
+          break;
+        case 'expense_paid':
+          parts.push(`despesa ${res.id} marcada como paga`);
+          break;
+        case 'expense_template':
+          parts.push(`template de despesa "${res.name}" criado`);
+          break;
+        case 'cash_adjusted':
+          parts.push(`caixa ajustado em €${res.amount} — ${res.reason}`);
+          break;
+        case 'cash_entry':
+          parts.push(`entrada de €${res.amount} no caixa — ${res.description}`);
+          break;
+        case 'cash_history':
+          parts.push(`${res.total} registro(s) no histórico do caixa`);
+          break;
+        case 'cash_projection':
+          parts.push(`projeção do caixa para ${res.months} meses calculada`);
+          break;
+        case 'cash_reconciled':
+          parts.push(`caixa reconciliado para €${res.targetBalance}`);
+          break;
+        case 'idea_commented':
+          parts.push(`comentário adicionado à ideia ${res.id}`);
+          break;
+        case 'idea_from_template':
+          parts.push(`ideia "${res.title}" criada do template ${res.templateId}`);
+          break;
+        case 'idea_templates':
+          parts.push(`${res.total} template(s) de ideia listado(s)`);
+          break;
+        case 'whatsapp_scan':
+          parts.push(`WhatsApp escaneado`);
+          break;
+        case 'whatsapp_buffer_cleared':
+          parts.push(`buffer do WhatsApp limpo`);
+          break;
+        case 'whatsapp_history':
+          parts.push(`${res.total} mensagem(ns) no histórico do WhatsApp`);
+          break;
+        case 'classifications':
+          parts.push(`${res.items?.length || 0} classificação(ões) pendente(s)`);
+          break;
+        case 'email_marked_read':
+          parts.push(`email ${res.id} marcado como lido`);
+          break;
+        case 'email_marked_unread':
+          parts.push(`email ${res.id} marcado como não lido`);
+          break;
+        case 'email_starred':
+          parts.push(`email ${res.id} favoritado`);
+          break;
+        case 'email_archived':
+          parts.push(`email ${res.id} arquivado`);
+          break;
+        case 'email_trashed':
+          parts.push(`email ${res.id} movido para lixeira`);
+          break;
+        case 'email_spam':
+          parts.push(`email ${res.id} marcado como spam`);
+          break;
+        case 'draft_approved':
+          parts.push(`rascunho ${res.id} aprovado`);
+          break;
+        case 'draft_rejected':
+          parts.push(`rascunho ${res.id} rejeitado`);
+          break;
+        case 'email_reply_suggestion':
+          parts.push(`sugestão de resposta gerada`);
+          break;
+        case 'email_thread_summary':
+          parts.push(`thread resumida`);
+          break;
+        case 'email_analyzed':
+          parts.push(`email ${res.id} analisado`);
+          break;
+        case 'instagram_messages':
+          parts.push(`${res.items?.length || 0} mensagem(ns) do Instagram`);
+          break;
+        case 'instagram_imported':
+          parts.push(`mensagem ${res.id} importada do Instagram`);
+          break;
+        case 'links':
+          parts.push(`${res.total} link(s) listado(s)`);
+          break;
+        case 'link_added':
+          parts.push(`link salvo: ${res.url}`);
+          break;
+        case 'link_deleted':
+          parts.push(`link ${res.id} excluído`);
+          break;
+        case 'link_enriched':
+          parts.push(`link ${res.url} enriquecido`);
+          break;
+        case 'links_synced':
+          parts.push(`links sincronizados`);
+          break;
+        case 'ops_alert':
+          parts.push(`alerta "${res.title}" criado`);
+          break;
+        case 'ops_alert_deleted':
+          parts.push(`alerta ${res.id} excluído`);
+          break;
+        case 'ops_change':
+          parts.push(`mudança registrada: ${res.description}`);
+          break;
+        case 'stack_logs':
+          parts.push(`${res.lines} linha(s) de log do stack`);
+          break;
+        case 'stack_status':
+          parts.push(`status do stack verificado`);
+          break;
+        case 'security_log':
+          parts.push(`${res.items?.length || 0} registro(s) de segurança`);
+          break;
+        case 'security_config_updated':
+          parts.push(`configuração de segurança atualizada`);
+          break;
+        case 'security_whatsapp_test':
+          parts.push(`teste de WhatsApp de segurança realizado`);
+          break;
+        case 'notifications':
+          parts.push(`${res.total} notificação(ões) listada(s)`);
+          break;
+        case 'notification_read':
+          parts.push(`notificação ${res.id} marcada como lida`);
+          break;
+        case 'all_notifications_read':
+          parts.push(`todas as notificações marcadas como lidas`);
+          break;
+        case 'notification_deleted':
+          parts.push(`notificação ${res.id} excluída`);
+          break;
+        case 'users':
+          parts.push(`${res.total} usuário(s) listado(s)`);
+          break;
+        case 'user_switched':
+          parts.push(`usuário trocado para ${res.userId}`);
+          break;
+        case 'github_repos':
+          parts.push(`${res.items?.length || 0} repositório(s) GitHub`);
+          break;
+        case 'vercel_projects':
+          parts.push(`${res.items?.length || 0} projeto(s) Vercel`);
+          break;
+        case 'bug_reports':
+          parts.push(`${res.items?.length || 0} relatório(s) de bug`);
+          break;
+        case 'bug_report_deleted':
+          parts.push(`relatório ${res.filename} excluído`);
           break;
       }
     }
