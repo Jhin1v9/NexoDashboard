@@ -199,8 +199,8 @@ export default function LunaProactiveToast() {
 
   const handleClick = () => {
     if (!toast) return
-    // Emite evento para o LunaFloatingButton abrir com o texto sugerido
-    lunaEventBus.emit('luna:proactiveClick', { text: toast.action })
+    // Abre o Luna Action Center em vez de jogar texto no chat
+    lunaEventBus.emit('luna:openActionCenter')
     setToast(null)
     if (timerRef.current) clearTimeout(timerRef.current)
   }

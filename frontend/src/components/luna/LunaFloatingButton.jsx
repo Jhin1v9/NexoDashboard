@@ -9,6 +9,7 @@ import { hasFormFields, getSchema, isKnownIntent } from './LunaIntentSchemas'
 import { formatHelpForModule } from './LunaModuleSuggestions'
 import LunaActionFlow from './LunaActionFlow'
 import LunaBatchAction from './LunaBatchAction'
+import LunaActionCenter from './LunaActionCenter'
 import { decideExecution, logDecision } from '../../lib/lunaDecisionEngine'
 import axios from 'axios'
 
@@ -35,6 +36,7 @@ export default function LunaFloatingButton() {
   const [actionFlow, setActionFlow] = useState(null) // { result, mode }
   const [batchAction, setBatchAction] = useState(null) // { intent }
   const [proactiveBadge, setProactiveBadge] = useState(null) // { count, type }
+  const [actionCenterOpen, setActionCenterOpen] = useState(false)
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
@@ -74,14 +76,37 @@ export default function LunaFloatingButton() {
     return () => clearInterval(interval)
   }, [])
 
-  // ── Ouve clique em toast proativo ──
+  // ── Ouve eventos proativos ──
   useEffect(() => {
-    const handleProactive = ({ text }) => {
-      setText(text)
-      setIsOpen(true)
+    const handleOpenActionCenter = () => {
+      setActionCenterOpen(true)
+      setIsOpen(false)
     }
-    lunaEventBus.on('luna:proactiveClick', handleProactive)
-    return () => lunaEventBus.off('luna:proactiveClick', handleProactive)
+    const handleDismissed = () => {
+      // Recarrega badge após dismiss
+      const fetchProactive = async () => {
+        try {
+          const token = localStorage.getItem('nexo_token') || ''
+          const res = await axios.get('/api/luna/proactive', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (res.data?.total > 0) {
+            setProactiveBadge({ count: res.data.total, type: res.data.topPriority })
+          } else {
+            setProactiveBadge(null)
+          }
+        } catch {
+          setProactiveBadge(null)
+        }
+      }
+      fetchProactive()
+    }
+    lunaEventBus.on('luna:openActionCenter', handleOpenActionCenter)
+    lunaEventBus.on('luna:actionDismissed', handleDismissed)
+    return () => {
+      lunaEventBus.off('luna:openActionCenter', handleOpenActionCenter)
+      lunaEventBus.off('luna:actionDismissed', handleDismissed)
+    }
   }, [])
 
   // Fecha com ESC
@@ -90,6 +115,7 @@ export default function LunaFloatingButton() {
       if (e.key === 'Escape') {
         setIsOpen(false)
         setChatResult(null)
+        setActionCenterOpen(false)
       }
     }
     window.addEventListener('keydown', handleKey)
@@ -476,37 +502,50 @@ export default function LunaFloatingButton() {
       </AnimatePresence>
 
       {/* Botão flutuante */}
-      <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        onClick={() => {
-          setIsOpen(!isOpen)
-          if (isOpen) {
-            setChatResult(null)
-            setPendingActions(null)
-          }
-        }}
-        className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all ${
-          isOpen
-            ? 'bg-nexo-danger text-white shadow-nexo-danger/30'
-            : 'bg-gradient-to-r from-nexo-primary to-purple-600 text-white shadow-purple-500/30 hover:shadow-purple-500/50'
-        }`}
-      >
-        {isOpen ? (
-          <X className="w-5 h-5" />
-        ) : (
-          <Wand2 className="w-5 h-5" />
-        )}
-        <span className="text-sm font-semibold hidden sm:inline tracking-wide">
-          {isOpen ? 'Fechar' : 'Luna'}
-        </span>
-        {/* Badge Proativo */}
-        {!isOpen && proactiveBadge && proactiveBadge.count > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-lg animate-pulse">
-            {proactiveBadge.count > 9 ? '9+' : proactiveBadge.count}
+      <div className="fixed bottom-6 right-6 z-[100]">
+        <motion.button
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
+          onClick={() => {
+            if (actionCenterOpen) {
+              setActionCenterOpen(false)
+              return
+            }
+            if (proactiveBadge && !isOpen) {
+              setActionCenterOpen(true)
+              return
+            }
+            setIsOpen(!isOpen)
+            if (isOpen) {
+              setChatResult(null)
+              setPendingActions(null)
+            }
+          }}
+          className={`flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all ${
+            isOpen || actionCenterOpen
+              ? 'bg-nexo-danger text-white shadow-nexo-danger/30'
+              : 'bg-gradient-to-r from-nexo-primary to-purple-600 text-white shadow-purple-500/30 hover:shadow-purple-500/50'
+          }`}
+        >
+          {isOpen || actionCenterOpen ? (
+            <X className="w-5 h-5" />
+          ) : (
+            <Wand2 className="w-5 h-5" />
+          )}
+          <span className="text-sm font-semibold hidden sm:inline tracking-wide">
+            {isOpen || actionCenterOpen ? 'Fechar' : 'Luna'}
           </span>
+        </motion.button>
+        {/* Badge Proativo — clique separado abre Action Center */}
+        {!isOpen && !actionCenterOpen && proactiveBadge && proactiveBadge.count > 0 && (
+          <button
+            onClick={() => setActionCenterOpen(true)}
+            className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-lg animate-pulse hover:bg-red-400 transition-colors cursor-pointer z-[101]"
+          >
+            {proactiveBadge.count > 9 ? '9+' : proactiveBadge.count}
+          </button>
         )}
-      </motion.button>
+      </div>
 
       {/* Luna Action Flow — drawer inline para coleta/preview/confirm (Passo 3) */}
       {actionFlow && (
@@ -532,7 +571,10 @@ export default function LunaFloatingButton() {
         </div>
       )}
 
-
+      {/* Luna Action Center — Inbox de ações pendentes */}
+      {actionCenterOpen && (
+        <LunaActionCenter onClose={() => setActionCenterOpen(false)} />
+      )}
     </>
   )
 }
