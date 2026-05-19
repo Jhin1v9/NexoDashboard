@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, X, Send, Loader2, MessageSquare, Bot, CheckCircle, ArrowRight } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, Bot, CheckCircle, ArrowRight, Wand2 } from 'lucide-react'
 import { useLunaNLU } from '../../hooks/useLunaNLU'
 import { useLunaContext } from '../../hooks/useLunaContext'
 import { lunaEventBus } from '../../lib/lunaEventBus'
@@ -8,6 +8,7 @@ import { hasFormFields, getSchema } from './LunaIntentSchemas'
 import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
 import SmartFormModal from './SmartFormModal'
 import LunaActionFlow from './LunaActionFlow'
+import { decideExecution, logDecision } from '../../lib/lunaDecisionEngine'
 import axios from 'axios'
 
 /**
@@ -32,11 +33,23 @@ export default function LunaFloatingButton() {
   const [chatConfirming, setChatConfirming] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
-  const [actionFlowResult, setActionFlowResult] = useState(null)
+  const [actionFlow, setActionFlow] = useState(null) // { result, mode }
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
-  const moduleData = getSuggestionsForModule(currentModule || 'unknown')
+
+  // Sugestões globais — não limitadas por página. O currentModule é enviado
+  // como contexto pro NLU (melhora precisão) mas o usuário pode executar
+  // QUALQUER comando de QUALQUER página.
+  const GLOBAL_SUGGESTIONS = [
+    'criar tarefa',
+    'saldo do caixa',
+    'listar projetos',
+    'verificar menções',
+    'ajuda',
+  ]
+
+  const placeholderText = 'Diga o que precisa...'
 
   // Foca no input quando abre + emite evento de estado
   useEffect(() => {
@@ -94,9 +107,26 @@ export default function LunaFloatingButton() {
     const intent = nluResult.intent
     const schema = getSchema(intent)
 
-    // ── CASO 1: Intent com formulário editável → LunaActionFlow (decisão inteligente) ──
+    // ── CASO 1: Intent com formulário editável → Decision Engine (Passo 3) ──
     if (hasFormFields(intent)) {
-      setActionFlowResult(nluResult)
+      const schema = getSchema(intent)
+      const decision = decideExecution({
+        score: nluResult.score || 0,
+        intent,
+        text: userText,
+        schema,
+        values: {},
+        hasSelection: false,
+      })
+      logDecision(decision, 'LunaFloatingButton')
+
+      if (decision.mode === 'auto') {
+        // Execução direta — sem UI
+        executeAutoAction(nluResult, schema)
+      } else {
+        // Abre drawer com modo decidido
+        setActionFlow({ result: nluResult, mode: decision.mode })
+      }
       setIsOpen(false)
       return
     }
@@ -132,6 +162,7 @@ export default function LunaFloatingButton() {
         message: userText,
         authorName: 'Usuário',
         context: [],
+        contextModule: currentModule || null,
       })
       const data = res.data
 
@@ -180,6 +211,7 @@ export default function LunaFloatingButton() {
         message: 'sim',
         authorName: 'Usuário',
         context: [],
+        contextModule: currentModule || null,
         confirmActions: true,
         pendingActions,
       })
@@ -202,9 +234,45 @@ export default function LunaFloatingButton() {
   }
 
   const handleActionFlowDone = (data) => {
-    setActionFlowResult(null)
+    setActionFlow(null)
     if (data?.redirect) {
       window.location.href = data.redirect
+    }
+  }
+
+  const executeAutoAction = async (result, schema) => {
+    lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
+    try {
+      if (schema.isRedirect) {
+        const target = typeof schema.redirectTo === 'function'
+          ? schema.redirectTo({})
+          : schema.redirectTo
+        if (target) window.location.href = target
+        return
+      }
+      if (schema.isInfo) {
+        lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
+        return
+      }
+      if (!schema.submitConfig) {
+        lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
+        return
+      }
+      const payload = schema.submitConfig.transform({})
+      const token = localStorage.getItem('nexo_token') || ''
+      await axios({
+        method: schema.submitConfig.method,
+        url: schema.submitConfig.endpoint,
+        data: payload,
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      addToast?.(schema.successMessage || 'Feito! ✓', 'success')
+      lunaEventBus.emit('luna:actionCompleted', { intent: result.intent, mode: 'auto', payload })
+      lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Erro'
+      addToast?.(`Erro: ${msg}`, 'error')
+      lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
     }
   }
 
@@ -242,13 +310,10 @@ export default function LunaFloatingButton() {
               <div className="glass-card p-4 space-y-3 shadow-xl shadow-black/40">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-nexo-primary" />
-                    <span className="text-xs font-medium text-nexo-text">O que você precisa?</span>
-                    {currentModule && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-primary/10 text-nexo-primary border border-nexo-primary/20">
-                        {moduleData.label}
-                      </span>
-                    )}
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-nexo-primary to-purple-600 flex items-center justify-center">
+                      <Sparkles className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="text-xs font-medium text-nexo-text">Luna</span>
                   </div>
                   <button
                     onClick={() => {
@@ -256,7 +321,7 @@ export default function LunaFloatingButton() {
                       inputRef.current?.focus()
                     }}
                     className="text-[10px] px-2 py-1 rounded-full bg-nexo-card border border-nexo-border text-nexo-muted hover:text-nexo-primary hover:border-nexo-primary/50 transition-colors"
-                    title="Ver comandos desta página"
+                    title="Ver todos os comandos"
                   >
                     ?
                   </button>
@@ -268,7 +333,7 @@ export default function LunaFloatingButton() {
                     type="text"
                     value={text}
                     onChange={e => setText(e.target.value)}
-                    placeholder={`Ex: "${moduleData.quick[0]}", "${moduleData.quick[1]}"...`}
+                    placeholder={placeholderText}
                     className="flex-1 bg-nexo-bg border border-nexo-border rounded-lg px-3 py-2 text-sm text-nexo-text placeholder:text-nexo-muted/50 outline-none focus:border-nexo-primary transition-colors"
                     disabled={isLoading || chatLoading}
                   />
@@ -286,7 +351,7 @@ export default function LunaFloatingButton() {
                 )}
 
                 <div className="flex flex-wrap gap-1.5">
-                  {moduleData.quick.map(suggestion => (
+                  {GLOBAL_SUGGESTIONS.map(suggestion => (
                     <button
                       key={suggestion}
                       onClick={() => {
@@ -390,8 +455,8 @@ export default function LunaFloatingButton() {
 
       {/* Botão flutuante */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => {
           setIsOpen(!isOpen)
           if (isOpen) {
@@ -399,31 +464,27 @@ export default function LunaFloatingButton() {
             setPendingActions(null)
           }
         }}
-        className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all ${
+        className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all ${
           isOpen
-            ? 'bg-nexo-danger text-white shadow-nexo-danger/20'
-            : chatState === 'thinking'
-              ? 'bg-nexo-warning text-white shadow-nexo-warning/20 animate-pulse'
-              : chatState === 'acting'
-                ? 'bg-nexo-success text-white shadow-nexo-success/20'
-                : 'bg-nexo-primary text-white hover:bg-nexo-primary/90 shadow-nexo-primary/20'
+            ? 'bg-nexo-danger text-white shadow-nexo-danger/30'
+            : 'bg-gradient-to-r from-nexo-primary to-purple-600 text-white shadow-purple-500/30 hover:shadow-purple-500/50'
         }`}
       >
-        {isOpen ? <X className="w-5 h-5" /> : chatState === 'thinking' ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
-        <span className="text-sm font-medium hidden sm:inline">
-          {isOpen ? 'Fechar' : chatState === 'thinking' ? 'Pensando...' : chatState === 'acting' ? 'Agindo...' : 'Luna'}
-        </span>
-        {currentModule && !isOpen && (
-          <span className="hidden lg:inline text-[10px] opacity-70 ml-0.5">
-            {currentModule}
-          </span>
+        {isOpen ? (
+          <X className="w-5 h-5" />
+        ) : (
+          <Wand2 className="w-5 h-5" />
         )}
+        <span className="text-sm font-semibold hidden sm:inline tracking-wide">
+          {isOpen ? 'Fechar' : 'Luna'}
+        </span>
       </motion.button>
 
-      {/* Luna Action Flow — orquestrador inteligente (Passo 3) */}
-      {actionFlowResult && (
+      {/* Luna Action Flow — drawer inline para coleta/preview/confirm (Passo 3) */}
+      {actionFlow && (
         <LunaActionFlow
-          nluResult={actionFlowResult}
+          nluResult={actionFlow.result}
+          mode={actionFlow.mode}
           onDone={handleActionFlowDone}
         />
       )}
