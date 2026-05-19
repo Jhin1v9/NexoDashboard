@@ -156,6 +156,7 @@
 
 /* ═════════════════════════════════════════════════════════════════════════════
    PRINT / PDF — Estilos para impressão do Changelog e outras páginas
+   Tema escuro preservado (mesmas cores do site). Sem limite de páginas.
    ═════════════════════════════════════════════════════════════════════════════ */
 
 @media print {
@@ -171,10 +172,10 @@
     display: none !important;
   }
 
-  /* Fundo branco e texto escuro para economia de tinta e legibilidade */
+  /* Preserva o tema escuro do site — sem inverter cores */
   body {
-    background: #ffffff !important;
-    color: #1a1a1a !important;
+    background: #08080c !important;
+    color: #e0e0e0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -194,49 +195,42 @@
     padding: 0 !important;
   }
 
-  /* Cards do changelog — borda sutil, fundo branco */
+  /* Cards do changelog — mantêm fundo escuro e bordas do tema */
   .bg-nexo-card,
   [class*="bg-nexo-card"] {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
+    background: #0f1117 !important;
+    border: 1px solid #1a1a2e !important;
     box-shadow: none !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
     margin-bottom: 12px !important;
   }
 
-  /* Títulos em preto */
+  /* Mantém cores originais dos textos */
   h1, h2, h3,
-  [class*="text-nexo-text"],
-  [class*="text-2xl"],
-  [class*="text-lg"] {
-    color: #1a1a1a !important;
+  [class*="text-nexo-text"] {
+    color: #e2e8f0 !important;
   }
 
-  /* Texto secundário em cinza escuro */
   [class*="text-nexo-text-secondary"],
   [class*="text-sm"],
   p {
-    color: #4a5568 !important;
+    color: #94a3b8 !important;
   }
 
-  /* Badges de tier e categoria — mantêm cor mas com texto legível */
+  /* Badges mantêm aparência original */
   [class*="bg-red-500/20"],
   [class*="bg-yellow-500/20"],
   [class*="bg-blue-500/20"] {
-    background: #f7fafc !important;
-    border: 1px solid #cbd5e0 !important;
-    color: #2d3748 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Tags */
+  /* Tags mantêm aparência original */
   [class*="bg-white/5"] {
-    background: #edf2f7 !important;
-    color: #4a5568 !important;
-    border: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Ícones coloridos dos cards — mantêm a cor para identificação visual */
+  /* Ícones coloridos — mantêm cor */
   [class*="rounded-xl flex items-center justify-center shadow-lg"] {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -247,20 +241,14 @@
     display: none !important;
   }
 
-  /* Header de impressão personalizado */
+  /* Header de impressão */
   @page {
     margin: 15mm;
   }
 
-  /* Quebra de página entre cards grandes */
-  .space-y-4 > * {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Stats cards no topo */
+  /* Stats cards no topo — mantêm tema escuro */
   .grid[class*="grid-cols-3"] > div {
-    background: #f7fafc !important;
-    border: 1px solid #e2e8f0 !important;
+    background: #0f1117 !important;
+    border: 1px solid #1a1a2e !important;
   }
 }
