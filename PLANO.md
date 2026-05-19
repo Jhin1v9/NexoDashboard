@@ -2,7 +2,7 @@
 
 > **LEIA ESTE ARQUIVO PRIMEIRO** antes de qualquer ação no projeto.  
 > Este documento mantém o estado atual, decisões aprovadas e próximos passos.  
-> **Atualizado:** 2026-05-19 20:35 UTC
+> **Atualizado:** 2026-05-19 22:30 UTC
 
 ---
 
@@ -30,15 +30,30 @@
 
 ---
 
+## ✅ Concluído (Aprovado) — Continuação
+
+### Fase Segurança — Parte 2 (Commits `d25eebe`)
+- [x] **Detecção VPN/Tor/Proxy/Hosting** via `ipapi.is` (1.000 req/dia grátis) + lista oficial Tor Project
+- [x] **Heurísticas de anonimato** — timezone mismatch, WebRTC IP leak, headless detection, language vs location
+- [x] **Captura de câmera do intruso** via `getUserMedia` (silencioso se permissão já concedida)
+- [x] **Captura de screenshot da tela** via `getDisplayMedia` (prompt do browser, aba atual preferida)
+- [x] **Fingerprint forense avançado** — WebRTC, permissions, performance, bluetooth, USB, VR, clipboard, device orientation, installed apps, media capabilities, speech, wakeLock, payment, credentials, share, contacts, serial, HID, MIDI, gamepads
+- [x] **Alerta Discord com imagens** — envia foto da câmera e screenshot como attachments no webhook
+- [x] **Alerta WhatsApp** — inclui status de câmera/screenshot capturados
+- [x] **Express JSON limit aumentado** para `10mb` (suporta imagens base64)
+- [x] **Security log enriquecido** — `risk`, `hasCameraPhoto`, `hasScreenshot`, `severity: critical` para conexões anônimas
+
 ## 🔒 Pendente de Aprovação / Próximos Passos
 
-### Fase Segurança — Parte 2 (AGUARDANDO APROVAÇÃO)
+### Fase Segurança — Parte 3 (AGUARDANDO APROVAÇÃO)
 - [ ] **Página de login tradicional** — substituir o terminal secreto/Konami code
 - [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
 - [ ] **Path traversal fix** — workspace file access (`../` bypass)
 - [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
 - [ ] **HTTP headers de segurança** — HSTS, X-Frame-Options, CSP, etc.
 - [ ] **Audit log persistente** — security log no PostgreSQL (não JSON)
+- [ ] **Atualizar Discord Webhook** — token atual retorna 401 (Invalid Webhook Token)
+- [ ] **Reinstalar WhatsApp sender** — módulo `playwright` ausente no ambiente
 
 ### Fase Migração de Dados (AGUARDANDO APROVAÇÃO)
 - [ ] Migrar `tasks.json` → PostgreSQL
