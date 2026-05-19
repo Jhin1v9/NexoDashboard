@@ -288,8 +288,6 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-
-
 // ── DEBUG: Gmail OAuth config ──
 app.get('/api/debug/gmail-config', (req, res) => {
   const clientId = process.env.GMAIL_CLIENT_ID || '';
@@ -3031,28 +3029,7 @@ if (!fs.existsSync(LINKS_INDEX_FILE)) {
 }
 
 function ensureChangelog() {
-  // Sempre sobrescreve com o seed do repo — garante que o Render tenha os dados atualizados
-  const seedFile = path.join(__dirname, 'changelog-seed.json');
-  let seedData = null;
-
-  try {
-    if (fs.existsSync(seedFile)) {
-      seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
-    }
-  } catch (err) {
-    console.error('[CHANGELOG] Erro ao carregar seed:', err.message);
-  }
-
-  if (seedData && seedData.entries) {
-    writeJSON(CHANGELOG_FILE, {
-      ...seedData,
-      lastUpdated: new Date().toISOString()
-    });
-    console.log(`[CHANGELOG] Sobrescrito com ${seedData.entries.length} entradas do seed.`);
-    return;
-  }
-
-  // Fallback hardcoded se seed não existir
+  // Cria apenas se o arquivo não existe — não sobrescreve dados existentes
   if (!fs.existsSync(CHANGELOG_FILE)) {
     const initialData = {
       version: '1.0',
