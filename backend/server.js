@@ -865,6 +865,7 @@ const PUBLIC_API_ROUTES = [
   '/api/health',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/email/auth/callback', // OAuth callback do Gmail (chamado pelo Google, sem token)
 ];
 
 app.use((req, res, next) => {
