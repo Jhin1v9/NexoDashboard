@@ -23,7 +23,7 @@
 active_instance: kimi-10a71fc7
 signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-18T11:01:42+02:00
+last_updated: 2026-05-19T18:40:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -47,35 +47,26 @@ last_updated: 2026-05-18T11:01:42+02:00
 
 ## 2. Current Focus
 
-### 🎯 Sprint Ativo: Luna v20.0 — NLU Unificado + Fluxo Floating Button
+### 🎯 Sprint Ativo: Luna Viva — Passo 3: Execução Inteligente
 
 **Status:** ✅ Concluído — build passando, commits até `920c182` enviados
 
-#### NLU Unificado (LunaFloatingButton ↔ Página /luna) ✅
-- [x] **Fluxo dual:** SmartFormModal para intents com formulário + fallback `/api/luna/chat` para consultas
-- [x] **Mesmo backend:** Ambos usam NLU (NLP.js) → ActionExecutor → resposta
-- [x] **Intents novos:** `social`, `financeiro.listar_pagamentos`, `financeiro.listar_despesas`, `sistema.ajuda`, `sistema.navegar`
-- [x] **Saudações:** NLU reconhece "oi luna", "bom dia", "como vai" com score 1.0
-- [x] **Corpus expandido:** 30+ novos intents adicionados aos DOMAINS do NLU
-- [x] **NLU Massiva:** 36 → 137 intents, 15 domínios, modelo re-treinado e validado
+#### Passo 3 — Execução Inteligente ✅
+- [x] **lunaDecisionEngine.js:** Matriz de decisão (score + dados + risco → auto/collect/confirm/preview/transform)
+- [x] **LunaActionDrawer.jsx:** Drawer lateral 380px, sem backdrop blur, página continua interativa
+- [x] **LunaSafetyDelay.jsx:** Barra de progresso 1.5s com botão "Desfazer" (ESC) para ações destrutivas
+- [x] **useLunaAnimation.js:** Web Animations API — create/delete/update/move/batch/breath/progress/shake
+- [x] **LunaActionFlow.jsx:** Componente de apresentação puro (sem useEffect), orquestrado pelo LunaFloatingButton
+- [x] **Integração no LunaFloatingButton:** Decision Engine chamado no submit handler, execução direta (auto) ou drawer
+
+#### NLU Expansão ✅
+- [x] **137 intents** em 15 domínios (PT/ES/CA), modelo re-treinado e validado
 - [x] **SmartFormModal:** Schemas para todos os 137 intents
-- [x] **Sugestões por módulo:** Comandos novos adicionados ao LunaModuleSuggestions
 
-#### ActionExecutor v19+ ✅
-- [x] **Novas ações:** `ajuda` (mensagem de ajuda completa), `navigate` (redirect)
-- [x] **Correção `completeTask`:** Retorna erro quando não acha tarefa (não cria vazia)
-- [x] **Correção `buildSummary`:** Fallback `'desconhecida'` para task_done, cases help/navigate
-- [x] **`buildConciergeReply`:** Suporta help, navigate, task_done com erro
-
-#### Botão Flutuante (Produção) ✅
-- [x] **Sem limitação por página:** Sugestões são globais (5 comandos fixos)
-- [x] **Sem debug:** Removido badge `currentModule` do botão e do header
-- [x] **Estilo produção:** Gradiente purple, ícone `Wand2`, glow shadow
-- [x] **Contexto enviado:** `currentModule` vai pro NLU (melhora precisão sem limitar)
-
-#### Changelog Recuperado ✅
-- [x] **18 entradas** recuperadas (tinham sido apagadas, reduzidas para 3)
-- [x] **3 entradas novas** mantidas (Workspace v1, Active Learning, Fluxo Unificado)
+#### Infraestrutura Luna Viva (Passos 1-2) ✅
+- [x] **LunaContext + Event Bus:** Consciência global, comunicação desacoplada
+- [x] **Harvesters:** RouteHarvester, TaskHarvester, EmailHarvester, FinanceHarvester
+- [x] **useLunaDOM:** Captura de cliques, foco e scroll no DOM
 
 #### Deploy/Repo ✅
 - [x] **NexoDashboard local antigo:** Remote removido (não empurra mais pro GitHub)
@@ -95,10 +86,17 @@ last_updated: 2026-05-18T11:01:42+02:00
 
 ### Frontend (React 18, Vite, Tailwind)
 - `frontend/src/pages/LunaControl.jsx` — Página `/luna` (terminal + chat + comandos)
-- `frontend/src/components/luna/LunaFloatingButton.jsx` — Botão flutuante global (mini-chat)
+- `frontend/src/components/luna/LunaFloatingButton.jsx` — Botão flutuante global (mini-chat + Decision Engine)
+- `frontend/src/components/luna/LunaActionDrawer.jsx` — Drawer inline 380px sem blur (Passo 3)
+- `frontend/src/components/luna/LunaSafetyDelay.jsx` — Safety delay 1.5s com undo (Passo 3)
+- `frontend/src/components/luna/LunaActionFlow.jsx` — Orquestrador de apresentação (Passo 3)
 - `frontend/src/components/luna/SmartFormModal.jsx` — Modal de formulário para intents com fields
-- `frontend/src/components/luna/LunaIntentSchemas.js` — Schemas de formulário por intent
-- `frontend/src/components/luna/LunaModuleSuggestions.js` — Sugestões globais (não mais por página)
+- `frontend/src/components/luna/LunaIntentSchemas.js` — Schemas de formulário por intent (137 intents)
+- `frontend/src/components/luna/LunaModuleSuggestions.js` — Sugestões globais
+- `frontend/src/hooks/useLunaAnimation.js` — Web Animations API hook (Passo 3)
+- `frontend/src/lib/lunaDecisionEngine.js` — Motor de decisão de execução (Passo 3)
+- `frontend/src/context/LunaContext.jsx` — Consciência global da Luna
+- `frontend/src/lib/lunaEventBus.js` — Event emitter desacoplado
 
 ### NLU Flow (prioridade)
 1. **NLU** (`node-nlp`) — Score ≥0.5 → executa direto
