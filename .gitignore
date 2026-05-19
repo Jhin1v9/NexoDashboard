@@ -8,20 +8,20 @@ artifacts*.png
 **/.wwebjs_auth/
 .vercel/
 **/.vercel/
-backend/data/*
-!backend/data/schema/
-!backend/data/schema/**
-!backend/data/config/
-!backend/data/config/**
+# Backend data — pastas runtime/backup ignoradas, JSONs versionados por padrão
 backend/data/runtime/
 backend/data/reports/
 backend/data/.backup-bom-fix/
 backend/data/.reset-backup-*/
-backend/data/*.json
-!backend/data/schema/*.json
-!backend/data/config/*.json
-!backend/data/users.json
-!backend/data/changelog.json
+backend/data/dev-logs/
+backend/data/*.backup*
+backend/data/*.bak
+backend/data/*.log
+backend/data/luna-buffer.json
+backend/data/luna-checkpoint.json
+backend/data/whatsapp-checkpoint.json
+backend/data/full-extract.json
+backend/data/changelog.json.bak
 backend/cache/
 backend/node_modules/
 agents/node_modules/
@@ -77,3 +77,5 @@ backend/public/
 frontend/dist/
 .env
 backend/workspace/
+backend/data/luna-model.nlp
+backend/data/gmail-tokens.json

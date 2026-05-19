@@ -1,0 +1,46 @@
+{
+  "templates": [
+    {
+      "id": "orcamento",
+      "name": "Orçamento",
+      "subject": "Orçamento — {{projeto_nome}}",
+      "body": "<p>Olá {{cliente_nome}},</p><p>Muito obrigado pelo teu interesse na Nexo Digital. Analisámos a tua solicitação para <strong>{{projeto_nome}}</strong> e preparamos o seguinte orçamento:</p><ul><li><strong>Serviço:</strong> {{servico}}</li><li><strong>Investimento:</strong> {{valor}}</li><li><strong>Prazo estimado:</strong> {{prazo}}</li></ul><p>Este orçamento é uma estimativa baseada nos requisitos partilhados. Para um orçamento detalhado, propomos uma breve reunião de 15 minutos para alinharmos todos os detalhes.</p><p>Disponível para ti,</p>",
+      "variables": ["cliente_nome", "projeto_nome", "servico", "valor", "prazo"]
+    },
+    {
+      "id": "suporte",
+      "name": "Suporte",
+      "subject": "Re: Suporte técnico — Ticket #{{ticket_id}}",
+      "body": "<p>Olá {{cliente_nome}},</p><p>Recebemos a tua solicitação de suporte (Ticket #{{ticket_id}}). Já estamos a analisar a situação e entraremos em contacto em breve com uma solução.</p><p><strong>Prioridade:</strong> {{prioridade}}</p><p>Se precisares de alguma coisa urgente, não hesites em contactar-nos pelo WhatsApp ou telefone.</p><p>Um saludo,</p>",
+      "variables": ["cliente_nome", "ticket_id", "prioridade"]
+    },
+    {
+      "id": "proposta",
+      "name": "Proposta",
+      "subject": "Proposta de serviço — {{projeto_nome}}",
+      "body": "<p>Olá {{cliente_nome}},</p><p>É com entusiasmo que te apresentamos a nossa proposta para <strong>{{projeto_nome}}</strong>.</p><p><strong>Serviços incluídos:</strong></p><ul><li>{{servicos}}</li></ul><p><strong>Investimento total:</strong> {{valor_total}}</p><p><strong>Condições:</strong> {{condicoes}}</p><p>Estamos disponíveis para esclarecer qualquer dúvida e ajustar a proposta conforme as tuas necessidades.</p><p>Aguardamos o teu feedback,</p>",
+      "variables": ["cliente_nome", "projeto_nome", "servicos", "valor_total", "condicoes"]
+    },
+    {
+      "id": "follow_up",
+      "name": "Follow-up",
+      "subject": "Seguimento — {{projeto_nome}}",
+      "body": "<p>Olá {{cliente_nome}},</p><p>Espero que esteja tudo bem contigo. Queria fazer um breve seguimento sobre o nosso projeto <strong>{{projeto_nome}}</strong>.</p><p>Os próximos passos seriam:</p><ul><li>{{proximos_passos}}</li></ul><p>Há alguma dúvida ou bloqueio do qual possamos ajudar? Estamos aqui para o que precisares.</p><p>Um saludo,</p>",
+      "variables": ["cliente_nome", "projeto_nome", "proximos_passos"]
+    },
+    {
+      "id": "agradecimento",
+      "name": "Agradecimento",
+      "subject": "Obrigado pela confiança — {{projeto_nome}}",
+      "body": "<p>Olá {{cliente_nome}},</p><p>Queremos agradecer-te pela confiança em escolher a Nexo Digital para desenvolver <strong>{{projeto_nome}}</strong>.</p><p>Foi um prazer trabalhar contigo e estamos muito satisfeitos com o resultado final. Se precisares de qualquer suporte ou quiseres expandir o projeto no futuro, estamos aqui.</p><p>Muito obrigado!</p>",
+      "variables": ["cliente_nome", "projeto_nome"]
+    },
+    {
+      "id": "boas_vindas",
+      "name": "Boas-vindas",
+      "subject": "Bem-vindo à Nexo Digital! 🚀",
+      "body": "<p>Olá {{cliente_nome}},</p><p>Bem-vindo à família Nexo Digital! É um prazer ter-te connosco no projeto <strong>{{projeto_nome}}</strong>.</p><p>O teu ponto de contacto principal será o <strong>{{responsavel}}</strong>, que te acompanhará durante todo o processo.</p><p>Os próximos passos:</p><ol><li>Reunião de kickoff (30 min)</li><li>Definição de escopo detalhado</li><li>Início do desenvolvimento</li></ol><p>Se tiveres alguma dúvida, estamos à tua disposição.</p><p>Vamos construir algo incrível juntos!</p>",
+      "variables": ["cliente_nome", "projeto_nome", "responsavel"]
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "version": "1.0",
+  "notifications": [
+    {
+      "id": "notif-5",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"admin\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-19T16:21:00.677Z",
+      "metadata": {
+        "eventId": "sec-1779207660675"
+      }
+    },
+    {
+      "id": "notif-4",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"admin\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-19T15:17:03.333Z",
+      "metadata": {
+        "eventId": "sec-1779203823332"
+      }
+    },
+    {
+      "id": "notif-3",
+      "type": "luna_email_draft",
+      "title": "Luna sugeriu uma resposta",
+      "message": "Rascunho gerado para \"Bem-vindo ÃƒÂ  Nexo Digital!\". Revise antes de enviar.",
+      "severity": "medium",
+      "read": true,
+      "timestamp": "2026-05-19T13:54:18.498Z",
+      "metadata": {
+        "draftId": "luna-draft-2",
+        "threadId": "19e40816cd90caa8",
+        "emailId": "19e40816cd90caa8",
+        "subject": "Bem-vindo ÃƒÂ  Nexo Digital!"
+      }
+    },
+    {
+      "id": "notif-2",
+      "type": "luna_email_draft",
+      "title": "Luna sugeriu uma resposta",
+      "message": "Rascunho gerado para \"Orçamento website\". Revise antes de enviar.",
+      "severity": "medium",
+      "read": true,
+      "timestamp": "2026-05-19T11:33:49.901Z",
+      "metadata": {
+        "draftId": "luna-draft-1",
+        "threadId": "thread-abc",
+        "emailId": "msg-123",
+        "subject": "Orçamento website"
+      }
+    },
+    {
+      "id": "notif-1",
+      "type": "luna_email_tasks",
+      "title": "2 tarefa(s) criada(s) do email",
+      "message": "Action items de \"Teste de email\" foram convertidos em tarefas.",
+      "severity": "low",
+      "read": true,
+      "timestamp": "2026-05-19T11:33:34.640Z",
+      "metadata": {
+        "threadId": "test-thread-1",
+        "subject": "Teste de email",
+        "taskIds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "id": "notif-12",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"2\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-14T08:19:29.524Z",
+      "metadata": {
+        "eventId": "sec-1778746769523"
+      }
+    },
+    {
+      "id": "notif-11",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"2\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-14T08:19:28.268Z",
+      "metadata": {
+        "eventId": "sec-1778746768266"
+      }
+    },
+    {
+      "id": "notif-10",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"a\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-14T08:19:26.880Z",
+      "metadata": {
+        "eventId": "sec-1778746766879"
+      }
+    },
+    {
+      "id": "notif-9",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"22\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-14T08:19:23.827Z",
+      "metadata": {
+        "eventId": "sec-1778746763826"
+      }
+    },
+    {
+      "id": "notif-8",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"abner\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-14T08:19:21.167Z",
+      "metadata": {
+        "eventId": "sec-1778746761165"
+      }
+    },
+    {
+      "id": "notif-7",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T16:29:24.403Z",
+      "metadata": {
+        "eventId": "sec-1778603364402"
+      }
+    },
+    {
+      "id": "notif-6",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"abner\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T13:12:27.343Z",
+      "metadata": {
+        "eventId": "sec-1778591547342"
+      }
+    },
+    {
+      "id": "notif-5",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T12:15:33.617Z",
+      "metadata": {
+        "eventId": "sec-1778588133617"
+      }
+    },
+    {
+      "id": "notif-4",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T12:15:33.556Z",
+      "metadata": {
+        "eventId": "sec-1778588133556"
+      }
+    },
+    {
+      "id": "notif-3",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T12:15:33.498Z",
+      "metadata": {
+        "eventId": "sec-1778588133497"
+      }
+    },
+    {
+      "id": "notif-2",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T12:15:33.432Z",
+      "metadata": {
+        "eventId": "sec-1778588133432"
+      }
+    },
+    {
+      "id": "notif-1",
+      "type": "security_alert",
+      "title": "🚨 Login falho detectado",
+      "message": "Login falho para \"hacker\" — IP: 127.0.0.1 (Desconhecido, Desconhecido)",
+      "severity": "high",
+      "read": true,
+      "timestamp": "2026-05-12T12:15:33.372Z",
+      "metadata": {
+        "eventId": "sec-1778588133371"
+      }
+    }
+  ],
+  "lastId": 5
+}

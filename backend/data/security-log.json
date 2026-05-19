@@ -1,0 +1,359 @@
+{
+  "version": "1.0",
+  "events": [
+    {
+      "id": "sec-1779207660675",
+      "timestamp": "2026-05-19T16:21:00.675Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "country": "Rede Local",
+        "city": "Servidor Local",
+        "region": "LAN",
+        "isp": "Private Network",
+        "org": "Local"
+      },
+      "device": {
+        "browser": "Desconhecido",
+        "browserVersion": "Desconhecido",
+        "os": "Desconhecido",
+        "device": "Desconhecido",
+        "arch": "Desconhecido",
+        "isMobile": false,
+        "screen": "Desconhecido",
+        "resolution": "Desconhecido",
+        "gpu": "Desconhecido",
+        "timezone": "Desconhecido",
+        "language": "Desconhecido",
+        "fingerprint": "N/A",
+        "fingerprintFull": "N/A",
+        "userAgent": "N/A"
+      },
+      "attemptedUser": "admin",
+      "message": "Login falho para \"admin\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "notified": false
+    },
+    {
+      "id": "sec-1779203823332",
+      "timestamp": "2026-05-19T15:17:03.332Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "country": "Rede Local",
+        "city": "Servidor Local",
+        "region": "LAN",
+        "isp": "Private Network",
+        "org": "Local"
+      },
+      "device": {
+        "browser": "Desconhecido",
+        "browserVersion": "Desconhecido",
+        "os": "Desconhecido",
+        "device": "Desconhecido",
+        "arch": "Desconhecido",
+        "isMobile": false,
+        "screen": "Desconhecido",
+        "resolution": "Desconhecido",
+        "gpu": "Desconhecido",
+        "timezone": "Desconhecido",
+        "language": "Desconhecido",
+        "fingerprint": "N/A",
+        "fingerprintFull": "N/A",
+        "userAgent": "N/A"
+      },
+      "attemptedUser": "admin",
+      "message": "Login falho para \"admin\" — IP: 127.0.0.1 (Servidor Local, Rede Local)",
+      "notified": false
+    },
+    {
+      "id": "sec-1778746769523",
+      "timestamp": "2026-05-14T08:19:29.523Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "2",
+      "notified": false,
+      "device": {
+        "os": "Linux",
+        "gpu": "ANGLE (AMD, AMD Radeon Vega 8 Graphics (radeonsi raven ACO), OpenGL ES 3.2)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1366x768x24",
+        "browser": "Chrome 148.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "resolution": "1366x768x24",
+        "fingerprint": "AwDF0ig8C85GKQAA",
+        "browserVersion": "Chrome 148.0.0.0",
+        "fingerprintFull": "AwDF0ig8C85GKQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "id": "sec-1778746768266",
+      "timestamp": "2026-05-14T08:19:28.266Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "2",
+      "notified": false,
+      "device": {
+        "os": "Linux",
+        "gpu": "ANGLE (AMD, AMD Radeon Vega 8 Graphics (radeonsi raven ACO), OpenGL ES 3.2)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1366x768x24",
+        "browser": "Chrome 148.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "resolution": "1366x768x24",
+        "fingerprint": "AwDF0ig8C85GKQAA",
+        "browserVersion": "Chrome 148.0.0.0",
+        "fingerprintFull": "AwDF0ig8C85GKQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "id": "sec-1778746766879",
+      "timestamp": "2026-05-14T08:19:26.879Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "a",
+      "notified": false,
+      "device": {
+        "os": "Linux",
+        "gpu": "ANGLE (AMD, AMD Radeon Vega 8 Graphics (radeonsi raven ACO), OpenGL ES 3.2)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1366x768x24",
+        "browser": "Chrome 148.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "resolution": "1366x768x24",
+        "fingerprint": "AwDF0ig8C85GKQAA",
+        "browserVersion": "Chrome 148.0.0.0",
+        "fingerprintFull": "AwDF0ig8C85GKQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "id": "sec-1778746763826",
+      "timestamp": "2026-05-14T08:19:23.826Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "22",
+      "notified": false,
+      "device": {
+        "os": "Linux",
+        "gpu": "ANGLE (AMD, AMD Radeon Vega 8 Graphics (radeonsi raven ACO), OpenGL ES 3.2)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1366x768x24",
+        "browser": "Chrome 148.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "resolution": "1366x768x24",
+        "fingerprint": "AwDF0ig8C85GKQAA",
+        "browserVersion": "Chrome 148.0.0.0",
+        "fingerprintFull": "AwDF0ig8C85GKQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "id": "sec-1778746761165",
+      "timestamp": "2026-05-14T08:19:21.165Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "abner",
+      "notified": false,
+      "device": {
+        "os": "Linux",
+        "gpu": "ANGLE (AMD, AMD Radeon Vega 8 Graphics (radeonsi raven ACO), OpenGL ES 3.2)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1366x768x24",
+        "browser": "Chrome 148.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "resolution": "1366x768x24",
+        "fingerprint": "AwDF0ig8C85GKQAA",
+        "browserVersion": "Chrome 148.0.0.0",
+        "fingerprintFull": "AwDF0ig8C85GKQAAAABJRU5ErkJggg=="
+      }
+    },
+    {
+      "id": "sec-1778603364402",
+      "timestamp": "2026-05-12T16:29:24.402Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Servidor Local",
+        "country": "Rede Local"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows 10.0",
+        "gpu": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "arch": "x64",
+        "device": "Desktop",
+        "screen": "1920x1080x24",
+        "browser": "Chrome 124.0.0.0",
+        "isMobile": false,
+        "language": "pt-BR",
+        "timezone": "Europe/Madrid",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "resolution": "1920x1080x24",
+        "fingerprint": "a7f3c2d9e8b1a7f3",
+        "browserVersion": "Chrome 124.0.0.0",
+        "fingerprintFull": "a7f3c2d9e8b1a7f3"
+      }
+    },
+    {
+      "id": "sec-1778591547342",
+      "timestamp": "2026-05-12T13:12:27.342Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "abner",
+      "notified": false,
+      "device": {
+        "os": "Desconhecido",
+        "screen": "Desconhecido",
+        "browser": "Desconhecido",
+        "fingerprint": "test"
+      }
+    },
+    {
+      "id": "sec-1778588133617",
+      "timestamp": "2026-05-12T12:15:33.617Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows ",
+        "screen": "1920x1080",
+        "browser": "Chrome/124",
+        "fingerprint": "a7f3c2d9e8b1"
+      }
+    },
+    {
+      "id": "sec-1778588133556",
+      "timestamp": "2026-05-12T12:15:33.556Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows ",
+        "screen": "1920x1080",
+        "browser": "Chrome/124",
+        "fingerprint": "a7f3c2d9e8b1"
+      }
+    },
+    {
+      "id": "sec-1778588133497",
+      "timestamp": "2026-05-12T12:15:33.497Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows ",
+        "screen": "1920x1080",
+        "browser": "Chrome/124",
+        "fingerprint": "a7f3c2d9e8b1"
+      }
+    },
+    {
+      "id": "sec-1778588133432",
+      "timestamp": "2026-05-12T12:15:33.432Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows ",
+        "screen": "1920x1080",
+        "browser": "Chrome/124",
+        "fingerprint": "a7f3c2d9e8b1"
+      }
+    },
+    {
+      "id": "sec-1778588133371",
+      "timestamp": "2026-05-12T12:15:33.371Z",
+      "type": "failed_login",
+      "severity": "high",
+      "ip": "127.0.0.1",
+      "location": {
+        "city": "Desconhecido",
+        "country": "Desconhecido"
+      },
+      "attemptedUser": "hacker",
+      "notified": false,
+      "device": {
+        "os": "Windows ",
+        "screen": "1920x1080",
+        "browser": "Chrome/124",
+        "fingerprint": "a7f3c2d9e8b1"
+      }
+    }
+  ]
+}

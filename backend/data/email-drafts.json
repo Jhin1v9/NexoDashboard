@@ -1,0 +1,33 @@
+{
+  "drafts": [
+    {
+      "id": "luna-draft-2",
+      "emailId": "19e40816cd90caa8",
+      "threadId": "19e40816cd90caa8",
+      "subject": "Re: Bem-vindo ÃƒÂ  Nexo Digital!",
+      "body": "",
+      "notes": "Error generando el borrador",
+      "tone": "professional",
+      "status": "pending",
+      "createdBy": "luna",
+      "approvedBy": null,
+      "createdAt": "2026-05-19T13:54:18.483Z",
+      "updatedAt": "2026-05-19T13:54:18.483Z"
+    },
+    {
+      "id": "luna-draft-1",
+      "emailId": "msg-123",
+      "threadId": "thread-abc",
+      "subject": "Re: Orçamento website",
+      "body": "",
+      "notes": "Error generando el borrador",
+      "tone": "professional",
+      "status": "approved",
+      "createdBy": "luna",
+      "approvedBy": "abner",
+      "createdAt": "2026-05-19T11:33:49.885Z",
+      "updatedAt": "2026-05-19T11:33:49.953Z"
+    }
+  ],
+  "lastId": 2
+}

@@ -1,0 +1,1749 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-05-19T18:01:45.364Z",
+  "threads": {
+    "abner": {
+      "id": "abner",
+      "type": "individual",
+      "title": "Abner + Luna",
+      "participants": [
+        "abner"
+      ],
+      "createdAt": "2026-05-12T10:00:00.000Z",
+      "updatedAt": "2026-05-18T20:32:30.464Z",
+      "messageCount": 0,
+      "messages": []
+    },
+    "nonoke": {
+      "id": "nonoke",
+      "type": "individual",
+      "title": "Nonoke + Luna",
+      "participants": [
+        "nonoke"
+      ],
+      "createdAt": "2026-05-12T10:00:00.000Z",
+      "updatedAt": "2026-05-18T20:32:30.464Z",
+      "messageCount": 0,
+      "messages": []
+    },
+    "elias": {
+      "id": "elias",
+      "type": "individual",
+      "title": "Elias + Luna",
+      "participants": [
+        "elias"
+      ],
+      "createdAt": "2026-05-12T10:00:00.000Z",
+      "updatedAt": "2026-05-18T20:32:30.464Z",
+      "messageCount": 0,
+      "messages": []
+    },
+    "group": {
+      "id": "group",
+      "type": "group",
+      "title": "NEXO + Luna",
+      "participants": [
+        "abner",
+        "nonoke",
+        "elias"
+      ],
+      "createdAt": "2026-05-12T10:00:00.000Z",
+      "updatedAt": "2026-05-19T18:01:45.364Z",
+      "messageCount": 83,
+      "messages": [
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "oi luna",
+          "timestamp": "2026-05-18T21:46:56.828Z",
+          "id": "msg_1779140816828_kmckm"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Oi, Abner! 👋 Tô por aqui, pronta pra ajudar.",
+          "timestamp": "2026-05-18T21:46:57.001Z",
+          "intent": "social",
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140817001_0ycmy"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "oi luna",
+          "timestamp": "2026-05-18T21:47:46.491Z",
+          "id": "msg_1779140866491_kj6zd"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Opa, Abner! 😊 O que temos hoje?",
+          "timestamp": "2026-05-18T21:47:46.565Z",
+          "intent": "social",
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140866566_kd3sn"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "como esta o status do nexo",
+          "timestamp": "2026-05-18T21:47:58.452Z",
+          "id": "msg_1779140878452_5bw33"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Status do NEXO agora 📊\n\n📋 Tarefas: 43 pendentes (5 P0, 4 P1)\n🎣 Leads: 0 novos\n💰 Financeiro: €0.00 saldo\n\nQuer que eu detalhe alguma área, Abner?",
+          "timestamp": "2026-05-18T21:47:58.521Z",
+          "intent": "consultar_status",
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140878522_iez8c"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "cria tarefa testar luna chat pra abner P0",
+          "timestamp": "2026-05-18T21:47:58.564Z",
+          "id": "msg_1779140878564_hd177"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-18T21:47:58.586Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "testar  chat  P0",
+                "prioridade": "P0",
+                "responsavel": "abner"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "testar  chat  P0",
+              "type": "text",
+              "placeholder": "Nome da tarefa"
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "abner",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P0",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"testar  chat  P0\" → abner",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140878586_ib5k7"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 1000 euros do cliente Joao",
+          "timestamp": "2026-05-18T21:47:58.621Z",
+          "id": "msg_1779140878622_0gs1b"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €1000 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T21:47:58.671Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140878671_s8tvu"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "quais tarefas pendentes",
+          "timestamp": "2026-05-18T21:48:18.435Z",
+          "id": "msg_1779140898435_v12g1"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\n📋 Tarefas (pendentes): 119\n  • [low] terminar jogo de sinuca (elias)\n  • [low] terminar jogo de sinuca (elias)\n  • [low] cafe (elias)\n  • [low] cafe (elias)\n  • [low] revisar código do site (elias)\n  • [low] revisar código do site (elias)\n  • [medium] revisar código do site NEXO Digital (elias)\n  • [medium] revisar código do site NEXO Digital (elias)\n  • [low] revisar código do site\n  • [low] revisar código do site\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T21:48:18.467Z",
+          "intent": "consultar_tarefas",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140898468_dhl3n"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos 200 euros com material de escritorio",
+          "timestamp": "2026-05-18T21:48:18.494Z",
+          "id": "msg_1779140898495_3tfr0"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⏸️ **Limite diário atingido**\n\nTodas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n🔄 **A quota reseta às 09:00 (CEST)** — daqui a pouco estou de volta!\n\nEnquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) sem precisar do Gemini — só me perguntar! 📊",
+          "timestamp": "2026-05-18T21:48:19.122Z",
+          "intent": null,
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": true,
+          "resetAt": "2026-05-19T07:00:00.000Z",
+          "id": "msg_1779140899122_eq1sf"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "novo lead Maria do projeto de website",
+          "timestamp": "2026-05-18T21:48:19.145Z",
+          "id": "msg_1779140899145_t1a9o"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Confirmo isso?\n\n• Registrar lead: \"Maria do projeto de website\"\n\nResponde \"sim\" ou clica em confirmar pra eu executar 👍",
+          "timestamp": "2026-05-18T21:48:19.165Z",
+          "intent": "criar_lead",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_lead",
+              "params": {
+                "nome": "Maria do projeto de website",
+                "contexto": "novo lead Maria do projeto de website"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": null,
+          "editableFields": null,
+          "preview": "• Registrar lead: \"Maria do projeto de website\"",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140899166_2iga5"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "sim",
+          "timestamp": "2026-05-18T21:48:36.684Z",
+          "id": "msg_1779140916685_kqxd9"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\nlead \"Maria do projeto de website\" registrado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T21:48:36.723Z",
+          "intent": null,
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779140916724_26rdx"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos 200 euros com material de escritorio",
+          "timestamp": "2026-05-18T22:00:04.834Z",
+          "id": "msg_1779141604834_j7ox2"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⏸️ **Limite diário atingido**\n\nTodas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n🔄 **A quota reseta às 09:00 (CEST)** — daqui a pouco estou de volta!\n\nEnquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) sem precisar do Gemini — só me perguntar! 📊",
+          "timestamp": "2026-05-18T22:00:05.334Z",
+          "intent": null,
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": true,
+          "resetAt": "2026-05-19T07:00:00.000Z",
+          "id": "msg_1779141605337_q5y94"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga tarefa testar luna chat",
+          "timestamp": "2026-05-18T22:00:05.405Z",
+          "id": "msg_1779141605406_uemyn"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos 200 euros com material de escritorio",
+          "timestamp": "2026-05-18T22:36:53.998Z",
+          "id": "msg_1779143813999_70zwn"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou registrar essa despesa. Confere os dados 👇",
+          "timestamp": "2026-05-18T22:36:54.152Z",
+          "intent": "registrar_despesa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "registrar_despesa",
+              "params": {
+                "valor": 200,
+                "descricao": "gastamos 200 euros com material de escritorio",
+                "tipo": "despesa"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "expense_edit",
+          "editableFields": {
+            "valor": {
+              "label": "Valor (€)",
+              "value": "200",
+              "type": "text",
+              "placeholder": "0.00",
+              "required": true
+            },
+            "para": {
+              "label": "Para",
+              "value": "gastamos 200 euros com material de escritorio",
+              "type": "text",
+              "placeholder": "Descrição da despesa",
+              "required": true
+            },
+            "descricao": {
+              "label": "Descrição",
+              "value": "gastamos 200 euros com material de escritorio",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais"
+            },
+            "split": {
+              "label": "Dividir entre sócios",
+              "value": true,
+              "type": "checkbox"
+            }
+          },
+          "preview": "• Registrar despesa: €200 para ?",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143814153_4s2br"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga tarefa testar luna chat",
+          "timestamp": "2026-05-18T22:36:54.203Z",
+          "id": "msg_1779143814204_011jc"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Eita, Abner... deu ruim em uma parte 😅\n\nErro: Tarefa \"testar luna chat\" não encontrada\n\nPode tentar de novo ou mandar de outro jeito?",
+          "timestamp": "2026-05-18T22:36:54.236Z",
+          "intent": "excluir_tarefa",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143814236_hzyrm"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "ver emails",
+          "timestamp": "2026-05-18T22:36:54.291Z",
+          "id": "msg_1779143814292_9y7fn"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\n📧 Emails (todos): 0 total, 0 não lidos\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:36:54.338Z",
+          "intent": "consultar_emails",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143814339_mgtrm"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "cria tarefa revisar codigo do site pra Abner P0",
+          "timestamp": "2026-05-18T22:37:08.311Z",
+          "id": "msg_1779143828311_m8clr"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-18T22:37:08.339Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "revisar codigo do site  P0",
+                "prioridade": "P0",
+                "responsavel": "abner"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "revisar codigo do site  P0",
+              "type": "text",
+              "placeholder": "Nome da tarefa",
+              "required": true
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "abner",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P0",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"revisar codigo do site  P0\" → abner",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143828340_mz3vq"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 1000 euros do cliente Joao Silva",
+          "timestamp": "2026-05-18T22:37:08.364Z",
+          "id": "msg_1779143828365_eo6vc"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €1000 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:37:08.409Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143828411_9fzgp"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 500 euros do cliente Maria",
+          "timestamp": "2026-05-18T22:37:36.189Z",
+          "id": "msg_1779143856190_svjyq"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €500 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:37:36.278Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143856279_vvmtv"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 500 euros do cliente Maria",
+          "timestamp": "2026-05-18T22:37:48.693Z",
+          "id": "msg_1779143868694_ip8yk"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €500 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:37:48.739Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143868740_2214n"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 800 euros do cliente Pedro",
+          "timestamp": "2026-05-18T22:39:00.793Z",
+          "id": "msg_1779143940794_retjc"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €800 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:39:00.931Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143940931_oz54r"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 600 euros do cliente Ana",
+          "timestamp": "2026-05-18T22:39:32.540Z",
+          "id": "msg_1779143972541_imhc0"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €600 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:39:32.630Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779143972630_dctz1"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 600 euros do cliente Ana",
+          "timestamp": "2026-05-18T22:40:55.380Z",
+          "id": "msg_1779144055380_rgnsw"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €600 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:40:55.470Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144055471_7gjmj"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 600 euros do cliente Ana",
+          "timestamp": "2026-05-18T22:41:18.404Z",
+          "id": "msg_1779144078404_vd1xp"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €600 do Cliente registrado com split automático aplicado\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:41:18.450Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144078451_8j8x7"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "recebemos 700 euros do cliente Carlos",
+          "timestamp": "2026-05-18T22:43:15.587Z",
+          "id": "msg_1779144195588_qtjon"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\npagamento de €700 do Cliente registrado com split:\n  • Abner: €175\n  • Nonoke: €175\n  • Elias: €175\n  • Empresa: €175\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:43:15.729Z",
+          "intent": "registrar_pagamento_com_split",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144195730_lfush"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos 150 euros com internet",
+          "timestamp": "2026-05-18T22:43:32.771Z",
+          "id": "msg_1779144212771_p06vu"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou registrar essa despesa. Confere os dados 👇",
+          "timestamp": "2026-05-18T22:43:32.804Z",
+          "intent": "registrar_despesa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "registrar_despesa",
+              "params": {
+                "valor": 150,
+                "descricao": "gastamos 150 euros com internet",
+                "tipo": "despesa"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "expense_edit",
+          "editableFields": {
+            "valor": {
+              "label": "Valor (€)",
+              "value": "150",
+              "type": "text",
+              "placeholder": "0.00",
+              "required": true
+            },
+            "para": {
+              "label": "Para",
+              "value": "gastamos 150 euros com internet",
+              "type": "text",
+              "placeholder": "Descrição da despesa",
+              "required": true
+            },
+            "descricao": {
+              "label": "Descrição",
+              "value": "gastamos 150 euros com internet",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais"
+            },
+            "split": {
+              "label": "Dividir entre sócios",
+              "value": true,
+              "type": "checkbox"
+            }
+          },
+          "preview": "• Registrar despesa: €150 para ?",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144212805_0bqfz"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga lead Maria do projeto de website",
+          "timestamp": "2026-05-18T22:43:32.828Z",
+          "id": "msg_1779144212829_l2fsn"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Eita, Abner... deu ruim em uma parte 😅\n\nErro: Lead \"Maria do projeto de website\" não encontrado\n\nPode tentar de novo ou mandar de outro jeito?",
+          "timestamp": "2026-05-18T22:43:32.851Z",
+          "intent": "excluir_lead",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144212851_nctkh"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga lead Paulo Santafe",
+          "timestamp": "2026-05-18T22:44:24.018Z",
+          "id": "msg_1779144264019_e3qdt"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Eita, Abner... deu ruim em uma parte 😅\n\nErro: Lead \"Paulo Santafe\" não encontrado\n\nPode tentar de novo ou mandar de outro jeito?",
+          "timestamp": "2026-05-18T22:44:24.115Z",
+          "intent": "excluir_lead",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144264115_40zu8"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "sim",
+          "timestamp": "2026-05-18T22:44:24.142Z",
+          "id": "msg_1779144264143_va0lg"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Eita, Abner... deu ruim em uma parte 😅\n\nErro: Lead \"Paulo Santafe\" não encontrado\n\nPode tentar de novo ou mandar de outro jeito?",
+          "timestamp": "2026-05-18T22:44:24.156Z",
+          "intent": null,
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144264157_shsw9"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga lead Paulo Santafe",
+          "timestamp": "2026-05-18T22:47:21.504Z",
+          "id": "msg_1779144441505_ir342"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\n🗑️ Lead \"Paulo Santafe\" excluído\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:47:21.598Z",
+          "intent": "excluir_lead",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144441599_a1yhq"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "apaga lead TPV Sorveteria",
+          "timestamp": "2026-05-18T22:51:20.974Z",
+          "id": "msg_1779144680975_2xt5m"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⚠️ Tem certeza que quer excluir essa lead?\n\nEssa ação não pode ser desfeita.",
+          "timestamp": "2026-05-18T22:51:21.083Z",
+          "intent": "excluir_lead",
+          "executed": false,
+          "actions": [
+            {
+              "type": "excluir_lead",
+              "params": {
+                "nome": "TPV Sorveteria",
+                "confirmar": true
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "delete_confirm",
+          "editableFields": {
+            "confirmText": {
+              "label": "Digite \"TPV Sorveteria\" para confirmar",
+              "value": "",
+              "type": "text",
+              "placeholder": "Digite o nome do lead",
+              "required": true
+            }
+          },
+          "preview": "• excluir_lead",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144681084_e2g4u"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "sim",
+          "timestamp": "2026-05-18T22:51:30.379Z",
+          "id": "msg_1779144690380_e32pf"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\n🗑️ Lead \"TPV Sorveteria\" excluído\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:51:30.393Z",
+          "intent": null,
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144690394_u9jaz"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "cria tarefa testar modais ricos pra Abner P0",
+          "timestamp": "2026-05-18T22:51:59.114Z",
+          "id": "msg_1779144719115_u51m4"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-18T22:51:59.144Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "testar modais ricos  P0",
+                "prioridade": "P0",
+                "responsavel": "abner"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "testar modais ricos  P0",
+              "type": "text",
+              "placeholder": "Nome da tarefa",
+              "required": true
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "abner",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P0",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"testar modais ricos  P0\" → abner",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144719145_j7au7"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "cria tarefa testar modais ricos pra Abner P0",
+          "timestamp": "2026-05-18T22:52:54.882Z",
+          "id": "msg_1779144774883_pea87"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-18T22:52:54.907Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "testar modais ricos  P0",
+                "prioridade": "P0",
+                "responsavel": "abner"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "testar modais ricos  P0",
+              "type": "text",
+              "placeholder": "Nome da tarefa",
+              "required": true
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "abner",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P0",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"testar modais ricos  P0\" → abner",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144774908_al72p"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "cria tarefa testar modais ricos pra Abner P0",
+          "timestamp": "2026-05-18T22:54:26.901Z",
+          "id": "msg_1779144866907_mf4cv"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-18T22:54:26.952Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "testar modais ricos  P0",
+                "prioridade": "P0",
+                "responsavel": "abner"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "testar modais ricos  P0",
+              "type": "text",
+              "placeholder": "Nome da tarefa",
+              "required": true
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "abner",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P0",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"testar modais ricos  P0\" → abner",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144866953_byvu4"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "sim",
+          "timestamp": "2026-05-18T22:55:58.504Z",
+          "id": "msg_1779144958505_edihe"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\ntarefa \"testar modais ricos  P0\" criada pra abner\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:55:58.533Z",
+          "intent": null,
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779144958534_mvp5c"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "sim",
+          "timestamp": "2026-05-18T22:56:42.163Z",
+          "id": "msg_1779145002163_jcr74"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\ntarefa \"testar modais ricos\" criada pra abner\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-18T22:56:42.190Z",
+          "intent": null,
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779145002191_anwn1"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "ooi",
+          "timestamp": "2026-05-19T05:58:03.604Z",
+          "id": "msg_1779170283606_w8rn6"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⏸️ **Limite diário atingido**\n\nTodas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n🔄 **A quota reseta às 09:00 (CEST)** — daqui a pouco estou de volta!\n\nEnquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) sem precisar do Gemini — só me perguntar! 📊",
+          "timestamp": "2026-05-19T05:58:04.624Z",
+          "intent": null,
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": true,
+          "resetAt": "2026-05-20T07:00:00.000Z",
+          "id": "msg_1779170284625_e0geu"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos 500 euros com notebook",
+          "timestamp": "2026-05-19T05:59:45.692Z",
+          "id": "msg_1779170385692_n61ws"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou registrar essa despesa. Confere os dados 👇",
+          "timestamp": "2026-05-19T05:59:45.724Z",
+          "intent": "registrar_despesa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "registrar_despesa",
+              "params": {
+                "valor": 500,
+                "descricao": "gastamos 500 euros com notebook",
+                "tipo": "despesa"
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "expense_edit",
+          "editableFields": {
+            "valor": {
+              "label": "Valor (€)",
+              "value": "500",
+              "type": "text",
+              "placeholder": "0.00",
+              "required": true
+            },
+            "para": {
+              "label": "Para",
+              "value": "gastamos 500 euros com notebook",
+              "type": "text",
+              "placeholder": "Descrição da despesa",
+              "required": true
+            },
+            "descricao": {
+              "label": "Descrição",
+              "value": "gastamos 500 euros com notebook",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais"
+            },
+            "split": {
+              "label": "Dividir entre sócios",
+              "value": true,
+              "type": "checkbox"
+            }
+          },
+          "preview": "• Registrar despesa: €500 para ?",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779170385725_df11z"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "criar tarefa",
+          "timestamp": "2026-05-19T05:59:53.306Z",
+          "id": "msg_1779170393307_xh47y"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Vou criar essa tarefa. Confere se tá certo e clique em \"Criar tarefa\" 👇",
+          "timestamp": "2026-05-19T05:59:53.339Z",
+          "intent": "criar_tarefa",
+          "executed": false,
+          "actions": [
+            {
+              "type": "criar_tarefa",
+              "params": {
+                "titulo": "criar tarefa",
+                "prioridade": "P2",
+                "responsavel": null
+              },
+              "confidence": 0.85,
+              "source": "regex"
+            }
+          ],
+          "needsConfirmation": true,
+          "previewType": "task_edit",
+          "editableFields": {
+            "title": {
+              "label": "Título",
+              "value": "criar tarefa",
+              "type": "text",
+              "placeholder": "Nome da tarefa",
+              "required": true
+            },
+            "assignedTo": {
+              "label": "Responsável",
+              "value": "",
+              "type": "select",
+              "options": [
+                {
+                  "value": "",
+                  "label": "Nenhum"
+                },
+                {
+                  "value": "abner",
+                  "label": "Abner"
+                },
+                {
+                  "value": "nonoke",
+                  "label": "Nonoke (Enoque)"
+                },
+                {
+                  "value": "elias",
+                  "label": "Elias"
+                }
+              ]
+            },
+            "priority": {
+              "label": "Prioridade",
+              "value": "P2",
+              "type": "select",
+              "options": [
+                {
+                  "value": "P0",
+                  "label": "P0 🔴 Urgente"
+                },
+                {
+                  "value": "P1",
+                  "label": "P1 🟠 Importante"
+                },
+                {
+                  "value": "P2",
+                  "label": "P2 🔵 Normal"
+                }
+              ]
+            },
+            "dueDate": {
+              "label": "Prazo",
+              "value": "",
+              "type": "date",
+              "placeholder": "Selecione uma data"
+            },
+            "description": {
+              "label": "Descrição",
+              "value": "",
+              "type": "textarea",
+              "placeholder": "Detalhes adicionais (opcional)"
+            }
+          },
+          "preview": "• Criar tarefa: \"criar tarefa\"",
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779170393340_fcy4m"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "gastamos",
+          "timestamp": "2026-05-19T05:59:58.782Z",
+          "id": "msg_1779170398782_65lsg"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⏸️ **Limite diário atingido**\n\nTodas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n🔄 **A quota reseta às 09:00 (CEST)** — daqui a pouco estou de volta!\n\nEnquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) sem precisar do Gemini — só me perguntar! 📊",
+          "timestamp": "2026-05-19T05:59:59.198Z",
+          "intent": null,
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": true,
+          "resetAt": "2026-05-20T07:00:00.000Z",
+          "id": "msg_1779170399199_evnee"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "ganhamos",
+          "timestamp": "2026-05-19T06:00:03.094Z",
+          "id": "msg_1779170403096_3mer3"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "⏸️ **Limite diário atingido**\n\nTodas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n🔄 **A quota reseta às 09:00 (CEST)** — daqui a pouco estou de volta!\n\nEnquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) sem precisar do Gemini — só me perguntar! 📊",
+          "timestamp": "2026-05-19T06:00:03.329Z",
+          "intent": null,
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": true,
+          "resetAt": "2026-05-20T07:00:00.000Z",
+          "id": "msg_1779170403330_au8kv"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "enviar email",
+          "timestamp": "2026-05-19T13:38:14.930Z",
+          "id": "msg_1779197894931_c2y3l"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Pronto, Abner! ✅\n\n📧 Emails (todos): 10 total, 10 não lidos\n  • 🆕 Instagram <follow-suggestions@mail.instagram.com>: \"nexodigital.sys, explora a binerinformaticasbcn, elietichagas y otros en tu feed\"\n  • 🆕 \"Nicolás Bignú\" <nicobignu@llmometrics.com>: \"La guía oficial de Google sobre GEO\"\n  • 🆕 GEO Metrics <app@llmometrics.com>: \"Ejecución del Informe GEO 'Superclim' Completada\"\n  • 🆕 HeyGen <no_reply@email.heygen.com>: \"New with Avatar V: How to direct your avatar's performance\"\n  • 🆕 Google Analytics <analytics-noreply@google.com>: \"Nexo Digital, consigue hasta 1200 € de crédito de Google Ads para conectar con los clientes\"\n\nSe precisar de mais alguma coisa, é só chamar.",
+          "timestamp": "2026-05-19T13:38:15.757Z",
+          "intent": "consultar_emails",
+          "executed": true,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779197895757_7nd79"
+        },
+        {
+          "role": "user",
+          "author": "abner",
+          "authorName": "Abner",
+          "authorColor": "#3742fa",
+          "text": "qual é o status deste cliente?",
+          "timestamp": "2026-05-19T18:01:43.161Z",
+          "id": "msg_1779213703163_megof"
+        },
+        {
+          "role": "assistant",
+          "author": "luna",
+          "authorName": "Luna",
+          "authorColor": "#9b59b6",
+          "text": "Status do NEXO agora 📊\n\n📋 Tarefas: 37 pendentes (12 P0, 7 P1)\n🎣 Leads: 1 novos\n💰 Financeiro: €3829.98 saldo\n\nQuer que eu detalhe alguma área, Abner?",
+          "timestamp": "2026-05-19T18:01:45.363Z",
+          "intent": "consultar_status",
+          "executed": false,
+          "actions": null,
+          "needsConfirmation": false,
+          "previewType": null,
+          "editableFields": null,
+          "preview": null,
+          "quotaExhausted": false,
+          "resetAt": null,
+          "id": "msg_1779213705364_shhip"
+        }
+      ]
+    }
+  }
+}

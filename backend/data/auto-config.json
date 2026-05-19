@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-05-01T13:15:00+02:00",
+  "autoMode": {
+    "enabled": true,
+    "description": "Luna analisa sozinha, detecta gaps, envia perguntas no Production 2026 e se atualiza automaticamente"
+  },
+  "checkIntervals": {
+    "dashboardAnalysis": "every 2 hours",
+    "whatsappCheck": "every 30 minutes",
+    "financialSync": "every 6 hours",
+    "healthScoreUpdate": "every 12 hours",
+    "projectProgress": "every 4 hours"
+  },
+  "autoActions": {
+    "detectMissingData": {
+      "enabled": true,
+      "triggers": [
+        "Caixa inconsistente (Home ≠ Financeiro)",
+        "Pagamento com status desconhecido",
+        "Despesa sem valor real",
+        "Cliente com Health Score < 50%",
+        "Tarefa atrasada > 7 dias",
+        "WhatsApp sem mensagens novas por > 2h",
+        "Site sem integração de leads",
+        "Projeto sem progresso por > 3 dias"
+      ],
+      "action": "Enviar pergunta no grupo Production 2026 com marca Luna"
+    },
+    "sendQuestions": {
+      "enabled": true,
+      "rules": [
+        "SÓ grupo Production - 2026",
+        "NUNCA outros grupos ou chats pessoais",
+        "Marca obrigatória: 🌙 Luna — CTO Virtual — Kimi Claw",
+        "Aguardar resposta antes de enviar nova pergunta",
+        "Se não houver resposta em 2h, enviar lembrete",
+        "Se houver resposta, atualizar Dashboard automaticamente"
+      ]
+    },
+    "selfUpdate": {
+      "enabled": true,
+      "sources": [
+        "WhatsApp Production 2026",
+        "WhatsApp Paulo (web) — SÓ LEITURA",
+        "Dashboard backend/data",
+        "GitHub repos",
+        "Vercel projects",
+        "Site chatopsmaster.com"
+      ],
+      "actions": [
+        "Atualizar JSON de pagamentos",
+        "Atualizar JSON de despesas",
+        "Atualizar caixa",
+        "Atualizar tarefas",
+        "Atualizar Health Score",
+        "Salvar backup WhatsApp",
+        "Gerar relatórios"
+      ]
+    }
+  },
+  "questionTemplates": {
+    "missingPayment": {
+      "trigger": "Pagamento com status 'pending' ou 'unknown' por > 3 dias",
+      "template": "🌙 Luna — CTO Virtual — Kimi Claw\n\nTime, preciso atualizar o status de pagamento:\n\n💰 Cliente: {clientName}\n📋 Valor: € {amount}\n📅 Previsto: {dueDate}\n\nStatus atual no Dashboard: {currentStatus}\n\n❓ O pagamento foi recebido? Se sim:\n• Data do pagamento:\n• Método (Bizum/Transferência/Dinheiro):\n• Quem pagou:\n\nResponde aqui que eu atualizo o sistema automaticamente.\n\n🌙 Luna — CTO Virtual — Kimi Claw"
+    },
+    "missingExpense": {
+      "trigger": "Despesa cadastrada mas sem valor real",
+      "template": "🌙 Luna — CTO Virtual — Kimi Claw\n\nTime, preciso do valor real de uma despesa:\n\n📊 Despesa: {expenseName}\n💰 Valor estimado: € {estimatedAmount}\n📅 Renovação: {renewDate}\n\n❓ Qual o valor EXATO que pagamos?\n• Valor real: € ?\n• Data do pagamento:\n• Quem pagou:\n• Dividido entre quantos:\n\nResponde aqui que eu atualizo.\n\n🌙 Luna — CTO Virtual — Kimi Claw"
+    },
+    "missingLeadIntegration": {
+      "trigger": "Site com formulário mas sem integração configurada",
+      "template": "🌙 Luna — CTO Virtual — Kimi Claw\n\nTime, detectei um buraco no nosso funil de vendas:\n\n🌐 Site: chatopsmaster.com\n📋 Tem formulário de contato: ✅\n📤 Para onde vão os leads: ❓ DESCONHECIDO\n\n❓ Onde vocês recebem os dados dos formulários preenchidos?\n1. Email (qual email?)\n2. Planilha Google Sheets\n3. Não chega nada (perdendo leads!)\n4. Outro:\n\nPreciso saber pra integrar no Dashboard e não perdermos mais leads!\n\n🌙 Luna — CTO Virtual — Kimi Claw"
+    },
+    "taskCompletion": {
+      "trigger": "Tarefa marcada como pendente mas provavelmente já feita",
+      "template": "🌙 Luna — CTO Virtual — Kimi Claw\n\nTime, preciso confirmar uma tarefa:\n\n📋 Tarefa: {taskName}\n📅 Criada em: {taskDate}\n⏳ Status: Pendente\n\n❓ Essa tarefa já foi concluída?\n• Sim → Vou marcar como done no Dashboard\n• Não → Qual o impedimento?\n\n🌙 Luna — CTO Virtual — Kimi Claw"
+    },
+    "domainConnection": {
+      "trigger": "Domínio comprado mas status de conexão desconhecido",
+      "template": "🌙 Luna — CTO Virtual — Kimi Claw\n\nTime, preciso verificar um domínio:\n\n🌐 Domínio: {domainName}\n📋 Cliente: {clientName}\n💰 Registrado: ✅\n🔌 Conectado com hosting: ❓\n\n❓ O domínio já está apontando pro servidor (Hostinger/Vercel/Netlify)?\n• Sim → DNS configurado\n• Não → Ainda precisa configurar\n• Não sei → Vou verificar\n\n🌙 Luna — CTO Virtual — Kimi Claw"
+    }
+  },
+  "responseHandling": {
+    "identifyOwnQuestion": {
+      "method": "Verificar se a última mensagem do grupo é da Luna (marcador 🌙 Luna — CTO Virtual — Kimi Claw)"
+    },
+    "captureResponse": {
+      "method": "Extrair mensagens após a pergunta da Luna até a próxima pergunta ou até 2h",
+      "parseRules": [
+        "Se mensagem contém 'sim/yes/já/foi/pago' → atualizar status para completed/paid",
+        "Se mensagem contém 'não/no/ainda não/pendente' → manter status",
+        "Se mensagem contém número → usar como valor",
+        "Se mensagem contém data → usar como data de pagamento",
+        "Se mensagem contém 'Bizum/transferência' → usar como método"
+      ]
+    },
+    "updateDashboard": {
+      "enabled": true,
+      "method": "PATCH para backend API com dados extraídos da resposta",
+      "confirmation": "Enviar confirmação no grupo: '✅ Dashboard atualizado com: {dados}'"
+    }
+  },
+  "lunaMarker": "🌙 Luna — CTO Virtual — Kimi Claw"
+}
+

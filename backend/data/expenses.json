@@ -1,0 +1,279 @@
+[
+  {
+    "id": "exp-1778317687557-l1nq",
+    "name": "Kimi",
+    "description": "",
+    "amount": {
+      "value": 34.43,
+      "currency": "EUR"
+    },
+    "costPerPerson": {
+      "value": 34.43,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "Único",
+    "startDate": "2026-05-08T22:00:00.000Z",
+    "renewDate": null,
+    "endDate": null,
+    "category": "ai_tools",
+    "categoryLabel": "IA / Tools",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": true,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-09T09:08:07.557Z",
+    "updatedAt": "2026-05-09T09:08:07.557Z"
+  },
+  {
+    "id": "exp-1778270151709-3vpb",
+    "name": "Hostinger",
+    "description": "",
+    "amount": {
+      "value": 1,
+      "currency": "EUR"
+    },
+    "costPerPerson": {
+      "value": 0.33,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": "2026-05-07T22:00:00.000Z",
+    "renewDate": null,
+    "endDate": null,
+    "category": "hosting",
+    "categoryLabel": "Outros",
+    "splitAmong": [
+      "abner",
+      "nonoke",
+      "elias"
+    ],
+    "paidBy": {
+      "abner": {
+        "paid": false,
+        "amount": 0.33,
+        "method": null,
+        "paidAt": null
+      },
+      "elias": {
+        "paid": false,
+        "amount": 0.33,
+        "method": null,
+        "paidAt": null
+      },
+      "nonoke": {
+        "paid": false,
+        "amount": 0.33,
+        "method": null,
+        "paidAt": null
+      }
+    },
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-08T19:55:51.709Z",
+    "updatedAt": "2026-05-08T19:55:51.709Z"
+  },
+  {
+    "id": "exp-1778269991245-mh9y",
+    "name": "Kimi",
+    "description": "",
+    "amount": {
+      "value": 40,
+      "currency": "EUR"
+    },
+    "costPerPerson": {
+      "value": 40,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "Único",
+    "startDate": "2026-05-07T22:00:00.000Z",
+    "renewDate": null,
+    "endDate": null,
+    "category": "ai_tools",
+    "categoryLabel": "IA / Tools",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": true,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-08T19:53:11.245Z",
+    "updatedAt": "2026-05-08T19:53:11.245Z"
+  },
+  {
+    "id": "exp-1779198201179-nsc7",
+    "name": "",
+    "description": "Teste Luna Despesa",
+    "amount": 150.5,
+    "costPerPerson": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": null,
+    "renewDate": null,
+    "endDate": null,
+    "category": "operacional",
+    "categoryLabel": "Outros",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-19T13:43:21.179Z",
+    "updatedAt": "2026-05-19T13:43:21.179Z"
+  },
+  {
+    "id": "exp-1779198223430-iq8a",
+    "name": "",
+    "description": "Teste",
+    "amount": 150.5,
+    "costPerPerson": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": null,
+    "renewDate": null,
+    "endDate": null,
+    "category": "operacional",
+    "categoryLabel": "Outros",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-19T13:43:43.430Z",
+    "updatedAt": "2026-05-19T13:43:43.430Z"
+  },
+  {
+    "id": "exp-1779198694987-qsh9",
+    "name": "",
+    "description": "",
+    "amount": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "costPerPerson": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": null,
+    "renewDate": null,
+    "endDate": null,
+    "category": "operacional",
+    "categoryLabel": "Outros",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-19T13:51:34.987Z",
+    "updatedAt": "2026-05-19T13:51:34.987Z"
+  },
+  {
+    "id": "exp-1779199366888-55mw",
+    "name": "",
+    "description": "Despesa teste API 1779199366",
+    "amount": 50,
+    "costPerPerson": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": null,
+    "renewDate": null,
+    "endDate": null,
+    "category": "teste",
+    "categoryLabel": "Outros",
+    "splitAmong": [],
+    "paidBy": {},
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "system",
+    "createdAt": "2026-05-19T14:02:46.888Z",
+    "updatedAt": "2026-05-19T14:02:46.888Z"
+  },
+  {
+    "id": "exp-1779200764556-59xd",
+    "name": "Hostinger Premium",
+    "description": "Renovação anual",
+    "amount": {
+      "value": 120,
+      "currency": "EUR"
+    },
+    "costPerPerson": {
+      "value": 40,
+      "currency": "EUR"
+    },
+    "type": "one_time",
+    "period": null,
+    "periodLabel": "",
+    "startDate": null,
+    "renewDate": null,
+    "endDate": null,
+    "category": "hosting",
+    "categoryLabel": "Hospedagem",
+    "splitAmong": [
+      "abner",
+      "nonoke",
+      "elias"
+    ],
+    "paidBy": {
+      "abner": {
+        "paid": false,
+        "amount": 40,
+        "paidAt": null,
+        "method": null
+      },
+      "nonoke": {
+        "paid": false,
+        "amount": 40,
+        "paidAt": null,
+        "method": null
+      },
+      "elias": {
+        "paid": false,
+        "amount": 40,
+        "paidAt": null,
+        "method": null
+      }
+    },
+    "fullyPaid": false,
+    "autoDeductFromCashBox": true,
+    "notes": "",
+    "attachments": [],
+    "createdBy": "luna",
+    "createdAt": "2026-05-19T14:26:04.556Z",
+    "updatedAt": "2026-05-19T14:26:04.556Z"
+  }
+]
