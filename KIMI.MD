@@ -111,11 +111,31 @@ last_updated: 2026-05-19T18:40:00+02:00
 
 | Problema | Severidade | Status |
 |----------|-----------|--------|
-| API Gemini revogada (`AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g`) | 🔴 Alta | NLU offline cobre 100% dos comandos operacionais |
+| API Gemini revogada (`AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g`) | 🔴 Alta | NLU offline cobre 100% dos comandos operacionais, mas IA generativa (drafts, resumos, ideias) está offline |
 | `criar rascunho de email` score NLU baixo (0.68) | ✅ Resolvido | Corpus expandido, score agora 1.0 com novos exemplos |
 | Email params (`para`, `assunto`) não extraídos de frases naturais | 🟡 Média | `extractEmail()` e `extractAfterKeyword()` existem mas são básicos |
 | `concluir tarefa` sem match → avisa "desconhecida" | 🟢 Baixa | Poderia sugerir tarefas similares no futuro |
 | Modelo NLU `.nlp` salvo em disco | ✅ Resolvido | `backend/data/luna-model.nlp` e `backend/model.nlp` persistidos |
+| **Modo C: Transformação de Interface** (checkboxes multi-seleção) | 🟡 Média | NÃO implementado — `.kimi-context/plans-vs-reality.md` |
+| **Preview visual** antes de executar ação destrutiva | 🟡 Média | NÃO implementado — `LunaInlinePreview` não existe |
+| **Assistente passivo proativo** (badges, toasts) | 🟢 Baixa | NÃO implementado — Fase 6 do roadmap ainda não iniciada |
+
+---
+
+## 4.1 Plano vs Realidade
+
+> Análise completa: `.kimi-context/plans-vs-reality.md`
+
+| Fase | Progresso Real | Gap Principal |
+|------|---------------|---------------|
+| 1 — Fundação de Consciência | ✅ 100% | — |
+| 2 — Eliminar o Modal | 🟡 ~50% | Faltam Modo C (transformação) e Modo D (passivo) |
+| 3 — Execução Inteligente | ✅ ~80% | Faltam preview visual antes de executar |
+| 4 — Consciência por Módulo | ✅ 100% | — |
+| 5 — NLP.js + Contexto | ✅ 100% | — |
+| 6 — Sugestões Proativas | ❌ ~10% | Nada implementado ainda |
+
+**Veredito:** A Luna está **operacional** (~70% do roadmap). Comando-voz → ação está 100% funcional. Gaps são UX avançada (proatividade, transformação de interface) e IA generativa (Gemini).
 
 ---
 

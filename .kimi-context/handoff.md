@@ -21,12 +21,28 @@
 - [x] **LunaModuleSuggestions:** Comandos novos por módulo (email, financeiro, tarefas, workspace, whatsapp)
 - [x] **Build passando:** Vite build 0 erros
 
-### ⏳ Próximo passo (Passo 4 — Cross-Module Insights)
-- [ ] **Passo 4 — Consciência Transversal:** Cruzar dados entre módulos (ex: financeiro + projetos + tarefas)
-- [ ] **Passo 5 — Transformação de Interface:** Checkboxes para seleção múltipla ("apagar várias tarefas")
-- [ ] **Passo 6 — Proactive Suggestions:** Badge no botão flutuante com sugestões contextuais
-- [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
-- [ ] **Deploy para Render:** Verificar build no Render
+### ⏳ Próximos passos (priorizados por realidade do código)
+
+Baseado na análise em `.kimi-context/plans-vs-reality.md`:
+
+**🔴 CRÍTICO (blocante):**
+- [ ] **Substituir `GEMINI_API_KEY`** no `backend/.env` (revogada pelo Google) — sem isso, IA generativa (drafts, resumos, ideias) não funciona
+
+**🟡 IMPORTANTE (UX):**
+- [ ] **Modo C — Transformação de Interface:** Checkboxes multi-seleção, "apagar várias tarefas", "mover vários emails" — componente `LunaInterfaceTransformer` não existe
+- [ ] **Preview visual:** Antes de executar ação destrutiva, mostrar o que vai acontecer — componente `LunaInlinePreview` não existe
+- [ ] **Modo D — Assistente Passivo Proativo:** Luna sugere ações sem o usuário perguntar (badges no botão, toasts contextuais)
+
+**🟢 MÉDIO (polimento):**
+- [ ] **Cross-Module Insights:** Cruzar dados financeiro+projetos+tarefas em respostas da Luna
+- [ ] **Deploy para Render:** Verificar build remoto e modelo NLU carregando
+- [ ] **Melhorar extração de params:** `extractEmail()` e `extractAfterKeyword()` para frases naturais
+
+**✅ JÁ IMPLEMENTADO (não repetir):**
+- [x] Fase 1 — Fundação de Consciência (7/7)
+- [x] Fase 3 — Execução Inteligente (4/5, falta preview visual)
+- [x] Fase 4 — Consciência por Módulo (3/3)
+- [x] Fase 5 — NLP.js + Contexto (4/4)
 
 ---
 
