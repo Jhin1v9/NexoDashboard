@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, X, Send, Loader2, MessageSquare, Bot, CheckCircle, ArrowRight } from 'lucide-react'
 import { useLunaNLU } from '../../hooks/useLunaNLU'
+import { useLunaContext } from '../../hooks/useLunaContext'
+import { lunaEventBus } from '../../lib/lunaEventBus'
 import { hasFormFields, getSchema } from './LunaIntentSchemas'
 import SmartFormModal from './SmartFormModal'
 import axios from 'axios'
@@ -29,11 +31,15 @@ export default function LunaFloatingButton() {
   const [pendingActions, setPendingActions] = useState(null)
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
+  const { currentModule, chatState } = useLunaContext()
 
-  // Foca no input quando abre
+  // Foca no input quando abre + emite evento de estado
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100)
+      lunaEventBus.emit('luna:stateChange', { chatState: 'listening', isOpen: true })
+    } else {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'idle', isOpen: false })
     }
   }, [isOpen])
 
@@ -55,8 +61,12 @@ export default function LunaFloatingButton() {
     if (!text.trim() || isLoading || chatLoading) return
 
     const userText = text.trim()
+    lunaEventBus.emit('luna:command', { text: userText, intent: null, confidence: 0 })
     const nluResult = await understand(userText)
-    if (!nluResult) return
+    if (!nluResult) {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
+      return
+    }
 
     setText('')
 
@@ -65,6 +75,7 @@ export default function LunaFloatingButton() {
 
     // ── CASO 1: Intent com formulário editável → SmartFormModal (UX perfeita) ──
     if (hasFormFields(intent)) {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
       setModalResult(nluResult)
       setIsOpen(false)
       return
@@ -72,6 +83,7 @@ export default function LunaFloatingButton() {
 
     // ── CASO 2: Redirect → executa direto ──
     if (schema.isRedirect) {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
       setIsOpen(false)
       const target = typeof schema.redirectTo === 'function'
         ? schema.redirectTo({})
@@ -93,6 +105,7 @@ export default function LunaFloatingButton() {
     }
 
     // ── CASO 4: Sem schema específico ou consulta → fallback para /api/luna/chat ──
+    lunaEventBus.emit('luna:stateChange', { chatState: 'thinking' })
     setChatLoading(true)
     try {
       const res = await axios.post('/api/luna/chat', {
@@ -124,6 +137,7 @@ export default function LunaFloatingButton() {
       })
     } finally {
       setChatLoading(false)
+      lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
     }
   }
 
@@ -341,14 +355,25 @@ export default function LunaFloatingButton() {
             setPendingActions(null)
           }
         }}
-        className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2 px-4 py-3 rounded-full shadow-lg shadow-nexo-primary/20 transition-all ${
+        className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all ${
           isOpen
-            ? 'bg-nexo-danger text-white'
-            : 'bg-nexo-primary text-white hover:bg-nexo-primary/90'
+            ? 'bg-nexo-danger text-white shadow-nexo-danger/20'
+            : chatState === 'thinking'
+              ? 'bg-nexo-warning text-white shadow-nexo-warning/20 animate-pulse'
+              : chatState === 'acting'
+                ? 'bg-nexo-success text-white shadow-nexo-success/20'
+                : 'bg-nexo-primary text-white hover:bg-nexo-primary/90 shadow-nexo-primary/20'
         }`}
       >
-        {isOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-        <span className="text-sm font-medium hidden sm:inline">{isOpen ? 'Fechar' : 'Luna'}</span>
+        {isOpen ? <X className="w-5 h-5" /> : chatState === 'thinking' ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
+        <span className="text-sm font-medium hidden sm:inline">
+          {isOpen ? 'Fechar' : chatState === 'thinking' ? 'Pensando...' : chatState === 'acting' ? 'Agindo...' : 'Luna'}
+        </span>
+        {currentModule && !isOpen && (
+          <span className="hidden lg:inline text-[10px] opacity-70 ml-0.5">
+            {currentModule}
+          </span>
+        )}
       </motion.button>
 
       {/* Smart Form Modal (mantido para intents com formulário) */}

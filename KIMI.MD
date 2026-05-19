@@ -22,7 +22,7 @@
 active_instance: kimi-10a71fc7
 signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-19
+last_updated: 2026-05-19T17:35:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -59,8 +59,19 @@ last_updated: 2026-05-19
 - [x] POST `/api/luna/learn` re-treina modelo em ~3-5s
 - [x] Feedback visual com toasts ("Luna aprendeu!")
 
+#### Luna Context + Event Bus (Nova camada de contexto compartilhado) ✅
+- [x] `LunaContext` — Provider global com estado do módulo atual + chat state
+- [x] `lunaEventBus` — Event emitter para comunicação desacoplada entre componentes
+- [x] `RouteHarvester` — Detecta mudanças de rota e emite `luna:routeChanged`
+- [x] `LunaFloatingButton` integrado com contexto: estados visuais (thinking/acting/idle), badge de módulo atual
+
+#### Render CLI (Instalado localmente) ✅
+- [x] `render` CLI v2.17.0 instalada em `~/.local/bin/render`
+- [x] Aguardando autenticação (API key ou `render login`)
+
 #### Próximos passos pendentes
 - [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
+- [ ] **Autenticar Render CLI** — Gerar API key no dashboard ou rodar `render login`
 - [ ] FASE 4 — Expandir corpus NLU de ~25 para 50-100 exemplos por intent
 - [ ] FASE 5 — Melhorar extração de título (regex atual remove objeto)
 - [ ] Deploy para Render

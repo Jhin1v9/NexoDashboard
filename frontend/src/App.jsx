@@ -10,6 +10,7 @@ import CommandPalette from './components/CommandPalette'
 import ToastContainer from './components/ToastContainer'
 import MobileBottomNav from './components/MobileBottomNav'
 import LunaFloatingButton from './components/luna/LunaFloatingButton'
+import { RouteHarvester } from './components/luna/harvesters'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
@@ -50,6 +51,7 @@ function ProtectedLayout() {
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} onSearchClick={() => setCmdOpen(true)} />
+        <RouteHarvester />
         <main className="flex-1 overflow-y-auto p-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
