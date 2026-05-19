@@ -101,10 +101,16 @@ export default function LunaFloatingButton() {
       }
       fetchProactive()
     }
+    const handleOpenChat = () => {
+      setActionCenterOpen(false)
+      setIsOpen(true)
+    }
     lunaEventBus.on('luna:openActionCenter', handleOpenActionCenter)
+    lunaEventBus.on('luna:openChat', handleOpenChat)
     lunaEventBus.on('luna:actionDismissed', handleDismissed)
     return () => {
       lunaEventBus.off('luna:openActionCenter', handleOpenActionCenter)
+      lunaEventBus.off('luna:openChat', handleOpenChat)
       lunaEventBus.off('luna:actionDismissed', handleDismissed)
     }
   }, [])

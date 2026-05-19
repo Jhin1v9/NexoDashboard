@@ -4266,6 +4266,31 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
       }
     }
 
+    // Leads
+    if (domain === 'lead') {
+      try {
+        const leadsPath = path.join(dataDir, 'leads.json');
+        if (!fs.existsSync(leadsPath)) {
+          return res.json({ success: true, modified: 0 });
+        }
+        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
+        const arr = Array.isArray(leads) ? leads : [];
+        arr.forEach(l => {
+          if (!ids.includes(l.id) && !ids.includes(String(l.id))) return;
+          if (action === 'marcar_contatado') {
+            l.status = 'contacted';
+            l.pipelineStatus = 'contacted';
+            l.contactedAt = new Date().toISOString();
+            modified++;
+          }
+        });
+        fs.writeFileSync(leadsPath, JSON.stringify(arr, null, 2));
+      } catch (leadErr) {
+        console.error('[LunaBatch] Erro ao processar leads:', leadErr.message);
+        errors.push('lead: ' + leadErr.message);
+      }
+    }
+
     if (modified === 0 && errors.length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhum item foi modificado. Verifique os IDs ou a ação.' });
     }
