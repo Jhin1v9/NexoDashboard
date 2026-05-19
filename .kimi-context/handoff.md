@@ -28,13 +28,13 @@ Baseado na análise em `.kimi-context/plans-vs-reality.md`:
 **🔴 CRÍTICO (blocante):**
 - [ ] **Substituir `GEMINI_API_KEY`** no `backend/.env` (revogada pelo Google) — sem isso, IA generativa (drafts, resumos, ideias) não funciona
 
-**🟡 IMPORTANTE (UX):**
-- [ ] **Modo C — Transformação de Interface:** Checkboxes multi-seleção, "apagar várias tarefas", "mover vários emails" — componente `LunaInterfaceTransformer` não existe
-- [ ] **Preview visual:** Antes de executar ação destrutiva, mostrar o que vai acontecer — componente `LunaInlinePreview` não existe
-- [ ] **Modo D — Assistente Passivo Proativo:** Luna sugere ações sem o usuário perguntar (badges no botão, toasts contextuais)
+**🟡 IMPORTANTE (UX) — ✅ CONCLUÍDO:**
+- [x] **Modo C — Transformação de Interface:** `LunaBatchAction` com checkboxes multi-seleção por página
+- [x] **Preview visual:** `LunaInlinePreview` integrado no LunaActionDrawer (modos preview/confirm)
+- [x] **Modo D — Assistente Passivo Proativo:** Badge animado no botão flutuante com `/api/luna/proactive`
 
-**🟢 MÉDIO (polimento):**
-- [ ] **Cross-Module Insights:** Cruzar dados financeiro+projetos+tarefas em respostas da Luna
+**🟢 MÉDIO (polimento) — ✅ CONCLUÍDO:**
+- [x] **Cross-Module Insights:** Endpoint `/api/luna/insights` com resumo cruzado + recomendações
 - [ ] **Deploy para Render:** Verificar build remoto e modelo NLU carregando
 - [ ] **Melhorar extração de params:** `extractEmail()` e `extractAfterKeyword()` para frases naturais
 
