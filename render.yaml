@@ -15,7 +15,8 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: JWT_SECRET
-        generateValue: true
+        value: b2b5540e2058220d83b58c1cc6fb62383c58fdc4363c87fcc6db6456647b6fee
+        # ⚠️ TROCAR IMEDIATAMENTE pelo Render Dashboard: https://dashboard.render.com/web/srv-d85gqtrbc2fs73bq95bg
       - key: ROOT_DIR
         value: /opt/render/project/src
       - key: DATABASE_URL
