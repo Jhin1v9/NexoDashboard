@@ -11,21 +11,22 @@
 | Área | Status |
 |------|--------|
 | Backend (local) | ✅ Rodando com hardening de segurança aplicado |
-| Backend (Render) | 🔄 Deploy em andamento (build → queued) |
+| Backend (Render) | ✅ Deploy concluído — hardening ativo |
 | Frontend (local) | ✅ OK |
-| Frontend (Render) | 🔄 Aguardando deploy do backend |
+| Frontend (Render) | ✅ OK |
 
 ---
 
 ## ✅ Concluído (Aprovado)
 
-### Fase Segurança — Parte 1 (Commit `19dba35`)
+### Fase Segurança — Parte 1 (Commits `19dba35` → `8ffd2f1`)
 - [x] **Middleware global de auth** protege TODAS as rotas `/api/*` por padrão
 - [x] **CORS restrito** — apenas origens permitidas (não mais `*`)
-- [x] **JWT_SECRET** — remove fallback hardcoded, encerra se não definido
+- [x] **JWT_SECRET** — remove fallback hardcoded, gera aleatório se não definido
 - [x] **Remove `/api/debug/gmail-config`** — endpoint que expunha credenciais OAuth
 - [x] **Rate limiting no login** — max 5 tentativas/15min, bloqueio 30min
 - [x] Testado localmente: sem token → 401, com token → 200, rate limit → 429
+- [x] **Testado em produção** — todas as rotas retornam 401 sem auth ✅
 
 ---
 
