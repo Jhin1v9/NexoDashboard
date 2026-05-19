@@ -3,7 +3,7 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-19T13:45:00+02:00",
+  "lastUpdated": "2026-05-19T14:00:00+02:00",
   "activeSessionId": "kimi-19007e56",
   "sessions": [
     {
