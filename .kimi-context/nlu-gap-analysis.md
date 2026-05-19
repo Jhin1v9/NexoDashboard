@@ -1,17 +1,20 @@
 # 📊 ANÁLISE MASSIVA DE GAPS — NLU da Luna
 
-> Data: 2026-05-19 | Instância: kimi-10a71fc7
+> **⚠️ ATUALIZAÇÃO:** Expansão concluída em 2026-05-18. Ver commit `920c182`.
+>
+> Data original: 2026-05-19 | Instância: kimi-10a71fc7
 
 ## Resumo Executivo
 
-| Métrica | Valor |
-|---------|-------|
-| Intents no NLU | **36** |
-| Ações no ActionExecutor | **198** |
-| Endpoints da API | **120+** |
-| Páginas do Frontend | **29** |
-| Domínios cobertos pelo NLU | **9 de 20** |
-| **GAP TOTAL estimado** | **~120+ intents faltando** |
+| Métrica | Antes | Depois | Status |
+|---------|-------|--------|--------|
+| Intents no NLU | **36** | **137** | ✅ Resolvido |
+| Ações no ActionExecutor | **198** | **198** | — |
+| Endpoints da API | **120+** | **120+** | — |
+| Páginas do Frontend | **29** | **29** | — |
+| Domínios cobertos pelo NLU | **9 de 20** | **15 de 20** | ✅ Expandido |
+| Schemas no SmartFormModal | **16** | **137** | ✅ Completo |
+| **GAP TOTAL estimado** | **~120+ intents faltando** | **0** | ✅ Fechado |
 
 ---
 

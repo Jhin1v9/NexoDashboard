@@ -3,7 +3,7 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-19T18:45:00+02:00",
+  "lastUpdated": "2026-05-18T11:01:42+02:00",
   "activeSessionId": "kimi-10a71fc7",
   "sessions": [
     {
@@ -50,7 +50,7 @@
       "id": "kimi-10a71fc7",
       "startedAt": "2026-05-19T15:00:00+02:00",
       "status": "active",
-      "focus": "Luna v20.0 NLU Unificado + Fluxo Floating Button + SmartFormModal fallback + Botão estilizado produção + Changelog recuperado — commits até 039ee00"
+      "focus": "Luna v20.0 NLU Unificado + Fluxo Floating Button + SmartFormModal fallback + NLU Expansion 36→137 intents + Changelog recuperado — commits até 920c182"
       "snapshotFile": "sessions/2026-05-19-kimi-10a71fc7.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
@@ -91,7 +91,7 @@
       "signature": "KIMI-10A71FC7",
       "color": "🟡",
       "role": "coding-agent",
-      "notes": "Sessão atual. NLU unificado (floating + /luna), ActionExecutor (ajuda/navigate/task_done), botão flutuante estilizado produção, changelog recuperado (18 entradas), repo unificado."
+      "notes": "Sessão atual. NLU unificado (floating + /luna), NLU Expansion 36→137 intents em 15 domínios, ActionExecutor (ajuda/navigate/task_done), botão flutuante estilizado produção, changelog recuperado (19 entradas), repo unificado."
     }
   },
   "rules": {

@@ -23,7 +23,7 @@
 active_instance: kimi-10a71fc7
 signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-19T18:45:00+02:00
+last_updated: 2026-05-18T11:01:42+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -49,7 +49,7 @@ last_updated: 2026-05-19T18:45:00+02:00
 
 ### 🎯 Sprint Ativo: Luna v20.0 — NLU Unificado + Fluxo Floating Button
 
-**Status:** ✅ Concluído — build passando, commits até `039ee00` enviados
+**Status:** ✅ Concluído — build passando, commits até `920c182` enviados
 
 #### NLU Unificado (LunaFloatingButton ↔ Página /luna) ✅
 - [x] **Fluxo dual:** SmartFormModal para intents com formulário + fallback `/api/luna/chat` para consultas
@@ -57,6 +57,9 @@ last_updated: 2026-05-19T18:45:00+02:00
 - [x] **Intents novos:** `social`, `financeiro.listar_pagamentos`, `financeiro.listar_despesas`, `sistema.ajuda`, `sistema.navegar`
 - [x] **Saudações:** NLU reconhece "oi luna", "bom dia", "como vai" com score 1.0
 - [x] **Corpus expandido:** 30+ novos intents adicionados aos DOMAINS do NLU
+- [x] **NLU Massiva:** 36 → 137 intents, 15 domínios, modelo re-treinado e validado
+- [x] **SmartFormModal:** Schemas para todos os 137 intents
+- [x] **Sugestões por módulo:** Comandos novos adicionados ao LunaModuleSuggestions
 
 #### ActionExecutor v19+ ✅
 - [x] **Novas ações:** `ajuda` (mensagem de ajuda completa), `navigate` (redirect)
@@ -77,7 +80,7 @@ last_updated: 2026-05-19T18:45:00+02:00
 #### Deploy/Repo ✅
 - [x] **NexoDashboard local antigo:** Remote removido (não empurra mais pro GitHub)
 - [x] **NEXO_DASHBOARD_PRO:** Único projeto com acesso ao remote
-- [x] **Todos os commits enviados:** `039ee00` é o HEAD atual
+- [x] **Todos os commits enviados:** `920c182` é o HEAD atual
 
 ---
 
@@ -109,10 +112,10 @@ last_updated: 2026-05-19T18:45:00+02:00
 | Problema | Severidade | Status |
 |----------|-----------|--------|
 | API Gemini revogada (`AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g`) | 🔴 Alta | NLU offline cobre 100% dos comandos operacionais |
-| `criar rascunho de email` score NLU baixo (0.68) | 🟢 Baixa | Funciona, mas precisa de mais exemplos |
+| `criar rascunho de email` score NLU baixo (0.68) | ✅ Resolvido | Corpus expandido, score agora 1.0 com novos exemplos |
 | Email params (`para`, `assunto`) não extraídos de frases naturais | 🟡 Média | `extractEmail()` e `extractAfterKeyword()` existem mas são básicos |
 | `concluir tarefa` sem match → avisa "desconhecida" | 🟢 Baixa | Poderia sugerir tarefas similares no futuro |
-| Modelo NLU `.nlp` não salvo em disco (treinado em memória) | 🟡 Média | Deleta `backend/data/luna-model.nlp` no deploy para forçar retreinamento |
+| Modelo NLU `.nlp` salvo em disco | ✅ Resolvido | `backend/data/luna-model.nlp` e `backend/model.nlp` persistidos |
 
 ---
 

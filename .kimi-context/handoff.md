@@ -2,31 +2,31 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-19
+> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-18
 
 ---
 
-## 🎯 Foco Atual (Luna v20.0 — NLU Unificado + Fluxo Floating Button)
+## 🎯 Foco Atual (Passo 3 — Execução Inteligente ✅ CONCLUÍDO)
 
 ### ✅ Concluído nesta sessão (kimi-10a71fc7 🟡)
-- [x] **NLU Unificado:** LunaFloatingButton e página `/luna` usam o MESMO backend (`/api/luna/chat`)
-- [x] **Fluxo dual:** SmartFormModal para formulários + fallback `/api/luna/chat` para consultas
-- [x] **Intents novos:** `social` (saudações), `financeiro.listar_pagamentos/despesas`
-- [x] **ActionExecutor:** Ações `ajuda` e `navigate`, correção `completeTask` (sem criar tarefa vazia)
-- [x] **Saudações NLU:** "oi luna", "bom dia", "como vai" — score 1.0, respostas variadas
-- [x] **Botão flutuante estilizado:** Gradiente purple, ícone Wand2, sem debug, sem limitação por página
-- [x] **Sugestões globais:** 5 comandos fixos em qualquer página (não mais por módulo)
-- [x] **Changelog recuperado:** 18 entradas (tinham sido apagadas, reduzidas para 3)
-- [x] **Repo unificado:** `NexoDashboard/` local antigo desvinculado do remote
-- [x] **Todos os commits enviados:** `039ee00` é o HEAD atual
+- [x] **Passo 3 — Execução Inteligente:** Sistema de decisão baseado em confiança, dados e risco
+- [x] **lunaDecisionEngine.js:** Motor que decide entre auto/collect/confirm/preview/transform
+- [x] **LunaActionDrawer.jsx:** Drawer lateral 380px sem backdrop blur (Modo B)
+- [x] **LunaSafetyDelay.jsx:** Barra de progresso 1.5s com undo para ações destrutivas
+- [x] **useLunaAnimation.js:** Hook com Web Animations API (create/delete/update/move/batch/breath/progress/shake)
+- [x] **LunaActionFlow.jsx:** Componente de apresentação orquestrado pelo LunaFloatingButton
+- [x] **Integração no LunaFloatingButton:** Decision Engine chamado no submit, execução auto ou drawer
+- [x] **NLU Expansion (FASE 4 do gap analysis):** 36→137 intents, 15 domínios, modelo re-treinado
+- [x] **SmartFormModal schemas:** 121 schemas novos adicionados (total: 137 intents cobertos)
+- [x] **LunaModuleSuggestions:** Comandos novos por módulo (email, financeiro, tarefas, workspace, whatsapp)
 - [x] **Build passando:** Vite build 0 erros
 
-### ⏳ Próximo passo
+### ⏳ Próximo passo (Passo 4 — Cross-Module Insights)
+- [ ] **Passo 4 — Consciência Transversal:** Cruzar dados entre módulos (ex: financeiro + projetos + tarefas)
+- [ ] **Passo 5 — Transformação de Interface:** Checkboxes para seleção múltipla ("apagar várias tarefas")
+- [ ] **Passo 6 — Proactive Suggestions:** Badge no botão flutuante com sugestões contextuais
 - [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
-- [ ] **FASE 4 — Expandir corpus NLU:** Aumentar exemplos por intent (criar_rascunho score 0.68)
-- [ ] **FASE 5 — Melhorar extração de params:** Email `para`/`assunto` de frases naturais
-- [ ] **FASE 6 — Deploy para Render:** Verificar se build no Render está OK
-- [ ] **Opcional:** Adicionar `LunaActionDrawer`, `LunaActionFlow`, `LunaSafetyDelay` ao fluxo principal
+- [ ] **Deploy para Render:** Verificar build no Render
 
 ---
 
@@ -44,20 +44,19 @@
 ## 🔗 Arquivos chave desta sessão
 
 ```
-backend/server.js                                    # Endpoint /api/luna/chat (NLU → ActionExecutor)
-backend/services/luna-nlu.js                         # Motor NLP.js + corpus de treinamento
-agents/core/ActionExecutor.js                        # 113+ ações (ajuda, navigate, task_done corrigido)
-agents/core/NLUActionMapper.js                       # Mapeia intents NLU → ações
-agents/core/IntentParser.js                          # Regex fallback
-
-frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante (mini-chat + SmartFormModal fallback)
-frontend/src/components/luna/SmartFormModal.jsx      # Modal de formulário (Active Learning)
-frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário por intent
-frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões GLOBAIS (5 fixas, não por página)
-frontend/src/context/LunaContext.jsx                 # Provider global de contexto
-frontend/src/lib/lunaEventBus.js                     # Event emitter desacoplado
-
-backend/data/changelog.json                          # 18 entradas recuperadas + 3 novas
+frontend/src/lib/lunaDecisionEngine.js              # Motor de decisão (score → modo de execução)
+frontend/src/hooks/useLunaAnimation.js              # Web Animations API hook
+frontend/src/components/luna/LunaActionDrawer.jsx   # Drawer 380px sem blur
+frontend/src/components/luna/LunaSafetyDelay.jsx    # Safety delay 1.5s com undo
+frontend/src/components/luna/LunaActionFlow.jsx     # Orquestrador de apresentação
+frontend/src/components/luna/LunaFloatingButton.jsx # Integração com Decision Engine
+frontend/src/components/luna/SmartFormModal.jsx     # Fallback modal (Active Learning)
+frontend/src/components/luna/LunaIntentSchemas.js   # Schemas para 137 intents
+frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões contextuais por módulo
+frontend/src/context/LunaContext.jsx                # Provider global de contexto
+frontend/src/lib/lunaEventBus.js                    # Event emitter desacoplado
+backend/services/luna-nlu.js                        # Motor NLP.js — 137 intents, PT/ES/CA
+backend/data/luna-model.nlp                         # Modelo treinado persistido
 ```
 
 ---
@@ -65,11 +64,21 @@ backend/data/changelog.json                          # 18 entradas recuperadas +
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `039ee00` — `feat(luna-floating): remove limitacao por pagina + estilo producao`  
+**Commit atual:** `920c182` — `feat(nlu): Expansão massiva de intents 36→137 + schemas + sugestões`  
 **Build:** ✅ Vite build passando (0 erros)  
-**Testes manuais:** ✅ 24 comandos NLU testados (página /luna + botão flutuante)  
+**Testes manuais:** ⚠️ Vite HMR cache instável — usar build de produção para testes finais  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
-**Render:** ⏳ Aguardando deploy automático do commit `039ee00`  
+**Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB) e `backend/model.nlp` (2.7MB)  
+
+**Validação NLU (score 1.000 em todos):**
+- "rascunhos pendentes" → `email.listar_rascunhos`
+- "tarefas P0" → `tarefa.p0`
+- "extrato financeiro" → `financeiro.extrato`
+- "minhas tarefas" → `tarefa.minhas`
+- "aprovar rascunho" → `email.aprovar_rascunho`
+- "rejeitar draft" → `email.rejeitar_rascunho`
+- "gastos do mês" → `financeiro.gastos_do_mes`
+- "balanço financeiro" → `financeiro.ver_balanco`
 
 ---
 
