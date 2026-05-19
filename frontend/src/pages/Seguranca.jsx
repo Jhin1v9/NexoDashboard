@@ -4,7 +4,8 @@ import {
   Shield, AlertTriangle, Globe, Monitor, Smartphone, Cpu,
   MapPin, Clock, Fingerprint, X, Filter, ChevronDown,
   Eye, Trash2, Lock, Wifi, Server, HardDrive,
-  Navigation, Radio, Flag, AlertOctagon
+  Navigation, Radio, Flag, AlertOctagon, Camera, Image,
+  ShieldAlert, Ghost, ScanFace, Crosshair
 } from 'lucide-react'
 
 // Mapeamento de países para emoji de bandeira
@@ -178,7 +179,9 @@ export default function Seguranca() {
       }).length
       const alerted = evts.filter(e => e.notified).length
       const externalIps = evts.filter(e => !isLocalIp(e.ip)).length
-      setStats({ total: evts.length, uniqueIps, today, alerted, externalIps })
+      const anonymous = evts.filter(e => e.risk?.isAnonymous).length
+      const evidences = evts.filter(e => e.hasCameraPhoto || e.hasScreenshot).length
+      setStats({ total: evts.length, uniqueIps, today, alerted, externalIps, anonymous, evidences })
     } catch (e) {}
     setLoading(false)
   }
@@ -186,6 +189,8 @@ export default function Seguranca() {
   const filteredEvents = events.filter(e => {
     if (filter === 'all') return true
     if (filter === 'alert') return e.notified
+    if (filter === 'anonymous') return e.risk?.isAnonymous
+    if (filter === 'evidence') return e.hasCameraPhoto || e.hasScreenshot
     return e.type === filter
   })
 
@@ -260,13 +265,15 @@ export default function Seguranca() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
         {[
           { icon: AlertTriangle, label: 'Eventos Totais', value: stats.total, color: 'text-orange-400' },
           { icon: Globe, label: 'IPs Únicos', value: stats.uniqueIps, color: 'text-blue-400' },
           { icon: Clock, label: 'Hoje', value: stats.today, color: 'text-green-400' },
           { icon: Shield, label: 'Alertas Enviados', value: stats.alerted, color: 'text-red-400' },
           { icon: Radio, label: 'IPs Externos', value: stats.externalIps, color: 'text-amber-400' },
+          { icon: Ghost, label: 'Anônimos', value: stats.anonymous, color: 'text-purple-400' },
+          { icon: Camera, label: 'Evidências', value: stats.evidences, color: 'text-pink-400' },
         ].map((s, i) => (
           <div key={i} className="glass-card p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -285,6 +292,8 @@ export default function Seguranca() {
           { id: 'all', label: 'Todos' },
           { id: 'failed_login', label: 'Login Falho' },
           { id: 'alert', label: 'Com Alerta' },
+          { id: 'anonymous', label: 'Anônimo' },
+          { id: 'evidence', label: 'Com Evidências' },
         ].map(f => (
           <button
             key={f.id}
@@ -335,6 +344,36 @@ export default function Seguranca() {
                     {event.notified && (
                       <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
                         ALERTA ENVIADO
+                      </span>
+                    )}
+                    {event.risk?.isAnonymous && (
+                      <span className="text-[10px] bg-purple-600/30 text-purple-400 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Ghost className="w-3 h-3" />
+                        ANÔNIMO
+                      </span>
+                    )}
+                    {event.risk?.isVpn && (
+                      <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded">VPN</span>
+                    )}
+                    {event.risk?.isTor && (
+                      <span className="text-[10px] bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded">TOR</span>
+                    )}
+                    {event.risk?.isProxy && (
+                      <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded">PROXY</span>
+                    )}
+                    {event.risk?.isHosting && (
+                      <span className="text-[10px] bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded">HOSTING</span>
+                    )}
+                    {event.hasCameraPhoto && (
+                      <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Camera className="w-3 h-3" />
+                        CÂMERA
+                      </span>
+                    )}
+                    {event.hasScreenshot && (
+                      <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Image className="w-3 h-3" />
+                        SCREEN
                       </span>
                     )}
                     {!isLocalIp(event.ip) && (
@@ -458,6 +497,116 @@ export default function Seguranca() {
                 </div>
               </div>
 
+              {/* Risk Analysis */}
+              {selectedEvent.risk && (
+                <div>
+                  <h3 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" />
+                    Análise de Risco
+                  </h3>
+                  <div className="bg-nexo-bg rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Conexão Anônima</span>
+                      <span className={`text-sm font-bold ${selectedEvent.risk.isAnonymous ? 'text-purple-400' : 'text-green-400'}`}>
+                        {selectedEvent.risk.isAnonymous ? 'SIM ⚠️' : 'Não'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">VPN</span>
+                      <span className={`text-sm font-bold ${selectedEvent.risk.isVpn ? 'text-indigo-400' : 'text-nexo-muted'}`}>
+                        {selectedEvent.risk.isVpn ? 'SIM' : 'Não'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Tor</span>
+                      <span className={`text-sm font-bold ${selectedEvent.risk.isTor ? 'text-violet-400' : 'text-nexo-muted'}`}>
+                        {selectedEvent.risk.isTor ? 'SIM' : 'Não'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Proxy</span>
+                      <span className={`text-sm font-bold ${selectedEvent.risk.isProxy ? 'text-cyan-400' : 'text-nexo-muted'}`}>
+                        {selectedEvent.risk.isProxy ? 'SIM' : 'Não'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Hosting / Datacenter</span>
+                      <span className={`text-sm font-bold ${selectedEvent.risk.isHosting ? 'text-slate-400' : 'text-nexo-muted'}`}>
+                        {selectedEvent.risk.isHosting ? 'SIM' : 'Não'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Threat Score</span>
+                      <span className="text-sm font-mono font-bold">
+                        {selectedEvent.risk.threatScore || 0}/100
+                      </span>
+                    </div>
+                    {selectedEvent.risk.provider && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-nexo-muted">Provedor</span>
+                        <span className="text-sm font-medium">{selectedEvent.risk.provider}</span>
+                      </div>
+                    )}
+                    {selectedEvent.risk.asnType && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-nexo-muted">ASN Type</span>
+                        <span className="text-sm font-medium">{selectedEvent.risk.asnType}</span>
+                      </div>
+                    )}
+                    {selectedEvent.risk.source && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-nexo-muted">Fonte</span>
+                        <span className="text-sm font-mono">{selectedEvent.risk.source}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Heurísticas */}
+                  {selectedEvent.risk.heuristics && Object.keys(selectedEvent.risk.heuristics).length > 0 && (
+                    <div className="mt-3">
+                      <h4 className="text-xs font-bold text-nexo-muted uppercase mb-2">Heurísticas Locais</h4>
+                      <div className="bg-nexo-bg rounded-lg p-3 space-y-1">
+                        {selectedEvent.risk.heuristics.timezoneMismatch && (
+                          <div className="flex items-center gap-2 text-xs text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            Timezone mismatch (browser vs IP)
+                          </div>
+                        )}
+                        {selectedEvent.risk.heuristics.webrtcMismatch && (
+                          <div className="flex items-center gap-2 text-xs text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            WebRTC IP leak mismatch
+                          </div>
+                        )}
+                        {selectedEvent.risk.heuristics.headlessSuspect && (
+                          <div className="flex items-center gap-2 text-xs text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            Navegador headless / automação suspeita
+                          </div>
+                        )}
+                        {selectedEvent.risk.heuristics.langLocationMismatch && (
+                          <div className="flex items-center gap-2 text-xs text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            Idioma vs Localização mismatch
+                          </div>
+                        )}
+                        {selectedEvent.risk.heuristics.knownHostingProvider && (
+                          <div className="flex items-center gap-2 text-xs text-amber-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            Provedor de hosting conhecido
+                          </div>
+                        )}
+                        {selectedEvent.risk.heuristics.webrtcPublicIps?.length > 0 && (
+                          <div className="text-xs text-nexo-muted">
+                            WebRTC IPs: {selectedEvent.risk.heuristics.webrtcPublicIps.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* IP & Location */}
               <div>
                 <h3 className="text-sm font-bold text-blue-400 mb-3 flex items-center gap-2">
@@ -572,19 +721,115 @@ export default function Seguranca() {
                 </div>
               </div>
 
-              {/* Fingerprint */}
+              {/* Fingerprint Avançado */}
               <div>
                 <h3 className="text-sm font-bold text-violet-400 mb-3 flex items-center gap-2">
                   <Fingerprint className="w-4 h-4" />
                   Fingerprint Digital
                 </h3>
-                <div className="bg-nexo-bg rounded-lg p-4">
-                  <p className="text-xs text-nexo-muted mb-2">Hash único do canvas (usado para identificar dispositivos)</p>
-                  <code className="block text-xs font-mono bg-black/30 p-3 rounded-lg break-all">
-                    {selectedEvent.device?.fingerprintFull || selectedEvent.device?.fingerprint || 'N/A'}
-                  </code>
+                <div className="bg-nexo-bg rounded-lg p-4 space-y-2">
+                  <div>
+                    <p className="text-xs text-nexo-muted mb-1">Canvas Hash</p>
+                    <code className="block text-xs font-mono bg-black/30 p-2 rounded-lg break-all">
+                      {selectedEvent.device?.fingerprintFull || selectedEvent.device?.fingerprint || 'N/A'}
+                    </code>
+                  </div>
+                  {selectedEvent.device?.webrtc && selectedEvent.device.webrtc !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">WebRTC IPs</span>
+                      <span className="text-sm font-mono">{Array.isArray(selectedEvent.device.webrtc) ? selectedEvent.device.webrtc.join(', ') : selectedEvent.device.webrtc}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.permissions && selectedEvent.device.permissions !== 'N/A' && (
+                    <div>
+                      <span className="text-sm text-nexo-muted">Permissions</span>
+                      <code className="block text-[10px] font-mono bg-black/30 p-2 rounded-lg break-all mt-1">
+                        {JSON.stringify(selectedEvent.device.permissions)}
+                      </code>
+                    </div>
+                  )}
+                  {selectedEvent.device?.performance && selectedEvent.device.performance !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Hardware Cores</span>
+                      <span className="text-sm font-mono">{selectedEvent.device.performance.hardwareConcurrency || 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.bluetooth && selectedEvent.device.bluetooth !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Bluetooth API</span>
+                      <span className="text-sm">{selectedEvent.device.bluetooth === true || selectedEvent.device.bluetooth === 'true' ? 'Disponível' : 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.usb && selectedEvent.device.usb !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">WebUSB</span>
+                      <span className="text-sm">{selectedEvent.device.usb === true || selectedEvent.device.usb === 'true' ? 'Disponível' : 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.wakeLock && selectedEvent.device.wakeLock !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Wake Lock</span>
+                      <span className="text-sm">{selectedEvent.device.wakeLock === true || selectedEvent.device.wakeLock === 'true' ? 'Disponível' : 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.payment && selectedEvent.device.payment !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Payment Request</span>
+                      <span className="text-sm">{selectedEvent.device.payment === true || selectedEvent.device.payment === 'true' ? 'Disponível' : 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.credentials && selectedEvent.device.credentials !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Credentials API</span>
+                      <span className="text-sm">{selectedEvent.device.credentials === true || selectedEvent.device.credentials === 'true' ? 'Disponível' : 'N/A'}</span>
+                    </div>
+                  )}
+                  {selectedEvent.device?.clipboard && selectedEvent.device.clipboard !== 'N/A' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-nexo-muted">Clipboard</span>
+                      <span className="text-sm font-mono">{JSON.stringify(selectedEvent.device.clipboard).slice(0, 60)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Evidências Visuais */}
+              {(selectedEvent.hasCameraPhoto || selectedEvent.hasScreenshot) && (
+                <div>
+                  <h3 className="text-sm font-bold text-pink-400 mb-3 flex items-center gap-2">
+                    <Camera className="w-4 h-4" />
+                    Evidências Visuais
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedEvent.hasCameraPhoto && selectedEvent.cameraPhoto && (
+                      <div>
+                        <p className="text-xs text-nexo-muted mb-2 flex items-center gap-1">
+                          <Camera className="w-3 h-3" /> Foto da Câmera
+                        </p>
+                        <img
+                          src={selectedEvent.cameraPhoto}
+                          alt="Foto do intruso"
+                          className="w-full rounded-lg border border-nexo-border"
+                          style={{ maxHeight: '300px', objectFit: 'contain' }}
+                        />
+                      </div>
+                    )}
+                    {selectedEvent.hasScreenshot && selectedEvent.screenshot && (
+                      <div>
+                        <p className="text-xs text-nexo-muted mb-2 flex items-center gap-1">
+                          <Image className="w-3 h-3" /> Screenshot
+                        </p>
+                        <img
+                          src={selectedEvent.screenshot}
+                          alt="Screenshot do intruso"
+                          className="w-full rounded-lg border border-nexo-border"
+                          style={{ maxHeight: '300px', objectFit: 'contain' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Raw User-Agent */}
               <div>
