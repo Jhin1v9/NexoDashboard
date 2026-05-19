@@ -22,7 +22,7 @@
 active_instance: kimi-10a71fc7
 signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-19T17:35:00+02:00
+last_updated: 2026-05-19T17:55:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -44,7 +44,7 @@ last_updated: 2026-05-19T17:35:00+02:00
 
 ### 🎯 Sprint Ativo: Workspace-Leads Unification + Active Learning
 
-**Status:** ✅ Concluído — build passando, commit `3ea779f` enviado
+**Status:** ✅ Concluído — build passando, commit `af5dea2` enviado
 
 #### Workspace-Leads Unification ✅
 - [x] `GET /api/workspace/clients` retorna leads (`kind: 'lead'`) + clientes (`kind: 'client'`) unificados
@@ -64,6 +64,19 @@ last_updated: 2026-05-19T17:35:00+02:00
 - [x] `lunaEventBus` — Event emitter para comunicação desacoplada entre componentes
 - [x] `RouteHarvester` — Detecta mudanças de rota e emite `luna:routeChanged`
 - [x] `LunaFloatingButton` integrado com contexto: estados visuais (thinking/acting/idle), badge de módulo atual
+
+#### Minichat Contextual (UX refinada) ✅
+- [x] **Sem backdrop blur** — overlay invisível, página nítida atrás do minichat
+- [x] **Sugestões por página** — `LunaModuleSuggestions.js` mapeia comandos por módulo (Operações, Financeiro, Tarefas, etc.)
+- [x] **Comando "ajuda" inteligente** — digita "ajuda"/"help"/"comandos" e mostra todos os comandos daquela página específica, sem chamar API
+- [x] **Botão "?"** no header do minichat para ativar ajuda rapidamente
+- [x] **Placeholder dinâmico** — muda conforme a página atual
+
+#### Harvesters de página + DOM Tracking ✅
+- [x] `EmailHarvester` — expõe contexto da página Email (emails selecionados, drafts pendentes, etc.)
+- [x] `FinanceHarvester` — expõe contexto da página Financeiro
+- [x] `TaskHarvester` — expõe contexto da página Tarefas
+- [x] `useLunaDOM` — hook que captura cliques, foco em inputs e scroll no DOM
 
 #### Render CLI (Instalado localmente) ✅
 - [x] `render` CLI v2.17.0 instalada em `~/.local/bin/render`

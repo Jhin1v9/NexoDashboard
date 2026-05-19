@@ -16,6 +16,8 @@
 - [x] **Picker de intents:** Busca `/api/luna/intents` e POST `/api/luna/learn` para re-treinar
 - [x] **Luna Context + Event Bus:** `LunaContext` provider global, `lunaEventBus` emitter, `RouteHarvester` detecta rotas
 - [x] **LunaFloatingButton integrado:** Estados visuais (thinking/acting/idle), badge de módulo atual, integração com event bus
+- [x] **Minichat contextual:** Sem blur, sugestões por página, comando "ajuda" inteligente, botão "?"
+- [x] **Harvesters de página:** `EmailHarvester`, `FinanceHarvester`, `TaskHarvester` + `useLunaDOM`
 - [x] **Render CLI v2.17.0:** Instalada localmente em `~/.local/bin/render`
 - [x] **Build passando:** 0 erros, commits enviados para GitHub
 
@@ -49,11 +51,16 @@ backend/services/luna-nlu.js                         # Engine NLP.js + addTraini
 frontend/src/pages/Workspace.jsx                     # Sidebar unificada + LeadPreviewPanel
 frontend/src/components/luna/SmartFormModal.jsx      # Active Learning (picker de intents)
 frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário
+frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões e ajuda contextual por módulo
 frontend/src/hooks/useLunaNLU.js                     # Hook axios
+frontend/src/hooks/useLunaDOM.js                     # Tracking de interações DOM
 frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global (integrado com LunaContext + lunaEventBus)
 frontend/src/context/LunaContext.jsx                 # Provider global de contexto da Luna
 frontend/src/lib/lunaEventBus.js                     # Event emitter desacoplado
 frontend/src/components/luna/harvesters/RouteHarvester.jsx  # Detecta mudanças de rota
+frontend/src/components/luna/harvesters/EmailHarvester.jsx  # Contexto da página Email
+frontend/src/components/luna/harvesters/FinanceHarvester.jsx # Contexto da página Financeiro
+frontend/src/components/luna/harvesters/TaskHarvester.jsx    # Contexto da página Tarefas
 ```
 
 ---
@@ -61,7 +68,7 @@ frontend/src/components/luna/harvesters/RouteHarvester.jsx  # Detecta mudanças 
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `228a397` — `docs(changelog): Adiciona entradas de hoje`  
+**Commit atual:** `af5dea2` — `feat(luna): Minichat contextual — sugestões por página, sem blur, ajuda inteligente`  
 **Build:** ✅ Vite build passando (0 erros)  
 **Testes manuais:** ✅ Conversão de lead cria workspace + README.md  
 **Render CLI:** ✅ v2.17.0 instalada em `~/.local/bin/render` (aguardando auth)  
