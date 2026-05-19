@@ -1,0 +1,94 @@
+{
+  "reports": [
+    {
+      "id": "report-1777809896017",
+      "timestamp": "2026-05-03T12:04:56.012Z",
+      "period": {
+        "start": "2026-05-03T11:34:56.012Z",
+        "end": "2026-05-03T12:04:56.012Z",
+        "duration": "30min"
+      },
+      "summary": {
+        "messagesProcessed": 0,
+        "newTasks": 0,
+        "newIdeas": 0,
+        "newDecisions": 0,
+        "linksFound": 0,
+        "mentionsHandled": 0,
+        "mentionsPending": 0
+      },
+      "tasks": {
+        "total": 0,
+        "urgent": 0,
+        "p0": [],
+        "p1": [],
+        "p2": [],
+        "p3": []
+      },
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "urgent": 0,
+        "dominant": "neutro"
+      },
+      "mentions": {
+        "total": 0,
+        "responded": 0,
+        "pending": 0,
+        "kimi": 0,
+        "luna": 0,
+        "kimiclaw": 0,
+        "todos": 0
+      },
+      "links": [],
+      "insights": [],
+      "nextScan": "2026-05-03T12:04:56.000Z",
+      "nextReport": "2026-05-03T12:04:56.000Z"
+    },
+    {
+      "id": "report-1777810014957",
+      "timestamp": "2026-05-03T12:06:54.955Z",
+      "period": {
+        "start": "2026-05-03T11:36:54.955Z",
+        "end": "2026-05-03T12:06:54.955Z",
+        "duration": "30min"
+      },
+      "summary": {
+        "messagesProcessed": 0,
+        "newTasks": 0,
+        "newIdeas": 0,
+        "newDecisions": 0,
+        "linksFound": 0,
+        "mentionsHandled": 0,
+        "mentionsPending": 0
+      },
+      "tasks": {
+        "total": 0,
+        "urgent": 0,
+        "p0": [],
+        "p1": [],
+        "p2": [],
+        "p3": []
+      },
+      "sentiment": {
+        "positive": 0,
+        "negative": 0,
+        "urgent": 0,
+        "dominant": "neutro"
+      },
+      "mentions": {
+        "total": 0,
+        "responded": 0,
+        "pending": 0,
+        "kimi": 0,
+        "luna": 0,
+        "kimiclaw": 0,
+        "todos": 0
+      },
+      "links": [],
+      "insights": [],
+      "nextScan": "2026-05-03T12:06:54.000Z",
+      "nextReport": "2026-05-03T12:06:54.000Z"
+    }
+  ]
+}

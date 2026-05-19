@@ -1,0 +1,19 @@
+{
+  "versao": "1.0",
+  "ultimaAtualizacao": "2026-05-19T06:49:38.353Z",
+  "servidores": [
+    {
+      "id": "srv-screenshot-demo-05_demos-site-v1-s9q5",
+      "clienteId": "screenshot-demo",
+      "demoPath": "05_demos/site-v1",
+      "tipo": "static-html",
+      "porta": 8081,
+      "url": "http://localhost:8081",
+      "pid": 153535,
+      "comando": "npx serve . -l 8081",
+      "status": "running",
+      "iniciadoEm": "2026-05-19T06:15:44.122Z",
+      "logFile": "dev-logs/srv-screenshot-demo-05_demos-site-v1-s9q5.log"
+    }
+  ]
+}

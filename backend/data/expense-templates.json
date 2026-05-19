@@ -1,0 +1,23 @@
+[
+  {
+    "id": "tmpl-001",
+    "name": "Hostinger Premium",
+    "defaultAmount": {
+      "value": 120.0,
+      "currency": "EUR"
+    },
+    "defaultPeriod": "annual",
+    "defaultCategory": "hosting",
+    "defaultSplitAmong": [
+      "abner",
+      "nonoke",
+      "elias"
+    ],
+    "autoCreate": true,
+    "autoCreateDaysBefore": 7,
+    "isActive": true,
+    "usageCount": 1,
+    "lastUsedAt": "2026-04-30T00:00:00Z",
+    "createdAt": "2026-04-30T00:00:00Z"
+  }
+]

@@ -1,0 +1,230 @@
+[
+  {
+    "quoteId": "quote-tropicale-001",
+    "projectId": "proj-tropicale-001",
+    "projectName": "TPV Sorveteria Tropicale",
+    "clientName": "Juan - Sorveteria Tropicale",
+    "clientId": "juan-tropicale",
+    "status": "sent",
+    "statusLabel": "Orçamento Enviado - Aguardando Resposta",
+    "totalAmount": {
+      "value": 5500,
+      "currency": "EUR"
+    },
+    "monthlyFee": {
+      "value": 199,
+      "currency": "EUR"
+    },
+    "year1Investment": {
+      "value": 7888,
+      "currency": "EUR"
+    },
+    "discountUpfront": {
+      "percent": 5,
+      "amount": 5225,
+      "currency": "EUR"
+    },
+    "createdAt": "2026-04-26T00:00:00.000Z",
+    "sentAt": "2026-04-26T00:00:00.000Z",
+    "validUntil": "2026-05-25T22:00:00.000Z",
+    "githubUrl": "https://github.com/Jhin1v9/tpv-orcamento-sorveteria/tree/main/pressuposto",
+    "items": [
+      {
+        "id": "item-001",
+        "total": 1200,
+        "details": [
+          "Tela de login e autenticação",
+          "Dashboard com métricas em tempo real",
+          "Gestão de produtos e categorias",
+          "Carrinho de compras com checkout",
+          "Histórico de vendas e relatórios"
+        ],
+        "category": "Desenvolvimento Frontend",
+        "quantity": 1,
+        "unitPrice": 1200,
+        "description": "Interface do TPV (Terminal de Ponto de Venda) com design responsivo"
+      },
+      {
+        "id": "item-002",
+        "total": 1500,
+        "details": [
+          "Autenticação JWT",
+          "CRUD completo de produtos, vendas, clientes",
+          "Integração com Supabase",
+          "WebSockets para tempo real",
+          "Exportação de relatórios PDF/Excel"
+        ],
+        "category": "Backend & API",
+        "quantity": 1,
+        "unitPrice": 1500,
+        "description": "API RESTful completa com banco de dados"
+      },
+      {
+        "id": "item-003",
+        "total": 800,
+        "details": [
+          "Tela de pedidos em tempo real",
+          "Status de preparação (pendente, preparando, pronto)",
+          "Notificações sonoras",
+          "Gestão de fila de pedidos"
+        ],
+        "category": "KDS - Kitchen Display System",
+        "quantity": 1,
+        "unitPrice": 800,
+        "description": "Sistema de visualização para cozinha"
+      },
+      {
+        "id": "item-004",
+        "total": 1000,
+        "details": [
+          "Interface touchscreen otimizada",
+          "Seleção de produtos com imagens",
+          "Pagamento integrado",
+          "Impressão de comprovante",
+          "Suporte a múltiplos idiomas"
+        ],
+        "category": "Kiosk de Autoatendimento",
+        "quantity": 1,
+        "unitPrice": 1000,
+        "description": "Terminal self-service para clientes"
+      },
+      {
+        "id": "item-005",
+        "total": 600,
+        "details": [
+          "Gestão de usuários e permissões",
+          "Relatórios financeiros detalhados",
+          "Controle de estoque",
+          "Configurações do sistema",
+          "Backup e exportação de dados"
+        ],
+        "category": "Painel Admin",
+        "quantity": 1,
+        "unitPrice": 600,
+        "description": "Dashboard administrativo completo"
+      },
+      {
+        "id": "item-006",
+        "total": 200,
+        "details": [
+          "Deploy na Vercel",
+          "Configuração de domínio",
+          "SSL/HTTPS",
+          "Monitoramento básico",
+          "Suporte por 30 dias"
+        ],
+        "category": "Deploy & Infraestrutura",
+        "quantity": 1,
+        "unitPrice": 200,
+        "description": "Hospedagem e configuração de produção"
+      },
+      {
+        "id": "item-007",
+        "total": 200,
+        "details": [
+          "Manual do usuário",
+          "Treinamento remoto 2h",
+          "Vídeos tutoriais",
+          "Suporte por email 30 dias"
+        ],
+        "category": "Treinamento & Documentação",
+        "quantity": 1,
+        "unitPrice": 200,
+        "description": "Capacitação da equipe e manuais"
+      }
+    ]
+  },
+  {
+    "quoteId": "quote-santafe-001",
+    "projectId": "proj-santafe-001",
+    "projectName": "Site Santafe Construcciones",
+    "clientName": "Paulo - Santafe Construcciones",
+    "clientId": "paulo-santafe",
+    "status": "accepted",
+    "statusLabel": "Orçamento Aprovado - Em Desenvolvimento",
+    "totalAmount": {
+      "value": 350,
+      "currency": "EUR"
+    },
+    "monthlyFee": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "year1Investment": {
+      "value": 0,
+      "currency": "EUR"
+    },
+    "discountUpfront": {
+      "percent": 0,
+      "amount": 0,
+      "currency": "EUR"
+    },
+    "createdAt": "2026-04-15T00:00:00.000Z",
+    "sentAt": "2026-04-15T00:00:00.000Z",
+    "validUntil": "2026-05-14T22:00:00.000Z",
+    "githubUrl": null,
+    "items": [
+      {
+        "id": "item-sf-001",
+        "total": 150,
+        "details": [
+          "Design responsivo",
+          "Seção de serviços",
+          "Galeria de obras",
+          "Formulário de contato",
+          "Integração com WhatsApp"
+        ],
+        "category": "Landing Page",
+        "quantity": 1,
+        "unitPrice": 150,
+        "description": "Página principal da construtora"
+      },
+      {
+        "id": "item-sf-002",
+        "total": 150,
+        "details": [
+          "Página 'Sobre Nós'",
+          "Página 'Serviços'",
+          "Página 'Obras Realizadas'",
+          "Página 'Contato'"
+        ],
+        "category": "Páginas Internas",
+        "quantity": 3,
+        "unitPrice": 50,
+        "description": "Páginas adicionais do site"
+      },
+      {
+        "id": "item-sf-003",
+        "total": 50,
+        "details": [
+          "Deploy na Hostinger",
+          "Configuração de domínio",
+          "SEO básico",
+          "Google Analytics"
+        ],
+        "category": "Deploy & SEO",
+        "quantity": 1,
+        "unitPrice": 50,
+        "description": "Hospedagem e otimização"
+      }
+    ]
+  },
+  {
+    "clientName": "Cliente Teste",
+    "projectName": "Projeto Luna",
+    "value": 5000,
+    "description": "Orçamento via SmartFormModal",
+    "status": "draft",
+    "quoteId": "quote-1779198201240",
+    "createdAt": "2026-05-19T13:43:21.240Z"
+  },
+  {
+    "clientName": "Cliente",
+    "projectName": "Projeto",
+    "value": 5000,
+    "description": "Desc",
+    "status": "draft",
+    "quoteId": "quote-1779198223470",
+    "createdAt": "2026-05-19T13:43:43.470Z"
+  }
+]

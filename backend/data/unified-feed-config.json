@@ -1,0 +1,264 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-05-01T13:45:00+02:00",
+  "integration": {
+    "name": "Discord + WhatsApp + GitHub + Vercel Unified Feed",
+    "description": "Agregação de dados de múltiplas fontes em um único dashboard com classificação automática"
+  },
+  "sources": [
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp Web",
+      "type": "polling",
+      "interval": "30min",
+      "endpoints": [
+        {
+          "group": "Production 2026",
+          "id": "production-2026",
+          "priority": "high",
+          "extract": ["messages", "tasks", "ideas", "decisions", "links", "payments"]
+        },
+        {
+          "group": "Paulo (web)",
+          "id": "paulo-web",
+          "priority": "medium",
+          "extract": ["messages", "client-updates"],
+          "rules": ["READ-ONLY", "NEVER-SEND-MESSAGES"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "active"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "type": "websocket-api",
+      "interval": "realtime",
+      "endpoints": [
+        {
+          "server": "Programadores de Plantão",
+          "channels": ["geral", "projetos", "dicas", "ajuda"],
+          "members": ["Jhin1v9", "Wardilias", "Enoque", "Nonoke"],
+          "priority": "high",
+          "extract": ["messages", "code-snippets", "links", "dicas", "perguntas", "respostas"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "pending-connection"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "type": "api-polling",
+      "interval": "1h",
+      "endpoints": [
+        {
+          "repos": ["Jhin1v9/nexo-dashboard-pro", "Jhin1v9/TPV-SORVETERIA-DEMO", "EEA-Ops-Master/nexo-digital"],
+          "extract": ["commits", "issues", "prs", "releases"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "active"
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "type": "api-polling",
+      "interval": "1h",
+      "endpoints": [
+        {
+          "projects": [],
+          "extract": ["deploys", "previews", "errors"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "pending-config"
+    },
+    {
+      "id": "site-leads",
+      "name": "Site chatopsmaster.com",
+      "type": "webhook",
+      "interval": "event-driven",
+      "endpoints": [
+        {
+          "url": "https://chatopsmaster.com",
+          "forms": ["/pt/contacto.html", "/pt/formulario.html"],
+          "extract": ["form-submissions", "lead-data"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "pending-integration"
+    },
+    {
+      "id": "finance",
+      "name": "Sistema Financeiro Interno",
+      "type": "file-watcher",
+      "interval": "5min",
+      "endpoints": [
+        {
+          "files": ["payments.json", "expenses.json", "cash-box.json", "transactions.json"],
+          "extract": ["payments", "expenses", "cash-flow"]
+        }
+      ],
+      "lastCheck": null,
+      "status": "active"
+    }
+  ],
+  "unifiedPipeline": {
+    "name": "NEXO Unified Ingestion Pipeline",
+    "description": "Pipeline unificado que coleta, classifica e distribui dados de todas as fontes",
+    "stages": [
+      {
+        "stage": "1-extract",
+        "description": "Coleta dados de cada fonte no intervalo definido",
+        "output": "Raw messages per source"
+      },
+      {
+        "stage": "2-classify",
+        "description": "Classifica cada mensagem/evento por tipo e prioridade",
+        "classifiers": [
+          {
+            "name": "TaskDetector",
+            "patterns": ["tarefa", "fazer", "precisamos", "tem que", "deveríamos"],
+            "priority": "high"
+          },
+          {
+            "name": "IdeaDetector",
+            "patterns": ["ideia", "sugestão", "podemos", "que tal", "seria bom"],
+            "priority": "medium"
+          },
+          {
+            "name": "DecisionDetector",
+            "patterns": ["decidimos", "vamos fazer", "fechamos", "combinado", "aprovar"],
+            "priority": "high"
+          },
+          {
+            "name": "PaymentDetector",
+            "patterns": ["paguei", "transferi", "bizum", "recebi", "€", "EUR"],
+            "priority": "critical"
+          },
+          {
+            "name": "QuestionDetector",
+            "patterns": ["?", "pergunta", "dúvida", "como faz", "onde fica"],
+            "priority": "medium"
+          },
+          {
+            "name": "LinkDetector",
+            "regex": "https?://[^\\s]+",
+            "priority": "low"
+          },
+          {
+            "name": "CodeSnippetDetector",
+            "patterns": ["```", "function", "const", "import", "export"],
+            "priority": "medium"
+          }
+        ]
+      },
+      {
+        "stage": "3-transform",
+        "description": "Normaliza dados para formato unificado",
+        "schema": {
+          "id": "uuid",
+          "source": "whatsapp|discord|github|vercel|site|finance",
+          "sourceGroup": "string",
+          "timestamp": "ISO8601",
+          "author": "string",
+          "content": "string",
+          "type": "task|idea|decision|payment|question|link|code|update|alert",
+          "priority": "critical|high|medium|low",
+          "client": "string|null",
+          "project": "string|null",
+          "actionable": "boolean",
+          "extractedData": "object"
+        }
+      },
+      {
+        "stage": "4-distribute",
+        "description": "Distribui para os destinos corretos no Dashboard",
+        "destinations": [
+          {
+            "type": "task",
+            "condition": "type == 'task' && actionable == true",
+            "target": "tasks.json + whatsapp-tasks.json"
+          },
+          {
+            "type": "financial",
+            "condition": "type == 'payment'",
+            "target": "payments.json + transactions.json + cash-box.json"
+          },
+          {
+            "type": "client-update",
+            "condition": "client != null",
+            "target": "Client CHAT folder + client health score"
+          },
+          {
+            "type": "idea",
+            "condition": "type == 'idea'",
+            "target": "Ideas log + NEXO-CONTEXT.md"
+          },
+          {
+            "type": "alert",
+            "condition": "priority == 'critical' || priority == 'high'",
+            "target": "alerts.json + WhatsApp Production 2026 (if from Luna)"
+          },
+          {
+            "type": "feed",
+            "condition": "default",
+            "target": "Unified Feed in Dashboard"
+          }
+        ]
+      }
+    ]
+  },
+  "dashboardUI": {
+    "name": "Unified Feed Tab",
+    "description": "Nova aba no Dashboard mostrando feed unificado de todas as fontes",
+    "filters": [
+      "Todas as fontes",
+      "WhatsApp apenas",
+      "Discord apenas",
+      "GitHub apenas",
+      "Vercel apenas",
+      "Finanças apenas",
+      "Tarefas detectadas",
+      "Ideias",
+      "Pagamentos",
+      "Alertas"
+    ],
+    "grouping": [
+      "Por fonte",
+      "Por cliente",
+      "Por tipo",
+      "Por prioridade",
+      "Por data"
+    ]
+  },
+  "automationScripts": {
+    "unifiedCheck": {
+      "name": "nexo-unified-check.mjs",
+      "description": "Script master que executa todos os checks a cada 30 min",
+      "schedule": "*/30 * * * *",
+      "steps": [
+        "1. Check WhatsApp (extract messages)",
+        "2. Check Discord (extract messages)",
+        "3. Check GitHub (commits, issues, PRs)",
+        "4. Check Vercel (deploys, errors)",
+        "5. Check Site Forms (new submissions)",
+        "6. Check Finance (new transactions)",
+        "7. Classify all new items",
+        "8. Update Dashboard JSONs",
+        "9. Generate unified report",
+        "10. Send WhatsApp summary if critical items found"
+      ]
+    }
+  },
+  "status": {
+    "whatsapp": "✅ Connected",
+    "discord": "⏳ Pending connection",
+    "github": "✅ Connected",
+    "vercel": "⏳ Pending config",
+    "site-leads": "⏳ Pending integration",
+    "finance": "✅ Connected"
+  }
+}
+

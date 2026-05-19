@@ -1,0 +1,21 @@
+{
+  "updatedAt": "2026-05-08T19:25:39.431Z",
+  "stats": {
+    "totalMessages": 0,
+    "totalTasks": 0,
+    "totalIdeas": 0,
+    "totalDecisions": 0,
+    "totalLinks": 0,
+    "totalLeads": 0,
+    "totalFinance": 0,
+    "totalIgnored": 0
+  },
+  "messages": [],
+  "tasks": [],
+  "ideas": [],
+  "decisions": [],
+  "links": [],
+  "leads": [],
+  "finance": [],
+  "ignoredMessages": []
+}

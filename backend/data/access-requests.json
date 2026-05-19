@@ -1,0 +1,12 @@
+{
+  "requests": [],
+  "settings": {
+    "autoApproveDomains": ["nexo-digital.app"],
+    "requireReason": true,
+    "defaultRole": "viewer",
+    "notifyOnRequest": ["whatsapp", "push"],
+    "maxRequestsPerDay": 3,
+    "requestExpiryDays": 7
+  },
+  "lastUpdated": "2026-05-01T16:30:00.000Z"
+}

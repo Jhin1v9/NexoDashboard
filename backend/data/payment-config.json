@@ -1,0 +1,169 @@
+{
+  "version": "2.0",
+  "updatedAt": "2026-04-30T12:45:00+02:00",
+  "currency": "EUR",
+  "company": {
+    "name": "NEXO DIGITAL",
+    "splitRule": {
+      "members": ["abner", "nonoke", "elias"],
+      "percentPerMember": 25,
+      "companyPercent": 25,
+      "totalPercent": 100
+    }
+  },
+  "cashBox": {
+    "balance": 0,
+    "monthlyIncome": 0,
+    "monthlyExpenses": 0,
+    "projectedBalance": 0,
+    "alertThreshold": 200
+  },
+  "clients": [
+    {
+      "id": "juan-tropicale",
+      "name": "Juan — TPV Sorveteria Tropicale",
+      "project": "Sistema TPV Completo (4 apps)",
+      "products": [
+        "App Kiosk Self-Service",
+        "App Cozinha KDS",
+        "App Admin (Dashboard + Estoque)",
+        "PWA Cliente (QR Code + Pedido)"
+      ],
+      "totalAmount": 5500,
+      "currency": "EUR",
+      "monthlyFee": 199,
+      "status": "pending",
+      "paymentTerms": {
+        "type": "split",
+        "installments": [
+          {
+            "label": "Sinal (50%)",
+            "amount": 2750,
+            "dueDate": "2026-05-15",
+            "status": "pending",
+            "method": "to-be-defined",
+            "notes": "Aceito verbalmente em 25/04/2026. Proposta valida ate 26/05/2026."
+          },
+          {
+            "label": "Entrega (50%)",
+            "amount": 2750,
+            "dueDate": "2026-06-15",
+            "status": "pending",
+            "method": "to-be-defined",
+            "notes": "Apos confirmacao do sinal e inicio do trabalho"
+          }
+        ]
+      },
+      "revenueSplit": {
+        "abner": 25,
+        "nonoke": 25,
+        "elias": 25,
+        "company": 25
+      },
+      "notes": "Orçamento formalizado em 26/04/2026. Documento: pressuposto/index.html no GitHub Jhin1v9/tpv-orcamento-sorveteria",
+      "links": {
+        "github": "https://github.com/Jhin1v9/tpv-orcamento-sorveteria",
+        "projectFolder": "C:\\Users\\Administrator\\Documents\\NEXO DIGITAL\\CLIENTES\\JUAN_SORVETERIA_TROPICALE"
+      }
+    },
+    {
+      "id": "paulo-santafe",
+      "name": "Paulo — Santafe Construcciones",
+      "project": "Site Web Completo + SEO",
+      "products": [
+        "Site Web (v1 em desenvolvimento)",
+        "Motor SEO",
+        "Logo e Identidade Visual",
+        "Dominio: www.santafe-construcciones.com"
+      ],
+      "totalAmount": 350,
+      "currency": "EUR",
+      "monthlyFee": 19.99,
+      "status": "partial",
+      "paymentTerms": {
+        "type": "split",
+        "installments": [
+          {
+            "label": "Primeira parcela (50%)",
+            "amount": 175,
+            "dueDate": "2026-04-30",
+            "status": "pending",
+            "method": "transfer",
+            "paidBy": "Paulo",
+            "paidTo": "Abner Gabriel Ribeiro Mendes — BBVA",
+            "notes": "Paulo vai pagar hoje (30/04). Aceita transferencia ou Bizum."
+          },
+          {
+            "label": "Segunda parcela (50%)",
+            "amount": 175,
+            "dueDate": "2026-05-30",
+            "status": "pending",
+            "method": "transfer",
+            "notes": "Pagamento no final do projeto"
+          }
+        ]
+      },
+      "revenueSplit": {
+        "abner": 25,
+        "nonoke": 25,
+        "elias": 25,
+        "company": 25
+      },
+      "notes": "Contrato fechado. Dominio registrado. Primeira versao em desenvolvimento. Fotos pendentes do Paulo.",
+      "links": {
+        "domain": "https://www.santafe-construcciones.com",
+        "projectFolder": "C:\\Users\\Administrator\\Documents\\NEXO DIGITAL\\CLIENTES\\PAULO_SANTAFE"
+      },
+      "conversationSummary": {
+        "status": "closed-deal",
+        "paymentMethod": "Transferencia ou Bizum",
+        "deliverables": [
+          "Logo melhorado e enviado",
+          "Identidade criada (paleta, descricao, temas)",
+          "Dominio registrado",
+          "Primeira versao do site em andamento",
+          "Motor SEO em preparacao"
+        ],
+        "pending": [
+          "Fotos dos trabalhos do Paulo",
+          "Pagamento primeira parcela (hoje 30/04)",
+          "Documentacao formal da empresa (B ou fatura se necessario)"
+        ]
+      }
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp-001",
+      "name": "Hostinger — 1 ano de hosting",
+      "amount": 120,
+      "currency": "EUR",
+      "type": "recurring",
+      "period": "annual",
+      "startDate": "2026-04-30",
+      "renewDate": "2027-04-30",
+      "category": "hosting",
+      "splitAmong": ["abner", "nonoke", "elias"],
+      "paidBy": {"abner": true, "nonoke": true, "elias": true},
+      "notes": "Comprado com adiantamento do Paulo. Dividido entre os 3.",
+      "recurring": true
+    },
+    {
+      "id": "exp-002",
+      "name": "Assinatura Kimi (IA)",
+      "amount": 40,
+      "currency": "EUR",
+      "type": "recurring",
+      "period": "monthly",
+      "startDate": "2026-04-01",
+      "renewDate": "2026-05-01",
+      "category": "ia-tools",
+      "splitAmong": ["abner", "nonoke", "elias"],
+      "paidBy": {"abner": false, "nonoke": false, "elias": false},
+      "notes": "Nonoke usa 2 instancias Kimi Code + 1 Kimi Claw. Valor estimado.",
+      "recurring": true
+    }
+  ],
+  "transactions": [],
+  "alerts": []
+}
