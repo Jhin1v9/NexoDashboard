@@ -278,7 +278,7 @@ export default function WorkspaceFileViewer({ clientId, file, token, onClose, on
           <div className="h-full">
             {/* Markdown preview */}
             {kind === 'markdown' && showPreview && (
-              <div className="h-full overflow-auto bg-nexo-dark">
+              <div className="h-full overflow-auto bg-nexo-bg">
                 <SimpleMarkdownPreview source={content} />
               </div>
             )}
@@ -287,7 +287,7 @@ export default function WorkspaceFileViewer({ clientId, file, token, onClose, on
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 readOnly={!editMode}
-                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                className="w-full h-full p-4 bg-nexo-bg font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-text"
                 spellCheck={false}
               />
             )}
@@ -317,7 +317,7 @@ export default function WorkspaceFileViewer({ clientId, file, token, onClose, on
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 readOnly={!editMode}
-                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                className="w-full h-full p-4 bg-nexo-bg font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-text"
                 spellCheck={false}
               />
             )}
@@ -328,7 +328,7 @@ export default function WorkspaceFileViewer({ clientId, file, token, onClose, on
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 readOnly={!editMode}
-                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                className="w-full h-full p-4 bg-nexo-bg font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-text"
                 spellCheck={false}
               />
             )}

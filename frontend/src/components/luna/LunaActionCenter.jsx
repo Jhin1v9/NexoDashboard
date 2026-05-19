@@ -369,10 +369,7 @@ export default function LunaActionCenter({ onClose }) {
         {/* Footer */}
         <div className="shrink-0 px-5 py-3 border-t border-nexo-border">
           <button
-            onClick={() => {
-              onClose()
-              lunaEventBus.emit('luna:openChat')
-            }}
+            onClick={() => lunaEventBus.emit('luna:openChat')}
             className="flex items-center justify-center gap-1.5 w-full text-[10px] text-nexo-muted hover:text-nexo-primary transition-colors py-1"
           >
             Abrir chat completo da Luna <ArrowRight className="w-3 h-3" />

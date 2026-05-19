@@ -517,10 +517,6 @@ export default function LunaFloatingButton() {
               setActionCenterOpen(false)
               return
             }
-            if (proactiveBadge && !isOpen) {
-              setActionCenterOpen(true)
-              return
-            }
             setIsOpen(!isOpen)
             if (isOpen) {
               setChatResult(null)
