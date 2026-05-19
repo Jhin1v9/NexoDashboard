@@ -51,7 +51,7 @@ last_updated: 2026-05-19T20:15:00+02:00
 
 ### 🎯 Sprint Ativo: Workspace File Viewer v2 + Contexto Luna Enriquecido
 
-**Status:** ✅ Concluído — build passando, commits até `3e4256e` enviados
+**Status:** ✅ Concluído — build passando, commits até `acc8db7` enviados
 
 #### Workspace File Viewer v2 ✅
 - [x] **Syntax highlighting:** `highlight.js` com 15 linguagens (JS, TS, JSON, CSS, Python, PHP, SQL, YAML, Bash, Dockerfile, GraphQL, etc.)
@@ -88,7 +88,7 @@ last_updated: 2026-05-19T20:15:00+02:00
 #### Deploy/Repo ✅
 - [x] **NexoDashboard local antigo:** Remote removido (não empurra mais pro GitHub)
 - [x] **NEXO_DASHBOARD_PRO:** Único projeto com acesso ao remote
-- [x] **Todos os commits enviados:** `920c182` é o HEAD atual
+- [x] **Todos os commits enviados:** `acc8db7` é o HEAD atual
 
 ---
 

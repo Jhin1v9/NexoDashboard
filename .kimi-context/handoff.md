@@ -20,7 +20,7 @@
 - [x] **Integração LunaControl.jsx:** Lê `file` dos query params e envia `contextFile` em mensagens de chat/thread
 - [x] **Changelog v3.4.0:** Entrada documentando o File Viewer
 - [x] **Build passando:** Vite build 0 erros, bundle 2.0MB
-- [x] **Push para origin/main:** Commits `4eaaf6a` + `3e4256e` enviados
+- [x] **Push para origin/main:** Commits `4eaaf6a` + `3e4256e` + `7b338b3` + `acc8db7` enviados
 
 ### ⏳ Próximos passos (priorizados por realidade do código)
 
