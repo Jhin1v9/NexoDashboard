@@ -2,24 +2,25 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-18
+> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-19
 
 ---
 
-## 🎯 Foco Atual (Passo 3 — Execução Inteligente ✅ CONCLUÍDO)
+## 🎯 Foco Atual (Workspace File Viewer v2 ✅ CONCLUÍDO)
 
 ### ✅ Concluído nesta sessão (kimi-10a71fc7 🟡)
-- [x] **Passo 3 — Execução Inteligente:** Sistema de decisão baseado em confiança, dados e risco
-- [x] **lunaDecisionEngine.js:** Motor que decide entre auto/collect/confirm/preview/transform
-- [x] **LunaActionDrawer.jsx:** Drawer lateral 380px sem backdrop blur (Modo B)
-- [x] **LunaSafetyDelay.jsx:** Barra de progresso 1.5s com undo para ações destrutivas
-- [x] **useLunaAnimation.js:** Hook com Web Animations API (create/delete/update/move/batch/breath/progress/shake)
-- [x] **LunaActionFlow.jsx:** Componente de apresentação orquestrado pelo LunaFloatingButton
-- [x] **Integração no LunaFloatingButton:** Decision Engine chamado no submit, execução auto ou drawer
-- [x] **NLU Expansion (FASE 4 do gap analysis):** 36→137 intents, 15 domínios, modelo re-treinado
-- [x] **SmartFormModal schemas:** 121 schemas novos adicionados (total: 137 intents cobertos)
-- [x] **LunaModuleSuggestions:** Comandos novos por módulo (email, financeiro, tarefas, workspace, whatsapp)
-- [x] **Build passando:** Vite build 0 erros
+- [x] **Workspace File Viewer v2:** Editor/viewer de arquivos no workspace com syntax highlighting
+- [x] **highlight.js:** 15 linguagens registradas (JS, TS, JSON, CSS, Python, PHP, SQL, YAML, Bash, Dockerfile, GraphQL, etc.)
+- [x] **Modo Preview/Código:** Toggle para Markdown, HTML e arquivos de código
+- [x] **Indicador de alterações não salvas:** ● laranja no header + subtítulo
+- [x] **Atalhos de teclado:** `Ctrl+S` salvar, `ESC` fechar viewer
+- [x] **Scrollbars customizadas:** `.custom-scrollbar` com thumb `#2a2a3e` e hover `#3a3a4e`
+- [x] **Endpoints backend:** `GET/PUT /api/workspace/clients/:id/content` (leitura/escrita textual)
+- [x] **Contexto Luna enriquecido:** `buildDashboardContext()` injeta conteúdo do arquivo no prompt (até 4000 chars)
+- [x] **Integração LunaControl.jsx:** Lê `file` dos query params e envia `contextFile` em mensagens de chat/thread
+- [x] **Changelog v3.4.0:** Entrada documentando o File Viewer
+- [x] **Build passando:** Vite build 0 erros, bundle 2.0MB
+- [x] **Push para origin/main:** Commits `4eaaf6a` + `3e4256e` enviados
 
 ### ⏳ Próximos passos (priorizados por realidade do código)
 
@@ -29,6 +30,8 @@ Baseado na análise em `.kimi-context/plans-vs-reality.md`:
 - [ ] **Substituir `GEMINI_API_KEY`** no `backend/.env` (revogada pelo Google) — sem isso, IA generativa (drafts, resumos, ideias) não funciona
 
 **🟡 IMPORTANTE (UX) — ✅ CONCLUÍDO:**
+- [x] **Workspace File Viewer v2:** Syntax highlighting, preview Markdown/HTML, indicador não salvo, atalhos
+- [x] **Contexto Luna enriquecido:** Arquivo do workspace injetado no prompt da IA
 - [x] **Modo C — Transformação de Interface:** `LunaBatchAction` com checkboxes multi-seleção por página
 - [x] **Preview visual:** `LunaInlinePreview` integrado no LunaActionDrawer (modos preview/confirm)
 - [x] **Modo D — Assistente Passivo Proativo:** Badge animado no botão flutuante com `/api/luna/proactive`
