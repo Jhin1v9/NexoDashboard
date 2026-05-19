@@ -1,27 +1,7 @@
 {
   "version": "1.1",
-  "lastUpdated": "2026-05-19T20:15:00.000Z",
+  "lastUpdated": "2026-05-19T18:21:22.000Z",
   "entries": [
-    {
-      "id": "changelog-luna-action-center",
-      "version": "3.4.0",
-      "title": "Luna Action Center — Inbox de Ações Pendentes",
-      "description": "Novo painel fixo (420px) que aparece ao clicar no toast proativo ou no badge vermelho do botão flutuante. Cada card é acionável: Concluir, Ver, Aprovar, Contatar com execução direta via /api/luna/batch. Cards agrupados por prioridade (Crítico/Atenção/Info). Persistência de 'ignorados' no backend (24h TTL). Clique no toast abre Action Center em vez de jogar texto genérico no chat. Botão principal do Luna sempre abre o chat; apenas o badge separado abre o Action Center.",
-      "category": "feature",
-      "emoji": "📋",
-      "author": "Luna",
-      "tier": 1,
-      "date": "2026-05-19T20:00:00.000Z",
-      "tags": [
-        "luna",
-        "action-center",
-        "proactive",
-        "inbox",
-        "batch",
-        "ux"
-      ],
-      "readBy": []
-    },
     {
       "id": "changelog-luna-revisao-critica",
       "version": "3.4.0",
@@ -31,13 +11,33 @@
       "emoji": "🔒",
       "author": "Luna",
       "tier": 1,
-      "date": "2026-05-19T19:45:00.000Z",
+      "date": "2026-05-19T18:21:22.000Z",
       "tags": [
         "luna",
         "seguranca",
         "bugfix",
         "revisao",
         "performance"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-luna-action-center",
+      "version": "3.4.0",
+      "title": "Luna Action Center — Inbox de Ações Pendentes",
+      "description": "Novo painel fixo (420px) que aparece ao clicar no toast proativo ou no badge vermelho do botão flutuante. Cada card é acionável: Concluir, Ver, Aprovar, Contatar com execução direta via /api/luna/batch. Cards agrupados por prioridade (Crítico/Atenção/Info). Persistência de \"ignorados\" no backend (24h TTL). Clique no toast abre Action Center em vez de jogar texto genérico no chat. Botão principal do Luna sempre abre o chat; apenas o badge separado abre o Action Center.",
+      "category": "feature",
+      "emoji": "📋",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T18:21:22.000Z",
+      "tags": [
+        "luna",
+        "action-center",
+        "proactive",
+        "inbox",
+        "batch",
+        "ux"
       ],
       "readBy": []
     },
@@ -58,9 +58,7 @@
         "machine-learning",
         "i18n"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-workspace-leads-active-learning",
@@ -79,9 +77,7 @@
         "nlu",
         "unificação"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-executor-ajuda-navegar",
@@ -99,9 +95,7 @@
         "navegação",
         "task_done"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-luna-fluxo-unificado",
@@ -120,9 +114,7 @@
         "nlu",
         "action-executor"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-ux-polimento-19",
@@ -141,9 +133,7 @@
         "responsive",
         "polimento"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-workspace-v1",
@@ -162,9 +152,7 @@
         "context-menu",
         "drag-drop"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-luna-v20",
@@ -183,9 +171,7 @@
         "unificação",
         "v20"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-action-executor-v19",
@@ -203,9 +189,7 @@
         "automation",
         "v19"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-ia-unificada",
@@ -224,9 +208,7 @@
         "email",
         "context"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-persistencia-contexto",
@@ -244,9 +226,7 @@
         "kimi",
         "docs"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-nexo-mail-sprint1",
@@ -265,9 +245,7 @@
         "densidade",
         "resizable"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-001",
@@ -303,9 +281,7 @@
         "action-items",
         "v2"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-002",
@@ -322,9 +298,7 @@
         "luna",
         "automation"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-003",
@@ -341,9 +315,7 @@
         "crud",
         "transacoes"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-004",
@@ -360,9 +332,7 @@
         "operacoes",
         "metrics"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-005",
@@ -379,9 +349,7 @@
         "clientes",
         "projetos"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-006",
@@ -398,9 +366,7 @@
         "vercel",
         "devops"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     },
     {
       "id": "changelog-007",
@@ -417,9 +383,7 @@
         "luna",
         "v1"
       ],
-      "readBy": [
-        "default"
-      ]
+      "readBy": []
     }
   ]
 }

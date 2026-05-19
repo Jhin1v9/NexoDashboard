@@ -114,6 +114,7 @@
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #08080c;
@@ -124,4 +125,30 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #2a2a3e;
+}
+
+/* Custom scrollbar para viewers/editores */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2a3e;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4e;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* highlight.js overrides para tema escuro */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
 }
