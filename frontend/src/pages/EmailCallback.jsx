@@ -48,7 +48,7 @@ export default function EmailCallback() {
   }, [location.search, navigate])
 
   return (
-    <div className="h-screen flex items-center justify-center bg-nexo-bg text-nexo-text">
+    <div className="h-full flex items-center justify-center bg-nexo-bg text-nexo-text">
       <div className="text-center">
         {status === 'processando' && (
           <>
