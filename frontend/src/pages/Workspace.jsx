@@ -7,8 +7,10 @@ import {
   ChevronRight, Plus, X, Upload, Trash2, Download, Grid, List,
   Search, HardDrive, ArrowLeft, MoreVertical, Edit3, CheckCircle2,
   AlertCircle, LayoutGrid, AlignJustify, ChevronDown, FolderPlus,
-  Play, Square, Terminal, RefreshCw, Loader2, ExternalLink
+  Play, Square, Terminal, RefreshCw, Loader2, ExternalLink, MousePointerClick
 } from 'lucide-react'
+import DevLogTerminal from '../components/workspace/DevLogTerminal'
+import ContextMenu from '../components/workspace/ContextMenu'
 
 function getFileIcon(name, type) {
   if (type === 'folder') return FolderOpen
@@ -171,6 +173,8 @@ export default function Workspace() {
   const [runningServers, setRunningServers] = useState([])
   const [renameTarget, setRenameTarget] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [activeLogServer, setActiveLogServer] = useState(null)
+  const [contextMenu, setContextMenu] = useState(null)
 
   const token = localStorage.getItem('token') || ''
   const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
@@ -300,6 +304,28 @@ export default function Workspace() {
     }
   }
 
+  const handleContextMenu = (e, f) => {
+    e.preventDefault()
+    const items = [
+      { label: 'Renomear', icon: Edit3, action: () => { setRenameTarget(f); setRenameValue(f.name) } },
+    ]
+    if (f.type === 'file') {
+      items.push({ label: 'Download', icon: Download, action: () => window.open(`/api/workspace/clients/${selectedClient.id}/download?path=${encodeURIComponent(f.path)}&token=${token}`, '_blank') })
+    }
+    const isRunnable = f.type === 'folder' && (projectTypes[f.path] && projectTypes[f.path] !== 'unknown')
+    const runningSrv = runningServers.find(s => s.clienteId === selectedClient?.id && s.demoPath === f.path)
+    if (isRunnable && !runningSrv) {
+      items.push({ label: 'Executar', icon: Play, action: () => handleStart(f.path) })
+    }
+    if (runningSrv) {
+      items.push({ label: 'Ver logs', icon: Terminal, action: () => setActiveLogServer(runningSrv.id) })
+      items.push({ label: 'Parar', icon: Square, action: () => handleStop(runningSrv.id), danger: true })
+    }
+    items.push({ separator: true, label: '', icon: null, action: () => {} })
+    items.push({ label: 'Excluir', icon: Trash2, action: () => handleDelete(f), danger: true })
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }
+
   const handleDelete = async (f) => {
     if (!confirm(`Excluir "${f.name}"?`)) return
     try {
@@ -359,6 +385,7 @@ export default function Workspace() {
           key={f.path}
           onClick={() => setSelectedFile(f)}
           onDoubleClick={() => f.type === 'folder' && handleNavigate(f.path)}
+          onContextMenu={(e) => handleContextMenu(e, f)}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-nexo-info/10 border border-nexo-info/30' : 'hover:bg-nexo-card/60 border border-transparent'}`}
         >
           <Icon size={20} className={f.type === 'folder' ? 'text-nexo-warning' : 'text-nexo-muted'} />
@@ -413,6 +440,7 @@ export default function Workspace() {
         animate={{ opacity: 1, scale: 1 }}
         onClick={() => setSelectedFile(f)}
         onDoubleClick={() => f.type === 'folder' && handleNavigate(f.path)}
+        onContextMenu={(e) => handleContextMenu(e, f)}
         className={`group relative p-4 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-nexo-info/10 border-nexo-info/40' : 'bg-nexo-card/40 border-nexo-border hover:border-nexo-info/30 hover:bg-nexo-card/70'}`}
       >
         <div className="flex flex-col items-center gap-2 text-center">
@@ -544,11 +572,17 @@ export default function Workspace() {
 
             {/* File area */}
             <div
-              className={`flex-1 overflow-y-auto p-4 ${dragOver ? 'bg-nexo-info/5 ring-2 ring-nexo-info/30 ring-inset' : ''}`}
+              className={`flex-1 overflow-y-auto p-4 relative ${dragOver ? 'bg-nexo-info/5' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
             >
+              {dragOver && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-nexo-info/10 backdrop-blur-sm rounded-lg border-2 border-dashed border-nexo-info/40 m-2">
+                  <Upload size={40} className="text-nexo-info mb-2" />
+                  <p className="text-sm font-medium text-nexo-info">Solte os arquivos aqui</p>
+                </div>
+              )}
               {loading ? (
                 <div className="flex items-center justify-center h-full text-nexo-muted gap-2">
                   <Loader2 size={20} className="animate-spin" /> Carregando...
@@ -611,6 +645,19 @@ export default function Workspace() {
 
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => { handleUpload(e.target.files); e.target.value = '' }} />
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Dev Log Terminal */}
+      <DevLogTerminal serverId={activeLogServer} onClose={() => setActiveLogServer(null)} />
 
       {/* Modals */}
       <AnimatePresence>

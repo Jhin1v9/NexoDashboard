@@ -13,6 +13,31 @@ const DATA_DIR = path.join(__dirname, 'data');
 const SERVERS_FILE = path.join(DATA_DIR, 'dev-servers.json');
 const LOGS_DIR = path.join(DATA_DIR, 'dev-logs');
 
+// ── Real-time log subscribers (SSE) ──
+const logSubscribers = new Map(); // serverId -> Set<callback>
+
+function subscribeToLogs(serverId, callback) {
+  if (!logSubscribers.has(serverId)) logSubscribers.set(serverId, new Set());
+  logSubscribers.get(serverId).add(callback);
+}
+
+function unsubscribeFromLogs(serverId, callback) {
+  const subs = logSubscribers.get(serverId);
+  if (subs) {
+    subs.delete(callback);
+    if (subs.size === 0) logSubscribers.delete(serverId);
+  }
+}
+
+function broadcastLog(serverId, line, isError = false) {
+  const subs = logSubscribers.get(serverId);
+  if (subs) {
+    subs.forEach(cb => {
+      try { cb(line, isError); } catch { /* ignore closed connections */ }
+    });
+  }
+}
+
 const PROJECT_COMMANDS = {
   'react-vite':     { cmd: 'npm', args: ['run', 'dev'], port: 5173, needsNodeModules: true },
   'react-cra':      { cmd: 'npm', args: ['start'], port: 3000, needsNodeModules: true },
@@ -205,10 +230,18 @@ async function startServer(rawClientId, rawDemoPath, options = {}) {
   });
 
   child.stdout.on('data', (data) => {
-    logStream.write(`[OUT] ${data.toString()}`);
+    const lines = data.toString().split('\n').filter(Boolean);
+    lines.forEach(line => {
+      logStream.write(`[OUT] ${line}\n`);
+      broadcastLog(serverId, line, false);
+    });
   });
   child.stderr.on('data', (data) => {
-    logStream.write(`[ERR] ${data.toString()}`);
+    const lines = data.toString().split('\n').filter(Boolean);
+    lines.forEach(line => {
+      logStream.write(`[ERR] ${line}\n`);
+      broadcastLog(serverId, line, true);
+    });
   });
   child.on('close', (code) => {
     logStream.write(`[${nowISO()}] Processo encerrado com código ${code}\n`);
@@ -308,6 +341,9 @@ module.exports = {
   cleanupDeadServers,
   isPortInUse,
   findAvailablePort,
+  subscribeToLogs,
+  unsubscribeFromLogs,
+  broadcastLog,
   SERVERS_FILE,
   LOGS_DIR
 };

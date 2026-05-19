@@ -15,6 +15,7 @@ import HealthTimeline from '../components/charts/HealthTimeline'
 import PortfolioRadar from '../components/charts/PortfolioRadar'
 import BugVelocity from '../components/charts/BugVelocity'
 import ClientBurnup from '../components/charts/ClientBurnup'
+import DevLogTerminal from '../components/workspace/DevLogTerminal'
 
 
 // ── Components ─────────────────────────────────────────────────────────────
@@ -72,6 +73,8 @@ const MiniBar = ({ value, max, color }) => {
   return (
     <div className="w-full h-1.5 bg-nexo-card rounded-full overflow-hidden">
       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+      {/* Dev Log Terminal */}
+      <DevLogTerminal serverId={activeLogServer} onClose={() => setActiveLogServer(null)} />
     </div>
   )
 }
@@ -134,6 +137,7 @@ export default function Dashboard() {
 
   // Servidores locais ativos (Workspace)
   const [runningServers, setRunningServers] = useState([])
+  const [activeLogServer, setActiveLogServer] = useState(null)
   const token = localStorage.getItem('nexo_token') || ''
   const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
 
@@ -362,6 +366,9 @@ export default function Dashboard() {
                 <a href={srv.url} target="_blank" rel="noreferrer" className="text-xs text-nexo-success hover:underline flex items-center gap-1">
                   <ExternalLink size={12} /> {srv.porta}
                 </a>
+                <button onClick={() => setActiveLogServer(srv.id)} className="p-1.5 hover:bg-nexo-card rounded-lg text-nexo-muted hover:text-nexo-text" title="Logs">
+                  <Terminal size={14} />
+                </button>
                 <button onClick={async () => {
                   try {
                     await api.post(`/api/workspace/clients/${srv.clienteId}/stop`, { serverId: srv.id })

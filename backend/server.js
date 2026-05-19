@@ -6572,6 +6572,28 @@ app.get('/api/workspace/servers/:serverId/logs', requireAuth, (req, res) => {
   }
 });
 
+// SSE: real-time logs stream
+app.get('/api/workspace/servers/:serverId/logs/stream', requireAuth, (req, res) => {
+  const { serverId } = req.params;
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const send = (line, isError) => {
+    res.write(`data: ${JSON.stringify({ line, isError, time: new Date().toISOString() })}\n\n`);
+  };
+
+  processManager.subscribeToLogs(serverId, send);
+
+  // Send initial ping
+  res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
+
+  req.on('close', () => {
+    processManager.unsubscribeFromLogs(serverId, send);
+  });
+});
+
 // ============================================================================
 // Catch-all
 // ═══════════════════════════════════════════════════════════════════════════════
