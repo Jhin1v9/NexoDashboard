@@ -36,6 +36,7 @@ import {
   X
 } from 'lucide-react'
 import useRealtime from '../hooks/useRealtime'
+import FinanceHarvester from '../components/luna/harvesters/FinanceHarvester'
 import StatementSection from '../components/finance/StatementSection'
 import QuickExpenseFab from '../components/finance/QuickExpenseFab'
 import SimpleExpenses from '../components/finance/SimpleExpenses'
@@ -977,6 +978,15 @@ export default function Financeiro() {
           )}
         </AnimatePresence>
       )}
+
+      <FinanceHarvester
+        activeTab={activeTab}
+        summary={summary}
+        payments={payments}
+        expenses={expenses}
+        cashBox={cashBox}
+        isLoading={isLoading}
+      />
     </div>
   )
 }

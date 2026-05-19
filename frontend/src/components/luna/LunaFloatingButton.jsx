@@ -5,6 +5,7 @@ import { useLunaNLU } from '../../hooks/useLunaNLU'
 import { useLunaContext } from '../../hooks/useLunaContext'
 import { lunaEventBus } from '../../lib/lunaEventBus'
 import { hasFormFields, getSchema } from './LunaIntentSchemas'
+import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
 import SmartFormModal from './SmartFormModal'
 import axios from 'axios'
 
@@ -29,9 +30,11 @@ export default function LunaFloatingButton() {
   const [chatLoading, setChatLoading] = useState(false)
   const [chatConfirming, setChatConfirming] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
+  const [showHelp, setShowHelp] = useState(false)
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
+  const moduleData = getSuggestionsForModule(currentModule || 'unknown')
 
   // Foca no input quando abre + emite evento de estado
   useEffect(() => {
@@ -61,6 +64,21 @@ export default function LunaFloatingButton() {
     if (!text.trim() || isLoading || chatLoading) return
 
     const userText = text.trim()
+    const userTextLower = userText.toLowerCase()
+
+    // ── CASO ESPECIAL: "ajuda" → mostra comandos do módulo atual sem chamar API ──
+    if (userTextLower === 'ajuda' || userTextLower === 'help' || userTextLower === 'comandos' || userTextLower === 'o que você pode fazer') {
+      setShowHelp(true)
+      setChatResult({
+        reply: formatHelpForModule(currentModule || 'unknown'),
+        intent: 'sistema.ajuda',
+        isError: false,
+      })
+      setIsOpen(false)
+      setText('')
+      return
+    }
+
     lunaEventBus.emit('luna:command', { text: userText, intent: null, confidence: 0 })
     const nluResult = await understand(userText)
     if (!nluResult) {
@@ -69,6 +87,7 @@ export default function LunaFloatingButton() {
     }
 
     setText('')
+    setShowHelp(false)
 
     const intent = nluResult.intent
     const schema = getSchema(intent)
@@ -201,7 +220,7 @@ export default function LunaFloatingButton() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[90]"
             onClick={() => setIsOpen(false)}
           >
             <motion.div
@@ -212,10 +231,27 @@ export default function LunaFloatingButton() {
               className="absolute bottom-24 right-6 left-6 sm:left-auto sm:w-[420px]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="glass-card p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-nexo-primary" />
-                  <span className="text-xs font-medium text-nexo-text">O que você precisa?</span>
+              <div className="glass-card p-4 space-y-3 shadow-xl shadow-black/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-nexo-primary" />
+                    <span className="text-xs font-medium text-nexo-text">O que você precisa?</span>
+                    {currentModule && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-primary/10 text-nexo-primary border border-nexo-primary/20">
+                        {moduleData.label}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setText('ajuda')
+                      inputRef.current?.focus()
+                    }}
+                    className="text-[10px] px-2 py-1 rounded-full bg-nexo-card border border-nexo-border text-nexo-muted hover:text-nexo-primary hover:border-nexo-primary/50 transition-colors"
+                    title="Ver comandos desta página"
+                  >
+                    ?
+                  </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex gap-2">
@@ -224,7 +260,7 @@ export default function LunaFloatingButton() {
                     type="text"
                     value={text}
                     onChange={e => setText(e.target.value)}
-                    placeholder='Ex: "cria tarefa urgente", "quanto temos no caixa", "listar projetos"...'
+                    placeholder={`Ex: "${moduleData.quick[0]}", "${moduleData.quick[1]}"...`}
                     className="flex-1 bg-nexo-bg border border-nexo-border rounded-lg px-3 py-2 text-sm text-nexo-text placeholder:text-nexo-muted/50 outline-none focus:border-nexo-primary transition-colors"
                     disabled={isLoading || chatLoading}
                   />
@@ -242,7 +278,7 @@ export default function LunaFloatingButton() {
                 )}
 
                 <div className="flex flex-wrap gap-1.5">
-                  {['cria tarefa', 'quanto temos no caixa', 'listar projetos', 'verificar mencoes'].map(suggestion => (
+                  {moduleData.quick.map(suggestion => (
                     <button
                       key={suggestion}
                       onClick={() => {

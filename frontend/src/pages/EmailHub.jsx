@@ -10,6 +10,7 @@ import EmailList from '../components/email/EmailList'
 import EmailReader from '../components/email/EmailReader'
 import EmailCompose from '../components/email/EmailCompose'
 import LunaEmailAssistant from '../components/email/LunaEmailAssistant'
+import EmailHarvester from '../components/luna/harvesters/EmailHarvester'
 import ResizablePanel from '../components/email/ResizablePanel'
 import { useGmailAuth } from '../hooks/useGmailAuth'
 import { useEmailShortcuts } from '../hooks/useEmailShortcuts'
@@ -485,6 +486,24 @@ export default function EmailHub() {
           </div>
         </div>
       )}
+
+      <EmailHarvester
+        emails={emails}
+        selectedThread={selectedThread}
+        selectedEmailId={selectedEmailId}
+        activeLabel={activeLabel}
+        labels={labels}
+        unreadCounts={unreadCounts}
+        search={search}
+        loading={loading}
+        syncing={syncing}
+        showCompose={showCompose}
+        showLuna={showLuna}
+        pendingDrafts={pendingDrafts}
+        authConnected={authStatus.connected}
+        isFocusMode={isFocusMode}
+        density={density}
+      />
     </div>
   )
 }
