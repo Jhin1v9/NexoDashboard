@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../../context/ToastContext'
 import { getSchema } from './LunaIntentSchemas'
 
 /**
@@ -19,6 +20,7 @@ import { getSchema } from './LunaIntentSchemas'
 
 export default function SmartFormModal({ result, onClose, onSuccess }) {
   const navigate = useNavigate()
+  const { addToast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [values, setValues] = useState({})
@@ -46,11 +48,10 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
       Object.assign(defaults, extracted)
     }
 
-    // Tenta inferir título da frase original (remove verbos comuns)
+    // Tenta inferir título da frase original (remove apenas verbos de ação no início)
     if (!defaults.titulo && schema.fields.titulo) {
       const cleaned = originalText
-        .replace(/^(cria|criar|nova|novo|adiciona|adicionar|faz|fazer|envia|enviar|manda|mandar|responde|responder|atualiza|atualizar|deleta|deletar|arquiva|arquivar|quero|preciso|gostaria)\s+/i, '')
-        .replace(/\s+(pro|pra|para)\s+(.+)$/i, '$2')
+        .replace(/^(cria|criar|nova|novo|adiciona|adicionar|faz|fazer|envia|enviar|manda|mandar|responde|responder|atualiza|atualizar|deleta|deletar|arquiva|arquivar|quero|preciso|gostaria|gostaria de|uma|um|de|para|pra|pro)\s+/gi, '')
         .trim()
       if (cleaned && cleaned.length > 2) {
         defaults.titulo = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
@@ -92,10 +93,12 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
 
     try {
       const payload = schema.submitConfig.transform(values)
+      const token = localStorage.getItem('nexo_token') || ''
       await axios({
         method: schema.submitConfig.method,
         url: schema.submitConfig.endpoint,
         data: payload,
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       onSuccess?.({ intent, payload })
@@ -274,7 +277,8 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
           <div className="flex items-center gap-2 px-5 py-3 border-t border-nexo-border bg-nexo-bg/50 shrink-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>

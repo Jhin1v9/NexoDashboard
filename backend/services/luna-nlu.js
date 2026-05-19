@@ -46,6 +46,7 @@ const DOMAINS = {
       'email.mover_lixeira',
       'email.marcar_importante',
       'email.listar_nao_lidos',
+      'email.marcar_lido',
       'email.sincronizar',
     ],
   },
@@ -102,6 +103,15 @@ const DOMAINS = {
       'whatsapp.ver_historico',
       'whatsapp.sincronizar',
       'whatsapp.marcar_nao_lido',
+      'whatsapp.verificar_mencoes',
+    ],
+  },
+  links: {
+    description: 'Comandos relacionados a links e recursos',
+    intents: [
+      'link.listar',
+      'link.adicionar',
+      'link.excluir',
     ],
   },
   orcamentos: {
@@ -445,6 +455,36 @@ const TRAINING_CORPUS = {
       'llista missatges no llegits',
       'hi ha email nou',
       'mostra notificacions d\'email',
+    ],
+  },
+
+  'email.marcar_lido': {
+    pt: [
+      'marcar email como lido',
+      'marcar email lido',
+      'email lido',
+      'marcar como lido',
+      'marcar mensagem como lida',
+      'marca esse email como lido',
+      'marcar lido',
+    ],
+    es: [
+      'marcar email como leído',
+      'marcar email leído',
+      'email leído',
+      'marcar como leído',
+      'marcar mensaje como leída',
+      'marca este email como leído',
+      'marcar leído',
+    ],
+    ca: [
+      'marcar email com a llegit',
+      'marcar email llegit',
+      'email llegit',
+      'marcar com a llegit',
+      'marcar missatge com a llegida',
+      'marca aquest email com a llegit',
+      'marcar llegit',
     ],
   },
 
@@ -810,8 +850,245 @@ const TRAINING_CORPUS = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
+  // DOMÍNIO: PROJETOS
+  // ══════════════════════════════════════════════════════════════════════════
+  'projeto.listar': {
+    pt: [
+      'listar projetos',
+      'mostrar projetos',
+      'ver projetos',
+      'projetos ativos',
+      'quais projetos temos',
+      'status dos projetos',
+      'meus projetos',
+    ],
+    es: [
+      'listar proyectos',
+      'mostrar proyectos',
+      'ver proyectos',
+      'proyectos activos',
+      'qué proyectos tenemos',
+      'estado de los proyectos',
+      'mis proyectos',
+    ],
+    ca: [
+      'llistar projectes',
+      'mostrar projectes',
+      'veure projectes',
+      'projectes actius',
+      'quins projectes tenim',
+      'estat dels projectes',
+      'els meus projectes',
+    ],
+  },
+
+  'projeto.criar': {
+    pt: [
+      'criar projeto',
+      'novo projeto',
+      'adicionar projeto',
+      'criar novo projeto',
+    ],
+    es: [
+      'crear proyecto',
+      'nuevo proyecto',
+      'añadir proyecto',
+      'crear nuevo proyecto',
+    ],
+    ca: [
+      'crear projecte',
+      'nou projecte',
+      'afegir projecte',
+      'crear nou projecte',
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DOMÍNIO: IDEIAS
+  // ══════════════════════════════════════════════════════════════════════════
+  'ideia.listar': {
+    pt: [
+      'listar ideias',
+      'mostrar ideias',
+      'ver ideias',
+      'ideias salvas',
+      'brainstorms',
+      'quais ideias temos',
+      'minhas ideias',
+      'sessao de ideias',
+    ],
+    es: [
+      'listar ideas',
+      'mostrar ideas',
+      'ver ideas',
+      'ideas guardadas',
+      'brainstorms',
+      'qué ideas tenemos',
+      'mis ideas',
+      'sesión de ideas',
+    ],
+    ca: [
+      'llistar idees',
+      'mostrar idees',
+      'veure idees',
+      'idees guardades',
+      'brainstorms',
+      'quines idees tenim',
+      'les meves idees',
+      'sessió d\'idees',
+    ],
+  },
+
+  'ideia.criar': {
+    pt: [
+      'criar ideia',
+      'nova ideia',
+      'adicionar ideia',
+      'novo brainstorm',
+      'criar brainstorm',
+    ],
+    es: [
+      'crear idea',
+      'nueva idea',
+      'añadir idea',
+      'nuevo brainstorm',
+      'crear brainstorm',
+    ],
+    ca: [
+      'crear idea',
+      'nova idea',
+      'afegir idea',
+      'nou brainstorm',
+      'crear brainstorm',
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
   // DOMÍNIO: SISTEMA / GERAL
   // ══════════════════════════════════════════════════════════════════════════
+  'whatsapp.verificar_mencoes': {
+    pt: [
+      'verificar mencoes',
+      'checar mencoes',
+      'tem alguem me mencionando',
+      'quem me mencionou',
+      'verifica se tem mencao',
+      'menções pendentes',
+      '@luna mencoes',
+      'tem mencao no whatsapp',
+    ],
+    es: [
+      'verificar menciones',
+      'checar menciones',
+      'hay alguien mencionándome',
+      'quién me mencionó',
+      'verifica si hay mención',
+      'menciones pendientes',
+      '@luna menciones',
+      'hay mención en whatsapp',
+    ],
+    ca: [
+      'verificar mencions',
+      'comprovar mencions',
+      'hi ha algú mencionant-me',
+      'qui m\'ha mencionat',
+      'verifica si hi ha menció',
+      'mencions pendents',
+      '@luna mencions',
+      'hi ha menció al whatsapp',
+    ],
+  },
+
+  'link.listar': {
+    pt: [
+      'listar links',
+      'mostrar links',
+      'ver links',
+      'links cadastrados',
+      'recursos salvos',
+      'mostra os links',
+      'quais links temos',
+    ],
+    es: [
+      'listar links',
+      'mostrar links',
+      'ver links',
+      'links registrados',
+      'recursos guardados',
+      'muestra los links',
+      'qué links tenemos',
+    ],
+    ca: [
+      'llistar links',
+      'mostrar links',
+      'veure links',
+      'links registrats',
+      'recursos guardats',
+      'mostra els links',
+      'quins links tenim',
+    ],
+  },
+
+  'link.adicionar': {
+    pt: [
+      'adicionar link',
+      'salvar link',
+      'guardar link',
+      'novo link',
+      'adicionar url',
+      'salvar url',
+    ],
+    es: [
+      'añadir link',
+      'guardar link',
+      'salvar link',
+      'nuevo link',
+      'añadir url',
+      'guardar url',
+    ],
+    ca: [
+      'afegir link',
+      'guardar link',
+      'salvar link',
+      'nou link',
+      'afegir url',
+      'guardar url',
+    ],
+  },
+
+  'sistema.notificacoes': {
+    pt: [
+      'listar notificacoes',
+      'mostrar notificacoes',
+      'ver notificacoes',
+      'notificacoes pendentes',
+      'tem notificacao',
+      'notificacoes do sistema',
+      'alertas',
+      'ver alertas',
+    ],
+    es: [
+      'listar notificaciones',
+      'mostrar notificaciones',
+      'ver notificaciones',
+      'notificaciones pendientes',
+      'hay notificación',
+      'notificaciones del sistema',
+      'alertas',
+      'ver alertas',
+    ],
+    ca: [
+      'llistar notificacions',
+      'mostrar notificacions',
+      'veure notificacions',
+      'notificacions pendents',
+      'hi ha notificació',
+      'notificacions del sistema',
+      'alertes',
+      'veure alertes',
+    ],
+  },
+
   'sistema.ajuda': {
     pt: [
       'ajuda',

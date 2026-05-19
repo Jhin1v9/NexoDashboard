@@ -29,8 +29,17 @@ const VALID_STATUSES = [
 
 const VALID_TYPES = [
   'proposta-comercial', 'brainstorm', 'prd', 'pipeline-vendas',
-  'estrategia', 'processo', 'marketing', 'outro'
+  'estrategia', 'processo', 'marketing', 'outro', 'feature'
 ];
+
+const TYPE_ALIASES = {
+  'feature': 'brainstorm',
+  'funcionalidade': 'brainstorm',
+  'improvement': 'processo',
+  'melhoria': 'processo',
+  'bug': 'processo',
+  'bugfix': 'processo',
+};
 
 const VALID_PRIORITIES = ['baixa', 'media', 'alta', 'urgente'];
 
@@ -386,9 +395,9 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
       if (!params.title || params.title.trim().length < 3) {
         return { success: false, error: 'Titulo obrigatorio, minimo 3 caracteres' };
       }
-      const type = params.type || 'outro';
+      const type = TYPE_ALIASES[params.type] || params.type || 'outro';
       if (!VALID_TYPES.includes(type)) {
-        return { success: false, error: `Tipo invalido: ${type}` };
+        return { success: false, error: `Tipo invalido: ${type}. Validos: ${VALID_TYPES.filter(t => t !== 'feature').join(', ')}` };
       }
       const ideasArray = ideasData.ideas ? Object.values(ideasData.ideas) : [];
       const newId = generateSequentialId(ideasArray, 'idea-');
@@ -755,8 +764,9 @@ module.exports = function(requireAuth) {
       if (!body.type) {
         return res.status(400).json({ success: false, error: 'Tipo obrigatorio' });
       }
-      if (!VALID_TYPES.includes(body.type)) {
-        return res.status(400).json({ success: false, error: `Tipo invalido. Validos: ${VALID_TYPES.join(', ')}` });
+      const normalizedType = TYPE_ALIASES[body.type] || body.type;
+      if (!VALID_TYPES.includes(normalizedType)) {
+        return res.status(400).json({ success: false, error: `Tipo invalido. Validos: ${VALID_TYPES.filter(t => t !== 'feature').join(', ')}` });
       }
 
       // Validar status
@@ -1230,10 +1240,11 @@ module.exports = function(requireAuth) {
       }
 
       if (body.type !== undefined) {
-        if (!VALID_TYPES.includes(body.type)) {
-          return res.status(400).json({ success: false, error: 'Tipo invalido' });
+        const normalizedType = TYPE_ALIASES[body.type] || body.type;
+        if (!VALID_TYPES.includes(normalizedType)) {
+          return res.status(400).json({ success: false, error: `Tipo invalido. Validos: ${VALID_TYPES.filter(t => t !== 'feature').join(', ')}` });
         }
-        idea.type = body.type;
+        idea.type = normalizedType;
       }
 
       // Merge profundo em content.blocks
