@@ -2,7 +2,7 @@ import {
   Mail, Send, Inbox, Star, Trash2, FileText,
   Archive, AlertTriangle, RefreshCw, Plus, Wifi, WifiOff,
   ChevronDown, ChevronRight, Tag, PanelLeftClose, PanelLeftOpen,
-  Maximize2
+  Maximize2, Minimize2
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 
@@ -29,6 +29,7 @@ export default function EmailSidebar({
   collapsed: controlledCollapsed,
   onToggleCollapse,
   onFocusMode,
+  isFocusMode,
 }) {
   const [internalCollapsed, setInternalCollapsed] = useState(() => {
     try {
@@ -60,14 +61,14 @@ export default function EmailSidebar({
   return (
     <div className={`${widthClass} border-r border-nexo-border flex flex-col h-full bg-nexo-card/50 transition-[width] duration-200 ease-out relative`}>
       {/* Toggle + Focus mode buttons (header) */}
-      <div className={`flex items-center ${collapsed ? 'justify-center px-1' : 'justify-between px-3'} py-2 border-b border-nexo-border`}>
-        {!collapsed && onFocusMode && (
+      <div className={`flex items-center ${collapsed ? 'justify-center px-1 gap-1' : 'justify-between px-3'} py-2 border-b border-nexo-border`}>
+        {onFocusMode && (
           <button
             onClick={onFocusMode}
             className="p-1.5 rounded-lg text-nexo-muted hover:text-nexo-text hover:bg-nexo-bg transition-colors"
-            title="Modo Foco (tela cheia)"
+            title={isFocusMode ? 'Sair do Modo Foco' : 'Modo Foco (tela cheia)'}
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         )}
         <button

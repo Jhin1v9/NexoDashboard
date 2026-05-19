@@ -241,6 +241,7 @@ export default function EmailHub() {
         userProfile={authStatus}
         unreadCounts={unreadCounts}
         onFocusMode={toggleFocusMode}
+        isFocusMode={isFocusMode}
       />
 
       {/* Lista de emails — redimensionável */}
