@@ -1,7 +1,26 @@
 {
   "version": "1.1",
-  "lastUpdated": "2026-05-19T18:30:00.000Z",
+  "lastUpdated": "2026-05-19T16:35:47.447746.000Z",
   "entries": [
+    {
+      "id": "changelog-nlu-expansion-137-intents",
+      "version": "3.3.0",
+      "title": "NLU Expansion: 36 → 137 Intents",
+      "description": "Expansão massiva do modelo NLU da Luna de 36 para 137 intents cobrindo todos os domínios do NEXO: email (19 intents incluindo rascunhos, favoritos, spam, lixeira), tarefas (16 intents incluindo P0/P1, atrasadas, por projeto/responsável), financeiro (16 intents incluindo extrato, balanço, projeção, reconciliação), whatsapp (13 intents), workspace (10 intents), sistema (12 intents), clientes (6), leads (6), projetos (7), orçamentos (7), ideias (7), instagram (3), github (3), vercel (2), segurança (5) e operações (5). Todos os intents possuem exemplos de treinamento em PT/ES/CA e schemas no SmartFormModal. O comando \"rascunhos pendentes\" agora funciona corretamente.",
+      "category": "feature",
+      "emoji": "🧠",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T16:35:47.447715.000Z",
+      "tags": [
+        "nlu",
+        "intents",
+        "expansão",
+        "machine-learning",
+        "i18n"
+      ],
+      "readBy": []
+    },
     {
       "id": "changelog-workspace-leads-active-learning",
       "version": "3.2.0",

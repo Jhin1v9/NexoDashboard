@@ -66,6 +66,11 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'extrato financeiro', desc: 'Histórico completo de transações' },
       { cmd: 'próximos pagamentos', desc: 'Receitas agendadas/pendentes' },
       { cmd: 'divisão dos founders', desc: 'Quanto cada um deve receber' },
+      { cmd: 'extrato financeiro', desc: 'Histórico completo de transações' },
+      { cmd: 'balanço do mês', desc: 'Receitas vs despesas do mês' },
+      { cmd: 'projeção de caixa', desc: 'Previsão financeira futura' },
+      { cmd: 'reconciliar caixa', desc: 'Conferência e fechamento do caixa' },
+      { cmd: 'histórico do caixa', desc: 'Evolução do caixa ao longo do tempo' },
     ],
   },
 
@@ -87,6 +92,9 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'concluir tarefa', desc: 'Marca uma tarefa como feita' },
       { cmd: 'excluir tarefa', desc: 'Remove uma tarefa do sistema' },
       { cmd: 'tarefas atrasadas', desc: 'Tarefas com prazo vencido' },
+      { cmd: 'tarefas por projeto', desc: 'Filtra tarefas por projeto/cliente' },
+      { cmd: 'tarefas por responsável', desc: 'Filtra tarefas por pessoa' },
+      { cmd: 'tarefas concluídas', desc: 'Histórico de tarefas feitas' },
     ],
   },
 
