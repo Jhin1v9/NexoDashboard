@@ -288,6 +288,24 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
+// Debug: verificar estado do changelog no Render
+app.get('/api/debug/changelog-file', (req, res) => {
+  try {
+    const exists = fs.existsSync(CHANGELOG_FILE);
+    const size = exists ? fs.statSync(CHANGELOG_FILE).size : 0;
+    const content = exists ? readJSON(CHANGELOG_FILE) : null;
+    res.json({
+      exists,
+      size,
+      path: CHANGELOG_FILE,
+      entriesCount: content?.entries?.length || 0,
+      ids: content?.entries?.map(e => e.id) || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── DEBUG: Gmail OAuth config ──
 app.get('/api/debug/gmail-config', (req, res) => {
   const clientId = process.env.GMAIL_CLIENT_ID || '';
