@@ -155,6 +155,12 @@ const DOMAINS = {
       'sistema.notificacoes',
     ],
   },
+  social: {
+    description: 'Saudações e conversação social',
+    intents: [
+      'social',
+    ],
+  },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -738,6 +744,10 @@ const TRAINING_CORPUS = {
       'tivemos um custo',
       'saída de dinheiro',
       'registra pagamento feito',
+      'quero registrar uma despesa',
+      'registrar despesa',
+      'nova saída de dinheiro',
+      'temos um gasto novo',
     ],
     es: [
       'añade gasto',
@@ -754,6 +764,113 @@ const TRAINING_CORPUS = {
       'hem tingut un cost',
       'sortida de diners',
       'registra pagament fet',
+    ],
+  },
+
+  'financeiro.listar_pagamentos': {
+    pt: [
+      'listar pagamentos',
+      'mostrar pagamentos',
+      'ver pagamentos',
+      'pagamentos recebidos',
+      'receitas registradas',
+      'histórico de pagamentos',
+      'quais pagamentos temos',
+    ],
+    es: [
+      'listar pagos',
+      'mostrar pagos',
+      'ver pagos',
+      'pagos recibidos',
+      'ingresos registrados',
+      'histórico de pagos',
+      'qué pagos tenemos',
+    ],
+    ca: [
+      'llistar pagaments',
+      'mostrar pagaments',
+      'veure pagaments',
+      'pagaments rebuts',
+      'ingressos registrats',
+      'històric de pagaments',
+      'quins pagaments tenim',
+    ],
+  },
+
+  'financeiro.listar_despesas': {
+    pt: [
+      'listar despesas',
+      'mostrar despesas',
+      'ver despesas',
+      'gastos registrados',
+      'despesas do mês',
+      'histórico de despesas',
+      'quais despesas temos',
+    ],
+    es: [
+      'listar gastos',
+      'mostrar gastos',
+      'ver gastos',
+      'costes registrados',
+      'gastos del mes',
+      'histórico de gastos',
+      'qué gastos tenemos',
+    ],
+    ca: [
+      'llistar despeses',
+      'mostrar despeses',
+      'veure despeses',
+      'costos registrats',
+      'despeses del mes',
+      'històric de despeses',
+      'quines despeses tenim',
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DOMÍNIO: SOCIAL
+  // ══════════════════════════════════════════════════════════════════════════
+  'social': {
+    pt: [
+      'oi',
+      'ola',
+      'oi luna',
+      'ola luna',
+      'bom dia',
+      'boa tarde',
+      'boa noite',
+      'tudo bem',
+      'como vai',
+      'como você está',
+      'como voce esta',
+      'e ai',
+      'e aí',
+      'salve',
+      'opa',
+      'iae',
+    ],
+    es: [
+      'hola',
+      'hola luna',
+      'buenos dias',
+      'buenas tardes',
+      'buenas noches',
+      'todo bien',
+      'como estás',
+      'como va',
+      'que tal',
+      'saludos',
+    ],
+    ca: [
+      'hola',
+      'hola luna',
+      'bon dia',
+      'bona tarda',
+      'bona nit',
+      'com estàs',
+      'com va',
+      'que tal',
+      'salutacions',
     ],
   },
 

@@ -76,3 +76,4 @@ public/whatsapp-qr-code.png
 backend/public/
 frontend/dist/
 .env
+backend/workspace/

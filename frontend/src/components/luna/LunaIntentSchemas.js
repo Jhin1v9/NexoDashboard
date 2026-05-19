@@ -263,6 +263,20 @@ export const INTENT_SCHEMAS = {
     },
   },
 
+  'financeiro.listar_pagamentos': {
+    title: 'Pagamentos Recebidos',
+    description: 'Redirecionando para a lista de pagamentos...',
+    isRedirect: true,
+    redirectTo: '/financeiro',
+  },
+
+  'financeiro.listar_despesas': {
+    title: 'Despesas',
+    description: 'Redirecionando para a lista de despesas...',
+    isRedirect: true,
+    redirectTo: '/financeiro',
+  },
+
   'financeiro.adicionar_despesa': {
     title: 'Nova Despesa',
     description: 'Registre uma nova saída de dinheiro.',
@@ -457,6 +471,12 @@ export const INTENT_SCHEMAS = {
     },
     isRedirect: true,
     redirectTo: (values) => values.destino,
+  },
+
+  'social': {
+    title: 'Oi! 👋',
+    description: 'Oi! Tô por aqui, pronta pra ajudar.\n\nPosso te ajudar com:\n• Criar tarefas, leads, ideias\n• Registrar pagamentos e despesas\n• Consultar caixa, projetos, links\n• Enviar emails e mensagens WhatsApp\n• Verificar menções e notificações\n\nO que você precisa?',
+    isInfo: true,
   },
 }
 

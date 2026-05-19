@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, X, Loader2, CheckCircle, AlertTriangle,
-  ArrowRight, HelpCircle, Navigation, Send, MessageSquare
+  ArrowRight, HelpCircle, Navigation, Send, MessageSquare,
+  BrainCircuit
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -24,6 +25,9 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [values, setValues] = useState({})
+  const [showIntentPicker, setShowIntentPicker] = useState(false)
+  const [availableIntents, setAvailableIntents] = useState([])
+  const [isLearning, setIsLearning] = useState(false)
 
   const intent = result?.intent || 'None'
   const score = result?.score || 0
@@ -64,6 +68,38 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
   const updateValue = useCallback((key, val) => {
     setValues(prev => ({ ...prev, [key]: val }))
   }, [])
+
+  // Busca intents disponíveis para active learning
+  useEffect(() => {
+    if (!showIntentPicker) return
+    axios.get('/api/luna/intents')
+      .then(res => {
+        if (res.data.success) {
+          const intents = (res.data.intents || []).map(i => typeof i === 'string' ? i : i.intent).filter(Boolean)
+          setAvailableIntents(intents)
+        }
+      })
+      .catch(() => setAvailableIntents([]))
+  }, [showIntentPicker])
+
+  const handleLearn = async (correctIntent) => {
+    setIsLearning(true)
+    try {
+      const token = localStorage.getItem('nexo_token') || ''
+      await axios.post('/api/luna/learn', {
+        lang: 'pt',
+        utterance: originalText,
+        intent: correctIntent
+      }, { headers: { Authorization: `Bearer ${token}` } })
+      addToast('Luna aprendeu! Modelo re-treinado com sucesso.', 'success')
+      onClose()
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Erro ao treinar'
+      addToast(`Erro no aprendizado: ${msg}`, 'error')
+    } finally {
+      setIsLearning(false)
+    }
+  }
 
   const handleSubmit = async () => {
     if (schema.isRedirect) {
@@ -258,6 +294,45 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
               </div>
             )}
 
+            {/* Active Learning — Seleção de intent correto */}
+            <AnimatePresence>
+              {showIntentPicker && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-2"
+                >
+                  <p className="text-xs text-nexo-muted">Qual era a intenção correta?</p>
+                  <div className="max-h-40 overflow-y-auto space-y-1 border border-nexo-border rounded-lg p-1">
+                    {availableIntents.length === 0 && (
+                      <div className="text-xs text-nexo-muted p-2">Carregando intents...</div>
+                    )}
+                    {availableIntents.map(availableIntent => (
+                      <button
+                        key={availableIntent}
+                        onClick={() => handleLearn(availableIntent)}
+                        disabled={isLearning}
+                        className={`w-full text-left px-3 py-1.5 rounded-md text-xs transition-colors ${
+                          availableIntent === intent
+                            ? 'bg-nexo-primary/10 text-nexo-primary font-medium'
+                            : 'hover:bg-nexo-card text-nexo-text'
+                        }`}
+                      >
+                        {isLearning && availableIntent === intent ? (
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Treinando...
+                          </span>
+                        ) : (
+                          availableIntent
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Campos do formulário */}
             {schema.fields && (
               <div className="space-y-3">
@@ -277,13 +352,35 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
           <div className="flex items-center gap-2 px-5 py-3 border-t border-nexo-border bg-nexo-bg/50 shrink-0">
             <button
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLearning}
               className="px-4 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <div className="flex-1" />
-            {schema.isRedirect && (
+
+            {/* Active Learning trigger */}
+            {!showIntentPicker && score < 0.85 && intent !== 'None' && (
+              <button
+                onClick={() => setShowIntentPicker(true)}
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text border border-nexo-border rounded-lg transition-colors disabled:opacity-50"
+              >
+                <BrainCircuit className="w-3.5 h-3.5" />
+                Não era isso?
+              </button>
+            )}
+            {showIntentPicker && (
+              <button
+                onClick={() => setShowIntentPicker(false)}
+                disabled={isLearning}
+                className="px-3 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text border border-nexo-border rounded-lg transition-colors disabled:opacity-50"
+              >
+                Voltar
+              </button>
+            )}
+
+            {schema.isRedirect && !showIntentPicker && (
               <button
                 onClick={handleSubmit}
                 className="flex items-center gap-1.5 px-4 py-2 bg-nexo-primary text-white text-xs font-medium rounded-lg hover:bg-nexo-primary/80 transition-colors"
@@ -292,7 +389,7 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
                 Ir para página
               </button>
             )}
-            {schema.fields && (
+            {schema.fields && !showIntentPicker && (
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}

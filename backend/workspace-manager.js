@@ -133,6 +133,12 @@ function getClient(id) {
   return readJSON(file);
 }
 
+function clientExists(id) {
+  const sid = sanitizeClientId(id);
+  if (!sid) return false;
+  return fs.existsSync(path.join(WORKSPACE_DIR, sid, 'cliente.json'));
+}
+
 function updateClient(id, updates) {
   const sid = sanitizeClientId(id);
   if (!sid) throw new Error('Invalid client id');
@@ -341,6 +347,7 @@ module.exports = {
   saveIndex,
   createClient,
   getClient,
+  clientExists,
   updateClient,
   deleteClient,
   listFiles,

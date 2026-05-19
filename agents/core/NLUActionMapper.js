@@ -101,6 +101,9 @@ const INTENT_TO_ACTION = {
   'sistema.status': { type: 'consultar_status', needsConfirmation: false },
   'sistema.navegar': { type: 'ideia', needsConfirmation: false },
   'sistema.notificacoes': { type: 'listar_notificacoes', needsConfirmation: false },
+
+  // SOCIAL
+  'social': { type: 'social', needsConfirmation: false },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
