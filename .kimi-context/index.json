@@ -4,13 +4,13 @@
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
   "lastUpdated": "2026-05-19T14:00:00+02:00",
-  "activeSessionId": "kimi-19007e56",
+  "activeSessionId": "kimi-c3e5bb1c",
   "sessions": [
     {
       "id": "kimi-19007e56",
       "startedAt": "2026-05-19T13:45:00+02:00",
-      "status": "active",
-      "focus": "Testes NEXO Mail Sprint 2 + relatório completo + descoberta de trabalho da instância 🟢",
+      "status": "archived",
+      "focus": "Testes NEXO Mail Sprint 2 + relatório completo + fix deploy Render",
       "snapshotFile": "sessions/2026-05-19-kimi-19007e56.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
@@ -30,8 +30,18 @@
       "id": "kimi-c4b19cd8",
       "startedAt": "2026-05-19T12:54:40+02:00",
       "status": "archived",
-      "focus": "Luna ADM Gestora Única — FASE 2: Expansão do ActionExecutor + integração com endpoints existentes",
+      "focus": "Luna ADM Gestora Única — FASE 2-5 completas (ActionExecutor + IntentParser + Unificação IAs)",
       "snapshotFile": "sessions/2026-05-19-kimi-c4b19cd8.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
+      "lastCompactionAt": null
+    },
+    {
+      "id": "kimi-c3e5bb1c",
+      "startedAt": "2026-05-19T14:00:00+02:00",
+      "status": "active",
+      "focus": "Changelog na sidebar + atualizações do dashboard + contexto compartilhado",
+      "snapshotFile": "sessions/2026-05-19-kimi-c3e5bb1c.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
       "lastCompactionAt": null
@@ -50,14 +60,21 @@
       "signature": "KIMI-C4B19CD8",
       "color": "🟢",
       "role": "coding-agent",
-      "notes": "Sessão anterior. Trabalhou na unificação da Luna como ADM Gestora Única. Deixou mudanças NÃO COMMITADAS no working tree (ActionExecutor expandido, contextModule nos endpoints Luna, botão Luna nas páginas)."
+      "notes": "Sessão anterior. Implementou ActionExecutor (109 métodos), IntentParser, unificação de IAs. Trabalho COMMITADO pela sessão 🔴 em 7ed2c6c."
     },
     "kimi-19007e56": {
       "instanceHash": "19007e56",
       "signature": "KIMI-19007E56",
       "color": "🔴",
       "role": "coding-agent",
-      "notes": "Sessão atual. Continuando testes do NEXO Mail Sprint 2 e relatório completo. DESCoberta: instância 🟢 deixou mudanças não commitadas que devem ser preservadas."
+      "notes": "Sessão anterior. Testes NEXO Mail Sprint 2. Descobriu API key Gemini revogada. Commitei trabalho da 🟢 em 7ed2c6c. Deploy Render OK."
+    },
+    "kimi-c3e5bb1c": {
+      "instanceHash": "c3e5bb1c",
+      "signature": "KIMI-C3E5BB1C",
+      "color": "🟣",
+      "role": "coding-agent",
+      "notes": "Sessão atual. Trabalhando em Changelog na sidebar + atualizações do dashboard."
     }
   },
   "rules": {
@@ -65,6 +82,7 @@
     "beforeSessionEnd": "ATUALIZAR handoff.md com próximas ações pendentes",
     "onNewSession": "LER KIMI.MD + handoff.md + último snapshot antes de agir",
     "onConflict": "Se múltiplas instâncias Kimi ativas, verificar activeSessionId e NUNCA sobrescrever trabalho de outra instância sem confirmação do usuário",
-    "onOtherKimiWork": "SEMPRE verificar se outras sessões Kimi modificaram arquivos que você também está trabalhando. Anotar no handoff.md e integrar mudanças."
+    "onOtherKimiWork": "SEMPRE verificar se outras sessões Kimi modificaram arquivos que você também está trabalhando. Anotar no handoff.md e integrar mudanças.",
+    "userPreference": "FOCO É QUALIDADE, NÃO VELOCIDADE. O usuário quer escolher a melhor solução de uma vez e não ficar mudando depois. SEMPRE priorizar qualidade, robustez e manutenibilidade sobre rapidez de implementação."
   }
 }

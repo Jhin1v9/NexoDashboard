@@ -3740,7 +3740,7 @@ app.get('/api/luna/analytics', (req, res) => {
 
 // POST /api/luna/chat — Chat direto com Luna via LLM
 // ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
-function buildDashboardContext() {
+function buildDashboardContext(contextModule = null, contextId = null) {
   try {
     const buffer = readLunaBuffer();
     const tasksFile = path.join(DATA_DIR, 'tasks.json');
@@ -3786,6 +3786,33 @@ function buildDashboardContext() {
     const ignoreMentions = whatsappConfig.ignoreMentions === true;
 
     let ctx = `📊 SNAPSHOT NEXO — ${new Date().toLocaleString('pt-BR')}\n\n`;
+
+    // ── CONTEXTO ESPECÍFICO POR MÓDULO ──
+    if (contextModule === 'ideas' && contextId) {
+      const ideasFile = path.join(DATA_DIR, 'ideas-registry.json');
+      const ideasData = readJSON(ideasFile, { ideas: {} });
+      const idea = ideasData.ideas?.[contextId];
+      if (idea) {
+        ctx += `🎯 CONTEXTO ATUAL — IDEIA "${idea.title || idea.id}":\n`;
+        ctx += `- Status: ${idea.status || 'rascunho'} | Tipo: ${idea.type || 'outro'} | Prioridade: ${idea.priority || 'media'}\n`;
+        if (idea.linkedTo?.clientName) ctx += `- Cliente vinculado: ${idea.linkedTo.clientName}\n`;
+        if (idea.tags?.length) ctx += `- Tags: ${idea.tags.join(', ')}\n`;
+        if (idea.aiContext?.brainstormHistory?.length) {
+          const lastMsgs = idea.aiContext.brainstormHistory.slice(-3);
+          ctx += `- Últimas mensagens no chat:\n`;
+          lastMsgs.forEach(m => {
+            ctx += `  ${m.role === 'user' ? '👤' : '🤖'} ${(m.content || '').slice(0, 80)}${(m.content || '').length > 80 ? '...' : ''}\n`;
+          });
+        }
+        ctx += `\n`;
+      }
+    }
+
+    if (contextModule === 'email' && contextId) {
+      // Contexto de email é carregado dinamicamente pelo chamador
+      ctx += `📧 CONTEXTO ATUAL — EMAIL/THREAD: ${contextId}\n`;
+      ctx += `(Detalhes do email são passados via context array no body)\n\n`;
+    }
 
     ctx += `📋 TAREFAS:\n`;
     ctx += `- P0: ${p0.length}${p0.length > 0 ? ' (' + p0.slice(0, 3).map(t => `"${(t.title || t.titulo || '').slice(0, 40)}"`).join(', ') + ')' : ''}\n`;
@@ -3876,6 +3903,65 @@ function buildChatFallbackReply(userMessage) {
 // ────────────────────────────────────────────────────────
 
 // ============================================================
+// POST /api/luna/understand — NLU Engine (NLP.js)
+// Classifica intenção, extrai entidades, retorna confidence
+// Funciona 100% offline — não depende de API externa
+// ============================================================
+app.post('/api/luna/understand', requireAuth, async (req, res) => {
+  try {
+    const { text, lang } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Texto obrigatório' });
+    }
+
+    const result = await lunaNLU.process(text.trim(), lang);
+
+    res.json({
+      success: true,
+      text: text.trim(),
+      intent: result.intent,
+      domain: result.domain,
+      score: result.score,
+      action: result.action,
+      entities: result.entities,
+      answer: result.answer,
+      language: result.language,
+      suggestions: result.suggestions || null,
+      sentiment: result.sentiment,
+    });
+  } catch (e) {
+    console.error('[LunaNLU] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/luna/intents — Lista todos os intents disponíveis
+app.get('/api/luna/intents', requireAuth, (req, res) => {
+  try {
+    const intents = lunaNLU.getIntents();
+    res.json({ success: true, intents });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/learn — Adiciona novo exemplo de treinamento
+app.post('/api/luna/learn', requireAuth, async (req, res) => {
+  try {
+    const { lang, utterance, intent } = req.body;
+    if (!lang || !utterance || !intent) {
+      return res.status(400).json({ success: false, error: 'lang, utterance e intent são obrigatórios' });
+    }
+
+    await lunaNLU.addTrainingExample(lang, utterance, intent);
+    res.json({ success: true, message: 'Exemplo adicionado e modelo re-treinado' });
+  } catch (e) {
+    console.error('[LunaNLU] Erro ao aprender:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ============================================================
 // POST /api/luna/chat — MODO CONCIERGE v19.0
 // IntentParser (regex/LLM) → ActionExecutor → resposta humanizada
 // LLM usado APENAS como fallback para conversas sociais
@@ -3931,12 +4017,58 @@ app.post('/api/luna/chat', async (req, res) => {
 
     // Filtra ações desconhecidas — se sobrar nenhuma, cai no fallback LLM
     const knownActions = [
-      'criar_tarefa', 'criar_lead', 'registrar_pagamento', 'registrar_pagamento_com_split',
-      'registrar_despesa', 'registrar_despesa_com_split', 'confirmar_tarefa',
-      'adicionar_comentario', 'atualizar_status', 'consultar_status',
-      'consultar_tarefas', 'consultar_leads', 'consultar_financeiro',
-      'consultar_whatsapp', 'consultar_emails', 'verificar_mencoes',
-      'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead',
+      // Tarefas
+      'criar_tarefa', 'confirmar_tarefa', 'excluir_tarefa', 'atualizar_status', 'adicionar_comentario',
+      'atualizar_tarefa', 'listar_tarefas_por_filtro', 'consultar_tarefas', 'consultar_status',
+      // Leads
+      'criar_lead', 'excluir_lead', 'atualizar_lead', 'converter_lead', 'consultar_leads',
+      // Financeiro — Receitas
+      'registrar_pagamento', 'registrar_pagamento_com_split', 'excluir_pagamento',
+      'listar_pagamentos', 'atualizar_pagamento', 'adicionar_transacao', 'receber_split',
+      // Financeiro — Despesas
+      'registrar_despesa', 'registrar_despesa_com_split', 'excluir_despesa',
+      'listar_despesas', 'atualizar_despesa', 'pagar_despesa', 'criar_template_despesa',
+      // Financeiro — Caixa
+      'consultar_caixa', 'ajustar_caixa', 'adicionar_entrada_caixa',
+      'listar_historico_caixa', 'projecao_caixa', 'reconciliar_caixa',
+      // Financeiro — Orçamentos
+      'criar_orcamento', 'atualizar_orcamento', 'deletar_orcamento', 'listar_orcamentos',
+      // Projetos
+      'listar_projetos', 'criar_projeto', 'atualizar_projeto', 'excluir_projeto',
+      // Clientes
+      'listar_clientes', 'criar_cliente', 'atualizar_cliente', 'excluir_cliente',
+      // Workspace
+      'adicionar_cliente_workspace', 'atualizar_cliente_workspace',
+      // Ideias
+      'criar_ideia', 'listar_ideias', 'atualizar_ideia', 'excluir_ideia', 'converter_ideia_em_tarefa',
+      'comentar_ideia', 'criar_ideia_de_template', 'listar_templates_ideias',
+      // WhatsApp
+      'consultar_whatsapp', 'verificar_mencoes', 'enviar_mensagem_whatsapp',
+      'escanear_whatsapp', 'limpar_buffer_whatsapp', 'ver_historico_whatsapp', 'ver_classificacoes', 'corrigir_classificacao',
+      // Email
+      'consultar_emails', 'listar_emails', 'ler_email', 'enviar_email', 'responder_email', 'gerar_rascunho_email',
+      'marcar_email_lido', 'marcar_email_nao_lido', 'favoritar_email', 'arquivar_email',
+      'mover_para_lixeira', 'marcar_spam', 'aprovar_rascunho', 'rejeitar_rascunho',
+      'sugerir_resposta_email', 'resumir_thread_email', 'analizar_email',
+      // Instagram
+      'listar_mensagens_instagram', 'importar_mensagem_instagram',
+      // Links
+      'listar_links', 'adicionar_link', 'excluir_link', 'enriquecer_link', 'sincronizar_links',
+      // Operações
+      'criar_alerta_operacao', 'excluir_alerta_operacao', 'registrar_mudanca',
+      // Sistema
+      'controlar_servico', 'ver_logs_stack', 'verificar_stack',
+      // Segurança
+      'consultar_log_seguranca', 'atualizar_config_seguranca', 'testar_whatsapp_seguranca',
+      // Notificações
+      'listar_notificacoes', 'marcar_notificacao_lida', 'marcar_todas_lidas', 'excluir_notificacao',
+      // Usuários
+      'consultar_usuarios', 'trocar_usuario', 'alterar_senha',
+      // External Tools
+      'listar_repos_github', 'listar_projetos_vercel', 'executar_comando', 'fazer_git_push',
+      // BugDetector
+      'listar_relatorios_bug', 'excluir_relatorio_bug',
+      // Misc
       'ideia', 'link', 'social'
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
@@ -4108,7 +4240,7 @@ app.post('/api/luna/chat', async (req, res) => {
     }
 
     // ── 6. FALLBACK: conversa via LLM (Gemini API) ──
-    const dataContext = buildDashboardContext();
+    const dataContext = buildDashboardContext(contextModule, contextId);
     const conversationHistory = context.slice(-10).map(c => ({
       role: c.role === 'user' ? 'user' : 'model',
       parts: [{ text: c.text }]
@@ -5172,6 +5304,7 @@ const emailAgent = new EmailAgent();
 const gmailOAuth = require('./services/gmail-oauth');
 const gmailAPI = require('./services/gmail-api');
 const emailAI = require('./services/email-ai');
+const lunaNLU = require('./services/luna-nlu');
 
 // ── AUTH: OAuth2 Gmail ──
 

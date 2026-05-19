@@ -1,65 +1,46 @@
 # 🔄 HANDOFF — Próximas Ações Pendentes
 
-> **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão.
+> **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-19007e56` 🔴 — última atualização: 2026-05-19
+> **Sessão ativa:** `kimi-c4b19cd8` 🟢 — última atualização: 2026-05-19
 
 ---
 
-## 🎯 Foco Atual
+## 🎯 Foco Atual (Luna ADM Gestora Única)
 
-### ✅ Concluído nesta sessão (kimi-19007e56 🔴)
-- [x] **Testes completos locais** — Backend, frontend build, endpoints com curl
-- [x] **Testes online (Render)** — API responde, bundle novo deployado (`index-DATHYlcm.js`)
-- [x] **Teste browser via Playwright** — Email Hub carrega, Luna painel inline funciona
-- [x] **Fix deploy Render** — `npm install --legacy-peer-deps` no root `package.json`
-- [x] **Descoberta da instância 🟢** — `kimi-c4b19cd8` deixou mudanças não commitadas; foram integradas no commit `7ed2c6c`
-- [x] **Sistema `.kimi-context/` funcional** — Index, handoff, snapshots salvos
+### ✅ Concluído nesta sessão
+- [x] **FASE 2 — ActionExecutor completo**: 109 métodos, 21 categorias, auditado
+- [x] **FASE 3 — IntentParser parcial**: Regex patterns + prompts LLM atualizados com novas ações
 
-### ❌ Problema CRÍTICO descoberto
-- [ ] **API Key Gemini revogada** — Google reportou como "leaked". Toda a IA do sistema está quebrada.
+### ⏳ Próximo passo
+- [ ] **Completar FASE 3** (se necessário — LLM já cobre a maioria)
+- [ ] **FASE 4 — Unificar IA de Ideias**: `/api/ideas/:id/ai-chat` → `/api/luna/chat` com `contextModule: "ideas"`
+- [ ] **FASE 5 — Unificar IA de Email**: Endpoints email AI → `/api/luna/chat` com `contextModule: "email"`
+- [ ] **FASE 6 — Consciência Total**: `buildDashboardContext()` incluir dados de TODOS os módulos
 
----
-
-## 🚨 Blockers / Problemas Conhecidos
-
-| Problema | Severidade | Status | Contexto |
-|---|---|---|---|
-| API Key Gemini revogada | 🔴 CRÍTICO | **NÃO RESOLVIDO** | `backend/.env` — key `AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g` bloqueada |
-| Frontend não mostra erro quando IA falha | 🟡 ALTO | Pendente | LunaEmailAssistant precisa de estado de erro |
-| EmailCompose não preenche `to` | 🟡 MÉDIO | Pendente | Ao aprovar draft de reply, destinatário fica vazio |
-| Chunk size warning | 🟢 BAIXO | Pendente | Bundle ~1.8MB |
+### 🚨 Modificações de outras sessões que afetam este trabalho
+| Sessão | Arquivos modificados | Impacto |
+|---|---|---|
+| `kimi-bbf526dc` 🔵 | `backend/server.js` (+170 linhas) | Novos endpoints `/api/email/ai/*` — integrados no ActionExecutor |
+| `kimi-bbf526dc` 🔵 | `frontend/src/components/email/LunaEmailAssistant.jsx` | Painel inline — NÃO reverter para modal |
+| `kimi-bbf526dc` 🔵 | `frontend/src/pages/EmailHub.jsx` | Banner drafts — integrado com compose |
 
 ---
 
-## 🔗 Arquivos Chave
+## 🔗 Arquivos chave desta sessão
 
 ```
-backend/.env                                 # ⚠️ Precisa de nova GEMINI_API_KEY
-backend/services/email-ai.js                 # Prompts de email (funciona quando API key OK)
-backend/services/gemini-client.js            # Cliente Gemini multi-key
-frontend/src/components/email/LunaEmailAssistant.jsx  # Painel inline
-frontend/src/pages/EmailHub.jsx              # Banner drafts, handlers
-frontend/src/components/email/EmailCompose.jsx        # initialBody prop
-agents/core/ActionExecutor.js                # Expandido pela instância 🟢
-.kimi-context/index.json                     # Índice de sessões
-.kimi-context/handoff.md                     # Este arquivo
+agents/core/ActionExecutor.js              # 2.939 linhas — 109 métodos, 113 cases
+agents/core/IntentParser.js                # Regex patterns + prompts LLM
+backend/server.js                            # knownActions atualizado (linha ~3933)
+frontend/src/pages/LunaControl.jsx           # Chat unificado
+plans/PLANO_LUNA_UNICA_ADM_GESTORA_v20.md    # Plano completo
 ```
 
 ---
 
-## 📝 Notas da Instância Atual
+## 📝 Notas da instância
 
-**Instância:** `kimi-19007e56` 🔴  
-**Última ação:** Commit `7ed2c6c` feito e deployado no Render. Aguardando nova GEMINI_API_KEY.  
-**Contexto salvo em:** `.kimi-context/sessions/2026-05-19-kimi-19007e56.md`
-
----
-
-## 🧠 Protocolo para Próxima Sessão
-
-1. **LER** `.kimi-context/index.json` — verificar `activeSessionId`
-2. **SE** `activeSessionId` for diferente de `kimi-19007e56`: confirmar com usuário
-3. **GERAR** novo ID `kimi-XXXXXXXX`
-4. **ATUALIZAR** `index.json` com nova sessão
-5. **TRABALHO:** Substituir API key → testar IA → polir frontend → deploy
+**Instância:** `kimi-c4b19cd8` 🟢  
+**Última ação:** FASE 2 completa + FASE 3 em andamento. ActionExecutor com 109 métodos. IntentParser com novos regex.  
+**Contexto salvo em:** `.kimi-context/sessions/2026-05-19-kimi-c4b19cd8.md`

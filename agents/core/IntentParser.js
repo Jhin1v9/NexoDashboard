@@ -353,7 +353,13 @@ class IntentParser {
         'registrar_despesa', 'registrar_despesa_com_split',
         'confirmar_tarefa', 'criar_tarefa', 'criar_lead',
         'adicionar_comentario', 'atualizar_status',
-        'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead'
+        'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead',
+        'excluir_projeto', 'excluir_orcamento', 'excluir_despesa', 'excluir_ideia',
+        'pagar_despesa', 'receber_split', 'ajustar_caixa', 'reconciliar_caixa',
+        'enviar_email', 'responder_email', 'marcar_spam', 'mover_para_lixeira',
+        'aprovar_rascunho', 'rejeitar_rascunho',
+        'excluir_link', 'excluir_alerta_operacao', 'excluir_notificacao',
+        'excluir_relatorio_bug', 'trocar_usuario'
       ].includes(a.type)),
       source: 'regex'
     };
@@ -412,6 +418,20 @@ AÇÕES SUPORTADAS:
 - consultar_financeiro: { filtro? } — resumo financeiro completo
 - consultar_whatsapp: { filtro? } — resumo de menções/mensagens
 - verificar_mencoes: { filtro? } — alias para consultar_whatsapp
+- criar_ideia: { titulo, descricao? } — cria nova ideia
+- listar_ideias: { filtro? } — lista ideias existentes
+- criar_projeto: { nome, descricao?, tipo?, status? } — cria novo projeto
+- listar_projetos: { filtro? } — lista projetos existentes
+- criar_cliente: { nome, email?, telefone? } — cadastra cliente
+- listar_clientes: { filtro? } — lista clientes
+- criar_orcamento: { titulo, valor, cliente?, descricao? } — cria orçamento
+- escanear_whatsapp: {} — força scan do WhatsApp
+- limpar_buffer_whatsapp: {} — limpa buffer de mensagens
+- marcar_email_lido: { id } — marca email como lido
+- arquivar_email: { id } — arquiva email
+- listar_links: { filtro? } — lista links salvos
+- listar_notificacoes: { filtro? } — lista notificações
+- verificar_stack: {} — status do sistema
 - social: { tipo }
 - ideia: { texto }
 - link: { url, contexto? }
@@ -477,6 +497,20 @@ AÇÕES SUPORTADAS:
 - registrar_despesa: { valor, para, descricao, tipo? }
 - confirmar_tarefa: { titulo, tarefa_id? }
 - consultar_status: { filtro? }
+- criar_ideia: { titulo, descricao? }
+- listar_ideias: { filtro? }
+- criar_projeto: { nome, descricao? }
+- listar_projetos: { filtro? }
+- criar_cliente: { nome, email?, telefone? }
+- listar_clientes: { filtro? }
+- criar_orcamento: { titulo, valor, cliente? }
+- escanear_whatsapp: {}
+- limpar_buffer_whatsapp: {}
+- marcar_email_lido: { id }
+- arquivar_email: { id }
+- listar_links: { filtro? }
+- listar_notificacoes: { filtro? }
+- verificar_stack: {}
 - social: { tipo }
 - ideia: { texto }
 - link: { url, contexto? }
@@ -581,7 +615,13 @@ JSON:`;
       'registrar_despesa', 'registrar_despesa_com_split',
       'confirmar_tarefa', 'criar_tarefa', 'criar_lead',
       'adicionar_comentario', 'atualizar_status',
-      'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead'
+      'excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead',
+      'excluir_projeto', 'excluir_orcamento', 'excluir_ideia',
+      'pagar_despesa', 'receber_split', 'ajustar_caixa', 'reconciliar_caixa',
+      'enviar_email', 'responder_email', 'marcar_spam', 'mover_para_lixeira',
+      'aprovar_rascunho', 'rejeitar_rascunho',
+      'excluir_link', 'excluir_alerta_operacao', 'excluir_notificacao',
+      'excluir_relatorio_bug', 'trocar_usuario'
     ];
     return actions.some(a => criticalActions.includes(a.type));
   }

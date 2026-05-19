@@ -1,6 +1,6 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, BellRing, X, CheckCheck, Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText } from 'lucide-react';
+import { Bell, BellRing, X, CheckCheck, Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CATEGORY_ICONS = {
@@ -11,6 +11,7 @@ const CATEGORY_ICONS = {
   performance: Zap,
   whatsapp: Smartphone,
   finance: DollarSign,
+  ai: Brain,
 };
 
 const CATEGORY_COLORS = {
@@ -21,6 +22,7 @@ const CATEGORY_COLORS = {
   performance: 'bg-yellow-500',
   whatsapp: 'bg-emerald-600',
   finance: 'bg-amber-500',
+  ai: 'bg-pink-500',
 };
 
 const CATEGORY_LABELS = {
@@ -31,6 +33,7 @@ const CATEGORY_LABELS = {
   performance: 'Performance',
   whatsapp: 'WhatsApp',
   finance: 'Financeiro',
+  ai: 'Inteligência Artificial',
 };
 
 function formatTimeAgo(dateString) {
