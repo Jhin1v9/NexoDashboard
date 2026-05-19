@@ -16,7 +16,7 @@ import { useEmailFocusMode } from '../context/EmailFocusModeContext'
 import { useEmailDensity } from '../context/EmailDensityContext'
 
 export default function EmailHub() {
-  const { focusMode, toggleFocusMode } = useEmailFocusMode()
+  const { isFocusMode, toggleFocusMode } = useEmailFocusMode()
   const { density, setDensity } = useEmailDensity()
   const { status: authStatus, connect, disconnect, refresh: refreshAuth } = useGmailAuth()
 
@@ -200,7 +200,7 @@ export default function EmailHub() {
     fetchEmails()
   }
 
-  const containerClass = focusMode
+  const containerClass = isFocusMode
     ? 'fixed inset-0 z-50 bg-nexo-bg flex overflow-hidden'
     : 'flex h-[calc(100vh-80px)] glass-card rounded-xl border border-nexo-border overflow-hidden'
 
