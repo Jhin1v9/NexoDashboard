@@ -40,6 +40,36 @@ function formatRelativeTime(internalDate) {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 }
 
+const densityStyles = {
+  compact: {
+    itemPadding: 'p-2',
+    avatarSize: 'w-8 h-8',
+    fromSize: 'text-xs',
+    subjectSize: 'text-xs',
+    snippetSize: 'text-[10px]',
+    timeSize: 'text-[10px]',
+    gap: 'gap-2',
+  },
+  normal: {
+    itemPadding: 'p-3',
+    avatarSize: 'w-10 h-10',
+    fromSize: 'text-sm',
+    subjectSize: 'text-sm',
+    snippetSize: 'text-xs',
+    timeSize: 'text-[10px]',
+    gap: 'gap-3',
+  },
+  comfortable: {
+    itemPadding: 'p-4',
+    avatarSize: 'w-10 h-10',
+    fromSize: 'text-sm',
+    subjectSize: 'text-sm',
+    snippetSize: 'text-xs',
+    timeSize: 'text-xs',
+    gap: 'gap-3',
+  },
+}
+
 export default function EmailList({
   emails,
   selectedId,
@@ -49,7 +79,9 @@ export default function EmailList({
   page,
   hasMore,
   onPageChange,
+  density = 'normal',
 }) {
+  const ds = densityStyles[density] || densityStyles.normal
   if (loading && emails.length === 0) {
     return (
       <div className="flex-1 p-4 space-y-3">
@@ -87,7 +119,7 @@ export default function EmailList({
             <div
               key={email.id}
               onClick={() => onSelect(email)}
-              className={`group flex items-start gap-3 p-3 cursor-pointer border-b border-nexo-border/50 transition-all hover:bg-nexo-bg/50 ${
+              className={`group flex items-start ${ds.gap} ${ds.itemPadding} cursor-pointer border-b border-nexo-border/50 transition-all hover:bg-nexo-bg/50 ${
                 isSelected ? 'bg-nexo-primary/10 border-l-2 border-l-nexo-primary' : ''
               } ${email.isUnread ? 'bg-nexo-card' : ''}`}
             >
@@ -108,26 +140,26 @@ export default function EmailList({
               </div>
 
               {/* Avatar */}
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${getAvatarColor(fromEmail)}`}>
+              <div className={`${ds.avatarSize} rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${getAvatarColor(fromEmail)}`}>
                 {getInitials(fromName)}
               </div>
 
               {/* Conteúdo */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm truncate ${email.isUnread ? 'font-bold text-nexo-text' : 'text-nexo-muted'}`}>
+                  <span className={`${ds.fromSize} truncate ${email.isUnread ? 'font-bold text-nexo-text' : 'text-nexo-muted'}`}>
                     {fromName}
                   </span>
                   {email.isUnread && <span className="w-2 h-2 rounded-full bg-nexo-primary flex-shrink-0" />}
                   {email.isImportant && <AlertTriangle className="w-3 h-3 text-orange-400 flex-shrink-0" />}
-                  <span className="text-[10px] text-nexo-muted ml-auto flex-shrink-0">
+                  <span className={`${ds.timeSize} text-nexo-muted ml-auto flex-shrink-0`}>
                     {formatRelativeTime(email.internalDate)}
                   </span>
                 </div>
-                <p className={`text-sm truncate ${email.isUnread ? 'font-semibold text-nexo-text' : 'text-nexo-muted'}`}>
+                <p className={`${ds.subjectSize} truncate ${email.isUnread ? 'font-semibold text-nexo-text' : 'text-nexo-muted'}`}>
                   {email.subject}
                 </p>
-                <p className="text-xs text-nexo-muted truncate mt-0.5">
+                <p className={`${ds.snippetSize} text-nexo-muted truncate mt-0.5`}>
                   {email.snippet}
                 </p>
                 <div className="flex items-center gap-2 mt-1">

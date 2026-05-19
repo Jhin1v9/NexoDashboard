@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from './context/AuthContext'
+import { EmailFocusModeProvider } from './context/EmailFocusModeContext'
+import { EmailDensityProvider } from './context/EmailDensityContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -97,15 +99,19 @@ function ProtectedLayout() {
 
 function App() {
   return (
-    <Routes>
-      {/* Landing page pública — camuflagem com terminal secreto */}
-      <Route path="/" element={<LandingPage />} />
+    <EmailFocusModeProvider>
+      <EmailDensityProvider>
+        <Routes>
+          {/* Landing page pública — camuflagem com terminal secreto */}
+          <Route path="/" element={<LandingPage />} />
 
-      {/* Todas as rotas internas protegidas */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/*" element={<ProtectedLayout />} />
-      </Route>
-    </Routes>
+          {/* Todas as rotas internas protegidas */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/*" element={<ProtectedLayout />} />
+          </Route>
+        </Routes>
+      </EmailDensityProvider>
+    </EmailFocusModeProvider>
   )
 }
 
