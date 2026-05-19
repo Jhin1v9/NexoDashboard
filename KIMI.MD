@@ -116,9 +116,9 @@ last_updated: 2026-05-19T18:40:00+02:00
 | Email params (`para`, `assunto`) não extraídos de frases naturais | 🟡 Média | `extractEmail()` e `extractAfterKeyword()` existem mas são básicos |
 | `concluir tarefa` sem match → avisa "desconhecida" | 🟢 Baixa | Poderia sugerir tarefas similares no futuro |
 | Modelo NLU `.nlp` salvo em disco | ✅ Resolvido | `backend/data/luna-model.nlp` e `backend/model.nlp` persistidos |
-| **Modo C: Transformação de Interface** (checkboxes multi-seleção) | 🟡 Média | NÃO implementado — `.kimi-context/plans-vs-reality.md` |
-| **Preview visual** antes de executar ação destrutiva | 🟡 Média | NÃO implementado — `LunaInlinePreview` não existe |
-| **Assistente passivo proativo** (badges, toasts) | 🟢 Baixa | NÃO implementado — Fase 6 do roadmap ainda não iniciada |
+| **Modo C: Transformação de Interface** (checkboxes multi-seleção) | ✅ Resolvido | `LunaBatchAction` implementado com seleção múltipla |
+| **Preview visual** antes de executar ação destrutiva | ✅ Resolvido | `LunaInlinePreview` integrado no LunaActionDrawer |
+| **Assistente passivo proativo** (badges, toasts) | ✅ Resolvido | Badge animado no botão flutuante com `/api/luna/proactive` |
 
 ---
 
