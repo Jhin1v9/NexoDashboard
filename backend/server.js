@@ -66,10 +66,15 @@ function resolveDashboardAuthor(reqBodyAuthor) {
 }
 
 // ── AUTH & SECURITY CONFIG ──
-const JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error('[SECURITY] JWT_SECRET não definido. Encerrando.');
-  process.exit(1);
+  // Fallback: gera secret aleatório na memória (tokens válidos só durante esta sessão)
+  // ⚠️ DEFINIR JWT_SECRET no Render Dashboard para persistência entre reinicializações
+  const crypto = require('crypto');
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  console.warn('[SECURITY] JWT_SECRET não definido no ambiente. Usando valor aleatório temporário.');
+  console.warn('[SECURITY] Todos os tokens serão invalidados após reinicialização do servidor.');
+  console.warn('[SECURITY] Ação recomendada: defina JWT_SECRET no Render Dashboard.');
 }
 const JWT_EXPIRES_IN = '8h';
 const SECURITY_LOG_FILE = path.join(DATA_DIR, 'security-log.json');
@@ -201,6 +206,154 @@ async function getIpLocation(ip) {
   return { country: 'Desconhecido', city: 'Desconhecido', region: '', isp: 'Desconhecido', org: '', lat: null, lon: null, timezone: null };
 }
 
+// Cache simples em memória para lista de Tor exit nodes
+let torExitList = new Set();
+let torListLastFetch = 0;
+const TOR_LIST_TTL = 30 * 60 * 1000; // 30 minutos
+
+async function refreshTorExitList() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://check.torproject.org/torbulkexitlist', { signal: controller.signal });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const text = await res.text();
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+      torExitList = new Set(lines);
+      torListLastFetch = Date.now();
+      console.log(`[SECURITY] Tor exit list atualizada: ${torExitList.size} IPs`);
+    }
+  } catch (e) {
+    console.warn('[SECURITY] Falha ao atualizar Tor exit list:', e.message);
+  }
+}
+
+async function isTorExitNode(ip) {
+  if (Date.now() - torListLastFetch > TOR_LIST_TTL || torExitList.size === 0) {
+    await refreshTorExitList();
+  }
+  return torExitList.has(ip);
+}
+
+// Helper: detectar VPN, Tor, Proxy, Hosting via ipapi.is (1.000 req/dia grátis)
+// Também usa heurísticas locais para fortalecer a detecção
+async function detectVpnTorProxy(ip, fingerprint = {}) {
+  const result = {
+    isVpn: false,
+    isProxy: false,
+    isTor: false,
+    isHosting: false,
+    isAnonymous: false,
+    threatScore: 0,
+    provider: null,
+    asnType: null,
+    heuristics: {},
+    source: 'none'
+  };
+
+  // IPs privados/locais — skip API
+  if (!ip || ip === 'unknown' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+    return result;
+  }
+
+  // 1. Consulta ipapi.is (grátis, sem auth, 1000/dia)
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const apiRes = await fetch(`https://api.ipapi.is?q=${ip}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (apiRes.ok) {
+      const data = await apiRes.json();
+      result.isVpn = !!data.vpn;
+      result.isProxy = !!data.proxy;
+      result.isTor = !!data.tor;
+      result.isHosting = !!data.datacenter;
+      result.provider = data.company?.name || data.asn?.organization || null;
+      result.asnType = data.asn?.type || null;
+      result.threatScore = data.abuse?.score || 0;
+      result.source = 'ipapi.is';
+      // Detalhes extras
+      result.ipapiDetails = {
+        company: data.company,
+        datacenter: data.datacenter,
+        abuse: data.abuse,
+        asn: data.asn
+      };
+    }
+  } catch (e) {
+    // Fallback silencioso
+  }
+
+  // 1b. Verificar lista oficial de Tor exit nodes
+  if (await isTorExitNode(ip)) {
+    result.isTor = true;
+    result.threatScore = Math.max(result.threatScore, 75);
+    result.source = result.source === 'none' ? 'tor-project-list' : result.source + '+tor-project-list';
+  }
+
+  // 2. Heurísticas locais (fortalecem a detecção mesmo se API falhar)
+  const heuristics = {};
+
+  // 2a. Timezone mismatch: timezone do browser ≠ timezone do IP
+  if (fingerprint.timezone && fingerprint.ipTimezone) {
+    heuristics.timezoneMismatch = fingerprint.timezone !== fingerprint.ipTimezone;
+    if (heuristics.timezoneMismatch) result.threatScore += 15;
+  }
+
+  // 2b. WebRTC leak: se há IPs locais expostos que não batem com o IP público
+  if (fingerprint.webrtc && fingerprint.webrtc.length > 0) {
+    const publicWebrtc = fingerprint.webrtc.filter(w => !w.startsWith('192.168.') && !w.startsWith('10.') && !w.startsWith('172.') && w !== '127.0.0.1');
+    heuristics.webrtcPublicIps = publicWebrtc;
+    if (publicWebrtc.length > 0 && !publicWebrtc.includes(ip)) {
+      heuristics.webrtcMismatch = true;
+      result.threatScore += 20;
+    }
+  }
+
+  // 2c. Velocidade de digitação / comportamento (se disponível)
+  if (fingerprint.typingPattern) {
+    heuristics.typingPattern = fingerprint.typingPattern;
+  }
+
+  // 2d. Navegador headless / automação
+  if (fingerprint.webdriver === true || fingerprint.plugins === 'N/A' || fingerprint.plugins?.length === 0) {
+    heuristics.headlessSuspect = true;
+    result.threatScore += 10;
+  }
+
+  // 2e. Language vs Location mismatch (heurística fraca, só pontua leve)
+  if (fingerprint.language && fingerprint.ipCountry) {
+    const langCountryMap = { 'pt': ['Brazil','Portugal'], 'en': ['United States','United Kingdom','Canada','Australia'], 'es': ['Spain','Mexico','Argentina','Colombia'] };
+    const primaryLang = fingerprint.language.split('-')[0];
+    const expectedCountries = langCountryMap[primaryLang];
+    if (expectedCountries && !expectedCountries.includes(fingerprint.ipCountry)) {
+      heuristics.langLocationMismatch = true;
+      result.threatScore += 5;
+    }
+  }
+
+  // 2f. Verificar se o IP pertence a ranges conhecidos de hosting/VPN genéricos
+  // Lista reduzida de ASNs/prefixos conhecidos (atualizável)
+  const knownHostingRanges = [
+    ' DigitalOcean ', ' Vultr ', ' Linode ', ' Hetzner ', ' OVH ', ' AWS ', ' Amazon ', ' Google Cloud ', ' Azure ', ' Microsoft ', ' Oracle ', ' Alibaba ', ' Contabo ', ' Scaleway '
+  ];
+  const ispName = (fingerprint.ipIsp || '').toLowerCase();
+  const orgName = (fingerprint.ipOrg || '').toLowerCase();
+  if (knownHostingRanges.some(r => ispName.includes(r.toLowerCase()) || orgName.includes(r.toLowerCase()))) {
+    heuristics.knownHostingProvider = true;
+    result.threatScore += 10;
+    if (!result.provider) result.provider = fingerprint.ipIsp || fingerprint.ipOrg;
+  }
+
+  result.heuristics = heuristics;
+
+  // Determinação final
+  result.isAnonymous = result.isVpn || result.isProxy || result.isTor || result.isHosting || result.threatScore >= 40;
+
+  return result;
+}
+
 // Helper: logar evento de segurança
 async function logSecurityEvent(event) {
   const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
@@ -252,10 +405,10 @@ function addNotification({ type, title, message, severity = 'medium', metadata =
 const DISCORD_SECURITY_WEBHOOK = 'https://discord.com/api/webhooks/1506384996305338518/NVJ5yYsBCd7JXFGsczUxTuVV0rpLzpt2dICREfNzKxuJ26TgY5--5diOpUdmEVXp3vza';
 
 // Helper: coletar TODOS os dados possíveis do request
-function collectIntruderData(req, fingerprint = {}) {
+function collectIntruderData(req, fingerprint = {}, risk = {}) {
   const ip = getClientIp(req);
   const headers = req.headers || {};
-  
+
   // TLS/SSL fingerprint via cipher suite e protocolo (se disponível)
   const tlsInfo = req.socket ? {
     cipher: req.socket.getCipher ? req.socket.getCipher() : null,
@@ -324,6 +477,7 @@ function collectIntruderData(req, fingerprint = {}) {
     referrer: headers.referer || headers.referrer || 'N/A',
     origin: headers.origin || 'N/A',
     bodyKeys: Object.keys(req.body || {}),
+    risk,
     // Dados do fingerprint do frontend
     fingerprint: {
       canvas: fingerprint.canvas || 'N/A',
@@ -358,24 +512,55 @@ function collectIntruderData(req, fingerprint = {}) {
       battery: fingerprint.battery || 'N/A',
       network: fingerprint.network || 'N/A',
       userAgent: fingerprint.userAgent || 'N/A',
+      webrtc: fingerprint.webrtc || 'N/A',
+      permissions: fingerprint.permissions || 'N/A',
+      performance: fingerprint.performance || 'N/A',
+      bluetooth: fingerprint.bluetooth || 'N/A',
+      usb: fingerprint.usb || 'N/A',
+      vrDisplays: fingerprint.vrDisplays || 'N/A',
+      clipboard: fingerprint.clipboard || 'N/A',
+      deviceOrientation: fingerprint.deviceOrientation || 'N/A',
+      installApps: fingerprint.installApps || 'N/A',
+      mediaCapabilities: fingerprint.mediaCapabilities || 'N/A',
+      speech: fingerprint.speech || 'N/A',
+      wakeLock: fingerprint.wakeLock || 'N/A',
+      payment: fingerprint.payment || 'N/A',
+      credentials: fingerprint.credentials || 'N/A',
+      share: fingerprint.share || 'N/A',
+      contacts: fingerprint.contacts || 'N/A',
+      serial: fingerprint.serial || 'N/A',
+      hid: fingerprint.hid || 'N/A',
+      midi: fingerprint.midi || 'N/A',
+      gamepads: fingerprint.gamepads || 'N/A',
     },
     rawUserAgent: headers['user-agent'] || 'N/A',
   };
 }
 
-// Helper: enviar alerta detalhado para Discord webhook
-async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts) {
+// Helper: converter base64 dataURL para Blob (Node.js native)
+function dataURLtoBlob(dataurl) {
+  if (!dataurl || typeof dataurl !== 'string') return null;
+  const arr = dataurl.split(',');
+  if (arr.length < 2) return null;
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+  const bstr = Buffer.from(arr[1], 'base64');
+  return new Blob([bstr], { type: mime });
+}
+
+// Helper: enviar alerta detalhado para Discord webhook (com suporte a imagens)
+async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts, images = {}) {
   try {
     const uaParsed = parseUserAgent(intruderData.rawUserAgent);
     const fp = intruderData.fingerprint;
+    const risk = intruderData.risk || {};
     const now = new Date();
     const attemptCount = recentAttempts?.length || 1;
-    
+
     // Montar embed rico
     const embed = {
       title: '🚨 INTRUSO DETECTADO — NEXO DASHBOARD',
       description: `Tentativa de login falha #${attemptCount} na última hora`,
-      color: 0xff0000, // Vermelho
+      color: risk.isAnonymous ? 0x8b0000 : 0xff0000, // Vermelho escuro se anônimo
       timestamp: now.toISOString(),
       footer: {
         text: 'Sistema de Segurança NEXO Digital',
@@ -401,6 +586,35 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
           value: `<t:${Math.floor(now.getTime() / 1000)}:F>`,
           inline: true
         },
+        // Risco & Anonimato
+        {
+          name: '🛡️ ANÁLISE DE RISCO',
+          value: [
+            `**VPN:** ${risk.isVpn ? '🟢 SIM' : 'Não'}`,
+            `**Proxy:** ${risk.isProxy ? '🟢 SIM' : 'Não'}`,
+            `**Tor:** ${risk.isTor ? '🟢 SIM' : 'Não'}`,
+            `**Hosting/DC:** ${risk.isHosting ? '🟢 SIM' : 'Não'}`,
+            `**Anônimo:** ${risk.isAnonymous ? '⚠️ SIM' : 'Não'}`,
+            `**Threat Score:** ${risk.threatScore || 0}/100`,
+            risk.provider ? `**Provedor:** ${risk.provider}` : '',
+            risk.asnType ? `**ASN Type:** ${risk.asnType}` : '',
+            risk.source ? `**Fonte:** ${risk.source}` : '',
+          ].filter(Boolean).join('\n') || 'N/A',
+          inline: false
+        },
+        // Heurísticas
+        risk.heuristics ? {
+          name: '🔬 HEURÍSTICAS LOCAIS',
+          value: [
+            risk.heuristics.timezoneMismatch ? '⚠️ Timezone mismatch' : '',
+            risk.heuristics.webrtcMismatch ? '⚠️ WebRTC IP leak mismatch' : '',
+            risk.heuristics.headlessSuspect ? '⚠️ Headless/automação suspeita' : '',
+            risk.heuristics.langLocationMismatch ? '⚠️ Idioma vs Localização mismatch' : '',
+            risk.heuristics.knownHostingProvider ? '⚠️ Provedor de hosting conhecido' : '',
+            risk.heuristics.webrtcPublicIps?.length ? `**WebRTC IPs:** ${risk.heuristics.webrtcPublicIps.join(', ')}` : '',
+          ].filter(Boolean).join('\n') || 'Nenhuma',
+          inline: false
+        } : null,
         // Localização
         {
           name: '🌍 LOCALIZAÇÃO',
@@ -496,6 +710,8 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
             `**Audio:** ${fp.audio !== 'N/A' ? 'Disponível' : 'N/A'}`,
             `**Battery:** ${fp.battery !== 'N/A' ? 'Disponível' : 'N/A'}`,
             `**Network:** ${fp.network !== 'N/A' ? JSON.stringify(fp.network) : 'N/A'}`,
+            `**WebRTC:** ${fp.webrtc !== 'N/A' ? JSON.stringify(fp.webrtc) : 'N/A'}`,
+            `**Permissions:** ${fp.permissions !== 'N/A' ? JSON.stringify(fp.permissions) : 'N/A'}`,
           ].join('\n'),
           inline: true
         },
@@ -530,21 +746,49 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
           value: `\`\`\`${intruderData.rawUserAgent?.slice(0, 500) || 'N/A'}\`\`\``,
           inline: false
         },
-      ]
+      ].filter(Boolean)
     };
 
-    const payload = {
-      username: 'NEXO Security Bot',
-      avatar_url: 'https://cdn-icons-png.flaticon.com/512/564/564419.png',
-      embeds: [embed],
-      content: '@everyone 🚨 **ALERTA DE INTRUSÃO DETECTADO**',
-    };
+    // Se houver imagens, usar multipart/form-data (Discord webhook suporta attachments)
+    const hasImages = images.cameraPhoto || images.screenshot;
+    let response;
 
-    const response = await fetch(DISCORD_SECURITY_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    if (hasImages) {
+      const form = new FormData();
+      const payloadJson = {
+        username: 'NEXO Security Bot',
+        avatar_url: 'https://cdn-icons-png.flaticon.com/512/564/564419.png',
+        content: '@everyone 🚨 **ALERTA DE INTRUSÃO DETECTADO**' + (risk.isAnonymous ? ' — ⚠️ CONEXÃO ANÔNIMA DETECTADA' : ''),
+        embeds: [embed]
+      };
+      form.append('payload_json', JSON.stringify(payloadJson));
+
+      if (images.cameraPhoto) {
+        const blob = dataURLtoBlob(images.cameraPhoto);
+        if (blob) form.append('file', blob, `intruder_camera_${Date.now()}.png`);
+      }
+      if (images.screenshot) {
+        const blob = dataURLtoBlob(images.screenshot);
+        if (blob) form.append('file', blob, `intruder_screen_${Date.now()}.png`);
+      }
+
+      response = await fetch(DISCORD_SECURITY_WEBHOOK, {
+        method: 'POST',
+        body: form,
+      });
+    } else {
+      const payload = {
+        username: 'NEXO Security Bot',
+        avatar_url: 'https://cdn-icons-png.flaticon.com/512/564/564419.png',
+        embeds: [embed],
+        content: '@everyone 🚨 **ALERTA DE INTRUSÃO DETECTADO**',
+      };
+      response = await fetch(DISCORD_SECURITY_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -552,8 +796,8 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
       return { sent: false, reason: 'discord_error', status: response.status, error: text };
     }
 
-    console.log('[SECURITY] Alerta Discord enviado com sucesso');
-    return { sent: true };
+    console.log('[SECURITY] Alerta Discord enviado com sucesso' + (hasImages ? ' (com imagens)' : ''));
+    return { sent: true, images: !!hasImages };
   } catch (e) {
     console.error('[SECURITY] Falha ao enviar Discord:', e.message);
     return { sent: false, reason: 'send_error', error: e.message };
@@ -612,7 +856,7 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLOBAL API AUTH MIDDLEWARE — Protege TODAS as rotas /api/* por padrão
@@ -7422,15 +7666,46 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       // Login falho — coleta MÁXIMA de dados do intruso
       const location = await getIpLocation(ip);
-      const intruderData = collectIntruderData(req, fingerprint);
+
+      // Enriquecer fingerprint com dados do IP para heurísticas
+      if (fingerprint && location) {
+        fingerprint.ipTimezone = location.timezone || null;
+        fingerprint.ipCountry = location.country || null;
+        fingerprint.ipIsp = location.isp || null;
+        fingerprint.ipOrg = location.org || null;
+      }
+
+      // Detectar VPN/Tor/Proxy/Hosting
+      const risk = await detectVpnTorProxy(ip, fingerprint);
+
+      const intruderData = collectIntruderData(req, fingerprint, risk);
       const deviceInfo = fingerprint || {};
       const uaParsed = parseUserAgent(deviceInfo.userAgent || '');
-      
+
+      // Extrair imagens enviadas pelo frontend (câmera + screenshot)
+      const images = {};
+      if (req.body && req.body.cameraPhoto && typeof req.body.cameraPhoto === 'string' && req.body.cameraPhoto.startsWith('data:image')) {
+        images.cameraPhoto = req.body.cameraPhoto;
+      }
+      if (req.body && req.body.screenshot && typeof req.body.screenshot === 'string' && req.body.screenshot.startsWith('data:image')) {
+        images.screenshot = req.body.screenshot;
+      }
+
       const event = await logSecurityEvent({
         type: 'failed_login',
-        severity: 'high',
+        severity: risk.isAnonymous ? 'critical' : 'high',
         ip,
         location,
+        risk: {
+          isVpn: risk.isVpn,
+          isProxy: risk.isProxy,
+          isTor: risk.isTor,
+          isHosting: risk.isHosting,
+          isAnonymous: risk.isAnonymous,
+          threatScore: risk.threatScore,
+          provider: risk.provider,
+          source: risk.source
+        },
         device: {
           browser: uaParsed.browser,
           browserVersion: uaParsed.browser,
@@ -7448,8 +7723,10 @@ app.post('/api/auth/login', async (req, res) => {
           userAgent: deviceInfo.userAgent || 'N/A'
         },
         attemptedUser,
-        message: `Login falho para "${attemptedUser}" — IP: ${ip} (${location.city}, ${location.country})`,
-        notified: false
+        message: `Login falho para "${attemptedUser}" — IP: ${ip} (${location.city}, ${location.country})` + (risk.isAnonymous ? ' [ANÔNIMO]' : ''),
+        notified: false,
+        hasCameraPhoto: !!images.cameraPhoto,
+        hasScreenshot: !!images.screenshot
       });
 
       // Verificar se atingiu limite de tentativas para alertar
@@ -7464,14 +7741,14 @@ app.post('/api/auth/login', async (req, res) => {
 
       if (recentAttempts.length >= maxAttempts) {
         // Envia para Discord (sempre, sem rate limit por tentativa)
-        const discordResult = await sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts);
+        const discordResult = await sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts, images);
         if (discordResult.sent) {
           event.notified = true;
           event.notificationChannel = (event.notificationChannel || '') + '+discord';
         }
 
         // Envia para WhatsApp (com rate limit)
-        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
+        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n${risk.isAnonymous ? '⚠️ *CONEXÃO ANÔNIMA DETECTADA*\n' : ''}\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n🛡️ VPN/Proxy/Tor: ${risk.isVpn ? 'VPN ' : ''}${risk.isProxy ? 'Proxy ' : ''}${risk.isTor ? 'Tor ' : ''}${risk.isHosting ? 'Hosting ' : ''}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n📸 Câmera: ${images.cameraPhoto ? 'CAPTURADA' : 'N/A'}\n🖥️ Screenshot: ${images.screenshot ? 'CAPTURADO' : 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
         const alertResult = await sendSecurityWhatsAlert(msg);
         if (alertResult.sent) {
           event.notified = true;
