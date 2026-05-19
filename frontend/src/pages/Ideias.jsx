@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Lightbulb, Plus, LayoutGrid, List, Table2, Kanban,
-  Search, Loader2
+  Search, Loader2, Bot
 } from 'lucide-react'
 import axios from 'axios'
 import IdeaStats from '../components/ideas/IdeaStats'
@@ -21,6 +22,7 @@ const TABS = [
 ]
 
 export default function Ideias() {
+  const navigate = useNavigate()
   const [view, setView] = useState('kanban')
   const [ideas, setIdeas] = useState([])
   const [stats, setStats] = useState({})
@@ -94,13 +96,23 @@ export default function Ideias() {
             <p className="text-xs text-nexo-muted">Workspace criativo da NEXO Digital</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowQuickAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-nexo-primary text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-nexo-primary/20"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Ideia
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/luna?context=ideas')}
+            className="flex items-center gap-2 px-3 py-2 bg-nexo-card text-nexo-text text-sm font-medium rounded-lg hover:bg-nexo-primary/10 hover:text-nexo-primary border border-nexo-border transition-colors"
+            title="Chat com Luna sobre Ideias"
+          >
+            <Bot className="w-4 h-4" />
+            Luna
+          </button>
+          <button
+            onClick={() => setShowQuickAdd(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-nexo-primary text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-nexo-primary/20"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Ideia
+          </button>
+        </div>
       </div>
 
       {/* STATS CARDS */}

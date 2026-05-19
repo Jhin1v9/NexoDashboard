@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
   Search, X, Mail, PanelRightOpen, PanelRightClose,
-  AlignJustify, LayoutList, LayoutTemplate, Sparkles
+  AlignJustify, LayoutList, LayoutTemplate, Sparkles, Bot
 } from 'lucide-react'
 import EmailSidebar from '../components/email/EmailSidebar'
 import EmailList from '../components/email/EmailList'
@@ -16,6 +17,7 @@ import { useEmailFocusMode } from '../context/EmailFocusModeContext'
 import { useEmailDensity } from '../context/EmailDensityContext'
 
 export default function EmailHub() {
+  const navigate = useNavigate()
   const { isFocusMode, toggleFocusMode } = useEmailFocusMode()
   const { density, setDensity } = useEmailDensity()
   const { status: authStatus, connect, disconnect, refresh: refreshAuth } = useGmailAuth()
@@ -304,6 +306,15 @@ export default function EmailHub() {
               )}
             </div>
             <div className="flex items-center justify-between">
+              {/* Botão Luna */}
+              <button
+                onClick={() => navigate('/luna?context=email')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-nexo-primary/10 text-nexo-primary border border-nexo-primary/20 hover:bg-nexo-primary/20 transition-colors"
+                title="Perguntar à Luna"
+              >
+                <Bot className="w-3.5 h-3.5" />
+                Luna
+              </button>
               {/* Filtros rápidos */}
               <div className="flex gap-1.5">
                 {['Todos', 'Não Lidos', 'Com Anexo'].map((f) => (

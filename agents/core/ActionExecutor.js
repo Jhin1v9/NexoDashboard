@@ -108,6 +108,64 @@ class ActionExecutor {
         return await this.deleteLead(action.params, authorName);
       case 'consultar_emails':
         return await this.queryEmails(action.params);
+      case 'atualizar_tarefa':
+        return await this.updateTask(action.params, authorName);
+      case 'listar_clientes':
+        return await this.listClients(action.params);
+      case 'criar_cliente':
+        return await this.createClient(action.params, authorName);
+      case 'atualizar_cliente':
+        return await this.updateClient(action.params, authorName);
+      case 'excluir_cliente':
+        return await this.deleteClient(action.params, authorName);
+      case 'listar_projetos':
+        return await this.listProjects(action.params);
+      case 'atualizar_lead':
+        return await this.updateLead(action.params, authorName);
+      case 'converter_lead':
+        return await this.convertLead(action.params, authorName);
+      case 'consultar_caixa':
+        return await this.queryCashBox(action.params);
+      case 'criar_ideia':
+        return await this.createIdea(action.params, authorName);
+      case 'listar_ideias':
+        return await this.listIdeas(action.params);
+      case 'atualizar_ideia':
+        return await this.updateIdea(action.params, authorName);
+      case 'excluir_ideia':
+        return await this.deleteIdea(action.params, authorName);
+      case 'converter_ideia_em_tarefa':
+        return await this.convertIdeaToTask(action.params, authorName);
+      case 'enviar_mensagem_whatsapp':
+        return await this.sendWhatsAppMessage(action.params, authorName);
+      case 'listar_emails':
+        return await this.listEmails(action.params);
+      case 'ler_email':
+        return await this.readEmail(action.params);
+      case 'criar_orcamento':
+        return await this.createQuote(action.params, authorName);
+      case 'atualizar_orcamento':
+        return await this.updateQuote(action.params, authorName);
+      case 'deletar_orcamento':
+        return await this.deleteQuote(action.params, authorName);
+      case 'listar_orcamentos':
+        return await this.listQuotes(action.params);
+      case 'criar_projeto':
+        return await this.createProject(action.params, authorName);
+      case 'atualizar_projeto':
+        return await this.updateProject(action.params, authorName);
+      case 'adicionar_cliente_workspace':
+        return await this.addWorkspaceClient(action.params, authorName);
+      case 'atualizar_cliente_workspace':
+        return await this.updateWorkspaceClient(action.params, authorName);
+      case 'enviar_email':
+        return await this.sendEmail(action.params, authorName);
+      case 'responder_email':
+        return await this.replyEmail(action.params, authorName);
+      case 'gerar_rascunho_email':
+        return await this.draftEmail(action.params, authorName);
+      case 'controlar_servico':
+        return await this.controlService(action.params);
       default:
         throw new Error(`Ação não suportada: ${action.type}`);
     }
@@ -968,6 +1026,637 @@ class ActionExecutor {
     }
   }
 
+  async apiDelete(endpoint) {
+    try {
+      const headers = {};
+      if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
+
+      const fetchPromise = fetch(`${this.apiBase}${endpoint}`, { method: 'DELETE', headers });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), this.timeout)
+      );
+
+      const res = await Promise.race([fetchPromise, timeoutPromise]);
+      if (!res.ok) return { error: `HTTP ${res.status}` };
+      return await res.json();
+    } catch (err) {
+      return { error: err.message };
+    }
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Tarefas
+  // ============================================================
+  async updateTask(params, authorName) {
+    const id = params.id;
+    const titulo = params.titulo || params.title;
+    if (!id && !titulo) throw new Error('ID ou título da tarefa necessário');
+
+    const tasksFile = path.join(this.dataDir, 'tasks.json');
+    const tasks = this.readJson(tasksFile, []);
+    let task = tasks.find(t => t.id === id);
+    if (!task && titulo) task = tasks.find(t => (t.title || t.titulo || '').toLowerCase().includes(titulo.toLowerCase()));
+    if (!task) throw new Error('Tarefa não encontrada');
+
+    if (params.titulo || params.title) task.title = params.titulo || params.title;
+    if (params.descricao || params.description) task.description = params.descricao || params.description;
+    if (params.prioridade || params.priority) {
+      const priorityMap = { P0: 'high', P1: 'medium', P2: 'low' };
+      task.priority = priorityMap[params.prioridade] || params.priority || task.priority;
+    }
+    if (params.responsavel || params.assignedTo !== undefined) task.assignedTo = params.responsavel || params.assignedTo;
+    if (params.prazo || params.dueDate) task.dueDate = params.prazo || params.dueDate;
+    if (params.status) task.status = params.status;
+    task.updatedAt = new Date().toISOString();
+
+    const apiResult = await this.apiPut(`/tasks/${task.id}`, task);
+    if (apiResult && !apiResult.error) {
+      this.writeJson(tasksFile, tasks);
+      return { type: 'task_updated', id: task.id, title: task.title, source: 'api' };
+    }
+
+    this.writeJson(tasksFile, tasks);
+    return { type: 'task_updated', id: task.id, title: task.title, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Clientes
+  // ============================================================
+  async listClients(params) {
+    const apiResult = await this.apiGet('/workspace/clients');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'clients', items: apiResult, source: 'api' };
+    }
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(clientsFile, { clients: {} });
+    const items = Object.values(data.clients || {});
+    return { type: 'clients', items, source: 'file' };
+  }
+
+  async createClient(params, authorName) {
+    const client = {
+      id: `client_${Date.now()}`,
+      name: params.nome || params.name || 'Cliente sem nome',
+      email: params.email || '',
+      phone: params.telefone || params.phone || '',
+      type: params.tipo || 'lead',
+      status: params.status || 'ativo',
+      notes: params.notas || params.notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/workspace/clients', client);
+    if (apiResult && !apiResult.error) {
+      return { type: 'client', id: client.id, name: client.name, source: 'api' };
+    }
+
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(clientsFile, { clients: {} });
+    data.clients = data.clients || {};
+    data.clients[client.id] = client;
+    this.writeJson(clientsFile, data);
+    return { type: 'client', id: client.id, name: client.name, source: 'file' };
+  }
+
+  async updateClient(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do cliente necessário');
+    const updates = {};
+    if (params.nome || params.name) updates.name = params.nome || params.name;
+    if (params.email) updates.email = params.email;
+    if (params.telefone || params.phone) updates.phone = params.telefone || params.phone;
+    if (params.status) updates.status = params.status;
+    if (params.notas || params.notes) updates.notes = params.notas || params.notes;
+    updates.updatedAt = new Date().toISOString();
+
+    const apiResult = await this.apiPut(`/workspace/clients/${id}`, updates);
+    if (apiResult && !apiResult.error) return { type: 'client_updated', id, source: 'api' };
+
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(clientsFile, { clients: {} });
+    if (data.clients[id]) {
+      Object.assign(data.clients[id], updates);
+      this.writeJson(clientsFile, data);
+      return { type: 'client_updated', id, name: data.clients[id].name, source: 'file' };
+    }
+    throw new Error('Cliente não encontrado');
+  }
+
+  async deleteClient(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do cliente necessário');
+
+    const apiResult = await this.apiDelete(`/workspace/clients/${id}`);
+    if (apiResult && !apiResult.error) return { type: 'client_deleted', id, source: 'api' };
+
+    const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(clientsFile, { clients: {} });
+    const name = data.clients[id]?.name;
+    delete data.clients[id];
+    this.writeJson(clientsFile, data);
+    return { type: 'client_deleted', id, name, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Projetos
+  // ============================================================
+  async listProjects(params) {
+    const apiResult = await this.apiGet('/projects');
+    if (apiResult && !apiResult.error && apiResult.projects) {
+      return { type: 'projects', items: apiResult.projects, source: 'api' };
+    }
+    const projectsFile = path.join(this.dataDir, 'schema', 'projects-registry.json');
+    const data = this.readJson(projectsFile, { projects: {} });
+    return { type: 'projects', items: Object.values(data.projects || {}), source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Leads
+  // ============================================================
+  async updateLead(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do lead necessário');
+    const updates = {};
+    if (params.nome || params.name) updates.name = params.nome || params.name;
+    if (params.email) updates.email = params.email;
+    if (params.telefone || params.phone) updates.phone = params.telefone || params.phone;
+    if (params.status) updates.status = params.status;
+    if (params.pipelineStatus) updates.pipelineStatus = params.pipelineStatus;
+    updates.updatedAt = new Date().toISOString();
+
+    const apiResult = await this.apiPut(`/leads/${id}`, updates);
+    if (apiResult && !apiResult.error) return { type: 'lead_updated', id, source: 'api' };
+
+    const leadsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(leadsFile, { clients: {} });
+    const lead = Object.values(data.clients || {}).find(c => c.id === id && (c.type === 'lead' || c.status === 'potencial'));
+    if (lead) {
+      Object.assign(lead, updates);
+      this.writeJson(leadsFile, data);
+      return { type: 'lead_updated', id, name: lead.name || lead.displayName, source: 'file' };
+    }
+    throw new Error('Lead não encontrado');
+  }
+
+  async convertLead(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do lead necessário');
+
+    const apiResult = await this.apiPost(`/leads/${id}/convert`, {});
+    if (apiResult && !apiResult.error) return { type: 'lead_converted', id, source: 'api' };
+
+    const leadsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
+    const data = this.readJson(leadsFile, { clients: {} });
+    if (data.clients[id]) {
+      data.clients[id].type = 'cliente';
+      data.clients[id].status = 'ativo';
+      data.clients[id].convertedAt = new Date().toISOString();
+      this.writeJson(leadsFile, data);
+      return { type: 'lead_converted', id, name: data.clients[id].name, source: 'file' };
+    }
+    throw new Error('Lead não encontrado');
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Caixa
+  // ============================================================
+  async queryCashBox(params) {
+    const apiResult = await this.apiGet('/cash-box');
+    if (apiResult && !apiResult.error) {
+      return { type: 'cash_box', balance: apiResult.balance, history: apiResult.history?.slice(-5), source: 'api' };
+    }
+    const cashFile = path.join(this.dataDir, 'cash-box.json');
+    const data = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+    return { type: 'cash_box', balance: data.balance, history: data.history?.slice(-5), source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Ideias
+  // ============================================================
+  async createIdea(params, authorName) {
+    const idea = {
+      id: `idea_${Date.now()}`,
+      title: params.titulo || params.title || 'Ideia sem título',
+      content: params.conteudo || params.content || '',
+      status: params.status || 'draft',
+      priority: params.prioridade || 'medium',
+      tags: params.tags || [],
+      author: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/ideas', idea);
+    if (apiResult && apiResult.success) {
+      return { type: 'idea', id: apiResult.data?.id || idea.id, title: idea.title, source: 'api' };
+    }
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { _schema: 'ideas-v1', ideas: [], templates: [], categories: [] });
+    data.ideas = data.ideas || [];
+    data.ideas.push(idea);
+    this.writeJson(ideasFile, data);
+    return { type: 'idea', id: idea.id, title: idea.title, source: 'file' };
+  }
+
+  async listIdeas(params) {
+    const apiResult = await this.apiGet('/ideas');
+    if (apiResult && apiResult.success && apiResult.data?.ideas) {
+      return { type: 'ideas', items: apiResult.data.ideas, source: 'api' };
+    }
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: [] });
+    return { type: 'ideas', items: data.ideas || [], source: 'file' };
+  }
+
+  async updateIdea(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID da ideia necessário');
+    const updates = {};
+    if (params.titulo || params.title) updates.title = params.titulo || params.title;
+    if (params.conteudo || params.content) updates.content = params.conteudo || params.content;
+    if (params.status) updates.status = params.status;
+    if (params.prioridade || params.priority) updates.priority = params.prioridade || params.priority;
+    if (params.tags) updates.tags = params.tags;
+    updates.updatedAt = new Date().toISOString();
+
+    const apiResult = await this.apiPut(`/ideas/${id}`, updates);
+    if (apiResult && apiResult.success) return { type: 'idea_updated', id, source: 'api' };
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: [] });
+    const idea = (data.ideas || []).find(i => i.id === id);
+    if (idea) {
+      Object.assign(idea, updates);
+      this.writeJson(ideasFile, data);
+      return { type: 'idea_updated', id, title: idea.title, source: 'file' };
+    }
+    throw new Error('Ideia não encontrada');
+  }
+
+  async deleteIdea(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID da ideia necessário');
+
+    const apiResult = await this.apiDelete(`/ideas/${id}`);
+    if (apiResult && apiResult.success) return { type: 'idea_deleted', id, source: 'api' };
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: [] });
+    const idx = (data.ideas || []).findIndex(i => i.id === id);
+    if (idx >= 0) {
+      const title = data.ideas[idx].title;
+      data.ideas.splice(idx, 1);
+      this.writeJson(ideasFile, data);
+      return { type: 'idea_deleted', id, title, source: 'file' };
+    }
+    throw new Error('Ideia não encontrada');
+  }
+
+  async convertIdeaToTask(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID da ideia necessário');
+
+    const apiResult = await this.apiPost(`/ideas/${id}/convert-task`, { assignedTo: params.responsavel || null });
+    if (apiResult && apiResult.success) {
+      return { type: 'idea_converted', id, taskId: apiResult.data?.taskId, source: 'api' };
+    }
+
+    const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+    const data = this.readJson(ideasFile, { ideas: [] });
+    const idea = (data.ideas || []).find(i => i.id === id);
+    if (!idea) throw new Error('Ideia não encontrada');
+
+    const taskResult = await this.createTask({
+      titulo: idea.title,
+      descricao: idea.content,
+      prioridade: idea.priority || 'P2',
+      responsavel: params.responsavel || null
+    }, authorName);
+
+    idea.status = 'converted';
+    idea.convertedToTaskId = taskResult.id;
+    idea.updatedAt = new Date().toISOString();
+    this.writeJson(ideasFile, data);
+
+    return { type: 'idea_converted', id, taskId: taskResult.id, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: WhatsApp
+  // ============================================================
+  async sendWhatsAppMessage(params, authorName) {
+    const to = params.para || params.to;
+    const text = params.texto || params.text || params.mensagem || params.message;
+    if (!to || !text) throw new Error('Número e mensagem necessários');
+
+    const apiResult = await this.apiPost('/whatsapp/send', { to, body: text });
+    if (apiResult && !apiResult.error) {
+      return { type: 'whatsapp_sent', to, text: text.substring(0, 50), source: 'api' };
+    }
+    throw new Error('Não foi possível enviar mensagem via WhatsApp');
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Email
+  // ============================================================
+  async listEmails(params) {
+    const query = params.label || params.filtro || 'INBOX';
+    const apiResult = await this.apiGet(`/email/messages?labelIds=${query}&maxResults=10`);
+    if (apiResult && !apiResult.error && apiResult.messages) {
+      const items = apiResult.messages.map(m => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        unread: m.labelIds?.includes('UNREAD') || m.unread
+      }));
+      const naoLidos = items.filter(i => i.unread).length;
+      return { type: 'emails', total: items.length, naoLidos, items, source: 'api' };
+    }
+    return { type: 'emails', total: 0, naoLidos: 0, items: [], source: 'api' };
+  }
+
+  async readEmail(params) {
+    const id = params.id;
+    if (!id) throw new Error('ID do email necessário');
+    const apiResult = await this.apiGet(`/email/messages/${id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'email', id, from: apiResult.from, subject: apiResult.subject, body: apiResult.body?.substring(0, 500), source: 'api' };
+    }
+    throw new Error('Email não encontrado');
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Orçamentos
+  // ============================================================
+  async createQuote(params, authorName) {
+    const quote = {
+      id: `quote_${Date.now()}`,
+      clientName: params.cliente || params.clientName || 'Cliente',
+      title: params.titulo || params.title || 'Orçamento',
+      description: params.descricao || params.description || '',
+      amount: parseFloat(params.valor || params.amount || 0),
+      status: params.status || 'pending',
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const apiResult = await this.apiPost('/quotes', quote);
+    if (apiResult && !apiResult.error) {
+      return { type: 'quote', id: quote.id, title: quote.title, amount: quote.amount, source: 'api' };
+    }
+
+    const quotesFile = path.join(this.dataDir, 'quotes.json');
+    const data = this.readJson(quotesFile, []);
+    data.push(quote);
+    this.writeJson(quotesFile, data);
+    return { type: 'quote', id: quote.id, title: quote.title, amount: quote.amount, source: 'file' };
+  }
+
+  async listQuotes(params) {
+    const apiResult = await this.apiGet('/quotes');
+    if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
+      return { type: 'quotes', items: apiResult, source: 'api' };
+    }
+    const quotesFile = path.join(this.dataDir, 'quotes.json');
+    const data = this.readJson(quotesFile, []);
+    return { type: 'quotes', items: data, source: 'file' };
+  }
+
+  async updateQuote(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do orçamento é obrigatório');
+    const updates = {
+      title: params.titulo || params.title,
+      description: params.descricao || params.description,
+      amount: params.valor !== undefined ? parseFloat(params.valor) : params.amount !== undefined ? parseFloat(params.amount) : undefined,
+      status: params.status,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const apiResult = await this.apiPut(`/quotes/${id}`, updates);
+    if (apiResult && !apiResult.error) {
+      return { type: 'quote_updated', id, changes: Object.keys(updates), source: 'api' };
+    }
+
+    const quotesFile = path.join(this.dataDir, 'quotes.json');
+    const data = this.readJson(quotesFile, []);
+    const idx = data.findIndex(q => q.id === id);
+    if (idx === -1) throw new Error(`Orçamento ${id} não encontrado`);
+    data[idx] = { ...data[idx], ...updates };
+    this.writeJson(quotesFile, data);
+    return { type: 'quote_updated', id, changes: Object.keys(updates), source: 'file' };
+  }
+
+  async deleteQuote(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do orçamento é obrigatório');
+
+    const apiResult = await this.apiDelete(`/quotes/${id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'quote_deleted', id, source: 'api' };
+    }
+
+    const quotesFile = path.join(this.dataDir, 'quotes.json');
+    const data = this.readJson(quotesFile, []);
+    const filtered = data.filter(q => q.id !== id);
+    if (filtered.length === data.length) throw new Error(`Orçamento ${id} não encontrado`);
+    this.writeJson(quotesFile, filtered);
+    return { type: 'quote_deleted', id, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Projetos
+  // ============================================================
+  async createProject(params, authorName) {
+    const project = {
+      id: params.id || `proj_${Date.now()}`,
+      codename: params.codename || params.id || `proj_${Date.now()}`,
+      name: params.nome || params.name || 'Novo Projeto',
+      type: params.tipo || params.type || 'web',
+      status: params.status || 'planejamento',
+      priority: params.prioridade || params.priority || 'medium',
+      progress: params.progresso || params.progress || 0,
+      description: params.descricao || params.description || '',
+      createdBy: authorName?.toLowerCase() || 'sistema',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Projetos não têm endpoint REST dedicado — salvar direto no registry
+    const registryFile = path.join(this.dataDir, 'schema', 'projects-registry.json');
+    const registry = this.readJson(registryFile, { projects: {} });
+    registry.projects = registry.projects || {};
+    registry.projects[project.id] = project;
+    this.writeJson(registryFile, registry);
+    return { type: 'project', id: project.id, name: project.name, source: 'file' };
+  }
+
+  async updateProject(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do projeto é obrigatório');
+    const updates = {
+      name: params.nome || params.name,
+      type: params.tipo || params.type,
+      status: params.status,
+      priority: params.prioridade || params.priority,
+      progress: params.progresso !== undefined ? parseInt(params.progresso) : params.progress !== undefined ? parseInt(params.progress) : undefined,
+      description: params.descricao || params.description,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const registryFile = path.join(this.dataDir, 'schema', 'projects-registry.json');
+    const registry = this.readJson(registryFile, { projects: {} });
+    registry.projects = registry.projects || {};
+    if (!registry.projects[id]) throw new Error(`Projeto ${id} não encontrado`);
+    registry.projects[id] = { ...registry.projects[id], ...updates };
+    this.writeJson(registryFile, registry);
+    return { type: 'project_updated', id, changes: Object.keys(updates), source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Workspace Clientes
+  // ============================================================
+  async addWorkspaceClient(params, authorName) {
+    const client = {
+      id: params.id || `ws_${Date.now()}`,
+      nome: params.nome || params.name || 'Novo Cliente',
+      status: params.status || 'ativo',
+      dataInicio: params.dataInicio || new Date().toISOString().slice(0, 10),
+      responsavel: params.responsavel || authorName?.toLowerCase() || 'sistema',
+      orcamentoTotal: parseFloat(params.orcamentoTotal || params.orcamento || 0),
+      moeda: params.moeda || 'EUR',
+      cor: params.cor || '#3b82f6',
+      tags: params.tags || [],
+      anotacoes: params.anotacoes || params.notes || ''
+    };
+
+    const apiResult = await this.apiPost('/workspace/clients', client);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'workspace_client', id: client.id, name: client.nome, source: 'api' };
+    }
+
+    // Fallback: salvar direto no workspace index
+    const wsFile = path.join(this.dataDir, 'workspace', 'workspace-index.json');
+    const ws = this.readJson(wsFile, { clientes: {} });
+    ws.clientes = ws.clientes || {};
+    ws.clientes[client.id] = client;
+    this.writeJson(wsFile, ws);
+    return { type: 'workspace_client', id: client.id, name: client.nome, source: 'file' };
+  }
+
+  async updateWorkspaceClient(params, authorName) {
+    const id = params.id;
+    if (!id) throw new Error('ID do cliente workspace é obrigatório');
+    const updates = {
+      nome: params.nome || params.name,
+      status: params.status,
+      responsavel: params.responsavel,
+      orcamentoTotal: params.orcamentoTotal !== undefined ? parseFloat(params.orcamentoTotal) : undefined,
+      moeda: params.moeda,
+      cor: params.cor,
+      tags: params.tags,
+      anotacoes: params.anotacoes || params.notes,
+      updatedAt: new Date().toISOString()
+    };
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+    const apiResult = await this.apiPut(`/workspace/clients/${id}`, updates);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'workspace_client_updated', id, changes: Object.keys(updates), source: 'api' };
+    }
+
+    const wsFile = path.join(this.dataDir, 'workspace', 'workspace-index.json');
+    const ws = this.readJson(wsFile, { clientes: {} });
+    ws.clientes = ws.clientes || {};
+    if (!ws.clientes[id]) throw new Error(`Cliente workspace ${id} não encontrado`);
+    ws.clientes[id] = { ...ws.clientes[id], ...updates };
+    this.writeJson(wsFile, ws);
+    return { type: 'workspace_client_updated', id, changes: Object.keys(updates), source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Email
+  // ============================================================
+  async sendEmail(params, authorName) {
+    const payload = {
+      to: params.para || params.to,
+      subject: params.assunto || params.subject,
+      text: params.texto || params.text || params.body,
+      html: params.html,
+      cc: params.cc,
+      bcc: params.bcc
+    };
+    if (!payload.to || !payload.subject) {
+      throw new Error('Destinatário (para/to) e assunto (assunto/subject) são obrigatórios');
+    }
+
+    const apiResult = await this.apiPost('/email/messages/send', payload);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'email_sent', to: payload.to, subject: payload.subject, source: 'api' };
+    }
+    throw new Error('Falha ao enviar email — serviço de email pode estar offline');
+  }
+
+  async replyEmail(params, authorName) {
+    const payload = {
+      to: params.para || params.to,
+      subject: params.assunto || params.subject,
+      text: params.texto || params.text || params.body,
+      html: params.html,
+      threadId: params.threadId,
+      inReplyTo: params.inReplyTo || params.messageId
+    };
+    if (!payload.to || !payload.subject) {
+      throw new Error('Destinatário (para/to) e assunto (assunto/subject) são obrigatórios');
+    }
+
+    const apiResult = await this.apiPost('/email/messages/send', payload);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'email_replied', to: payload.to, subject: payload.subject, threadId: payload.threadId, source: 'api' };
+    }
+    throw new Error('Falha ao responder email — serviço de email pode estar offline');
+  }
+
+  async draftEmail(params, authorName) {
+    const payload = {
+      to: params.para || params.to,
+      subject: params.assunto || params.subject,
+      text: params.texto || params.text || params.body,
+      html: params.html,
+      cc: params.cc,
+      bcc: params.bcc
+    };
+    if (!payload.to || !payload.subject) {
+      throw new Error('Destinatário (para/to) e assunto (assunto/subject) são obrigatórios');
+    }
+
+    const apiResult = await this.apiPost('/email/drafts', payload);
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
+      return { type: 'email_draft', to: payload.to, subject: payload.subject, source: 'api' };
+    }
+    throw new Error('Falha ao criar rascunho de email — serviço de email pode estar offline');
+  }
+
+  // ============================================================
+  // AÇÕES EXPANDIDAS: Sistema
+  // ============================================================
+  async controlService(params) {
+    const action = params.acao || params.action;
+    const service = params.servico || params.service;
+    if (!action) throw new Error('Ação necessária (start/stop/restart/status)');
+
+    const apiResult = await this.apiPost('/system/control', { action, service });
+    if (apiResult && !apiResult.error) {
+      return { type: 'service_control', action, service, result: apiResult, source: 'api' };
+    }
+    return { type: 'service_control', action, service, result: 'offline', source: 'fallback' };
+  }
+
   // ============================================================
   // FILE HELPERS
   // ============================================================
@@ -1048,6 +1737,36 @@ class ActionExecutor {
           break;
         case 'status_update':
           parts.push(`status da tarefa "${res.taskTitle || res.title || res.titulo}" atualizado para ${res.status}`);
+          break;
+        case 'quote':
+          parts.push(`orçamento "${res.title}" de €${res.amount}`);
+          break;
+        case 'quote_updated':
+          parts.push(`orçamento ${res.id} atualizado (${res.changes?.join(', ')})`);
+          break;
+        case 'quote_deleted':
+          parts.push(`orçamento ${res.id} excluído`);
+          break;
+        case 'project':
+          parts.push(`projeto "${res.name}" criado`);
+          break;
+        case 'project_updated':
+          parts.push(`projeto ${res.id} atualizado (${res.changes?.join(', ')})`);
+          break;
+        case 'workspace_client':
+          parts.push(`cliente workspace "${res.name}" adicionado`);
+          break;
+        case 'workspace_client_updated':
+          parts.push(`cliente workspace ${res.id} atualizado (${res.changes?.join(', ')})`);
+          break;
+        case 'email_sent':
+          parts.push(`📧 email enviado para ${res.to}: "${res.subject}"`);
+          break;
+        case 'email_replied':
+          parts.push(`📧 resposta enviada para ${res.to}: "${res.subject}"`);
+          break;
+        case 'email_draft':
+          parts.push(`📧 rascunho criado para ${res.to}: "${res.subject}"`);
           break;
       }
     }

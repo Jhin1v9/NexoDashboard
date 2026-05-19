@@ -3,17 +3,37 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-18T11:01:42+02:00",
-  "activeSessionId": "kimi-bbf526dc",
+  "lastUpdated": "2026-05-19T13:45:00+02:00",
+  "activeSessionId": "kimi-19007e56",
   "sessions": [
+    {
+      "id": "kimi-19007e56",
+      "startedAt": "2026-05-19T13:45:00+02:00",
+      "status": "active",
+      "focus": "Testes NEXO Mail Sprint 2 + relatório completo + descoberta de trabalho da instância 🟢",
+      "snapshotFile": "sessions/2026-05-19-kimi-19007e56.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
+      "lastCompactionAt": null
+    },
     {
       "id": "kimi-bbf526dc",
       "startedAt": "2026-05-18T11:01:42+02:00",
-      "status": "active",
+      "status": "archived",
       "focus": "NEXO Mail v2.0 — Sprint 2: Luna Integrada (drafts pendentes + action items → tarefas)",
       "snapshotFile": "sessions/2026-05-18-kimi-bbf526dc.md",
       "handoffFile": "handoff.md",
       "totalTurns": 12,
+      "lastCompactionAt": null
+    },
+    {
+      "id": "kimi-c4b19cd8",
+      "startedAt": "2026-05-19T12:54:40+02:00",
+      "status": "archived",
+      "focus": "Luna ADM Gestora Única — FASE 2: Expansão do ActionExecutor + integração com endpoints existentes",
+      "snapshotFile": "sessions/2026-05-19-kimi-c4b19cd8.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
       "lastCompactionAt": null
     }
   ],
@@ -23,13 +43,28 @@
       "signature": "KIMI-BBF526DC",
       "color": "🔵",
       "role": "coding-agent",
-      "notes": "Sessão atual. Trabalhando no EmailHub Sprint 2."
+      "notes": "Sessão anterior. Trabalhou no EmailHub Sprint 2. CRIADORA do sistema .kimi-context/."
+    },
+    "kimi-c4b19cd8": {
+      "instanceHash": "c4b19cd8",
+      "signature": "KIMI-C4B19CD8",
+      "color": "🟢",
+      "role": "coding-agent",
+      "notes": "Sessão anterior. Trabalhou na unificação da Luna como ADM Gestora Única. Deixou mudanças NÃO COMMITADAS no working tree (ActionExecutor expandido, contextModule nos endpoints Luna, botão Luna nas páginas)."
+    },
+    "kimi-19007e56": {
+      "instanceHash": "19007e56",
+      "signature": "KIMI-19007E56",
+      "color": "🔴",
+      "role": "coding-agent",
+      "notes": "Sessão atual. Continuando testes do NEXO Mail Sprint 2 e relatório completo. DESCoberta: instância 🟢 deixou mudanças não commitadas que devem ser preservadas."
     }
   },
   "rules": {
     "beforeCompaction": "SALVAR snapshot da sessão atual em .kimi-context/sessions/",
     "beforeSessionEnd": "ATUALIZAR handoff.md com próximas ações pendentes",
     "onNewSession": "LER KIMI.MD + handoff.md + último snapshot antes de agir",
-    "onConflict": "Se múltiplas instâncias Kimi ativas, verificar activeSessionId e NUNCA sobrescrever trabalho de outra instância sem confirmação do usuário"
+    "onConflict": "Se múltiplas instâncias Kimi ativas, verificar activeSessionId e NUNCA sobrescrever trabalho de outra instância sem confirmação do usuário",
+    "onOtherKimiWork": "SEMPRE verificar se outras sessões Kimi modificaram arquivos que você também está trabalhando. Anotar no handoff.md e integrar mudanças."
   }
 }
