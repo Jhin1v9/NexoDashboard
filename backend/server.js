@@ -66,7 +66,11 @@ function resolveDashboardAuthor(reqBodyAuthor) {
 }
 
 // ── AUTH & SECURITY CONFIG ──
-const JWT_SECRET = process.env.JWT_SECRET || 'nexo-ultra-secret-jwt-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('[SECURITY] JWT_SECRET não definido. Encerrando.');
+  process.exit(1);
+}
 const JWT_EXPIRES_IN = '8h';
 const SECURITY_LOG_FILE = path.join(DATA_DIR, 'security-log.json');
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
@@ -244,6 +248,318 @@ function addNotification({ type, title, message, severity = 'medium', metadata =
   return notifs.notifications[0];
 }
 
+// Discord Webhook para alertas de segurança
+const DISCORD_SECURITY_WEBHOOK = 'https://discord.com/api/webhooks/1506384996305338518/NVJ5yYsBCd7JXFGsczUxTuVV0rpLzpt2dICREfNzKxuJ26TgY5--5diOpUdmEVXp3vza';
+
+// Helper: coletar TODOS os dados possíveis do request
+function collectIntruderData(req, fingerprint = {}) {
+  const ip = getClientIp(req);
+  const headers = req.headers || {};
+  
+  // TLS/SSL fingerprint via cipher suite e protocolo (se disponível)
+  const tlsInfo = req.socket ? {
+    cipher: req.socket.getCipher ? req.socket.getCipher() : null,
+    protocol: req.socket.getProtocol ? req.socket.getProtocol() : null,
+    authorized: req.socket.authorized,
+    peerCertificate: req.socket.getPeerCertificate ? {
+      subject: req.socket.getPeerCertificate().subject,
+      issuer: req.socket.getPeerCertificate().issuer,
+      valid_from: req.socket.getPeerCertificate().valid_from,
+      valid_to: req.socket.getPeerCertificate().valid_to,
+      fingerprint: req.socket.getPeerCertificate().fingerprint,
+    } : null,
+  } : null;
+
+  // Dados de conexão
+  const connection = {
+    remoteAddress: req.connection?.remoteAddress,
+    remotePort: req.connection?.remotePort,
+    localAddress: req.connection?.localAddress,
+    localPort: req.connection?.localPort,
+    encrypted: req.connection?.encrypted || false,
+  };
+
+  // Headers relevantes para fingerprinting
+  const fingerprintHeaders = {
+    accept: headers.accept,
+    acceptLanguage: headers['accept-language'],
+    acceptEncoding: headers['accept-encoding'],
+    dnt: headers.dnt,
+    connection: headers.connection,
+    upgradeInsecureRequests: headers['upgrade-insecure-requests'],
+    secFetchDest: headers['sec-fetch-dest'],
+    secFetchMode: headers['sec-fetch-mode'],
+    secFetchSite: headers['sec-fetch-site'],
+    secFetchUser: headers['sec-fetch-user'],
+    secChUa: headers['sec-ch-ua'],
+    secChUaMobile: headers['sec-ch-ua-mobile'],
+    secChUaPlatform: headers['sec-ch-ua-platform'],
+    cacheControl: headers['cache-control'],
+    pragma: headers.pragma,
+    xForwardedFor: headers['x-forwarded-for'],
+    xRealIp: headers['x-real-ip'],
+    cfConnectingIp: headers['cf-connecting-ip'],
+    cfRay: headers['cf-ray'],
+    cfIpCountry: headers['cf-ipcountry'],
+    trueClientIp: headers['true-client-ip'],
+    via: headers.via,
+    forwarded: headers.forwarded,
+  };
+
+  // Filtrar headers nulos
+  Object.keys(fingerprintHeaders).forEach(key => {
+    if (fingerprintHeaders[key] === undefined) delete fingerprintHeaders[key];
+  });
+
+  return {
+    ip,
+    connection,
+    tls: tlsInfo,
+    headers: fingerprintHeaders,
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    url: req.originalUrl || req.url,
+    protocol: req.protocol,
+    host: req.get('host'),
+    referrer: headers.referer || headers.referrer || 'N/A',
+    origin: headers.origin || 'N/A',
+    bodyKeys: Object.keys(req.body || {}),
+    // Dados do fingerprint do frontend
+    fingerprint: {
+      canvas: fingerprint.canvas || 'N/A',
+      webgl: fingerprint.webgl || 'N/A',
+      webglVendor: fingerprint.webglVendor || 'N/A',
+      webglRenderer: fingerprint.webglRenderer || 'N/A',
+      screen: fingerprint.screen || 'N/A',
+      colorDepth: fingerprint.colorDepth || 'N/A',
+      pixelRatio: fingerprint.pixelRatio || 'N/A',
+      timezone: fingerprint.timezone || 'N/A',
+      timezoneOffset: fingerprint.timezoneOffset !== undefined ? fingerprint.timezoneOffset : 'N/A',
+      language: fingerprint.language || 'N/A',
+      languages: fingerprint.languages || 'N/A',
+      platform: fingerprint.platform || 'N/A',
+      vendor: fingerprint.vendor || 'N/A',
+      hardwareConcurrency: fingerprint.hardwareConcurrency || 'N/A',
+      deviceMemory: fingerprint.deviceMemory || 'N/A',
+      maxTouchPoints: fingerprint.maxTouchPoints || 'N/A',
+      touchSupport: fingerprint.touchSupport || 'N/A',
+      cpuClass: fingerprint.cpuClass || 'N/A',
+      oscpu: fingerprint.oscpu || 'N/A',
+      product: fingerprint.product || 'N/A',
+      productSub: fingerprint.productSub || 'N/A',
+      doNotTrack: fingerprint.doNotTrack || 'N/A',
+      cookieEnabled: fingerprint.cookieEnabled !== undefined ? fingerprint.cookieEnabled : 'N/A',
+      online: fingerprint.online !== undefined ? fingerprint.online : 'N/A',
+      pdfViewerEnabled: fingerprint.pdfViewerEnabled !== undefined ? fingerprint.pdfViewerEnabled : 'N/A',
+      webdriver: fingerprint.webdriver !== undefined ? fingerprint.webdriver : 'N/A',
+      plugins: fingerprint.plugins || 'N/A',
+      fonts: fingerprint.fonts || 'N/A',
+      audio: fingerprint.audio || 'N/A',
+      battery: fingerprint.battery || 'N/A',
+      network: fingerprint.network || 'N/A',
+      userAgent: fingerprint.userAgent || 'N/A',
+    },
+    rawUserAgent: headers['user-agent'] || 'N/A',
+  };
+}
+
+// Helper: enviar alerta detalhado para Discord webhook
+async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts) {
+  try {
+    const uaParsed = parseUserAgent(intruderData.rawUserAgent);
+    const fp = intruderData.fingerprint;
+    const now = new Date();
+    const attemptCount = recentAttempts?.length || 1;
+    
+    // Montar embed rico
+    const embed = {
+      title: '🚨 INTRUSO DETECTADO — NEXO DASHBOARD',
+      description: `Tentativa de login falha #${attemptCount} na última hora`,
+      color: 0xff0000, // Vermelho
+      timestamp: now.toISOString(),
+      footer: {
+        text: 'Sistema de Segurança NEXO Digital',
+        icon_url: 'https://cdn.discordapp.com/emojis/🔒.png'
+      },
+      thumbnail: {
+        url: 'https://cdn-icons-png.flaticon.com/512/564/564419.png'
+      },
+      fields: [
+        // Identificação do Alvo
+        {
+          name: '👤 USUÁRIO ALVO',
+          value: `\`\`\`${attemptedUser}\`\`\``,
+          inline: true
+        },
+        {
+          name: '📊 TENTATIVAS (1h)',
+          value: `\`\`\`${attemptCount}\`\`\``,
+          inline: true
+        },
+        {
+          name: '⏰ HORÁRIO',
+          value: `<t:${Math.floor(now.getTime() / 1000)}:F>`,
+          inline: true
+        },
+        // Localização
+        {
+          name: '🌍 LOCALIZAÇÃO',
+          value: [
+            `**País:** ${location.country || 'Desconhecido'}`,
+            `**Cidade:** ${location.city || 'Desconhecido'}`,
+            `**Região:** ${location.region || 'Desconhecido'}`,
+            `**ISP:** ${location.isp || 'Desconhecido'}`,
+            `**Org:** ${location.org || 'Desconhecido'}`,
+            location.lat ? `**Coordenadas:** ${location.lat}, ${location.lon}` : '',
+          ].filter(Boolean).join('\n') || 'N/A',
+          inline: false
+        },
+        // Rede
+        {
+          name: '🌐 REDE & IP',
+          value: [
+            `**IP:** \`\`\`${intruderData.ip}\`\`\``,
+            `**Protocolo:** ${intruderData.protocol?.toUpperCase() || 'HTTPS'}`,
+            `**Porta Remota:** ${intruderData.connection?.remotePort || 'N/A'}`,
+            `**Encriptado:** ${intruderData.connection?.encrypted ? 'Sim' : 'Não'}`,
+            intruderData.headers.xForwardedFor ? `**X-Forwarded-For:** \`\`\`${intruderData.headers.xForwardedFor}\`\`\`` : '',
+            intruderData.headers.cfConnectingIp ? `**CF-Connecting-IP:** \`\`\`${intruderData.headers.cfConnectingIp}\`\`\`` : '',
+            intruderData.headers.cfIpCountry ? `**CF País:** ${intruderData.headers.cfIpCountry}` : '',
+          ].filter(Boolean).join('\n') || 'N/A',
+          inline: false
+        },
+        // Dispositivo
+        {
+          name: '💻 DISPOSITIVO',
+          value: [
+            `**Navegador:** ${uaParsed.browser}`,
+            `**Sistema:** ${uaParsed.os}`,
+            `**Dispositivo:** ${uaParsed.device}`,
+            `**Arquitetura:** ${uaParsed.arch}`,
+            `**Mobile:** ${uaParsed.isMobile ? 'Sim ⚠️' : 'Não'}`,
+          ].join('\n'),
+          inline: true
+        },
+        // Tela
+        {
+          name: '🖥️ TELA & DISPLAY',
+          value: [
+            `**Resolução:** ${fp.screen}`,
+            `**Profundidade:** ${fp.colorDepth}`,
+            `**Pixel Ratio:** ${fp.pixelRatio}`,
+            `**Touch:** ${fp.touchSupport}`,
+            `**Max Touch:** ${fp.maxTouchPoints}`,
+          ].join('\n'),
+          inline: true
+        },
+        // Fingerprint
+        {
+          name: '🆔 FINGERPRINT AVANÇADO',
+          value: [
+            `**Canvas:** \`\`\`${fp.canvas?.slice(0, 32) || 'N/A'}...\`\`\``,
+            `**WebGL:** ${fp.webgl || 'N/A'}`,
+            `**WebGL Vendor:** ${fp.webglVendor || 'N/A'}`,
+            `**WebGL Renderer:** ${fp.webglRenderer || 'N/A'}`,
+            `**Hardware Cores:** ${fp.hardwareConcurrency}`,
+            `**Memória:** ${fp.deviceMemory}GB`,
+            `**Plataforma:** ${fp.platform}`,
+            `**Vendor:** ${fp.vendor}`,
+          ].join('\n'),
+          inline: false
+        },
+        // Navegador detalhado
+        {
+          name: '🔍 NAVEGADOR DETALHADO',
+          value: [
+            `**Idioma:** ${fp.language}`,
+            `**Idiomas:** ${Array.isArray(fp.languages) ? fp.languages.join(', ') : fp.languages}`,
+            `**Timezone:** ${fp.timezone}`,
+            `**Timezone Offset:** ${fp.timezoneOffset}min`,
+            `**DNT:** ${fp.doNotTrack}`,
+            `**Cookies:** ${fp.cookieEnabled}`,
+            `**Online:** ${fp.online}`,
+            `**PDF Viewer:** ${fp.pdfViewerEnabled}`,
+            `**Webdriver:** ${fp.webdriver}`,
+          ].join('\n'),
+          inline: true
+        },
+        // Rede & Sistema
+        {
+          name: '⚡ SISTEMA & REDE',
+          value: [
+            `**CPU Class:** ${fp.cpuClass}`,
+            `**OS CPU:** ${fp.oscpu}`,
+            `**Product:** ${fp.product}`,
+            `**Product Sub:** ${fp.productSub}`,
+            `**Plugins:** ${Array.isArray(fp.plugins) ? fp.plugins.length + ' plugins' : fp.plugins}`,
+            `**Fonts:** ${Array.isArray(fp.fonts) ? fp.fonts.length + ' fonts' : fp.fonts}`,
+            `**Audio:** ${fp.audio !== 'N/A' ? 'Disponível' : 'N/A'}`,
+            `**Battery:** ${fp.battery !== 'N/A' ? 'Disponível' : 'N/A'}`,
+            `**Network:** ${fp.network !== 'N/A' ? JSON.stringify(fp.network) : 'N/A'}`,
+          ].join('\n'),
+          inline: true
+        },
+        // Headers de segurança
+        {
+          name: '🛡️ HEADERS DE SEGURANÇA',
+          value: [
+            `**Sec-CH-UA:** ${intruderData.headers.secChUa || 'N/A'}`,
+            `**Sec-CH-UA-Mobile:** ${intruderData.headers.secChUaMobile || 'N/A'}`,
+            `**Sec-CH-UA-Platform:** ${intruderData.headers.secChUaPlatform || 'N/A'}`,
+            `**Sec-Fetch-Dest:** ${intruderData.headers.secFetchDest || 'N/A'}`,
+            `**Sec-Fetch-Mode:** ${intruderData.headers.secFetchMode || 'N/A'}`,
+            `**Sec-Fetch-Site:** ${intruderData.headers.secFetchSite || 'N/A'}`,
+            `**Accept-Language:** ${intruderData.headers.acceptLanguage || 'N/A'}`,
+            `**Accept-Encoding:** ${intruderData.headers.acceptEncoding || 'N/A'}`,
+          ].join('\n'),
+          inline: false
+        },
+        // TLS
+        {
+          name: '🔒 TLS/SSL INFO',
+          value: intruderData.tls ? [
+            `**Cipher:** ${intruderData.tls.cipher?.name || 'N/A'}`,
+            `**Protocol:** ${intruderData.tls.protocol || 'N/A'}`,
+            `**Autorizado:** ${intruderData.tls.authorized ? 'Sim' : 'Não'}`,
+          ].join('\n') : 'N/A',
+          inline: false
+        },
+        // Raw User Agent
+        {
+          name: '📝 RAW USER-AGENT',
+          value: `\`\`\`${intruderData.rawUserAgent?.slice(0, 500) || 'N/A'}\`\`\``,
+          inline: false
+        },
+      ]
+    };
+
+    const payload = {
+      username: 'NEXO Security Bot',
+      avatar_url: 'https://cdn-icons-png.flaticon.com/512/564/564419.png',
+      embeds: [embed],
+      content: '@everyone 🚨 **ALERTA DE INTRUSÃO DETECTADO**',
+    };
+
+    const response = await fetch(DISCORD_SECURITY_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[SECURITY] Discord webhook falhou:', response.status, text);
+      return { sent: false, reason: 'discord_error', status: response.status, error: text };
+    }
+
+    console.log('[SECURITY] Alerta Discord enviado com sucesso');
+    return { sent: true };
+  } catch (e) {
+    console.error('[SECURITY] Falha ao enviar Discord:', e.message);
+    return { sent: false, reason: 'send_error', error: e.message };
+  }
+}
+
 // Helper: enviar alerta no WhatsApp (com rate limiting)
 // Retorna { sent: boolean, reason?: string }
 async function sendSecurityWhatsAlert(message, opts = {}) {
@@ -281,39 +597,59 @@ async function sendSecurityWhatsAlert(message, opts = {}) {
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // Middleware
-app.use(cors());
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['https://nexodashboard.onrender.com', 'http://localhost:3457', 'http://localhost:5173'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Bloqueado: ${origin}`);
+      callback(new Error('CORS não permitido'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GLOBAL API AUTH MIDDLEWARE — Protege TODAS as rotas /api/* por padrão
+// ═══════════════════════════════════════════════════════════════════════════════
+const PUBLIC_API_ROUTES = [
+  '/api/health',
+  '/api/auth/login',
+  '/api/auth/logout',
+];
+
+app.use((req, res, next) => {
+  // Só aplica a rotas /api/*
+  if (!req.path.startsWith('/api/')) return next();
+
+  // Rotas explicitamente públicas
+  if (PUBLIC_API_ROUTES.includes(req.path)) return next();
+
+  // Rotas que já têm seu próprio requireAuth (não precisa duplicar)
+  // Mas por segurança vamos verificar aqui também
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace('Bearer ', '') || req.query.token;
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Não autorizado' });
+  }
+
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ success: false, error: 'Token inválido ou expirado' });
+  }
+});
+
 // Health check — DEVE vir antes do static para não ser capturado pelo SPA fallback
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
-});
-
-// ── DEBUG: Gmail OAuth config ──
-app.get('/api/debug/gmail-config', (req, res) => {
-  const clientId = process.env.GMAIL_CLIENT_ID || '';
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET || '';
-  const redirectUri = process.env.GMAIL_REDIRECT_URI || '';
-
-  const analyze = (str, name) => ({
-    length: str.length,
-    startsWithSpace: str.startsWith(' '),
-    endsWithSpace: str.endsWith(' '),
-    hasNewline: str.includes('\n'),
-    hasCarriageReturn: str.includes('\r'),
-    hasTab: str.includes('\t'),
-    hasQuotes: str.includes("'") || str.includes('"'),
-    firstChars: str.slice(0, 20),
-    lastChars: str.slice(-20),
-    masked: str.length > 10 ? str.slice(0, 5) + '...' + str.slice(-5) : str,
-    expectedLength: name === 'clientId' ? 72 : undefined,
-  });
-
-  res.json({
-    nodeEnv: process.env.NODE_ENV,
-    clientId: analyze(clientId, 'clientId'),
-    clientSecret: analyze(clientSecret, 'clientSecret'),
-    redirectUri: analyze(redirectUri, 'redirectUri'),
-  });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -7013,6 +7349,50 @@ app.post('/api/auto-fix/fix/:service', (req, res) => {
 // AUTH API v1.0 — Login Ultra-Secreto
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Rate limiter simples em memória para login
+const loginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+const LOGIN_BLOCK_MS = 30 * 60 * 1000;  // 30 minutos de bloqueio
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now, blockedUntil: null });
+    return { allowed: true };
+  }
+
+  // Se está bloqueado
+  if (record.blockedUntil && now < record.blockedUntil) {
+    return {
+      allowed: false,
+      retryAfter: Math.ceil((record.blockedUntil - now) / 1000)
+    };
+  }
+
+  // Resetar se passou a janela
+  if (now - record.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now, blockedUntil: null });
+    return { allowed: true };
+  }
+
+  // Incrementar contagem
+  record.count++;
+
+  // Bloquear se excedeu
+  if (record.count > MAX_LOGIN_ATTEMPTS) {
+    record.blockedUntil = now + LOGIN_BLOCK_MS;
+    return {
+      allowed: false,
+      retryAfter: Math.ceil(LOGIN_BLOCK_MS / 1000)
+    };
+  }
+
+  return { allowed: true };
+}
+
 // POST /api/auth/login — Valida credenciais e retorna JWT
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -7022,6 +7402,18 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const ip = getClientIp(req);
+
+    // Verificar rate limiting
+    const rateCheck = checkLoginRateLimit(ip);
+    if (!rateCheck.allowed) {
+      console.warn(`[SECURITY] Login bloqueado por rate limit — IP: ${ip}`);
+      return res.status(429).json({
+        success: false,
+        error: 'Muitas tentativas de login. Tente novamente mais tarde.',
+        retryAfter: rateCheck.retryAfter
+      });
+    }
+
     const attemptedUser = username.toLowerCase().trim();
 
     // Validar credenciais
