@@ -550,8 +550,8 @@ function dataURLtoBlob(dataurl) {
 // Helper: enviar alerta detalhado para Discord webhook (com suporte a imagens)
 async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts, images = {}) {
   try {
-    const uaParsed = parseUserAgent(intruderData.rawUserAgent);
-    const fp = intruderData.fingerprint;
+    const fp = intruderData.fingerprint || {};
+    const uaParsed = parseUserAgent(intruderData.rawUserAgent || fp.userAgent || 'N/A');
     const risk = intruderData.risk || {};
     const now = new Date();
     const attemptCount = recentAttempts?.length || 1;
