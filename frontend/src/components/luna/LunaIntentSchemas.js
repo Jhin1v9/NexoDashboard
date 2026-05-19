@@ -476,3 +476,23 @@ export function getSchema(intent) {
     isInfo: true,
   }
 }
+
+/**
+ * Verifica se um intent tem campos de formulário editáveis.
+ * Usado pelo LunaFloatingButton para decidir entre SmartFormModal ou chat fallback.
+ */
+export function hasFormFields(intent) {
+  if (!intent || intent === 'None') return false
+  const schema = INTENT_SCHEMAS[intent]
+  return !!(schema && schema.fields && Object.keys(schema.fields).length > 0)
+}
+
+/**
+ * Verifica se um intent existe no schema registry.
+ */
+export function isKnownIntent(intent) {
+  if (!intent || intent === 'None') return false
+  return !!INTENT_SCHEMAS[intent]
+}
+
+
