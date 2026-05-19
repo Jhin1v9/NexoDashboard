@@ -98,6 +98,10 @@ class ActionExecutor {
         return await this.saveIdea(action.params, authorName);
       case 'link':
         return await this.saveLink(action.params, authorName);
+      case 'ajuda':
+        return await this.showHelp(action.params, authorName);
+      case 'navegar':
+        return await this.navigate(action.params, authorName);
       case 'excluir_tarefa':
         return await this.deleteTask(action.params, authorName);
       case 'excluir_pagamento':
@@ -364,27 +368,13 @@ class ActionExecutor {
       return { type: 'task_done', id: match.id, titulo: match.titulo, source: 'file' };
     }
 
-    // Se não achou e não tem título, retorna erro
-    if (!titulo || titulo.trim() === '') {
-      return { type: 'task_done', error: true, message: 'Não consegui identificar qual tarefa concluir. Tente ser mais específico, tipo "concluir tarefa revisar código".', source: 'file' };
-    }
-
-    // Se não achou, cria como tarefa concluída
-    const task = {
-      id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      titulo,
-      status: 'concluida',
-      responsavel: authorName,
-      criadoPor: authorName,
-      dataCriacao: new Date().toISOString(),
-      dataConclusao: new Date().toISOString(),
-      concluidoPor: authorName,
-      origem: 'whatsapp_luna'
+    // Se não achou, retorna erro
+    return {
+      type: 'task_done',
+      error: true,
+      message: `Não encontrei nenhuma tarefa correspondente a "${titulo || 'desconhecida'}". Tente ser mais específico ou verifique o título exato.`,
+      source: 'file'
     };
-    tasks.push(task);
-    this.writeJson(tasksFile, tasks);
-
-    return { type: 'task_done', id: task.id, titulo, source: 'file_created' };
   }
 
   async addTaskComment(params, authorName) {
@@ -681,6 +671,36 @@ class ActionExecutor {
     this.writeJson(linksFile, links);
 
     return { type: 'link', id: link.id, url, source: 'file' };
+  }
+
+  // ============================================================
+  // AÇÕES: Sistema (ajuda, navegação)
+  // ============================================================
+  async showHelp(params, authorName) {
+    return {
+      type: 'help',
+      message: `Oi, ${authorName.split(' ')[0]}! 👋 Aqui está o que posso fazer:\n\n` +
+        `📋 Tarefas: criar, listar, concluir, atribuir\n` +
+        `💰 Financeiro: registrar pagamento/despesa, consultar caixa, listar\n` +
+        `📁 Projetos: criar, listar\n` +
+        `📧 Email: responder, marcar lido, listar não lidos, criar rascunho\n` +
+        `💬 WhatsApp: enviar mensagem, verificar menções\n` +
+        `💡 Ideias: criar, listar\n` +
+        `🔗 Links: listar\n` +
+        `🔔 Notificações: listar\n\n` +
+        `É só falar naturalmente, tipo "cria tarefa urgente" ou "quanto temos no caixa"!`,
+      source: 'file'
+    };
+  }
+
+  async navigate(params, authorName) {
+    const destino = params.destino || params.pagina || '/dashboard';
+    return {
+      type: 'navigate',
+      destino,
+      message: `Redirecionando para ${destino}...`,
+      source: 'file'
+    };
   }
 
   // ============================================================
@@ -2718,6 +2738,12 @@ class ActionExecutor {
           break;
         case 'link':
           parts.push(`link salvo`);
+          break;
+        case 'help':
+          parts.push(`ajuda enviada`);
+          break;
+        case 'navigate':
+          parts.push(`navegação para ${res.destino || 'página'}`);
           break;
         case 'task_deleted':
           parts.push(`tarefa "${res.titulo || res.title}" excluída`);

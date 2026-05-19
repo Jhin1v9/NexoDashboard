@@ -4095,7 +4095,7 @@ app.post('/api/luna/chat', async (req, res) => {
       // BugDetector
       'listar_relatorios_bug', 'excluir_relatorio_bug',
       // Misc
-      'ideia', 'link', 'social'
+      'ideia', 'link', 'social', 'ajuda', 'navegar'
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
 
@@ -4638,7 +4638,13 @@ function buildConciergeReply(result, authorName) {
       const res = r.result;
       switch (res.type) {
         case 'task': parts.push(`tarefa "${res.title || res.titulo}" criada${res.assignedTo ? ` pra ${res.assignedTo}` : ''}`); break;
-        case 'task_done': parts.push(`tarefa "${res.title || res.titulo}" marcada como concluída`); break;
+        case 'task_done':
+          if (res.error) {
+            parts.push(res.message || 'Não foi possível concluir a tarefa.');
+          } else {
+            parts.push(`tarefa "${res.title || res.titulo || 'desconhecida'}" marcada como concluída`);
+          }
+          break;
         case 'lead': parts.push(`lead "${res.displayName || res.nome}" registrado`); break;
         case 'payment':
           if (res.splits) {
@@ -4725,6 +4731,12 @@ function buildConciergeReply(result, authorName) {
           if (res.mencoesRecentes?.length > 0) {
             parts.push(`Menções recentes:\n${res.mencoesRecentes.map(m => `  - ${m.from}: "${m.text}"`).join('\n')}`);
           }
+          break;
+        case 'help':
+          parts.push(res.message || 'Aqui está o que posso fazer! 👋');
+          break;
+        case 'navigate':
+          parts.push(res.message || `Redirecionando para ${res.destino || 'página'}...`);
           break;
       }
     }
