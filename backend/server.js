@@ -7420,10 +7420,12 @@ app.post('/api/auth/login', async (req, res) => {
     const user = validateCredentials(attemptedUser, password);
 
     if (!user) {
-      // Login falho — logar e possivelmente alertar
+      // Login falho — coleta MÁXIMA de dados do intruso
       const location = await getIpLocation(ip);
+      const intruderData = collectIntruderData(req, fingerprint);
       const deviceInfo = fingerprint || {};
       const uaParsed = parseUserAgent(deviceInfo.userAgent || '');
+      
       const event = await logSecurityEvent({
         type: 'failed_login',
         severity: 'high',
@@ -7450,7 +7452,7 @@ app.post('/api/auth/login', async (req, res) => {
         notified: false
       });
 
-      // Verificar se atingiu limite de tentativas para alertar no WhatsApp
+      // Verificar se atingiu limite de tentativas para alertar
       const log = readJSON(SECURITY_LOG_FILE, { events: [], settings: {} });
       const recentAttempts = log.events.filter(e =>
         e.type === 'failed_login' &&
@@ -7461,11 +7463,19 @@ app.post('/api/auth/login', async (req, res) => {
       const maxAttempts = settings.maxAttemptsBeforeAlert || 5;
 
       if (recentAttempts.length >= maxAttempts) {
+        // Envia para Discord (sempre, sem rate limit por tentativa)
+        const discordResult = await sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts);
+        if (discordResult.sent) {
+          event.notified = true;
+          event.notificationChannel = (event.notificationChannel || '') + '+discord';
+        }
+
+        // Envia para WhatsApp (com rate limit)
         const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
         const alertResult = await sendSecurityWhatsAlert(msg);
         if (alertResult.sent) {
           event.notified = true;
-          event.notificationChannel = 'whatsapp+dashboard';
+          event.notificationChannel = (event.notificationChannel || '') + '+whatsapp';
         }
       }
 
