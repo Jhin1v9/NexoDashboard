@@ -132,6 +132,23 @@ export default function Dashboard() {
     notify('Lembrete adicionado', { body: newReminder.trim(), tag: 'reminder' })
   }
 
+  // Servidores locais ativos (Workspace)
+  const [runningServers, setRunningServers] = useState([])
+  const token = localStorage.getItem('nexo_token') || ''
+  const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
+
+  useEffect(() => {
+    const fetchServers = async () => {
+      try {
+        const res = await api.get('/api/workspace/servers')
+        setRunningServers(res.data.servers || [])
+      } catch { /* ignore — endpoint pode não existir online ainda */ }
+    }
+    fetchServers()
+    const iv = setInterval(fetchServers, 5000)
+    return () => clearInterval(iv)
+  }, [])
+
   return (
     <div className="space-y-6">
       {/* Header */}
