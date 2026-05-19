@@ -3806,29 +3806,44 @@ function buildChatFallbackReply(userMessage) {
   const p0 = tasks.filter(t => t.priority === 'P0');
   const p1 = tasks.filter(t => t.priority === 'P1');
   const leads = buffer.newLeads || [];
+  const expenses = buffer.newFinance || [];
   
   const msg = userMessage.toLowerCase();
   
-  if (msg.includes('tarefa') || msg.includes('task') || msg.includes('pendente')) {
-    if (p0.length > 0) return `Eita, minha conexão com o cérebro caiu agora 😅\n\nMas olha o que sei sem o LLM:\n🔴 ${p0.length} P0 pendente(s)\n🟠 ${p1.length} P1(s)\n\nQuer que eu detalho alguma?`;
-    if (tasks.length > 0) return `Tô meio lenta agora (problema técnico) ☕\n\nMas sei que tem ${tasks.length} tarefa(s) pendente(s). Quer que eu listo?`;
-    return `Tô com problema técnico agora 😅\n\nMas o radar de tarefas tá limpo! Nada pendente.`;
+  // Comandos de tarefa
+  if (msg.includes('tarefa') || msg.includes('task') || msg.includes('pendente') || msg.includes('fazer') || msg.includes('criar') || msg.includes('anota')) {
+    if (p0.length > 0) return `🔴 ${p0.length} P0 pendente(s)\n🟠 ${p1.length} P1(s)\n\nTô sem conexão com o cérebro agora, mas os dados locais funcionam! Quer que eu detalhe alguma tarefa?`;
+    if (tasks.length > 0) return `📋 ${tasks.length} tarefa(s) pendente(s)\n\nTô rodando no modo offline. Quer que eu liste?`;
+    return `✅ Radar de tarefas limpo! Nada pendente no momento.\n\n(rodando em modo fallback)`;
   }
   
-  if (msg.includes('lead') || msg.includes('cliente')) {
-    if (leads.length > 0) return `Meu cérebro deu uma travada, mas não me abandona! 😅\n\nTem ${leads.length} lead(s) no radar. Quer que eu mostro?`;
-    return `Problema técnico aqui, mas tô de olho! 👀\n\nNenhum lead novo no momento.`;
+  // Comandos de lead/cliente
+  if (msg.includes('lead') || msg.includes('cliente') || msg.includes('potencial') || msg.includes('novo cliente')) {
+    if (leads.length > 0) return `🎣 ${leads.length} lead(s) no radar.\n\nQuer que eu mostre os detalhes?`;
+    return `🎣 Nenhum lead novo no momento.\n\n(rodando em modo fallback)`;
   }
   
-  if (msg.includes('status') || msg.includes('panorama') || msg.includes('resumo')) {
-    const ignoreWhatsApp = configs.integrations?.whatsapp?.ignored === true;
-    let reply = `Eita, deu um tilt nos meus neurônios 😅\n\nMas aqui vai um resumo rápido:\n- Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n- Leads: ${leads.length}`;
-    if (!ignoreWhatsApp) reply += `\n- Mensagens: ${buffer.newMessages?.length || 0}`;
-    reply += `\n\nTenta de novo daqui a pouco?`;
+  // Comandos financeiros
+  if (msg.includes('dinheiro') || msg.includes('pagamento') || msg.includes('recebi') || msg.includes('gastei') || msg.includes('despesa') || msg.includes('caixa') || msg.includes('saldo')) {
+    const totalExpenses = expenses.reduce((s, e) => s + (e.valor || 0), 0);
+    return `💰 Modo fallback ativo.\n\n${expenses.length} movimentação(ões) registrada(s). Total de despesas: €${totalExpenses.toFixed(2)}\n\nQuer ver o detalhamento?`;
+  }
+  
+  // Comandos de status/panorama
+  if (msg.includes('status') || msg.includes('panorama') || msg.includes('resumo') || msg.includes('tudo bem') || msg.includes('como anda') || msg.includes('oi') || msg.includes('olá') || msg.includes('opa')) {
+    let reply = `👋 Tô aqui! (modo fallback)\n\n📊 Resumo rápido:\n• Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n• Leads: ${leads.length}`;
+    if (buffer.newMessages?.length > 0) reply += `\n• WhatsApp: ${buffer.newMessages.length} mensagem(ões)`;
+    reply += `\n\n💡 Tenta de novo em alguns minutos ou use comandos diretos como:\n"criar tarefa X", "registrar despesa de 50 em Y", "status"`;
     return reply;
   }
   
-  return `Eita, minha conexão com o cérebro caiu agora 😅\n\nTô aqui, só tô meio lenta. Pode repetir daqui a pouco? Ou manda um comando direto tipo /status que eu respondo sem depender do LLM.`;
+  // Comandos de email
+  if (msg.includes('email') || msg.includes('gmail') || msg.includes('correio')) {
+    return `📧 O módulo de email está ativo!\n\nVai na aba "Comunicação → Email" para conectar teu Gmail e gerenciar emails com a minha ajuda.\n\n(ou tenta de novo daqui a pouco se quiser falar por aqui)`;
+  }
+  
+  // Fallback genérico mais útil
+  return `🤔 Entendi "${userMessage.substring(0, 30)}${userMessage.length > 30 ? '...' : ''}"\n\nTô no modo fallback agora (sem conexão com o cérebro). Mas ainda consigo ajudar com:\n• Criar/listar tarefas\n• Registrar pagamentos/despesas\n• Consultar leads\n• Resumo de status\n\nTenta reformular ou espera alguns minutos!`;
 }
 // ────────────────────────────────────────────────────────
 
@@ -4107,23 +4122,34 @@ ${dataContext}`;
       { role: 'user', parts: [{ text: msg }] }
     ];
 
-    const geminiResult = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.7,
-        maxOutputTokens: 1024
-      }
-    });
+    let reply;
+    let usedModel = 'gemini-2.5-flash-lite';
+    let isFallback = false;
 
-    const reply = (geminiResult.text || '...').trim();
+    try {
+      const geminiResult = await genAI.models.generateContent({
+        model: usedModel,
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+          maxOutputTokens: 1024
+        }
+      });
+      reply = (geminiResult.text || '...').trim();
+    } catch (geminiErr) {
+      // LLM indisponível — usar fallback inteligente
+      console.warn('[CONCIERGE] Gemini indisponível, usando fallback:', geminiErr.message);
+      usedModel = 'fallback';
+      isFallback = true;
+      reply = buildChatFallbackReply(msg.trim());
+    }
 
-    res.json({ success: true, reply, model: 'gemini-2.5-flash-lite', intent: 'chat', timestamp: new Date().toISOString() });
+    res.json({ success: true, reply, model: usedModel, intent: 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
 
   } catch (e) {
-    console.error('[CONCIERGE] Erro no chat Gemini:', e.message, e.code || '');
-    const msg = req.body?.message || 'comando';
+    console.error('[CONCIERGE] Erro no chat:', e.message, e.code || '');
+    const msgText = req.body?.message || 'comando';
 
     // Se todas as API keys estão esgotadas, mostra mensagem humanizada com horário de reset
     if (e.code === 'GEMINI_ALL_KEYS_EXHAUSTED') {
@@ -4137,7 +4163,7 @@ ${dataContext}`;
       return res.json({ success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() });
     }
 
-    const fallbackReply = buildChatFallbackReply(msg.trim());
+    const fallbackReply = buildChatFallbackReply(msgText.trim());
     return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
   }
 });
@@ -6499,6 +6525,48 @@ app.get('/api/workspace/clients/:id/detect', requireAuth, (req, res) => {
   try {
     const type = workspaceManager.detectProjectType(req.params.id, req.query.path || '');
     res.json({ success: true, type });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── NEXO WORKSPACE: Local Dev Servers ──
+const processManager = require('./process-manager');
+
+app.post('/api/workspace/clients/:id/start', requireAuth, async (req, res) => {
+  try {
+    const { path: demoPath } = req.body;
+    const result = await processManager.startServer(req.params.id, demoPath);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/workspace/clients/:id/stop', requireAuth, (req, res) => {
+  try {
+    const { serverId } = req.body;
+    const result = processManager.stopServer(serverId);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/servers', requireAuth, (req, res) => {
+  try {
+    processManager.cleanupDeadServers();
+    const servers = processManager.getRunningServers();
+    res.json({ success: true, servers });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/servers/:serverId/logs', requireAuth, (req, res) => {
+  try {
+    const logs = processManager.getServerLogs(req.params.serverId, parseInt(req.query.lines) || 100);
+    res.json({ success: true, logs });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }

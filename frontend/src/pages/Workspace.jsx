@@ -7,7 +7,7 @@ import {
   ChevronRight, Plus, X, Upload, Trash2, Download, Grid, List,
   Search, HardDrive, ArrowLeft, MoreVertical, Edit3, CheckCircle2,
   AlertCircle, LayoutGrid, AlignJustify, ChevronDown, FolderPlus,
-  Play, Terminal, RefreshCw, Loader2
+  Play, Square, Terminal, RefreshCw, Loader2, ExternalLink
 } from 'lucide-react'
 
 function getFileIcon(name, type) {
@@ -168,11 +168,19 @@ export default function Workspace() {
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [projectTypes, setProjectTypes] = useState({})
+  const [runningServers, setRunningServers] = useState([])
   const [renameTarget, setRenameTarget] = useState(null)
   const [renameValue, setRenameValue] = useState('')
 
   const token = localStorage.getItem('token') || ''
   const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
+
+  const fetchServers = useCallback(async () => {
+    try {
+      const res = await api.get('/api/workspace/servers')
+      setRunningServers(res.data.servers || [])
+    } catch (e) { /* ignore */ }
+  }, [])
 
   const fetchClients = useCallback(async () => {
     try {
@@ -211,7 +219,10 @@ export default function Workspace() {
 
   useEffect(() => {
     fetchClients()
-  }, [fetchClients])
+    fetchServers()
+    const iv = setInterval(fetchServers, 5000)
+    return () => clearInterval(iv)
+  }, [fetchClients, fetchServers])
 
   useEffect(() => {
     if (urlClientId) {
@@ -265,6 +276,30 @@ export default function Workspace() {
     }
   }
 
+  const handleStart = async (demoPath) => {
+    try {
+      setLoading(true)
+      const res = await api.post(`/api/workspace/clients/${selectedClient.id}/start`, { path: demoPath })
+      if (res.data.success) {
+        fetchServers()
+        alert(`Servidor iniciado! ${res.data.server?.url || ''}`)
+      }
+    } catch (e) {
+      alert(e.response?.data?.error || e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStop = async (serverId) => {
+    try {
+      await api.post(`/api/workspace/clients/${selectedClient.id}/stop`, { serverId })
+      fetchServers()
+    } catch (e) {
+      alert(e.response?.data?.error || e.message)
+    }
+  }
+
   const handleDelete = async (f) => {
     if (!confirm(`Excluir "${f.name}"?`)) return
     try {
@@ -315,6 +350,8 @@ export default function Workspace() {
     const isRenaming = renameTarget?.path === f.path
     const projBadge = f.type === 'folder' ? projectTypes[f.path] : null
     const badge = getProjectBadge(projBadge)
+    const runningSrv = runningServers.find(s => s.clienteId === selectedClient?.id && s.demoPath === f.path)
+    const isRunnable = f.type === 'folder' && (projBadge && projBadge !== 'unknown')
 
     if (viewMode === 'list') {
       return (
@@ -341,9 +378,20 @@ export default function Workspace() {
             )}
           </div>
           {badge && <span className="text-[10px] px-1.5 py-0.5 rounded bg-nexo-card border border-nexo-border" style={{ color: badge.color }}>{badge.label}</span>}
+          {runningSrv && (
+            <a href={runningSrv.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-nexo-success/10 text-nexo-success border border-nexo-success/30" onClick={e => e.stopPropagation()}>
+              <ExternalLink size={10} /> {runningSrv.url}
+            </a>
+          )}
           <span className="text-xs text-nexo-muted w-20 text-right">{f.type === 'file' ? formatSize(f.size) : '—'}</span>
           <span className="text-xs text-nexo-muted w-28 text-right hidden md:block">{new Date(f.modifiedAt).toLocaleDateString()}</span>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+            {isRunnable && !runningSrv && (
+              <button onClick={() => handleStart(f.path)} className="p-1.5 hover:bg-nexo-success/20 text-nexo-success rounded-lg" title="Executar"><Play size={14} /></button>
+            )}
+            {runningSrv && (
+              <button onClick={() => handleStop(runningSrv.id)} className="p-1.5 hover:bg-nexo-danger/20 text-nexo-danger rounded-lg" title="Parar"><Square size={14} /></button>
+            )}
             <button onClick={() => { setRenameTarget(f); setRenameValue(f.name) }} className="p-1.5 hover:bg-nexo-card rounded-lg" title="Renomear"><Edit3 size={14} /></button>
             {f.type === 'file' && (
               <a href={`/api/workspace/clients/${selectedClient.id}/download?path=${encodeURIComponent(f.path)}&token=${token}`} className="p-1.5 hover:bg-nexo-card rounded-lg" title="Download" onClick={e => e.stopPropagation()}>
@@ -383,9 +431,20 @@ export default function Workspace() {
             <span className="text-xs font-medium truncate w-full">{f.name}</span>
           )}
           {badge && <span className="text-[10px] px-1.5 py-0.5 rounded bg-nexo-bg border border-nexo-border" style={{ color: badge.color }}>{badge.label}</span>}
+          {runningSrv && (
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-nexo-success/10 text-nexo-success border border-nexo-success/30">
+              <ExternalLink size={10} /> {runningSrv.url}
+            </span>
+          )}
           <span className="text-[10px] text-nexo-muted">{f.type === 'file' ? formatSize(f.size) : 'Pasta'}</span>
         </div>
         <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+          {isRunnable && !runningSrv && (
+            <button onClick={() => handleStart(f.path)} className="p-1 hover:bg-nexo-success/20 text-nexo-success rounded-lg bg-nexo-bg/80" title="Executar"><Play size={12} /></button>
+          )}
+          {runningSrv && (
+            <button onClick={() => handleStop(runningSrv.id)} className="p-1 hover:bg-nexo-danger/20 text-nexo-danger rounded-lg bg-nexo-bg/80" title="Parar"><Square size={12} /></button>
+          )}
           <button onClick={() => { setRenameTarget(f); setRenameValue(f.name) }} className="p-1 hover:bg-nexo-card rounded-lg bg-nexo-bg/80"><Edit3 size={12} /></button>
           {f.type === 'file' && (
             <a href={`/api/workspace/clients/${selectedClient.id}/download?path=${encodeURIComponent(f.path)}&token=${token}`} className="p-1 hover:bg-nexo-card rounded-lg bg-nexo-bg/80" onClick={e => e.stopPropagation()}>

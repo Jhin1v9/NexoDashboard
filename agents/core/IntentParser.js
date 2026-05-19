@@ -64,11 +64,11 @@ class IntentParser {
     // Regex de fallback para comandos óbvios (rápido, sem LLM)
     this.patterns = {
       task: {
-        regex: /\b(anota|cria(?:r)?|adiciona(?:r)?|bota|coloca|faz)\s+(?:uma?\s+)?tarefa\b/i,
+        regex: /\b(criar?\s+tarefa|anotar?\s+tarefa|adicionar?\s+tarefa|nova\s+tarefa|bota\s+tarefa|coloca\s+tarefa|faz(?:er)?\s+tarefa|tarefa\s*(?::|para|pra|pro)?)\b/i,
         action: 'criar_tarefa',
         extract: (text) => {
           // Limpa a frase removendo prefixos comuns
-          let cleaned = text.replace(/\b(luna[,!]?\s*|cria(?:r)?\s+|anota(?:r)?\s+|faz(?:er)?\s+|bota\s+|coloca\s+|adiciona(?:r)?\s+)\b/gi, ' ').trim();
+          let cleaned = text.replace(/\b(luna[,!]?\s*|cria(?:r)?\s+|anota(?:r)?\s+|faz(?:er)?\s+|bota\s+|coloca\s+|adiciona(?:r)?\s+|nova\s+)\b/gi, ' ').trim();
           cleaned = cleaned.replace(/\b(?:uma?\s+)?tarefa\s*[:\-]?\s*/i, ' ').trim();
 
           // Extrair responsável: "pro Elias", "pra Nonoke", "para o Abner"
@@ -83,13 +83,16 @@ class IntentParser {
             if (m) { responsavel = mapResponsavel(m[1]); break; }
           }
 
-          // Remove a parte do responsável do título (incluindo qualquer pontuação depois)
+          // Remove a parte do responsável do título
           if (responsavel) {
             cleaned = cleaned.replace(/\b(?:pro|pra|para(?:\s+(?:o|a))?)\s+[A-Za-zÀ-ÿ]+\s*[:\-]?\s*/i, ' ').trim();
             cleaned = cleaned.replace(/\batribuir\s+(?:ao|à|a)\s+[A-Za-zÀ-ÿ]+\s*[:\-]?\s*/i, ' ').trim();
           }
 
-          const titulo = cleaned || text;
+          let titulo = cleaned || text;
+          titulo = titulo.replace(/\btarefa\s*[:\-]?\s*/i, '').trim();
+          if (titulo.length < 2) titulo = text;
+
           const prioridade = /P0|urgente|cr[ií]tica/i.test(text) ? 'P0' : /P1/i.test(text) ? 'P1' : 'P2';
           return { titulo, prioridade, responsavel };
         }
@@ -118,16 +121,24 @@ class IntentParser {
         }
       },
       expense: {
-        regex: /\b(pagamos|pagou|gastou|gastamos|despesa|sa[ií]da|sa[ií]da\s+de|compramos|comprou|investimos|investiu)\s+.*?\b(\d+[\.,]?\d*)\b/i,
+        regex: /\b(pagamos|pagou|gastou|gastamos|despesa|sa[ií]da|sa[ií]da\s+de|compramos|comprou|investimos|investiu)\b/i,
         action: 'registrar_despesa',
         extract: (text) => {
-          const valorMatch = text.match(/(?:pagamos|pagou|gastou|gastamos|despesa|sa[ií]da|compramos|comprou|investimos|investiu).*?(\d+[\.,]?\d*)/i);
-          // Extrair descrição: tudo depois do valor ou palavras-chave como "com", "de", "para"
-          const descMatch = text.match(/(?:com|de|para|no|na)\s+(.+?)(?:\s+(?:valor|no\s+dia|em|$))/i) ||
-                           text.match(/(?:despesa|gasto)\s+(?:de\s+)?.*?\d+[\.,]?\d*\s*(?:euro|eur|€)?\s*(?:com|para|de)?\s*(.+)/i);
+          const valorMatch = text.match(/(\d+[\.,]?\d*)/);
+          // Extrair descrição: tudo depois de "com/de/para/no/na/em" após o valor
+          let desc = text;
+          // Remove o valor numérico e moeda da descrição
+          desc = desc.replace(/\d+[\.,]?\d*\s*(?:euros?|eur|€)?/i, '');
+          // Remove palavras de ação
+          desc = desc.replace(/\b(gastamos|gastou|pagamos|pagou|despesa|compramos|investimos|sa[ií]da)\b/gi, '');
+          // Captura tudo depois de "com", "de", "para", "no", "na", "em"
+          const descMatch = desc.match(/(?:com|de|para|no|na|em)\s+(.+)/i);
+          desc = descMatch?.[1]?.trim() || desc.trim();
+          // Limpa pontuação no início/fim
+          desc = desc.replace(/^[\s\-:]+|[\s\-:]+$/g, '');
           return {
             valor: parseFloat((valorMatch?.[1] || '0').replace(',', '.')),
-            descricao: descMatch?.[1]?.trim() || text,
+            descricao: desc || text,
             tipo: 'despesa'
           };
         }

@@ -4,11 +4,13 @@ import {
   Users, CheckSquare, AlertTriangle, TrendingUp, TrendingDown,
   Bell, Plus, Trash2, MessageCircle, FileText, Zap, Wallet,
   ArrowUpRight, ArrowDownRight, PiggyBank, Receipt, ShoppingCart,
-  CircleDollarSign, Target, Activity, Calendar, Clock, Moon
+  CircleDollarSign, Target, Activity, Calendar, Clock, Moon,
+  Terminal, Play, Square, ExternalLink
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useRealtime from '../hooks/useRealtime'
 import useNotifications from '../hooks/useNotifications'
+import axios from 'axios'
 import HealthTimeline from '../components/charts/HealthTimeline'
 import PortfolioRadar from '../components/charts/PortfolioRadar'
 import BugVelocity from '../components/charts/BugVelocity'
@@ -320,6 +322,42 @@ export default function Dashboard() {
           )}
         </motion.div>
       </div>
+
+      {/* Servidores Locais Ativos */}
+      {runningServers.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium text-nexo-muted flex items-center gap-2">
+              <Terminal size={16} className="text-nexo-info" />
+              Servidores Locais Ativos ({runningServers.length})
+            </h2>
+            <button onClick={() => navigate('/workspace')} className="text-xs text-nexo-info hover:underline">Workspace →</button>
+          </div>
+          <div className="space-y-2">
+            {runningServers.map(srv => (
+              <div key={srv.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-nexo-card/50 border border-nexo-border">
+                <div className="w-2 h-2 rounded-full bg-nexo-success animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{srv.clienteId} — {srv.demoPath.split('/').pop()}</p>
+                  <p className="text-[10px] text-nexo-muted">{srv.tipo} · PID {srv.pid}</p>
+                </div>
+                <a href={srv.url} target="_blank" rel="noreferrer" className="text-xs text-nexo-success hover:underline flex items-center gap-1">
+                  <ExternalLink size={12} /> {srv.porta}
+                </a>
+                <button onClick={async () => {
+                  try {
+                    await api.post(`/api/workspace/clients/${srv.clienteId}/stop`, { serverId: srv.id })
+                    setRunningServers(prev => prev.filter(s => s.id !== srv.id))
+                  } catch (e) { alert(e.response?.data?.error || e.message) }
+                }} className="p-1.5 hover:bg-nexo-danger/20 text-nexo-danger rounded-lg" title="Parar">
+                  <Square size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Predictions */}
       {predictions.length > 0 && (
