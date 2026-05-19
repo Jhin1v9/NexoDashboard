@@ -73,8 +73,6 @@ const MiniBar = ({ value, max, color }) => {
   return (
     <div className="w-full h-1.5 bg-nexo-card rounded-full overflow-hidden">
       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
-      {/* Dev Log Terminal */}
-      <DevLogTerminal serverId={activeLogServer} onClose={() => setActiveLogServer(null)} />
     </div>
   )
 }
@@ -431,6 +429,8 @@ export default function Dashboard() {
           {clients.length === 0 && <div className="text-center text-nexo-muted text-sm py-4">Nenhum cliente</div>}
         </div>
       </div>
+      {/* Dev Log Terminal */}
+      <DevLogTerminal serverId={activeLogServer} onClose={() => setActiveLogServer(null)} />
     </div>
   )
 }
