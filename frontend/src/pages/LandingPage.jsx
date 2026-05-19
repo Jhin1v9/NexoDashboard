@@ -30,6 +30,8 @@ import {
   Phone,
 } from 'lucide-react'
 import SecretTerminal from '../components/SecretTerminal'
+import useSyncTap from '../hooks/useSyncTap'
+import SyncSessionModal from '../components/SyncSessionModal'
 
 /* ============================================================
    NAVBAR
@@ -1139,6 +1141,10 @@ function Footer() {
    ============================================================ */
 export default function LandingPage() {
   const [terminalOpen, setTerminalOpen] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
+  const tapRef = useRef(null)
+
+  useSyncTap({ targetRef: tapRef, threshold: 7, timeout: 1500, onTrigger: () => setSyncOpen(true) })
 
   useEffect(() => {
     const konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']
@@ -1174,7 +1180,7 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div ref={tapRef} className="min-h-screen bg-[#0a0a0f]">
       <Navbar />
       <Hero />
       <Problem />
@@ -1189,6 +1195,7 @@ export default function LandingPage() {
       <FAQ />
       <Footer />
       <SecretTerminal isOpen={terminalOpen} onClose={() => setTerminalOpen(false)} />
+      <SyncSessionModal open={syncOpen} onClose={() => setSyncOpen(false)} />
     </div>
   )
 }

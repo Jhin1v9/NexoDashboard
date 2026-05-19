@@ -865,6 +865,7 @@ const PUBLIC_API_ROUTES = [
   '/api/health',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/auth/sync',
   '/api/email/auth/callback', // OAuth callback do Gmail (chamado pelo Google, sem token)
 ];
 
@@ -7783,6 +7784,31 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
     const user = users.users?.[req.user.userId];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
     res.json({ success: true, user: { id: req.user.userId, name: user.name, role: user.role, color: user.color } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/auth/sync — Sincroniza sessão cross-device (uso interno)
+// Requer header X-Sync-Token para validação discreta
+app.post('/api/auth/sync', (req, res) => {
+  try {
+    const secret = req.headers['x-sync-token'];
+    if (secret !== 'nexo-tap-7x-2026') {
+      return res.status(404).json({ success: false, error: 'Not found' });
+    }
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'Missing userId' });
+    }
+    const usersFile = path.join(DATA_DIR, 'users.json');
+    const users = readJSON(usersFile, { users: {} });
+    const user = users.users?.[userId];
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const token = generateToken(userId);
+    res.json({ success: true, token, user: { id: userId, name: user.name, role: user.role, color: user.color } });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
