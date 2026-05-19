@@ -1,7 +1,29 @@
 {
   "version": "1.1",
-  "lastUpdated": "2026-05-19T16:35:47.447746.000Z",
+  "lastUpdated": "2026-05-19T18:25:00.000Z",
   "entries": [
+    {
+      "id": "changelog-workspace-file-viewer-v2",
+      "version": "3.4.0",
+      "title": "Workspace File Viewer v2 — Editor + Syntax Highlighting",
+      "description": "Novo visualizador/editor de arquivos no Workspace com: (1) Syntax highlighting com highlight.js para JSON, JS, TS, Python, CSS, SQL, YAML, Bash, PHP, Dockerfile, GraphQL e mais — modo Preview/Código; (2) Indicador visual de alterações não salvas (● + texto no header); (3) Atalhos de teclado: Ctrl+S para salvar, ESC para fechar; (4) Scrollbars customizadas no editor; (5) Preview de Markdown renderizado com headers, bold, listas, links, code blocks; (6) Preview de HTML em iframe com sandbox + botão Abrir no navegador; (7) Botão Luna com contexto enriquecido — o arquivo inteiro é injetado no prompt da IA. Endpoints backend: GET/PUT /api/workspace/clients/:id/content.",
+      "category": "feature",
+      "emoji": "📁",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T18:25:00.000Z",
+      "tags": [
+        "workspace",
+        "file-viewer",
+        "editor",
+        "syntax-highlighting",
+        "highlight.js",
+        "markdown",
+        "html-preview",
+        "luna-context"
+      ],
+      "readBy": []
+    },
     {
       "id": "changelog-nlu-expansion-137-intents",
       "version": "3.3.0",
