@@ -5,104 +5,50 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --nexo-bg: #08080c;
+    --nexo-card: #0f1117;
+    --nexo-border: #1a1a2e;
+    --nexo-text: #e2e8f0;
+    --nexo-text-secondary: #94a3b8;
+    --nexo-accent: #7c3aed;
+    --nexo-accent-hover: #6d28d9;
+    --nexo-danger: #ef4444;
+    --nexo-success: #22c55e;
+    --nexo-warning: #f59e0b;
+  }
+
   body {
     font-family: 'Inter', sans-serif;
-    background-color: #08080c;
-    color: #e0e0e0;
+    background: var(--nexo-bg);
+    color: var(--nexo-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
-  }
-  html {
-    scroll-behavior: smooth;
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1a1a2e #08080c;
   }
 }
 
 @layer components {
-  .glass {
-    background: rgba(15, 15, 22, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
   .glass-card {
-    background: rgba(15, 15, 22, 0.8);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-  }
-  .btn-primary {
-    @apply px-4 py-2 rounded-lg bg-nexo-info text-white font-medium transition-all;
-  }
-  .btn-primary:hover {
-    @apply opacity-90;
-  }
-  .nav-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-nexo-muted transition-all cursor-pointer;
-  }
-  .nav-item:hover, .nav-item.active {
-    @apply bg-nexo-card text-white;
+    @apply bg-nexo-card/80 backdrop-blur-xl border border-nexo-border/50 rounded-xl;
   }
 
-  /* Landing page styles */
-  .gradient-text {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #a78bfa 0%, #22d3ee 50%, #34d399 100%);
-  }
-  .gradient-text-purple-cyan {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #7c3aed 0%, #22d3ee 100%);
-  }
-  .glow-violet {
-    box-shadow: 0 0 60px -15px rgba(124, 58, 237, 0.4), 0 0 100px -30px rgba(34, 211, 238, 0.2);
-  }
-  .glow-button {
-    box-shadow: 0 0 30px -5px rgba(124, 58, 237, 0.5), 0 0 60px -15px rgba(34, 211, 238, 0.3);
-  }
-  .card-hover {
-    @apply transition-all duration-300 ease-out;
-  }
-  .card-hover:hover {
-    @apply -translate-y-1 border-violet-500/40;
-    box-shadow: 0 20px 40px -15px rgba(124, 58, 237, 0.2), 0 0 30px -10px rgba(34, 211, 238, 0.1);
-  }
-  .mesh-gradient {
-    background: 
-      radial-gradient(ellipse at 20% 30%, rgba(124, 58, 237, 0.25) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 20%, rgba(34, 211, 238, 0.15) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-      linear-gradient(180deg, #0a0a0f 0%, #0f0f18 50%, #0a0a0f 100%);
+  .glass-card-solid {
+    @apply bg-nexo-card border border-nexo-border rounded-xl;
   }
 }
 
 @layer utilities {
-  .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-nexo-primary to-purple-500;
   }
 }
 
-/* Selection */
-::selection {
-  background: rgba(124, 58, 237, 0.4);
-  color: white;
-}
-
-/* Landing page animations */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 30px -5px rgba(124, 58, 237, 0.5), 0 0 60px -15px rgba(34, 211, 238, 0.3); }
-  50% { box-shadow: 0 0 40px -5px rgba(124, 58, 237, 0.7), 0 0 80px -15px rgba(34, 211, 238, 0.5); }
-}
-.animate-pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
-}
-
+/* Animations */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -151,4 +97,115 @@
 .hljs {
   background: transparent !important;
   padding: 0 !important;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PRINT / PDF — Estilos para impressão do Changelog e outras páginas
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  /* Esconde elementos de navegação e UI */
+  nav,
+  aside,
+  header[class*="fixed"],
+  .fixed,
+  .luna-floating-button,
+  [class*="FloatingButton"],
+  button.print\:hidden,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Fundo branco e texto escuro para economia de tinta e legibilidade */
+  body {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Container principal ocupa largura total */
+  main,
+  .max-w-4xl,
+  [class*="max-w-"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Cards do changelog — borda sutil, fundo branco */
+  .bg-nexo-card,
+  [class*="bg-nexo-card"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12px !important;
+  }
+
+  /* Títulos em preto */
+  h1, h2, h3,
+  [class*="text-nexo-text"],
+  [class*="text-2xl"],
+  [class*="text-lg"] {
+    color: #1a1a1a !important;
+  }
+
+  /* Texto secundário em cinza escuro */
+  [class*="text-nexo-text-secondary"],
+  [class*="text-sm"],
+  p {
+    color: #4a5568 !important;
+  }
+
+  /* Badges de tier e categoria — mantêm cor mas com texto legível */
+  [class*="bg-red-500/20"],
+  [class*="bg-yellow-500/20"],
+  [class*="bg-blue-500/20"] {
+    background: #f7fafc !important;
+    border: 1px solid #cbd5e0 !important;
+    color: #2d3748 !important;
+  }
+
+  /* Tags */
+  [class*="bg-white/5"] {
+    background: #edf2f7 !important;
+    color: #4a5568 !important;
+    border: none !important;
+  }
+
+  /* Ícones coloridos dos cards — mantêm a cor para identificação visual */
+  [class*="rounded-xl flex items-center justify-center shadow-lg"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Indicador de não-lido some na impressão */
+  [class*="bg-nexo-accent rounded-full shadow-lg"] {
+    display: none !important;
+  }
+
+  /* Header de impressão personalizado */
+  @page {
+    margin: 15mm;
+  }
+
+  /* Quebra de página entre cards grandes */
+  .space-y-4 > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Stats cards no topo */
+  .grid[class*="grid-cols-3"] > div {
+    background: #f7fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
 }

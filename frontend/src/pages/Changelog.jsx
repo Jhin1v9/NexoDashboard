@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { 
   Sparkles, Rocket, Bug, Shield, Zap, Smartphone, DollarSign, FileText, Brain,
-  Filter, CheckCheck, Clock, Tag, ArrowLeft, Bell
+  Filter, CheckCheck, Clock, Tag, ArrowLeft, Bell, Download
 } from 'lucide-react';
 import useChangelog from '../hooks/useChangelog';
 
@@ -162,15 +162,25 @@ export default function Changelog() {
           </p>
         </div>
         
-        {unreadCount > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={markAllAsRead}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-nexo-accent bg-nexo-accent/10 hover:bg-nexo-accent/20 rounded-lg transition-colors"
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-nexo-text-secondary bg-nexo-card border border-nexo-border hover:text-nexo-text hover:border-nexo-accent/50 rounded-lg transition-colors print:hidden"
           >
-            <CheckCheck className="w-4 h-4" />
-            Marcar todas como lidas
+            <Download className="w-4 h-4" />
+            Baixar PDF
           </button>
-        )}
+          
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-nexo-accent bg-nexo-accent/10 hover:bg-nexo-accent/20 rounded-lg transition-colors print:hidden"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Marcar todas como lidas
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
