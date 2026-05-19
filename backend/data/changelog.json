@@ -1,7 +1,46 @@
 {
   "version": "1.1",
-  "lastUpdated": "2026-05-19T16:35:47.447746.000Z",
+  "lastUpdated": "2026-05-19T20:15:00.000Z",
   "entries": [
+    {
+      "id": "changelog-luna-action-center",
+      "version": "3.4.0",
+      "title": "Luna Action Center — Inbox de Ações Pendentes",
+      "description": "Novo painel fixo (420px) que aparece ao clicar no toast proativo ou no badge vermelho do botão flutuante. Cada card é acionável: Concluir, Ver, Aprovar, Contatar com execução direta via /api/luna/batch. Cards agrupados por prioridade (Crítico/Atenção/Info). Persistência de 'ignorados' no backend (24h TTL). Clique no toast abre Action Center em vez de jogar texto genérico no chat. Botão principal do Luna sempre abre o chat; apenas o badge separado abre o Action Center.",
+      "category": "feature",
+      "emoji": "📋",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T20:00:00.000Z",
+      "tags": [
+        "luna",
+        "action-center",
+        "proactive",
+        "inbox",
+        "batch",
+        "ux"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-luna-revisao-critica",
+      "version": "3.4.0",
+      "title": "Revisão Crítica do Módulo Luna — 13 Bugs Corrigidos",
+      "description": "Revisão rigorosa do código Luna: batch/deletar agora REALMENTE remove itens (não marcava como completed); proactive evita contagem duplicada de tarefas P0+atrasadas; LunaInlinePreview remove dangerouslySetInnerHTML (XSS); LunaBatchAction usa classes Tailwind literais (purge-safe); LunaProactiveToast corrige AnimatePresence, limita dismissedIds a 50 e usa setTimeout recursivo; LunaActionDrawer reseta estado em novo intent e usa AbortController; LunaFloatingButton passa entities para auto-action.",
+      "category": "fix",
+      "emoji": "🔒",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T19:45:00.000Z",
+      "tags": [
+        "luna",
+        "seguranca",
+        "bugfix",
+        "revisao",
+        "performance"
+      ],
+      "readBy": []
+    },
     {
       "id": "changelog-nlu-expansion-137-intents",
       "version": "3.3.0",
@@ -19,7 +58,9 @@
         "machine-learning",
         "i18n"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-workspace-leads-active-learning",
@@ -38,7 +79,9 @@
         "nlu",
         "unificação"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-executor-ajuda-navegar",
@@ -56,7 +99,9 @@
         "navegação",
         "task_done"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-luna-fluxo-unificado",
@@ -75,7 +120,9 @@
         "nlu",
         "action-executor"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-ux-polimento-19",
@@ -94,7 +141,9 @@
         "responsive",
         "polimento"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-workspace-v1",
@@ -113,7 +162,9 @@
         "context-menu",
         "drag-drop"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-luna-v20",
@@ -132,7 +183,9 @@
         "unificação",
         "v20"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-action-executor-v19",
@@ -150,7 +203,9 @@
         "automation",
         "v19"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-ia-unificada",
@@ -169,7 +224,9 @@
         "email",
         "context"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-persistencia-contexto",
@@ -187,7 +244,9 @@
         "kimi",
         "docs"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-nexo-mail-sprint1",
@@ -206,7 +265,9 @@
         "densidade",
         "resizable"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-001",
@@ -242,7 +303,9 @@
         "action-items",
         "v2"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-002",
@@ -259,7 +322,9 @@
         "luna",
         "automation"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-003",
@@ -276,7 +341,9 @@
         "crud",
         "transacoes"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-004",
@@ -293,7 +360,9 @@
         "operacoes",
         "metrics"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-005",
@@ -310,7 +379,9 @@
         "clientes",
         "projetos"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-006",
@@ -327,7 +398,9 @@
         "vercel",
         "devops"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     },
     {
       "id": "changelog-007",
@@ -344,7 +417,9 @@
         "luna",
         "v1"
       ],
-      "readBy": []
+      "readBy": [
+        "default"
+      ]
     }
   ]
 }
