@@ -7,6 +7,7 @@ import { lunaEventBus } from '../../lib/lunaEventBus'
 import { hasFormFields, getSchema } from './LunaIntentSchemas'
 import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
 import SmartFormModal from './SmartFormModal'
+import LunaActionFlow from './LunaActionFlow'
 import axios from 'axios'
 
 /**
@@ -31,6 +32,7 @@ export default function LunaFloatingButton() {
   const [chatConfirming, setChatConfirming] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [actionFlowResult, setActionFlowResult] = useState(null)
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
@@ -92,10 +94,9 @@ export default function LunaFloatingButton() {
     const intent = nluResult.intent
     const schema = getSchema(intent)
 
-    // ── CASO 1: Intent com formulário editável → SmartFormModal (UX perfeita) ──
+    // ── CASO 1: Intent com formulário editável → LunaActionFlow (decisão inteligente) ──
     if (hasFormFields(intent)) {
-      lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
-      setModalResult(nluResult)
+      setActionFlowResult(nluResult)
       setIsOpen(false)
       return
     }
@@ -197,6 +198,13 @@ export default function LunaFloatingButton() {
       })
     } finally {
       setChatConfirming(false)
+    }
+  }
+
+  const handleActionFlowDone = (data) => {
+    setActionFlowResult(null)
+    if (data?.redirect) {
+      window.location.href = data.redirect
     }
   }
 
@@ -412,7 +420,15 @@ export default function LunaFloatingButton() {
         )}
       </motion.button>
 
-      {/* Smart Form Modal (mantido para intents com formulário) */}
+      {/* Luna Action Flow — orquestrador inteligente (Passo 3) */}
+      {actionFlowResult && (
+        <LunaActionFlow
+          nluResult={actionFlowResult}
+          onDone={handleActionFlowDone}
+        />
+      )}
+
+      {/* Smart Form Modal (fallback de segurança) */}
       {modalResult && (
         <SmartFormModal
           result={modalResult}
