@@ -174,10 +174,10 @@ export default function Tarefas() {
     }
   }
 
-  const checkMentions = () => {
-    const lastAtIndex = newComment.lastIndexOf('@')
+  const checkMentions = (text = newComment) => {
+    const lastAtIndex = text.lastIndexOf('@')
     if (lastAtIndex >= 0) {
-      const afterAt = newComment.slice(lastAtIndex + 1)
+      const afterAt = text.slice(lastAtIndex + 1)
       if (!afterAt.includes(' ')) {
         setMentionQuery(afterAt.toLowerCase())
         setShowMentions(true)
@@ -623,10 +623,15 @@ export default function Tarefas() {
                       <input
                         ref={commentInputRef}
                         value={newComment}
-                        onChange={e => { setNewComment(e.target.value); if (showMentions) checkMentions() }}
+                        onChange={e => {
+                          const val = e.target.value
+                          setNewComment(val)
+                          checkMentions(val)
+                        }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') { e.preventDefault(); addComment() }
-                          if (e.key === '@' || (e.key === 'Backspace' && showMentions)) checkMentions()
+                          if (e.key === '@') checkMentions(newComment + '@')
+                          if (e.key === 'Backspace' && showMentions) checkMentions()
                         }}
                         placeholder="Adicionar comentário... Use @ para mencionar"
                         className="w-full px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-info text-xs"
