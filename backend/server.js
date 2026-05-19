@@ -288,6 +288,34 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
+// ── DEBUG: Gmail OAuth config ──
+app.get('/api/debug/gmail-config', (req, res) => {
+  const clientId = process.env.GMAIL_CLIENT_ID || '';
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET || '';
+  const redirectUri = process.env.GMAIL_REDIRECT_URI || '';
+
+  const analyze = (str, name) => ({
+    length: str.length,
+    startsWithSpace: str.startsWith(' '),
+    endsWithSpace: str.endsWith(' '),
+    hasNewline: str.includes('\n'),
+    hasCarriageReturn: str.includes('\r'),
+    hasTab: str.includes('\t'),
+    hasQuotes: str.includes("'") || str.includes('"'),
+    firstChars: str.slice(0, 20),
+    lastChars: str.slice(-20),
+    masked: str.length > 10 ? str.slice(0, 5) + '...' + str.slice(-5) : str,
+    expectedLength: name === 'clientId' ? 72 : undefined,
+  });
+
+  res.json({
+    nodeEnv: process.env.NODE_ENV,
+    clientId: analyze(clientId, 'clientId'),
+    clientSecret: analyze(clientSecret, 'clientSecret'),
+    redirectUri: analyze(redirectUri, 'redirectUri'),
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Helpers ---
