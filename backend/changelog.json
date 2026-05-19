@@ -1,7 +1,98 @@
 {
     "version": "1.1",
-    "lastUpdated": "2026-05-19T20:35:30.164853+00:00",
+    "lastUpdated": "2026-05-20T01:40:00.000000+00:00",
     "entries": [
+        {
+            "id": "changelog-discord-mention-notifications",
+            "version": "3.6.0",
+            "title": "Notificações Discord para @mentions",
+            "description": "Quando um usuário é mencionado (@nome) em um comentário de tarefa, o sistema envia automaticamente uma notificação no Discord com embed rico contendo título da tarefa, descrição, comentário, autor e link. Mapeamento de usuários para Discord IDs permite menções reais (<@id>) que notificam a pessoa. Serviço discord-notifier.js criado com templates genéricos para task, finance, email, idea e lead. Usa o mesmo webhook de segurança por enquanto, facilmente trocável via DISCORD_MENTION_WEBHOOK.",
+            "category": "feature",
+            "emoji": "🔔",
+            "author": "NEXO Team",
+            "tier": 1,
+            "date": "2026-05-20T01:35:00.000000+00:00",
+            "tags": [
+                "discord",
+                "notificacao",
+                "mention",
+                "webhook",
+                "tarefas"
+            ],
+            "readBy": []
+        },
+        {
+            "id": "changelog-task-mentions",
+            "version": "3.6.0",
+            "title": "@mentions nos Comentários de Tarefas",
+            "description": "Comentários em tarefas agora suportam @mentions com dropdown de seleção. Digite @ para ver lista de usuários disponíveis (Abner, Nonoke, Elias). Menções são destacadas visualmente no comentário com cor primária e badge. Backend extrai mentions do texto e armazena no campo mentions[]. Corrigido bug de timing no checkMentions() que impedia dropdown de aparecer ao digitar @.",
+            "category": "feature",
+            "emoji": "💬",
+            "author": "NEXO Team",
+            "tier": 1,
+            "date": "2026-05-20T01:20:00.000000+00:00",
+            "tags": [
+                "tarefas",
+                "comentarios",
+                "mentions",
+                "ux"
+            ],
+            "readBy": []
+        },
+        {
+            "id": "changelog-sidebar-mobile",
+            "version": "3.6.0",
+            "title": "Sidebar Responsiva para Mobile",
+            "description": "Sidebar agora é ocultada automaticamente em telas menores que 640px (breakpoint sm:) usando classes hidden sm:flex. A navegação mobile continua funcionando via bottom navigation bar já existente (sm:hidden). Layout adapta-se perfeitamente a smartphones sem quebra de interface.",
+            "category": "feature",
+            "emoji": "📱",
+            "author": "NEXO Team",
+            "tier": 2,
+            "date": "2026-05-20T01:10:00.000000+00:00",
+            "tags": [
+                "mobile",
+                "responsive",
+                "sidebar",
+                "ui"
+            ],
+            "readBy": []
+        },
+        {
+            "id": "changelog-luna-draggable",
+            "version": "3.6.0",
+            "title": "Luna Botão Flutuante Arrastável",
+            "description": "O botão flutuante da Luna agora pode ser arrastado para qualquer posição da tela usando onPointerDown + window listeners para pointermove/pointerup. Implementa translate3d para performance GPU. Snap automático nas 4 bordas da tela ao soltar. Posição persistida no localStorage entre sessões. Guard didDrag previne toggle do chat ao arrastar.",
+            "category": "feature",
+            "emoji": "🌙",
+            "author": "NEXO Team",
+            "tier": 2,
+            "date": "2026-05-20T01:05:00.000000+00:00",
+            "tags": [
+                "luna",
+                "ui",
+                "drag-drop",
+                "ux"
+            ],
+            "readBy": []
+        },
+        {
+            "id": "changelog-notification-bell-fix",
+            "version": "3.6.0",
+            "title": "Fix do Sino de Notificações (z-index)",
+            "description": "Corrigido bug onde overlay do painel de notificações (z-[9998]) bloqueava cliques no botão do sino. Wrapper do botão elevado para z-[9999]. Adicionado stopPropagation em todos os handlers de clique (botão, overlay, painel) para prevenir fechamento acidental e conflitos de event bubbling.",
+            "category": "bugfix",
+            "emoji": "🔧",
+            "author": "NEXO Team",
+            "tier": 2,
+            "date": "2026-05-20T01:00:00.000000+00:00",
+            "tags": [
+                "bugfix",
+                "notifications",
+                "z-index",
+                "ui"
+            ],
+            "readBy": []
+        },
         {
             "id": "changelog-security-vpn-tor-proxy-detection",
             "version": "3.5.0",
