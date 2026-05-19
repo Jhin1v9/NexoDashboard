@@ -37,6 +37,16 @@ export default function LunaFloatingButton() {
   const [batchAction, setBatchAction] = useState(null) // { intent }
   const [proactiveBadge, setProactiveBadge] = useState(null) // { count, type }
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
+
+  // ── Drag state ──
+  const [fabPos, setFabPos] = useState(() => {
+    try {
+      const raw = localStorage.getItem('luna_fab_pos')
+      return raw ? JSON.parse(raw) : { x: 0, y: 0 }
+    } catch { return { x: 0, y: 0 } }
+  })
+  const dragRef = useRef({ active: false, startX: 0, startY: 0, origX: 0, origY: 0, didDrag: false })
+
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
@@ -507,12 +517,57 @@ export default function LunaFloatingButton() {
         )}
       </AnimatePresence>
 
-      {/* Botão flutuante */}
-      <div className="fixed bottom-6 right-6 z-[100]">
+      {/* Botão flutuante — arrastável */}
+      <div
+        className="fixed bottom-6 right-6 z-[100] touch-none select-none"
+        style={{ transform: `translate3d(${fabPos.x}px, ${fabPos.y}px, 0)` }}
+        onPointerDown={(e) => {
+          const d = dragRef.current
+          d.active = true
+          d.didDrag = false
+          d.startX = e.clientX
+          d.startY = e.clientY
+          d.origX = fabPos.x
+          d.origY = fabPos.y
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          const d = dragRef.current
+          if (!d.active) return
+          const dx = e.clientX - d.startX
+          const dy = e.clientY - d.startY
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.didDrag = true
+          setFabPos({ x: d.origX + dx, y: d.origY + dy })
+        }}
+        onPointerUp={(e) => {
+          const d = dragRef.current
+          if (!d.active) return
+          d.active = false
+          // Snap para borda mais próxima
+          const btnW = 120
+          const btnH = 56
+          const pad = 24
+          const currentRight = pad - fabPos.x
+          const currentBottom = pad - fabPos.y
+          const currentLeft = window.innerWidth - currentRight - btnW
+          const currentTop = window.innerHeight - currentBottom - btnH
+          let nx = fabPos.x
+          let ny = fabPos.y
+          if (currentLeft < currentRight) nx = window.innerWidth - btnW - pad
+          else nx = 0
+          if (currentTop < currentBottom) ny = window.innerHeight - btnH - pad
+          else ny = 0
+          const snapped = { x: nx, y: ny }
+          setFabPos(snapped)
+          try { localStorage.setItem('luna_fab_pos', JSON.stringify(snapped)) } catch {}
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }}
+      >
         <motion.button
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
           onClick={() => {
+            if (dragRef.current.didDrag) return
             if (actionCenterOpen) {
               setActionCenterOpen(false)
               return

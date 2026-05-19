@@ -83,10 +83,10 @@ function NotificationCenter() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative z-[9999]">
       <button
         ref={buttonRef}
-        onClick={() => setOpen(!open)}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="relative p-2 text-nexo-muted hover:text-nexo-text transition-colors"
       >
         <Bell className="w-5 h-5" />
@@ -99,9 +99,10 @@ function NotificationCenter() {
 
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
           <div
             className="fixed w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
             style={{ top: pos.top, right: pos.right }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">

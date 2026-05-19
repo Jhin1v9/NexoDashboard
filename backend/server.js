@@ -1289,6 +1289,7 @@ app.post('/api/tasks/:id/comments', (req, res) => {
     id: Date.now().toString(),
     text: req.body.text?.trim() || '',
     author: req.user?.userId || req.user?.id || req.body.author || 'sistema',
+    mentions: req.body.mentions || [],
     createdAt: new Date().toISOString()
   };
   task.comments = task.comments || [];

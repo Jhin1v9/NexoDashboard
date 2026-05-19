@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Trash2, Check, MessageCircle, User, ArrowRight,
@@ -56,6 +56,17 @@ export default function Tarefas() {
   const [modalTask, setModalTask] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [newComment, setNewComment] = useState('')
+  const [showMentions, setShowMentions] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const commentInputRef = useRef(null)
+
+  // Usuários disponíveis para @mention
+  const MENTION_USERS = useMemo(() => {
+    return Object.entries(users).map(([id, u]) => ({ id, name: u.name || id }))
+  }, [users])
+  const filteredMentions = MENTION_USERS.filter(u =>
+    u.name.toLowerCase().includes(mentionQuery)
+  )
 
   useEffect(() => {
     fetchUsers()
@@ -163,12 +174,50 @@ export default function Tarefas() {
     }
   }
 
+  const checkMentions = () => {
+    const lastAtIndex = newComment.lastIndexOf('@')
+    if (lastAtIndex >= 0) {
+      const afterAt = newComment.slice(lastAtIndex + 1)
+      if (!afterAt.includes(' ')) {
+        setMentionQuery(afterAt.toLowerCase())
+        setShowMentions(true)
+        return
+      }
+    }
+    setShowMentions(false)
+  }
+
+  const insertMention = (user) => {
+    const lastAtIndex = newComment.lastIndexOf('@')
+    const before = newComment.slice(0, lastAtIndex)
+    const after = newComment.slice(lastAtIndex + 1 + mentionQuery.length)
+    setNewComment(`${before}@${user.name} ${after}`)
+    setShowMentions(false)
+    commentInputRef.current?.focus()
+  }
+
+  const renderCommentText = (text) => {
+    if (!text) return text
+    const parts = text.split(/(@\w+)/g)
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return <span key={i} className="text-nexo-primary font-semibold bg-nexo-primary/10 px-0.5 rounded">{part}</span>
+      }
+      return <span key={i}>{part}</span>
+    })
+  }
+
   const addComment = async () => {
     if (!newComment.trim() || !modalTask) return
     try {
+      const mentions = []
+      MENTION_USERS.forEach(u => {
+        if (newComment.includes(`@${u.name}`)) mentions.push(u.id)
+      })
       await axios.post(`/api/tasks/${modalTask.id}/comments`, {
         text: newComment,
-        author: activeUser
+        author: activeUser,
+        mentions: mentions.length > 0 ? mentions : undefined
       })
       setNewComment('')
       // Refresh modal data
@@ -562,21 +611,52 @@ export default function Tarefas() {
                             {new Date(c.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-xs text-nexo-text pl-7">{c.text}</p>
+                        <p className="text-xs text-nexo-text pl-7">{renderCommentText(c.text)}</p>
                       </div>
                     ))}
                     {(editForm.comments || []).length === 0 && (
                       <p className="text-xs text-nexo-muted text-center py-2">Nenhum comentário ainda</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      value={newComment}
-                      onChange={e => setNewComment(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addComment()}
-                      placeholder="Adicionar comentário..."
-                      className="flex-1 px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-info text-xs"
-                    />
+                  <div className="flex items-center gap-2 mt-2 relative">
+                    <div className="flex-1 relative">
+                      <input
+                        ref={commentInputRef}
+                        value={newComment}
+                        onChange={e => { setNewComment(e.target.value); if (showMentions) checkMentions() }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { e.preventDefault(); addComment() }
+                          if (e.key === '@' || (e.key === 'Backspace' && showMentions)) checkMentions()
+                        }}
+                        placeholder="Adicionar comentário... Use @ para mencionar"
+                        className="w-full px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-info text-xs"
+                      />
+                      {/* Mention dropdown */}
+                      <AnimatePresence>
+                        {showMentions && filteredMentions.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 4 }}
+                            className="absolute bottom-full left-0 mb-1 w-40 bg-nexo-card border border-nexo-border rounded-xl shadow-xl overflow-hidden z-[50]"
+                          >
+                            {filteredMentions.map(user => (
+                              <button
+                                key={user.id}
+                                onClick={() => insertMention(user)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-nexo-bg transition-colors"
+                              >
+                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] text-white font-bold"
+                                  style={{ backgroundColor: getUserColor(user.id) }}>
+                                  {user.name.charAt(0)}
+                                </div>
+                                <span className="text-xs text-nexo-text">{user.name}</span>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     <button onClick={addComment} className="p-2 bg-nexo-info rounded-lg hover:opacity-90">
                       <Send size={14} className="text-white" />
                     </button>

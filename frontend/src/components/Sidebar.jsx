@@ -157,7 +157,7 @@ function AccordionSection({ item, isActive, sidebarOpen }) {
 
 export default function Sidebar({ open, setOpen }) {
   return (
-    <aside className={`${open ? 'w-60' : 'w-16'} glass flex flex-col transition-all duration-300`}>
+    <aside className={`${open ? 'w-60' : 'w-16'} glass hidden sm:flex sm:flex-col transition-all duration-300`}>
       <div className="p-4 flex items-center gap-3 border-b border-nexo-border">
         <div className="w-8 h-8 rounded-lg bg-nexo-info flex items-center justify-center font-bold text-white text-sm">N</div>
         {open && <span className="font-heading font-bold text-lg">NEXO</span>}
