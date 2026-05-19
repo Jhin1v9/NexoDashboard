@@ -4,7 +4,7 @@ import {
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
   TrendingUp, Users, Clock, Zap, BarChart3, ChevronDown, ChevronUp,
   Target, ArrowUpRight, CheckCircle2, Circle, AlertCircle,
-  RefreshCw, ExternalLink, Link2, FileText, AtSign
+  RefreshCw, ExternalLink, Link2, FileText, AtSign, Bot
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -691,6 +691,14 @@ export default function WhatsApp() {
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Atualizando...' : 'Refresh'}
+          </button>
+          <button 
+            onClick={() => navigate('/luna?context=whatsapp')}
+            className="flex items-center gap-2 px-3 py-2 bg-nexo-card rounded-lg text-xs hover:bg-nexo-primary/10 hover:text-nexo-primary border border-nexo-border transition-colors"
+            title="Falar com Luna sobre WhatsApp"
+          >
+            <Bot size={14} />
+            Luna
           </button>
           <button 
             onClick={() => navigate('/relatorios')}

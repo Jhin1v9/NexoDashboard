@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Sun, Moon, Activity, Trash2, Eraser, Save, Scan,
@@ -193,7 +194,11 @@ function EditablePreviewCard({ fields, onSubmit, onCancel }) {
 
 // ============================================================
 export default function LunaControl() {
-  const [activeTab, setActiveTab] = useState('terminal')
+  const [searchParams] = useSearchParams()
+  const contextModule = searchParams.get('context') || null
+  const contextId = searchParams.get('id') || null
+
+  const [activeTab, setActiveTab] = useState(contextModule ? 'chat' : 'terminal')
   const [commands, setCommands] = useState([])
   const [status, setStatus] = useState(null)
   const [executing, setExecuting] = useState(null)
@@ -221,6 +226,9 @@ export default function LunaControl() {
   const [isLoadingThread, setIsLoadingThread] = useState(false)
   const [showThreadDropdown, setShowThreadDropdown] = useState(false)
   const dropdownRef = useRef(null)
+
+  // Contexto passado via query params (ex: ?context=email&id=xyz)
+  const contextRef = useRef({ module: contextModule, id: contextId })
 
   useEffect(() => {
     if (authUser?.name) {
@@ -457,7 +465,9 @@ export default function LunaControl() {
         // Chat via thread persistente
         const res = await axios.post(`/api/luna/threads/${activeThreadId}/messages`, {
           text,
-          authorName: activeUser
+          authorName: activeUser,
+          contextModule: contextRef.current?.module || null,
+          contextId: contextRef.current?.id || null
         })
         const data = res.data
         const newMsgs = []
@@ -532,7 +542,9 @@ export default function LunaControl() {
         authorName: activeUser,
         confirmActions: true,
         pendingActions: pendingConfirmation.actions,
-        editedFields
+        editedFields,
+        contextModule: contextRef.current?.module || null,
+        contextId: contextRef.current?.id || null
       })
       const data = res.data
       const newMsgs = []

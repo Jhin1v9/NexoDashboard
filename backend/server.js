@@ -3882,7 +3882,7 @@ function buildChatFallbackReply(userMessage) {
 // ============================================================
 app.post('/api/luna/chat', async (req, res) => {
   try {
-    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields } = req.body;
+    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -3916,6 +3916,8 @@ app.post('/api/luna/chat', async (req, res) => {
     const buffer = readLunaBuffer();
     const parseContext = {
       authorName,
+      contextModule,
+      contextId,
       bufferSummary: {
         tasks: (buffer.newTasks || []).length,
         ideas: (buffer.newIdeas || []).length,
@@ -4262,7 +4264,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
     const thread = getThread(threadId);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
 
-    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields } = req.body;
+    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -4295,7 +4297,9 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       authorName,
       confirmActions,
       pendingActions,
-      editedFields
+      editedFields,
+      contextModule,
+      contextId
     };
 
     const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {

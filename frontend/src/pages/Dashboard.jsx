@@ -236,13 +236,14 @@ export default function Dashboard() {
         
         {/* Luna Stats */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="glass-card p-5">
+          className="glass-card p-5 cursor-pointer hover:border-nexo-primary/30 transition-colors"
+          onClick={() => navigate('/luna')}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-nexo-muted flex items-center gap-2">
               <Moon size={16} className="text-nexo-primary" />
               Luna v18.0
             </h2>
-            <button onClick={() => navigate('/luna')} className="text-xs text-nexo-info hover:underline">Control →</button>
+            <span className="text-xs text-nexo-info hover:underline">Control →</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-2 bg-nexo-card rounded-lg">
