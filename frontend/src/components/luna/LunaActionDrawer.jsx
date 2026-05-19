@@ -12,11 +12,11 @@
  * Referência: Opera Neon "Chat-Do-Make sidebar"
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, CheckCircle, AlertTriangle, Loader2,
-  Sparkles, ArrowRight, Edit3, Trash2
+  Sparkles, Edit3, Trash2
 } from 'lucide-react'
 import axios from 'axios'
 import { useToast } from '../../context/ToastContext'
@@ -36,16 +36,29 @@ export default function LunaActionDrawer({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [safetyDelayDone, setSafetyDelayDone] = useState(false)
+  const abortControllerRef = useRef(null)
 
   const intent = result?.intent || 'None'
   const score = result?.score || 0
   const entities = result?.entities || []
   const originalText = result?.text || ''
-  const schema = getSchema(intent)
+  const schema = getSchema(intent) || {}
 
   // Inicializa valores com defaults + entities extraídas
   useEffect(() => {
-    if (!schema.fields) return
+    // Sempre reseta estados quando o result muda (novo intent)
+    setSubmitError(null)
+    setSafetyDelayDone(false)
+    setIsSubmitting(false)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+
+    if (!schema.fields) {
+      setValues({})
+      return
+    }
 
     const defaults = {}
     Object.entries(schema.fields).forEach(([key, field]) => {
@@ -68,12 +81,36 @@ export default function LunaActionDrawer({
     }
 
     setValues(defaults)
-  }, [result, schema])
+  }, [result, schema, entities, originalText])
+
+  // Aborta requisição no desmonte
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+    }
+  }, [])
 
   const updateValue = useCallback((key, val) => {
     setValues(prev => ({ ...prev, [key]: val }))
     setSubmitError(null)
   }, [])
+
+  const validateFields = () => {
+    if (!schema.fields) return true
+    for (const [key, field] of Object.entries(schema.fields)) {
+      if (field.required) {
+        const val = values[key]
+        if (val === undefined || val === null || String(val).trim() === '') {
+          setSubmitError(`O campo "${field.label || key}" é obrigatório.`)
+          return false
+        }
+      }
+    }
+    return true
+  }
 
   const handleSubmit = async () => {
     if (schema.isRedirect) {
@@ -97,27 +134,36 @@ export default function LunaActionDrawer({
       return
     }
 
+    // Valida campos obrigatórios no modo collect
+    if (mode === 'collect' && !validateFields()) {
+      return
+    }
+
     setIsSubmitting(true)
     setSubmitError(null)
 
     try {
       const payload = schema.submitConfig.transform(values)
       const token = localStorage.getItem('nexo_token') || ''
+      abortControllerRef.current = new AbortController()
       await axios({
         method: schema.submitConfig.method,
         url: schema.submitConfig.endpoint,
         data: payload,
         headers: { Authorization: `Bearer ${token}` },
+        signal: abortControllerRef.current.signal,
       })
 
       addToast(schema.successMessage || 'Ação executada com sucesso ✓', 'success')
       onSuccess?.({ intent, payload, mode })
       onClose()
     } catch (err) {
+      if (axios.isCancel(err)) return
       const msg = err.response?.data?.error || err.message || 'Erro ao executar ação'
       setSubmitError(msg)
     } finally {
       setIsSubmitting(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -280,12 +326,12 @@ export default function LunaActionDrawer({
             <p className="text-xs text-nexo-muted whitespace-pre-line">{schema.description}</p>
           )}
 
-          {/* Campos */}
           {/* Preview visual da ação */}
           {(mode === 'preview' || mode === 'confirm') && (
             <LunaInlinePreview
               intent={intent}
               values={values}
+              disabled={mode === 'confirm' && !safetyDelayDone}
               onConfirm={() => {
                 if (mode === 'confirm') {
                   setSafetyDelayDone(true)

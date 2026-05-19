@@ -32,6 +32,15 @@ const ACTION_CONFIG = {
   'email.marcar_spam': { icon: Trash2, label: 'Marcar como spam', color: 'red', confirm: true },
 }
 
+// Tailwind purge-safe color maps
+const COLOR_MAP = {
+  red: { text: 'text-red-400', bg: 'bg-red-500', border: 'border-red-500' },
+  green: { text: 'text-green-400', bg: 'bg-green-500', border: 'border-green-500' },
+  blue: { text: 'text-blue-400', bg: 'bg-blue-500', border: 'border-blue-500' },
+  slate: { text: 'text-slate-400', bg: 'bg-slate-500', border: 'border-slate-500' },
+  primary: { text: 'text-nexo-primary', bg: 'bg-nexo-primary', border: 'border-nexo-primary' },
+}
+
 export default function LunaBatchAction({
   intent,
   onClose,
@@ -44,10 +53,18 @@ export default function LunaBatchAction({
   const [showConfirm, setShowConfirm] = useState(false)
 
   const config = ACTION_CONFIG[intent] || { icon: ArrowRight, label: 'Executar', color: 'primary', confirm: false }
+  const colors = COLOR_MAP[config.color] || COLOR_MAP.primary
   const ActionIcon = config.icon
 
   // Extrai itens do pageContext (vindo dos harvesters)
   const items = pageContext?.items || pageContext?.data?.items || []
+
+  // Se o usuário desmarcar todos, cancela a confirmação para evitar estado órfão
+  useEffect(() => {
+    if (selectedIds.size === 0 && showConfirm) {
+      setShowConfirm(false)
+    }
+  }, [selectedIds.size, showConfirm])
 
   const toggleItem = useCallback((id) => {
     setSelectedIds(prev => {
@@ -67,6 +84,7 @@ export default function LunaBatchAction({
   }, [items, selectedIds.size])
 
   const handleExecute = async () => {
+    if (isSubmitting) return
     if (selectedIds.size === 0) {
       addToast('Selecione pelo menos um item', 'warning')
       return
@@ -97,8 +115,6 @@ export default function LunaBatchAction({
       setIsSubmitting(false)
     }
   }
-
-  const selectedItems = items.filter(i => selectedIds.has(i.id))
 
   if (items.length === 0) {
     return (
@@ -132,7 +148,7 @@ export default function LunaBatchAction({
       {/* Header */}
       <div className="px-4 py-3 border-b border-nexo-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ActionIcon className={`w-4 h-4 text-${config.color}-400`} />
+          <ActionIcon className={`w-4 h-4 ${colors.text}`} />
           <span className="text-sm font-medium text-nexo-text">
             {config.label}
           </span>
@@ -176,7 +192,7 @@ export default function LunaBatchAction({
             >
               <div className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors
                 ${isSelected
-                  ? `bg-${config.color}-500 border-${config.color}-500`
+                  ? `${colors.bg} ${colors.border}`
                   : 'border-nexo-border bg-nexo-bg'
                 }`}
               >
@@ -244,7 +260,7 @@ export default function LunaBatchAction({
             disabled={selectedIds.size === 0 || isSubmitting}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
               ${selectedIds.size > 0
-                ? `bg-${config.color}-500/20 text-${config.color}-300 border border-${config.color}-500/30 hover:bg-${config.color}-500/30`
+                ? `${colors.bg}/20 ${colors.text} border ${colors.border}/30 hover:${colors.bg}/30`
                 : 'bg-nexo-bg text-nexo-muted border border-nexo-border cursor-not-allowed'
               } disabled:opacity-50`}
           >
