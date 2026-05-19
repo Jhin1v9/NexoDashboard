@@ -19,10 +19,10 @@
 ## 0. Instance Identity
 
 ```yaml
-active_instance: kimi-bbf526dc
-signature: KIMI-BBF526DC 🔵
+active_instance: kimi-10a71fc7
+signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-18
+last_updated: 2026-05-19
 ```
 
 **Regra para múltiplas instâncias Kimi:**

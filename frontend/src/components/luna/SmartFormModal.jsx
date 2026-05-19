@@ -210,7 +210,7 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="glass-card w-full max-w-md overflow-hidden"
+          className="glass-card w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -229,7 +229,7 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
           </div>
 
           {/* Body */}
-          <div className="px-5 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             {schema.description && (
               <p className="text-xs text-nexo-muted whitespace-pre-line">{schema.description}</p>
             )}
@@ -271,7 +271,7 @@ export default function SmartFormModal({ result, onClose, onSuccess }) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center gap-2 px-5 py-3 border-t border-nexo-border bg-nexo-bg/50">
+          <div className="flex items-center gap-2 px-5 py-3 border-t border-nexo-border bg-nexo-bg/50 shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs font-medium text-nexo-muted hover:text-nexo-text transition-colors"
