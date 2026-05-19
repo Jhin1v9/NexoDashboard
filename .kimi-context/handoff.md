@@ -6,27 +6,27 @@
 
 ---
 
-## 🎯 Foco Atual (Workspace-Leads Unification + Active Learning)
+## 🎯 Foco Atual (Luna v20.0 — NLU Unificado + Fluxo Floating Button)
 
 ### ✅ Concluído nesta sessão (kimi-10a71fc7 🟡)
-- [x] **Workspace-Leads Unification:** `GET /api/workspace/clients` retorna leads + clientes unificados
-- [x] **LeadPreviewPanel:** Preview de lead na sidebar do Workspace com botão "Converter em Cliente"
-- [x] **Conversão automática:** `POST /api/leads/:id/convert` cria workspace + README.md + estrutura padrão
-- [x] **Active Learning NLU:** SmartFormModal mostra "Não era isso?" quando score < 0.85
-- [x] **Picker de intents:** Busca `/api/luna/intents` e POST `/api/luna/learn` para re-treinar
-- [x] **Luna Context + Event Bus:** `LunaContext` provider global, `lunaEventBus` emitter, `RouteHarvester` detecta rotas
-- [x] **LunaFloatingButton integrado:** Estados visuais (thinking/acting/idle), badge de módulo atual, integração com event bus
-- [x] **Minichat contextual:** Sem blur, sugestões por página, comando "ajuda" inteligente, botão "?"
-- [x] **Harvesters de página:** `EmailHarvester`, `FinanceHarvester`, `TaskHarvester` + `useLunaDOM`
-- [x] **Render CLI v2.17.0:** Instalada localmente em `~/.local/bin/render`
-- [x] **Build passando:** 0 erros, commits enviados para GitHub
+- [x] **NLU Unificado:** LunaFloatingButton e página `/luna` usam o MESMO backend (`/api/luna/chat`)
+- [x] **Fluxo dual:** SmartFormModal para formulários + fallback `/api/luna/chat` para consultas
+- [x] **Intents novos:** `social` (saudações), `financeiro.listar_pagamentos/despesas`
+- [x] **ActionExecutor:** Ações `ajuda` e `navigate`, correção `completeTask` (sem criar tarefa vazia)
+- [x] **Saudações NLU:** "oi luna", "bom dia", "como vai" — score 1.0, respostas variadas
+- [x] **Botão flutuante estilizado:** Gradiente purple, ícone Wand2, sem debug, sem limitação por página
+- [x] **Sugestões globais:** 5 comandos fixos em qualquer página (não mais por módulo)
+- [x] **Changelog recuperado:** 18 entradas (tinham sido apagadas, reduzidas para 3)
+- [x] **Repo unificado:** `NexoDashboard/` local antigo desvinculado do remote
+- [x] **Todos os commits enviados:** `039ee00` é o HEAD atual
+- [x] **Build passando:** Vite build 0 erros
 
 ### ⏳ Próximo passo
 - [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
-- [ ] **Autenticar Render CLI** — Gerar API key no dashboard (Account Settings → API Keys) ou rodar `render login`
-- [ ] **FASE 4 — Expandir corpus NLU:** Aumentar de ~25 para 50-100 exemplos por intent
-- [ ] **FASE 5 — Melhorar extração de título:** Regex atual remove "do cliente Nexo" — precisa ser mais inteligente
-- [ ] **FASE 6 — Deploy para Render**
+- [ ] **FASE 4 — Expandir corpus NLU:** Aumentar exemplos por intent (criar_rascunho score 0.68)
+- [ ] **FASE 5 — Melhorar extração de params:** Email `para`/`assunto` de frases naturais
+- [ ] **FASE 6 — Deploy para Render:** Verificar se build no Render está OK
+- [ ] **Opcional:** Adicionar `LunaActionDrawer`, `LunaActionFlow`, `LunaSafetyDelay` ao fluxo principal
 
 ---
 
@@ -35,7 +35,7 @@
 | Sessão | Arquivos modificados | Impacto |
 |---|---|---|
 | `kimi-c4b19cd8` 🟢 | `agents/core/ActionExecutor.js` (+1.156 linhas) | 109 métodos, 21 categorias — integrar com SmartFormModal |
-| `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — pode complementar NLP.js |
+| `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — complementa NLP.js |
 | `kimi-19007e56` 🔴 | `backend/server.js` | ContextModule/contextId nos endpoints de chat |
 | `kimi-19007e56` 🔴 | Frontend EmailHub | Banner drafts, LunaEmailAssistant — não conflita |
 
@@ -44,23 +44,20 @@
 ## 🔗 Arquivos chave desta sessão
 
 ```
-backend/server.js                                    # Rotas /api/workspace/clients e /api/leads/:id/convert
-backend/workspace-manager.js                         # clientExists() + createClient()
-backend/services/luna-nlu.js                         # Engine NLP.js + addTrainingExample()
+backend/server.js                                    # Endpoint /api/luna/chat (NLU → ActionExecutor)
+backend/services/luna-nlu.js                         # Motor NLP.js + corpus de treinamento
+agents/core/ActionExecutor.js                        # 113+ ações (ajuda, navigate, task_done corrigido)
+agents/core/NLUActionMapper.js                       # Mapeia intents NLU → ações
+agents/core/IntentParser.js                          # Regex fallback
 
-frontend/src/pages/Workspace.jsx                     # Sidebar unificada + LeadPreviewPanel
-frontend/src/components/luna/SmartFormModal.jsx      # Active Learning (picker de intents)
-frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário
-frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões e ajuda contextual por módulo
-frontend/src/hooks/useLunaNLU.js                     # Hook axios
-frontend/src/hooks/useLunaDOM.js                     # Tracking de interações DOM
-frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global (integrado com LunaContext + lunaEventBus)
-frontend/src/context/LunaContext.jsx                 # Provider global de contexto da Luna
+frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante (mini-chat + SmartFormModal fallback)
+frontend/src/components/luna/SmartFormModal.jsx      # Modal de formulário (Active Learning)
+frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário por intent
+frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões GLOBAIS (5 fixas, não por página)
+frontend/src/context/LunaContext.jsx                 # Provider global de contexto
 frontend/src/lib/lunaEventBus.js                     # Event emitter desacoplado
-frontend/src/components/luna/harvesters/RouteHarvester.jsx  # Detecta mudanças de rota
-frontend/src/components/luna/harvesters/EmailHarvester.jsx  # Contexto da página Email
-frontend/src/components/luna/harvesters/FinanceHarvester.jsx # Contexto da página Financeiro
-frontend/src/components/luna/harvesters/TaskHarvester.jsx    # Contexto da página Tarefas
+
+backend/data/changelog.json                          # 18 entradas recuperadas + 3 novas
 ```
 
 ---
@@ -68,11 +65,11 @@ frontend/src/components/luna/harvesters/TaskHarvester.jsx    # Contexto da pági
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `af5dea2` — `feat(luna): Minichat contextual — sugestões por página, sem blur, ajuda inteligente`  
+**Commit atual:** `039ee00` — `feat(luna-floating): remove limitacao por pagina + estilo producao`  
 **Build:** ✅ Vite build passando (0 erros)  
-**Testes manuais:** ✅ Conversão de lead cria workspace + README.md  
-**Render CLI:** ✅ v2.17.0 instalada em `~/.local/bin/render` (aguardando auth)  
-**API Key Gemini:** 🔴 Revogada — endpoints `/api/email/ai/*` e `/api/luna/chat` retornam vazio  
+**Testes manuais:** ✅ 24 comandos NLU testados (página /luna + botão flutuante)  
+**API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
+**Render:** ⏳ Aguardando deploy automático do commit `039ee00`  
 
 ---
 
