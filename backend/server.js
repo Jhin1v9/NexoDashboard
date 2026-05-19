@@ -3964,6 +3964,226 @@ app.post('/api/luna/learn', requireAuth, async (req, res) => {
   }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// LUNA PROACTIVE & INSIGHTS ENDPOINTS
+// ═════════════════════════════════════════════════════════════════════════════
+
+// GET /api/luna/proactive — Retorna contagem de pendências para badge no botão
+app.get('/api/luna/proactive', requireAuth, async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const dataDir = path.join(__dirname, 'data');
+
+    let total = 0;
+    const breakdown = {};
+
+    // Tarefas P0/P1 pendentes
+    try {
+      const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
+      const critical = tasks.filter(t => t.status !== 'completed' && (t.priority === 'P0' || t.priority === 'high'));
+      const overdue = tasks.filter(t => t.status !== 'completed' && t.dueDate && new Date(t.dueDate) < new Date());
+      breakdown.tasksCritical = critical.length;
+      breakdown.tasksOverdue = overdue.length;
+      total += critical.length + overdue.length;
+    } catch (e) { breakdown.tasksCritical = 0; breakdown.tasksOverdue = 0; }
+
+    // Emails não lidos (drafts pendentes de aprovação)
+    try {
+      const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
+      const pendingDrafts = drafts.drafts ? drafts.drafts.filter(d => d.status === 'pending' || d.status === 'pending_approval').length : 0;
+      breakdown.emailsPending = pendingDrafts;
+      total += pendingDrafts;
+    } catch (e) { breakdown.emailsPending = 0; }
+
+    // Leads novos
+    try {
+      const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
+      const newLeads = Array.isArray(leads) ? leads.filter(l => l.status === 'new' || l.pipelineStatus === 'new').length : 0;
+      breakdown.leadsNew = newLeads;
+      total += newLeads;
+    } catch (e) { breakdown.leadsNew = 0; }
+
+    // Alerts ativos
+    try {
+      const alerts = JSON.parse(fs.readFileSync(path.join(dataDir, 'alerts.json'), 'utf8'));
+      const activeAlerts = Array.isArray(alerts) ? alerts.filter(a => a.active !== false && a.resolved !== true).length : 0;
+      breakdown.alertsActive = activeAlerts;
+      total += activeAlerts;
+    } catch (e) { breakdown.alertsActive = 0; }
+
+    // Determina prioridade máxima
+    let topPriority = 'info';
+    if (breakdown.tasksCritical > 0 || breakdown.alertsActive > 0) topPriority = 'critical';
+    else if (breakdown.tasksOverdue > 0) topPriority = 'warning';
+    else if (breakdown.emailsPending > 0 || breakdown.leadsNew > 0) topPriority = 'info';
+
+    res.json({ success: true, total, breakdown, topPriority });
+  } catch (e) {
+    console.error('[LunaProactive] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/luna/insights — Cross-Module Insights (resumo cruzado)
+app.get('/api/luna/insights', requireAuth, async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const dataDir = path.join(__dirname, 'data');
+
+    const insights = {
+      summary: '',
+      modules: {},
+      recommendations: [],
+    };
+
+    // ── Tarefas ──
+    try {
+      const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
+      const pending = tasks.filter(t => t.status !== 'completed');
+      const p0 = pending.filter(t => t.priority === 'P0' || t.priority === 'high');
+      const overdue = pending.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+      const byAssignee = {};
+      pending.forEach(t => {
+        const who = t.assignedTo || 'não atribuído';
+        byAssignee[who] = (byAssignee[who] || 0) + 1;
+      });
+      insights.modules.tasks = {
+        total: tasks.length,
+        pending: pending.length,
+        p0: p0.length,
+        overdue: overdue.length,
+        byAssignee,
+      };
+    } catch (e) { insights.modules.tasks = null; }
+
+    // ── Financeiro ──
+    try {
+      const cash = JSON.parse(fs.readFileSync(path.join(dataDir, 'cash-box.json'), 'utf8'));
+      insights.modules.finance = {
+        balance: cash.balance || 0,
+        monthlyIncome: cash.monthlyIncome || 0,
+        monthlyExpenses: cash.monthlyExpenses || 0,
+        projectedBalance: cash.projectedBalance || 0,
+        status: (cash.balance || 0) >= 0 ? 'positive' : 'negative',
+      };
+    } catch (e) { insights.modules.finance = null; }
+
+    // ── Leads ──
+    try {
+      const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
+      const arr = Array.isArray(leads) ? leads : [];
+      insights.modules.leads = {
+        total: arr.length,
+        new: arr.filter(l => l.status === 'new').length,
+        negotiating: arr.filter(l => l.pipelineStatus === 'negotiating' || l.status === 'negotiating').length,
+      };
+    } catch (e) { insights.modules.leads = null; }
+
+    // ── Emails ──
+    try {
+      const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
+      const pendingDrafts = drafts.drafts ? drafts.drafts.filter(d => d.status === 'pending').length : 0;
+      insights.modules.emails = {
+        draftsPending: pendingDrafts,
+      };
+    } catch (e) { insights.modules.emails = null; }
+
+    // ── Gera summary ──
+    const parts = [];
+    if (insights.modules.tasks?.p0 > 0) parts.push(`${insights.modules.tasks.p0} tarefa(s) P0 crítica(s)`);
+    if (insights.modules.tasks?.overdue > 0) parts.push(`${insights.modules.tasks.overdue} tarefa(s) atrasada(s)`);
+    if (insights.modules.finance?.status === 'negative') parts.push('caixa NEGATIVO');
+    if (insights.modules.leads?.new > 0) parts.push(`${insights.modules.leads.new} lead(s) novo(s)`);
+    if (insights.modules.emails?.draftsPending > 0) parts.push(`${insights.modules.emails.draftsPending} rascunho(s) pendente(s)`);
+
+    if (parts.length === 0) {
+      insights.summary = 'Tudo tranquilo! Nenhuma pendência crítica no momento.';
+    } else {
+      insights.summary = `Atenção: ${parts.join(', ')}.`;
+    }
+
+    // ── Recomendações ──
+    if (insights.modules.tasks?.p0 > 0) {
+      insights.recommendations.push({ type: 'critical', text: `Você tem ${insights.modules.tasks.p0} tarefa(s) P0. Recomendo focar nelas primeiro.` });
+    }
+    if (insights.modules.finance?.status === 'negative') {
+      insights.recommendations.push({ type: 'warning', text: 'O caixa está negativo. Verifique receitas pendentes e controle despesas.' });
+    }
+    if (insights.modules.tasks?.overdue > 3) {
+      insights.recommendations.push({ type: 'warning', text: `${insights.modules.tasks.overdue} tarefas atrasadas. Considere renegociar prazos.` });
+    }
+
+    res.json({ success: true, insights });
+  } catch (e) {
+    console.error('[LunaInsights] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/batch — Executa ação em lote sobre múltiplos itens
+app.post('/api/luna/batch', requireAuth, async (req, res) => {
+  try {
+    const { intent, ids } = req.body;
+    if (!intent || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'intent e ids (array) são obrigatórios' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const dataDir = path.join(__dirname, 'data');
+
+    const [domain, action] = intent.split('.');
+    let modified = 0;
+    let errors = [];
+
+    // Tarefas
+    if (domain === 'tarefa') {
+      const tasksPath = path.join(dataDir, 'company-tasks.json');
+      const tasks = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
+      tasks.forEach(t => {
+        if (!ids.includes(t.id)) return;
+        if (action === 'concluir' || action === 'deletar' || action === 'excluir') {
+          t.status = 'completed';
+          t.completedAt = new Date().toISOString();
+          modified++;
+        }
+        if (action === 'atribuir' && req.body.assignTo) {
+          t.assignedTo = req.body.assignTo;
+          modified++;
+        }
+      });
+      fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+    }
+
+    // Emails (drafts)
+    if (domain === 'email') {
+      const draftsPath = path.join(dataDir, 'email-drafts.json');
+      const drafts = JSON.parse(fs.readFileSync(draftsPath, 'utf8'));
+      if (drafts.drafts) {
+        drafts.drafts.forEach(d => {
+          if (!ids.includes(d.id)) return;
+          if (action === 'arquivar') { d.status = 'archived'; modified++; }
+          if (action === 'mover_lixeira') { d.status = 'trash'; modified++; }
+          if (action === 'marcar_lido') { d.status = 'read'; modified++; }
+          if (action === 'marcar_spam') { d.status = 'spam'; modified++; }
+        });
+        fs.writeFileSync(draftsPath, JSON.stringify(drafts, null, 2));
+      }
+    }
+
+    if (modified === 0 && errors.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhum item foi modificado. Verifique os IDs ou a ação.' });
+    }
+
+    res.json({ success: true, modified, errors: errors.length > 0 ? errors : undefined });
+  } catch (e) {
+    console.error('[LunaBatch] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ============================================================
 // POST /api/luna/chat — MODO CONCIERGE v19.0
 // IntentParser (regex/LLM) → ActionExecutor → resposta humanizada
