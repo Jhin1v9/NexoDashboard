@@ -65,6 +65,7 @@ function ProtectedLayout() {
             <Route path="/ideias/:id" element={<IdeaEditor />} />
             <Route path="/whatsapp" element={<WhatsApp />} />
             <Route path="/email" element={<EmailHub />} />
+            <Route path="/email/oauth/callback" element={<EmailCallback />} />
             <Route path="/instagram" element={<InstagramHub />} />
             <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/github" element={<GitHub />} />
