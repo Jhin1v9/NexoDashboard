@@ -8,6 +8,7 @@ import {
 import axios from 'axios'
 import useRealtime from '../hooks/useRealtime'
 import { useAuth } from '../context/AuthContext'
+import TaskHarvester from '../components/luna/harvesters/TaskHarvester'
 
 const STATUS_CONFIG = {
   pending: { label: 'Pendente', color: 'bg-gray-500', text: 'text-gray-400', border: 'border-gray-500', icon: Clock },
@@ -607,6 +608,21 @@ export default function Tarefas() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <TaskHarvester
+        tasks={tasks}
+        filtered={filtered}
+        stats={stats}
+        filters={{
+          statusFilter,
+          personFilter,
+          priorityFilter,
+          typeFilter,
+          showOverdueOnly,
+        }}
+        modalTask={modalTask}
+        users={users}
+      />
     </div>
   )
 }
