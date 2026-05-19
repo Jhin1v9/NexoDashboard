@@ -41,7 +41,9 @@ last_updated: 2026-05-19T18:40:00+02:00
 
 **Repo GitHub:** `github.com/Jhin1v9/NexoDashboard` (único — `NexoDashboard/` local antigo foi desvinculado do remote)
 
-**Branch de trabalho:** `codex/initial-nexo-dashboard-pro-v16`
+**Branch oficial:** `main` (merge de `codex/initial-nexo-dashboard-pro-v16` feito em 2026-05-19, fast-forward sem conflitos)
+
+**Histórico:** O desenvolvimento foi feito na branch `codex/initial-nexo-dashboard-pro-v16` e depois mergeado para `main`. A branch `codex` ainda existe mas não é mais necessária — `main` tem o código absoluto.
 
 ---
 
