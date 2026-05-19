@@ -4788,7 +4788,7 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
             }
           });
         }
-        if (changed) fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+        if (changed) writeJSON(tasksPath, tasks);
       }
     }
 
@@ -4808,7 +4808,7 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
             if (action === 'marcar_lido') { d.status = 'read'; modified++; }
             if (action === 'marcar_spam') { d.status = 'spam'; modified++; }
           });
-          fs.writeFileSync(draftsPath, JSON.stringify(drafts, null, 2));
+          writeJSON(draftsPath, drafts);
         }
       } catch (emailErr) {
         console.error('[LunaBatch] Erro ao processar emails:', emailErr.message);
@@ -4834,7 +4834,7 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
             modified++;
           }
         });
-        fs.writeFileSync(leadsPath, JSON.stringify(arr, null, 2));
+        writeJSON(leadsPath, arr);
       } catch (leadErr) {
         console.error('[LunaBatch] Erro ao processar leads:', leadErr.message);
         errors.push('lead: ' + leadErr.message);
@@ -4866,7 +4866,7 @@ function readDismissed() {
 }
 
 function writeDismissed(data) {
-  fs.writeFileSync(LUNA_DISMISSED_FILE, JSON.stringify(data, null, 2));
+  writeJSON(LUNA_DISMISSED_FILE, data);
 }
 
 function isDismissed(id, dismissed) {
