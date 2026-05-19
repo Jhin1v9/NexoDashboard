@@ -4138,23 +4138,30 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
     let modified = 0;
     let errors = [];
 
-    // Tarefas
+    // Tarefas (verifica tanto tasks.json quanto company-tasks.json)
     if (domain === 'tarefa') {
-      const tasksPath = path.join(dataDir, 'company-tasks.json');
-      const tasks = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
-      tasks.forEach(t => {
-        if (!ids.includes(t.id)) return;
-        if (action === 'concluir' || action === 'deletar' || action === 'excluir') {
-          t.status = 'completed';
-          t.completedAt = new Date().toISOString();
-          modified++;
-        }
-        if (action === 'atribuir' && req.body.assignTo) {
-          t.assignedTo = req.body.assignTo;
-          modified++;
-        }
-      });
-      fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+      const tasksFiles = ['tasks.json', 'company-tasks.json'];
+      for (const file of tasksFiles) {
+        const tasksPath = path.join(dataDir, file);
+        if (!fs.existsSync(tasksPath)) continue;
+        const tasks = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
+        let changed = false;
+        tasks.forEach(t => {
+          if (!ids.includes(t.id) && !ids.includes(String(t.id))) return;
+          if (action === 'concluir' || action === 'deletar' || action === 'excluir') {
+            t.status = 'completed';
+            t.completedAt = new Date().toISOString();
+            modified++;
+            changed = true;
+          }
+          if (action === 'atribuir' && req.body.assignTo) {
+            t.assignedTo = req.body.assignTo;
+            modified++;
+            changed = true;
+          }
+        });
+        if (changed) fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+      }
     }
 
     // Emails (drafts)
