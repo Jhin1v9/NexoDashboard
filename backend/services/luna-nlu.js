@@ -161,6 +161,61 @@ const DOMAINS = {
       'social',
     ],
   },
+  workspace: {
+    description: 'Comandos relacionados ao workspace de clientes',
+    intents: [
+      'workspace.listar_clientes',
+      'workspace.abrir',
+      'workspace.criar_cliente',
+      'workspace.criar_pasta',
+      'workspace.upload',
+      'workspace.servidores',
+      'workspace.iniciar_demo',
+      'workspace.parar_demo',
+      'workspace.logs',
+    ],
+  },
+  instagram: {
+    description: 'Comandos relacionados ao Instagram',
+    intents: [
+      'instagram.importar',
+      'instagram.mensagens',
+      'instagram.configurar',
+    ],
+  },
+  github: {
+    description: 'Comandos relacionados ao GitHub',
+    intents: [
+      'github.repos',
+      'github.git_push',
+      'github.status',
+    ],
+  },
+  vercel: {
+    description: 'Comandos relacionados à Vercel',
+    intents: [
+      'vercel.projetos',
+      'vercel.status',
+    ],
+  },
+  seguranca: {
+    description: 'Comandos relacionados à segurança e alertas',
+    intents: [
+      'seguranca.configuracoes',
+      'seguranca.logs',
+      'seguranca.testar_whatsapp',
+      'seguranca.alerta',
+    ],
+  },
+  operacoes: {
+    description: 'Comandos relacionados ao centro de operações',
+    intents: [
+      'operacao.alerta',
+      'operacao.excluir_alerta',
+      'operacao.mudanca',
+      'operacao.status',
+    ],
+  },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
