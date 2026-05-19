@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
-  Shield, Lightbulb, Bot, Terminal
+  Shield, Lightbulb, Bot, Terminal, FolderOpen
 } from 'lucide-react'
 
 const LUNA_AVATAR = '/luna-avatar.png'
@@ -32,6 +32,7 @@ const navItems = [
       { path: '/financeiro/gastos', icon: Receipt, label: 'Gastos' },
     ]
   },
+  { path: '/workspace', icon: FolderOpen, label: 'Workspace' },
   { path: '/projetos', icon: Folder, label: 'Projetos' },
   { path: '/tarefas', icon: CheckSquare, label: 'Tarefas' },
   { path: '/ideias', icon: Lightbulb, label: 'Ideias', badge: 'beta' },

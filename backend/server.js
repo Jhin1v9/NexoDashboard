@@ -9,6 +9,8 @@ const { spawn, exec } = require('child_process');
 const cron = require('node-cron');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const workspaceManager = require('./workspace-manager');
 // ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
@@ -6351,6 +6353,154 @@ app.delete('/api/bugdetector/reports/:filename', requireAuth, (req, res) => {
     res.json({ success: true, message: 'Report removido' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================================
+// NEXO WORKSPACE API v1.0
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB
+
+app.get('/api/workspace/clients', requireAuth, (req, res) => {
+  try {
+    const index = workspaceManager.getIndex();
+    res.json({ success: true, clientes: index.clientes });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/workspace/clients', requireAuth, (req, res) => {
+  try {
+    const { id, nome, status, dataInicio, responsavel, orcamentoTotal, moeda, cor, tags, anotacoes } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: 'id obrigatorio' });
+    const client = workspaceManager.createClient(id, {
+      nome, status, dataInicio, responsavel, orcamentoTotal, moeda, cor, tags, anotacoes
+    });
+    res.json({ success: true, client });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/clients/:id', requireAuth, (req, res) => {
+  try {
+    const client = workspaceManager.getClient(req.params.id);
+    if (!client) return res.status(404).json({ success: false, error: 'Cliente nao encontrado' });
+    res.json({ success: true, client });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.put('/api/workspace/clients/:id', requireAuth, (req, res) => {
+  try {
+    const client = workspaceManager.updateClient(req.params.id, req.body);
+    res.json({ success: true, client });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/api/workspace/clients/:id', requireAuth, (req, res) => {
+  try {
+    const result = workspaceManager.deleteClient(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/clients/:id/files', requireAuth, (req, res) => {
+  try {
+    const files = workspaceManager.listFiles(req.params.id, req.query.path || '');
+    res.json({ success: true, files });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/workspace/clients/:id/folders', requireAuth, (req, res) => {
+  try {
+    const { path: subPath, name } = req.body;
+    const folder = workspaceManager.createFolder(req.params.id, subPath, name);
+    res.json({ success: true, folder });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/workspace/clients/:id/upload', requireAuth, upload.single('file'), (req, res) => {
+  try {
+    const { path: subPath } = req.body;
+    const sid = req.params.id;
+    const rel = workspaceManager.sanitizeSubPath ? workspaceManager.sanitizeSubPath(subPath || '') : (subPath || '').replace(/\.\./g, '');
+    const targetDir = path.join(workspaceManager.WORKSPACE_DIR, sid, rel);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const safeName = req.file.originalname.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+    const targetFile = path.join(targetDir, safeName);
+    fs.writeFileSync(targetFile, req.file.buffer);
+
+    res.json({ success: true, file: { name: safeName, path: rel ? `${rel}/${safeName}` : safeName, size: req.file.size } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/clients/:id/download', requireAuth, (req, res) => {
+  try {
+    const sid = req.params.id;
+    const rel = (req.query.path || '').replace(/\.\./g, '');
+    const targetFile = path.join(workspaceManager.WORKSPACE_DIR, sid, rel);
+
+    if (!fs.existsSync(targetFile)) {
+      return res.status(404).json({ success: false, error: 'Arquivo nao encontrado' });
+    }
+
+    const stat = fs.statSync(targetFile);
+    if (stat.isDirectory()) {
+      return res.status(400).json({ success: false, error: 'Caminho e uma pasta' });
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(targetFile)}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const stream = fs.createReadStream(targetFile);
+    stream.pipe(res);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/api/workspace/clients/:id/files', requireAuth, (req, res) => {
+  try {
+    const result = workspaceManager.deleteFileOrFolder(req.params.id, req.query.path);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/workspace/clients/:id/rename', requireAuth, (req, res) => {
+  try {
+    const { path: subPath, newName } = req.body;
+    const result = workspaceManager.renameFileOrFolder(req.params.id, subPath, newName);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/workspace/clients/:id/detect', requireAuth, (req, res) => {
+  try {
+    const type = workspaceManager.detectProjectType(req.params.id, req.query.path || '');
+    res.json({ success: true, type });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

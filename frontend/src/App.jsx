@@ -10,6 +10,7 @@ import MobileBottomNav from './components/MobileBottomNav'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
+import Workspace from './pages/Workspace'
 import Projetos from './pages/Projetos'
 import Tarefas from './pages/Tarefas'
 import WhatsApp from './pages/WhatsApp'
@@ -54,6 +55,8 @@ function ProtectedLayout() {
             <Route path="/operacoes" element={<Operacoes />} />
             <Route path="/orcamentos" element={<Orcamentos />} />
             <Route path="/clientes" element={<Clientes />} />
+            <Route path="/workspace" element={<Workspace />} />
+            <Route path="/workspace/:clientId" element={<Workspace />} />
             <Route path="/projetos" element={<Projetos />} />
             <Route path="/tarefas" element={<Tarefas />} />
             <Route path="/ideias" element={<Ideias />} />
