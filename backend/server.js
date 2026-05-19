@@ -3029,105 +3029,121 @@ if (!fs.existsSync(LINKS_INDEX_FILE)) {
 }
 
 function ensureChangelog() {
+  const hardcodedEntries = [
+    {
+      id: 'changelog-001',
+      version: '3.1.0',
+      title: 'Sistema de Changelog e Release Notes',
+      description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
+      category: 'feature',
+      emoji: '✨',
+      author: 'Luna',
+      tier: 2,
+      date: new Date().toISOString(),
+      tags: ['changelog', 'ui', 'notificacoes'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-002',
+      version: '3.1.0',
+      title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
+      description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
+      category: 'whatsapp',
+      emoji: '📱',
+      author: 'Luna',
+      tier: 1,
+      date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      tags: ['whatsapp', 'luna', 'automation'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-003',
+      version: '3.1.0',
+      title: 'Sistema Financeiro v3.1 — CRUD Completo',
+      description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
+      category: 'finance',
+      emoji: '💰',
+      author: 'Abner',
+      tier: 2,
+      date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      tags: ['financeiro', 'crud', 'transacoes'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-004',
+      version: '3.0.0',
+      title: 'Centro de Operacoes NEXO Digital',
+      description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
+      category: 'feature',
+      emoji: '✨',
+      author: 'Abner',
+      tier: 2,
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      tags: ['dashboard', 'operacoes', 'metrics'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-005',
+      version: '3.0.0',
+      title: 'Orcamentos — Sistema de Acompanhamento',
+      description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.',
+      category: 'feature',
+      emoji: '✨',
+      author: 'Abner',
+      tier: 3,
+      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      tags: ['orcamentos', 'clientes', 'projetos'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-006',
+      version: '2.5.0',
+      title: 'Integracao GitHub + Vercel',
+      description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
+      category: 'improvement',
+      emoji: '🚀',
+      author: 'Nonoke',
+      tier: 3,
+      date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      tags: ['github', 'vercel', 'devops'],
+      readBy: [],
+    },
+    {
+      id: 'changelog-007',
+      version: '2.0.0',
+      title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
+      description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
+      category: 'whatsapp',
+      emoji: '📱',
+      author: 'Luna',
+      tier: 2,
+      date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      tags: ['whatsapp', 'luna', 'v1'],
+      readBy: [],
+    },
+  ];
+
   if (!fs.existsSync(CHANGELOG_FILE)) {
+    // Primeira vez — cria do zero
     const initialData = {
       version: '1.0',
       lastUpdated: new Date().toISOString(),
-      entries: [
-        {
-          id: 'changelog-001',
-          version: '3.1.0',
-          title: 'Sistema de Changelog e Release Notes',
-          description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
-          category: 'feature',
-          emoji: '✨',
-          author: 'Luna',
-          tier: 2,
-          date: new Date().toISOString(),
-          tags: ['changelog', 'ui', 'notificacoes'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-002',
-          version: '3.1.0',
-          title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
-          description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
-          category: 'whatsapp',
-          emoji: '📱',
-          author: 'Luna',
-          tier: 1,
-          date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          tags: ['whatsapp', 'luna', 'automation'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-003',
-          version: '3.1.0',
-          title: 'Sistema Financeiro v3.1 — CRUD Completo',
-          description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
-          category: 'finance',
-          emoji: '💰',
-          author: 'Abner',
-          tier: 2,
-          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['financeiro', 'crud', 'transacoes'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-004',
-          version: '3.0.0',
-          title: 'Centro de Operacoes NEXO Digital',
-          description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
-          category: 'feature',
-          emoji: '✨',
-          author: 'Abner',
-          tier: 2,
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['dashboard', 'operacoes', 'metrics'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-005',
-          version: '3.0.0',
-          title: 'Orcamentos — Sistema de Acompanhamento',
-          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.',
-          category: 'feature',
-          emoji: '✨',
-          author: 'Abner',
-          tier: 3,
-          date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['orcamentos', 'clientes', 'projetos'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-006',
-          version: '2.5.0',
-          title: 'Integracao GitHub + Vercel',
-          description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
-          category: 'improvement',
-          emoji: '🚀',
-          author: 'Nonoke',
-          tier: 3,
-          date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['github', 'vercel', 'devops'],
-          readBy: [],
-        },
-        {
-          id: 'changelog-007',
-          version: '2.0.0',
-          title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
-          description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
-          category: 'whatsapp',
-          emoji: '📱',
-          author: 'Luna',
-          tier: 2,
-          date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          tags: ['whatsapp', 'luna', 'v1'],
-          readBy: [],
-        },
-      ]
+      entries: hardcodedEntries
     };
     writeJSON(CHANGELOG_FILE, initialData);
+    return;
+  }
+
+  // Arquivo existe — faz merge das entradas hardcoded que faltam
+  const existingData = readJSON(CHANGELOG_FILE) || { entries: [] };
+  const existingIds = new Set(existingData.entries.map(e => e.id));
+  const missingEntries = hardcodedEntries.filter(e => !existingIds.has(e.id));
+
+  if (missingEntries.length > 0) {
+    existingData.entries.push(...missingEntries);
+    existingData.lastUpdated = new Date().toISOString();
+    writeJSON(CHANGELOG_FILE, existingData);
+    console.log(`[CHANGELOG] Adicionadas ${missingEntries.length} entradas hardcoded que faltavam.`);
   }
 }
 
@@ -3740,7 +3756,7 @@ app.get('/api/luna/analytics', (req, res) => {
 
 // POST /api/luna/chat — Chat direto com Luna via LLM
 // ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
-function buildDashboardContext(contextModule = null, contextId = null) {
+function buildDashboardContext(contextModule = null, contextId = null, contextFile = null) {
   try {
     const buffer = readLunaBuffer();
     const tasksFile = path.join(DATA_DIR, 'tasks.json');
@@ -3815,6 +3831,57 @@ function buildDashboardContext(contextModule = null, contextId = null) {
       // Contexto de email é carregado dinamicamente pelo chamador
       ctx += `📧 CONTEXTO ATUAL — EMAIL/THREAD: ${contextId}\n`;
       ctx += `(Detalhes do email são passados via context array no body)\n\n`;
+    }
+
+    if (contextModule === 'workspace' && contextId) {
+      ctx += `📁 CONTEXTO ATUAL — WORKSPACE CLIENTE: ${contextId}\n`;
+      if (contextFile) {
+        try {
+          const filePath = path.join(workspaceManager.WORKSPACE_DIR, contextId, contextFile.replace(/\.\./g, ''));
+          if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
+            const stats = fs.statSync(filePath);
+            if (stats.size <= 5 * 1024 * 1024) {
+              const fileContent = fs.readFileSync(filePath, 'utf8');
+              ctx += `📄 ARQUIVO EM FOCO: ${contextFile}\n`;
+              ctx += `Tamanho: ${stats.size} bytes\n`;
+              ctx += `--- CONTEÚDO ---\n${fileContent.slice(0, 4000)}${fileContent.length > 4000 ? '\n...(truncado)' : ''}\n--- FIM CONTEÚDO ---\n\n`;
+            } else {
+              ctx += `📄 ARQUIVO EM FOCO: ${contextFile} (arquivo muito grande para incluir no contexto)\n\n`;
+            }
+          } else {
+            ctx += `📄 ARQUIVO EM FOCO: ${contextFile} (não encontrado)\n\n`;
+          }
+        } catch (e) {
+          ctx += `📄 ARQUIVO EM FOCO: ${contextFile} (erro ao ler: ${e.message})\n\n`;
+        }
+      } else {
+        // Lista arquivos do workspace para contexto geral
+        try {
+          const clientDir = path.join(workspaceManager.WORKSPACE_DIR, contextId);
+          if (fs.existsSync(clientDir)) {
+            const listDir = (dir, prefix = '') => {
+              let out = '';
+              const items = fs.readdirSync(dir);
+              for (const item of items) {
+                if (item.startsWith('.')) continue;
+                const full = path.join(dir, item);
+                const rel = prefix ? `${prefix}/${item}` : item;
+                const st = fs.statSync(full);
+                if (st.isDirectory()) {
+                  out += `  📂 ${rel}/\n`;
+                  if (prefix === '') out += listDir(full, rel);
+                } else {
+                  out += `  📄 ${rel} (${st.size} bytes)\n`;
+                }
+              }
+              return out;
+            };
+            ctx += `Estrutura do workspace:\n${listDir(clientDir)}\n`;
+          }
+        } catch (e) {
+          ctx += `(Erro ao listar workspace: ${e.message})\n\n`;
+        }
+      }
     }
 
     ctx += `📋 TAREFAS:\n`;
@@ -4231,7 +4298,7 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
 // ============================================================
 app.post('/api/luna/chat', async (req, res) => {
   try {
-    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId } = req.body;
+    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -4527,7 +4594,7 @@ app.post('/api/luna/chat', async (req, res) => {
     }
 
     // ── 6. FALLBACK: conversa via LLM (Gemini API) ──
-    const dataContext = buildDashboardContext(contextModule, contextId);
+    const dataContext = buildDashboardContext(contextModule, contextId, contextFile);
     const conversationHistory = context.slice(-10).map(c => ({
       role: c.role === 'user' ? 'user' : 'model',
       parts: [{ text: c.text }]
@@ -4683,7 +4750,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
     const thread = getThread(threadId);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
 
-    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId } = req.body;
+    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -4718,7 +4785,8 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       pendingActions,
       editedFields,
       contextModule,
-      contextId
+      contextId,
+      contextFile
     };
 
     const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
@@ -7238,6 +7306,93 @@ app.get('/api/workspace/clients/:id/download', requireAuth, (req, res) => {
     res.setHeader('Content-Type', 'application/octet-stream');
     const stream = fs.createReadStream(targetFile);
     stream.pipe(res);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// WORKSPACE — Leitura e escrita de conteúdo textual
+// ═════════════════════════════════════════════════════════════════════════════
+
+const TEXT_EXTENSIONS = new Set([
+  'md', 'txt', 'json', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'py', 'php',
+  'yaml', 'yml', 'xml', 'sh', 'bash', 'zsh', 'sql', 'env', 'gitignore',
+  'csv', 'log', 'dockerfile', 'nginx', 'conf', 'ini', 'toml', 'graphql',
+]);
+
+function isTextFile(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  return TEXT_EXTENSIONS.has(ext);
+}
+
+function getMimeType(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const map = {
+    md: 'text/markdown', txt: 'text/plain', json: 'application/json',
+    js: 'application/javascript', jsx: 'application/javascript',
+    ts: 'application/typescript', tsx: 'application/typescript',
+    html: 'text/html', css: 'text/css', py: 'text/x-python',
+    php: 'text/x-php', yaml: 'text/yaml', yml: 'text/yaml',
+    xml: 'application/xml', sh: 'text/x-shellscript', sql: 'text/x-sql',
+    csv: 'text/csv', log: 'text/plain',
+  };
+  return map[ext] || 'text/plain';
+}
+
+app.get('/api/workspace/clients/:id/content', requireAuth, (req, res) => {
+  try {
+    const sid = req.params.id;
+    const rel = (req.query.path || '').replace(/\.\./g, '');
+    const targetFile = path.join(workspaceManager.WORKSPACE_DIR, sid, rel);
+
+    if (!fs.existsSync(targetFile)) {
+      return res.status(404).json({ success: false, error: 'Arquivo nao encontrado' });
+    }
+
+    const stat = fs.statSync(targetFile);
+    if (stat.isDirectory()) {
+      return res.status(400).json({ success: false, error: 'Caminho e uma pasta' });
+    }
+
+    // Limite de segurança: 5MB
+    if (stat.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: 'Arquivo muito grande (max 5MB)' });
+    }
+
+    const content = fs.readFileSync(targetFile, 'utf8');
+    res.json({
+      success: true,
+      content,
+      path: rel,
+      name: path.basename(targetFile),
+      size: stat.size,
+      mimetype: getMimeType(targetFile),
+      editable: isTextFile(targetFile),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.put('/api/workspace/clients/:id/content', requireAuth, (req, res) => {
+  try {
+    const sid = req.params.id;
+    const rel = (req.body.path || '').replace(/\.\./g, '');
+    const content = req.body.content || '';
+    const targetFile = path.join(workspaceManager.WORKSPACE_DIR, sid, rel);
+
+    if (!fs.existsSync(targetFile)) {
+      return res.status(404).json({ success: false, error: 'Arquivo nao encontrado' });
+    }
+
+    const stat = fs.statSync(targetFile);
+    if (stat.isDirectory()) {
+      return res.status(400).json({ success: false, error: 'Caminho e uma pasta' });
+    }
+
+    fs.writeFileSync(targetFile, content, 'utf8');
+    res.json({ success: true, message: 'Arquivo salvo com sucesso' });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
