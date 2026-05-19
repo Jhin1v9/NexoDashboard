@@ -78,7 +78,11 @@ class GmailOAuthService {
       };
     } catch (error) {
       console.error('[GmailOAuth] ❌ Erro ao trocar código:', error.message);
-      return { success: false, error: error.message };
+      console.error('[GmailOAuth]   → response:', error.response?.data);
+      console.error('[GmailOAuth]   → clientId presente:', !!this.clientId);
+      console.error('[GmailOAuth]   → clientSecret presente:', !!this.clientSecret);
+      console.error('[GmailOAuth]   → redirectUri:', this.redirectUri);
+      return { success: false, error: error.message, details: error.response?.data };
     }
   }
 
