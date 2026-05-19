@@ -12,8 +12,8 @@
  *   - "Tarefa 'Revisar contrato' será atribuída a: Nonoke"
  */
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   AlertTriangle, Trash2, Send, CheckCircle, X, User,
   Mail, FileText, DollarSign, Calendar, Tag, ArrowRight
@@ -57,57 +57,87 @@ const INTENT_COLORS = {
 
 /**
  * Gera uma descrição amigável do que vai acontecer.
+ * Retorna elementos React para evitar XSS.
  */
-function generatePreviewDescription(intent, values, count = 1) {
+function PreviewDescription({ intent, values, count = 1 }) {
   const [domain, action] = (intent || '').split('.')
 
   // Ações destrutivas
   if (action?.includes('deletar') || action?.includes('excluir') || action?.includes('remover')) {
     const itemName = getItemName(domain)
-    return count > 1
-      ? `Você está prestes a <strong>EXCLUIR ${count} ${itemName}</strong>. Esta ação não pode ser desfeita.`
-      : `Você está prestes a <strong>EXCLUIR</strong> esta ação. Não poderá desfazer.`
+    if (count > 1) {
+      return (
+        <span>
+          Você está prestes a <strong>EXCLUIR {count} {itemName}</strong>. Esta ação não pode ser desfeita.
+        </span>
+      )
+    }
+    return (
+      <span>
+        Você está prestes a <strong>EXCLUIR</strong> este item. Não poderá desfazer.
+      </span>
+    )
   }
 
   // Envio
   if (action?.includes('enviar')) {
     const dest = values.destinatario || values.para || values.cliente || 'destinatário'
-    return `Email será <strong>ENVIADO</strong> para: <span class="text-nexo-primary">${dest}</span>`
+    return (
+      <span>
+        Email será <strong>ENVIADO</strong> para: <span className="text-nexo-primary">{dest}</span>
+      </span>
+    )
   }
 
   // Atribuição
   if (action?.includes('atribuir')) {
     const to = values.assignedTo || values.responsavel || 'responsável'
-    return `Tarefa será <strong>ATRIBUÍDA</strong> a: <span class="text-nexo-primary">${to}</span>`
+    return (
+      <span>
+        Tarefa será <strong>ATRIBUÍDA</strong> a: <span className="text-nexo-primary">{to}</span>
+      </span>
+    )
   }
 
   // Responder
   if (action?.includes('responder')) {
-    return `Uma <strong>RESPOSTA</strong> será enviada para este email.`
+    return <span>Uma <strong>RESPOSTA</strong> será enviada para este email.</span>
   }
 
   // Pagamento/despesa
   if (action?.includes('pagar') || action?.includes('adicionar_despesa')) {
     const valor = values.valor || values.amount || '—'
     const desc = values.descricao || values.titulo || '—'
-    return `Será registrada uma despesa de <strong>R$ ${valor}</strong> para: ${desc}`
+    return (
+      <span>
+        Será registrada uma despesa de <strong>R$ {valor}</strong> para: {desc}
+      </span>
+    )
   }
 
   // Receita
   if (action?.includes('adicionar_receita')) {
     const valor = values.valor || values.amount || '—'
     const desc = values.descricao || values.titulo || '—'
-    return `Será registrada uma receita de <strong>R$ ${valor}</strong> para: ${desc}`
+    return (
+      <span>
+        Será registrada uma receita de <strong>R$ {valor}</strong> para: {desc}
+      </span>
+    )
   }
 
   // Tarefa criar
   if (action?.includes('criar') && domain === 'tarefa') {
     const titulo = values.titulo || 'Nova Tarefa'
     const resp = values.assignedTo || 'sem responsável'
-    return `Será criada a tarefa <strong>"${titulo}"</strong> atribuída a <span class="text-nexo-primary">${resp}</span>`
+    return (
+      <span>
+        Será criada a tarefa <strong>"{titulo}"</strong> atribuída a <span className="text-nexo-primary">{resp}</span>
+      </span>
+    )
   }
 
-  return `A ação <strong>${intent}</strong> será executada com os dados informados.`
+  return <span>A ação <strong>{intent}</strong> será executada com os dados informados.</span>
 }
 
 function getItemName(domain) {
@@ -126,12 +156,19 @@ function getItemName(domain) {
   return names[domain] || 'itens'
 }
 
+function formatValue(val) {
+  if (val === null || val === undefined) return '—'
+  if (typeof val === 'object') return JSON.stringify(val)
+  return String(val)
+}
+
 export default function LunaInlinePreview({
   intent,
   values = {},
   affectedItems = [], // array de { id, label, detail? }
   onConfirm,
   onCancel,
+  disabled = false, // quando true, desabilita o botão de confirmar
   className = '',
 }) {
   const Icon = INTENT_ICONS[intent] || INTENT_ICONS.default
@@ -142,11 +179,10 @@ export default function LunaInlinePreview({
   const [confirmed, setConfirmed] = useState(false)
 
   const handleConfirm = () => {
+    if (disabled) return
     setConfirmed(true)
     onConfirm?.()
   }
-
-  const descHtml = generatePreviewDescription(intent, values, count)
 
   return (
     <motion.div
@@ -165,10 +201,9 @@ export default function LunaInlinePreview({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p
-            className="text-sm leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: descHtml }}
-          />
+          <p className="text-sm leading-relaxed">
+            <PreviewDescription intent={intent} values={values} count={count} />
+          </p>
         </div>
       </div>
 
@@ -207,7 +242,7 @@ export default function LunaInlinePreview({
             return (
               <div key={key} className="flex justify-between text-sm">
                 <span className="text-nexo-muted capitalize">{key.replace(/_/g, ' ')}</span>
-                <span className="text-nexo-text font-medium truncate max-w-[60%]">{String(val)}</span>
+                <span className="text-nexo-text font-medium truncate max-w-[60%]">{formatValue(val)}</span>
               </div>
             )
           })}
@@ -218,7 +253,7 @@ export default function LunaInlinePreview({
       <div className="flex items-center gap-2 pt-1">
         <button
           onClick={handleConfirm}
-          disabled={confirmed}
+          disabled={confirmed || disabled}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
             ${isDestructive
               ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'

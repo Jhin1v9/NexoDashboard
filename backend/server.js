@@ -3985,7 +3985,10 @@ app.get('/api/luna/proactive', requireAuth, async (req, res) => {
       const overdue = tasks.filter(t => t.status !== 'completed' && t.dueDate && new Date(t.dueDate) < new Date());
       breakdown.tasksCritical = critical.length;
       breakdown.tasksOverdue = overdue.length;
-      total += critical.length + overdue.length;
+      // Evita duplicar tarefas que são P0 E atrasadas
+      const criticalIds = new Set(critical.map(t => t.id));
+      const overdueOnly = overdue.filter(t => !criticalIds.has(t.id));
+      total += critical.length + overdueOnly.length;
     } catch (e) { breakdown.tasksCritical = 0; breakdown.tasksOverdue = 0; }
 
     // Emails não lidos (drafts pendentes de aprovação)
@@ -4044,7 +4047,7 @@ app.get('/api/luna/insights', requireAuth, async (req, res) => {
       const pending = tasks.filter(t => t.status !== 'completed');
       const p0 = pending.filter(t => t.priority === 'P0' || t.priority === 'high');
       const overdue = pending.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
-      const byAssignee = {};
+      const byAssignee = Object.create(null);
       pending.forEach(t => {
         const who = t.assignedTo || 'não atribuído';
         byAssignee[who] = (byAssignee[who] || 0) + 1;
@@ -4134,7 +4137,15 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
     const path = require('path');
     const dataDir = path.join(__dirname, 'data');
 
-    const [domain, action] = intent.split('.');
+    const parts = intent.split('.');
+    const domain = parts[0];
+    const action = parts[1];
+    if (!domain || !action) {
+      return res.status(400).json({ success: false, error: 'Intent inválido. Formato esperado: dominio.acao' });
+    }
+    if (ids.length > 500) {
+      return res.status(400).json({ success: false, error: 'Limite de 500 itens por batch' });
+    }
     let modified = 0;
     let errors = [];
 
@@ -4146,37 +4157,59 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
         if (!fs.existsSync(tasksPath)) continue;
         const tasks = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
         let changed = false;
-        tasks.forEach(t => {
-          if (!ids.includes(t.id) && !ids.includes(String(t.id))) return;
-          if (action === 'concluir' || action === 'deletar' || action === 'excluir') {
-            t.status = 'completed';
-            t.completedAt = new Date().toISOString();
-            modified++;
+        const toDelete = action === 'deletar' || action === 'excluir';
+        if (toDelete) {
+          const beforeLen = tasks.length;
+          const idsSet = new Set(ids.map(String));
+          const remaining = tasks.filter(t => !idsSet.has(String(t.id)));
+          const deleted = beforeLen - remaining.length;
+          if (deleted > 0) {
+            tasks.length = 0;
+            tasks.push(...remaining);
+            modified += deleted;
             changed = true;
           }
-          if (action === 'atribuir' && req.body.assignTo) {
-            t.assignedTo = req.body.assignTo;
-            modified++;
-            changed = true;
-          }
-        });
+        } else {
+          tasks.forEach(t => {
+            if (!ids.includes(t.id) && !ids.includes(String(t.id))) return;
+            if (action === 'concluir') {
+              t.status = 'completed';
+              t.completedAt = new Date().toISOString();
+              modified++;
+              changed = true;
+            }
+            if (action === 'atribuir' && req.body.assignTo) {
+              t.assignedTo = req.body.assignTo;
+              modified++;
+              changed = true;
+            }
+          });
+        }
         if (changed) fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
       }
     }
 
     // Emails (drafts)
     if (domain === 'email') {
-      const draftsPath = path.join(dataDir, 'email-drafts.json');
-      const drafts = JSON.parse(fs.readFileSync(draftsPath, 'utf8'));
-      if (drafts.drafts) {
-        drafts.drafts.forEach(d => {
-          if (!ids.includes(d.id)) return;
-          if (action === 'arquivar') { d.status = 'archived'; modified++; }
-          if (action === 'mover_lixeira') { d.status = 'trash'; modified++; }
-          if (action === 'marcar_lido') { d.status = 'read'; modified++; }
-          if (action === 'marcar_spam') { d.status = 'spam'; modified++; }
-        });
-        fs.writeFileSync(draftsPath, JSON.stringify(drafts, null, 2));
+      try {
+        const draftsPath = path.join(dataDir, 'email-drafts.json');
+        if (!fs.existsSync(draftsPath)) {
+          return res.json({ success: true, modified: 0 });
+        }
+        const drafts = JSON.parse(fs.readFileSync(draftsPath, 'utf8'));
+        if (drafts.drafts) {
+          drafts.drafts.forEach(d => {
+            if (!ids.includes(d.id)) return;
+            if (action === 'arquivar') { d.status = 'archived'; modified++; }
+            if (action === 'mover_lixeira') { d.status = 'trash'; modified++; }
+            if (action === 'marcar_lido') { d.status = 'read'; modified++; }
+            if (action === 'marcar_spam') { d.status = 'spam'; modified++; }
+          });
+          fs.writeFileSync(draftsPath, JSON.stringify(drafts, null, 2));
+        }
+      } catch (emailErr) {
+        console.error('[LunaBatch] Erro ao processar emails:', emailErr.message);
+        errors.push('email: ' + emailErr.message);
       }
     }
 

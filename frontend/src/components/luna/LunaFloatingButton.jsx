@@ -6,8 +6,7 @@ import { useLunaContext } from '../../hooks/useLunaContext'
 import { useToast } from '../../context/ToastContext'
 import { lunaEventBus } from '../../lib/lunaEventBus'
 import { hasFormFields, getSchema, isKnownIntent } from './LunaIntentSchemas'
-import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
-import SmartFormModal from './SmartFormModal'
+import { formatHelpForModule } from './LunaModuleSuggestions'
 import LunaActionFlow from './LunaActionFlow'
 import LunaBatchAction from './LunaBatchAction'
 import { decideExecution, logDecision } from '../../lib/lunaDecisionEngine'
@@ -29,12 +28,10 @@ import axios from 'axios'
 export default function LunaFloatingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [text, setText] = useState('')
-  const [modalResult, setModalResult] = useState(null)
   const [chatResult, setChatResult] = useState(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [chatConfirming, setChatConfirming] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
-  const [showHelp, setShowHelp] = useState(false)
   const [actionFlow, setActionFlow] = useState(null) // { result, mode }
   const [batchAction, setBatchAction] = useState(null) // { intent }
   const [proactiveBadge, setProactiveBadge] = useState(null) // { count, type }
@@ -42,17 +39,6 @@ export default function LunaFloatingButton() {
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
   const { addToast } = useToast()
-
-  // Sugestões globais — não limitadas por página. O currentModule é enviado
-  // como contexto pro NLU (melhora precisão) mas o usuário pode executar
-  // QUALQUER comando de QUALQUER página.
-  const GLOBAL_SUGGESTIONS = [
-    'criar tarefa',
-    'saldo do caixa',
-    'listar projetos',
-    'verificar menções',
-    'ajuda',
-  ]
 
   const placeholderText = 'Diga o que precisa...'
 
@@ -103,7 +89,6 @@ export default function LunaFloatingButton() {
     const handleKey = (e) => {
       if (e.key === 'Escape') {
         setIsOpen(false)
-        setModalResult(null)
         setChatResult(null)
       }
     }
@@ -120,7 +105,6 @@ export default function LunaFloatingButton() {
 
     // ── CASO ESPECIAL: "ajuda" → mostra comandos do módulo atual sem chamar API ──
     if (userTextLower === 'ajuda' || userTextLower === 'help' || userTextLower === 'comandos' || userTextLower === 'o que você pode fazer') {
-      setShowHelp(true)
       setChatResult({
         reply: formatHelpForModule(currentModule || 'unknown'),
         intent: 'sistema.ajuda',
@@ -133,13 +117,11 @@ export default function LunaFloatingButton() {
 
     lunaEventBus.emit('luna:command', { text: userText, intent: null, confidence: 0 })
     const nluResult = await understand(userText)
+    setText('')
     if (!nluResult) {
       lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
       return
     }
-
-    setText('')
-    setShowHelp(false)
 
     const intent = nluResult.intent
     const schema = getSchema(intent)
@@ -299,7 +281,7 @@ export default function LunaFloatingButton() {
         lunaEventBus.emit('luna:stateChange', { chatState: 'idle' })
         return
       }
-      const payload = schema.submitConfig.transform({})
+      const payload = schema.submitConfig.transform(result.entities || result.values || {})
       const token = localStorage.getItem('nexo_token') || ''
       await axios({
         method: schema.submitConfig.method,
@@ -319,13 +301,6 @@ export default function LunaFloatingButton() {
 
   const handleSuccess = (data) => {
     console.log('[Luna] Ação executada:', data)
-  }
-
-  const getUserColor = (name) => {
-    const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c']
-    let hash = 0
-    for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    return colors[Math.abs(hash) % colors.length]
   }
 
   return (
@@ -392,7 +367,13 @@ export default function LunaFloatingButton() {
                 )}
 
                 <div className="flex flex-wrap gap-1.5">
-                  {GLOBAL_SUGGESTIONS.map(suggestion => (
+                  {[
+                    'criar tarefa',
+                    'saldo do caixa',
+                    'listar projetos',
+                    'verificar menções',
+                    'ajuda',
+                  ].map(suggestion => (
                     <button
                       key={suggestion}
                       onClick={() => {
@@ -551,14 +532,7 @@ export default function LunaFloatingButton() {
         </div>
       )}
 
-      {/* Smart Form Modal (fallback de segurança) */}
-      {modalResult && (
-        <SmartFormModal
-          result={modalResult}
-          onClose={() => setModalResult(null)}
-          onSuccess={handleSuccess}
-        />
-      )}
+
     </>
   )
 }
