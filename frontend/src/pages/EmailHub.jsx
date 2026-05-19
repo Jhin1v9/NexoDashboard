@@ -1,17 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import {
-  Search, X, Loader2, Mail, Plus, Sparkles
+  Search, X, Mail, PanelRightOpen, PanelRightClose,
+  AlignJustify, LayoutList, LayoutTemplate
 } from 'lucide-react'
 import EmailSidebar from '../components/email/EmailSidebar'
 import EmailList from '../components/email/EmailList'
 import EmailReader from '../components/email/EmailReader'
 import EmailCompose from '../components/email/EmailCompose'
 import LunaEmailAssistant from '../components/email/LunaEmailAssistant'
+import ResizablePanel from '../components/email/ResizablePanel'
 import { useGmailAuth } from '../hooks/useGmailAuth'
 import { useEmailShortcuts } from '../hooks/useEmailShortcuts'
+import { useEmailFocusMode } from '../context/EmailFocusModeContext'
+import { useEmailDensity } from '../context/EmailDensityContext'
 
 export default function EmailHub() {
+  const { focusMode, toggleFocusMode } = useEmailFocusMode()
+  const { density, setDensity } = useEmailDensity()
   const { status: authStatus, connect, disconnect, refresh: refreshAuth } = useGmailAuth()
 
   const [emails, setEmails] = useState([])
@@ -58,12 +64,9 @@ export default function EmailHub() {
       const res = await axios.get('/api/email/labels')
       if (res.data.success) {
         setLabels(res.data.labels)
-        // Calcular unread counts por label
         const counts = {}
         for (const label of res.data.labels) {
-          if (label.messagesUnread) {
-            counts[label.id] = label.messagesUnread
-          }
+          if (label.messagesUnread) counts[label.id] = label.messagesUnread
         }
         setUnreadCounts(counts)
       }
@@ -78,7 +81,6 @@ export default function EmailHub() {
       const res = await axios.get(`/api/email/threads/${threadId}`)
       if (res.data.success) {
         setSelectedThread(res.data.thread)
-        // Marcar como lido ao abrir
         const firstUnread = res.data.thread.messages?.find((m) => m.isUnread)
         if (firstUnread) {
           await axios.post(`/api/email/messages/${firstUnread.id}/read`)
@@ -119,9 +121,7 @@ export default function EmailHub() {
   useEmailShortcuts({
     enabled: !showCompose && !showLuna,
     onCompose: () => setShowCompose(true),
-    onReply: () => {
-      // Implementar resposta com email selecionado
-    },
+    onReply: () => {},
     onArchive: async () => {
       if (selectedEmailId) {
         await axios.post(`/api/email/messages/${selectedEmailId}/archive`)
@@ -159,7 +159,6 @@ export default function EmailHub() {
     if (email.threadId) {
       await fetchThread(email.threadId)
     } else {
-      // Email sem thread, buscar diretamente
       try {
         const res = await axios.get(`/api/email/messages/${email.id}`)
         if (res.data.success) {
@@ -188,21 +187,22 @@ export default function EmailHub() {
       setSelectedThread(null)
       setSelectedEmailId(null)
     }
-    // Recarregar lista
     await fetchEmails()
   }
 
   const handleReplySent = () => {
     fetchEmails()
-    if (selectedThread?.id) {
-      fetchThread(selectedThread.id)
-    }
+    if (selectedThread?.id) fetchThread(selectedThread.id)
   }
 
   const handlePageChange = (newPage) => {
     setPage(newPage)
     fetchEmails()
   }
+
+  const containerClass = focusMode
+    ? 'fixed inset-0 z-50 bg-nexo-bg flex overflow-hidden'
+    : 'flex h-[calc(100vh-80px)] glass-card rounded-xl border border-nexo-border overflow-hidden'
 
   // Tela de não conectado
   if (!authStatus.loading && !authStatus.connected) {
@@ -227,7 +227,7 @@ export default function EmailHub() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] glass-card rounded-xl border border-nexo-border overflow-hidden">
+    <div className={containerClass}>
       {/* Sidebar */}
       <EmailSidebar
         activeLabel={activeLabel}
@@ -240,103 +240,172 @@ export default function EmailHub() {
         onConnect={connect}
         userProfile={authStatus}
         unreadCounts={unreadCounts}
+        onFocusMode={toggleFocusMode}
       />
 
-      {/* Lista de emails */}
-      <div className="w-80 border-r border-nexo-border flex flex-col">
-        {/* Barra de busca */}
-        <div className="p-3 border-b border-nexo-border">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexo-muted" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Buscar emails..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text placeholder-nexo-muted focus:outline-none focus:border-nexo-primary"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-nexo-muted hover:text-nexo-text"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+      {/* Lista de emails — redimensionável */}
+      <ResizablePanel
+        defaultWidth={320}
+        minWidth={240}
+        maxWidth={500}
+        storageKey="nexo-email-list-width"
+        side="right"
+      >
+        <div className="h-full flex flex-col border-r border-nexo-border">
+          {/* Barra de busca + controles */}
+          <div className="p-3 border-b border-nexo-border space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexo-muted" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Buscar emails..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text placeholder-nexo-muted focus:outline-none focus:border-nexo-primary"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-nexo-muted hover:text-nexo-text"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              {/* Filtros rápidos */}
+              <div className="flex gap-1.5">
+                {['Todos', 'Não Lidos', 'Com Anexo'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      if (f === 'Não Lidos') setSearch('is:unread')
+                      else if (f === 'Com Anexo') setSearch('has:attachment')
+                      else setSearch('')
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+                      (f === 'Todos' && !search) ||
+                      (f === 'Não Lidos' && search === 'is:unread') ||
+                      (f === 'Com Anexo' && search === 'has:attachment')
+                        ? 'bg-nexo-primary/20 text-nexo-primary border border-nexo-primary/30'
+                        : 'text-nexo-muted hover:text-nexo-text'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              {/* Densidade */}
+              <div className="flex items-center gap-0.5">
+                {[
+                  { key: 'compact', icon: AlignJustify, label: 'Compacto' },
+                  { key: 'normal', icon: LayoutList, label: 'Normal' },
+                  { key: 'comfortable', icon: LayoutTemplate, label: 'Confortável' },
+                ].map(({ key, icon: Icon, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setDensity(key)}
+                    className={`p-1 rounded-md transition-colors ${
+                      density === key
+                        ? 'bg-nexo-primary/20 text-nexo-primary'
+                        : 'text-nexo-muted hover:text-nexo-text hover:bg-nexo-bg'
+                    }`}
+                    title={label}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          {/* Filtros rápidos */}
-          <div className="flex gap-2 mt-2">
-            {['Todos', 'Não Lidos', 'Com Anexo'].map((f) => (
-              <button
-                key={f}
-                onClick={() => {
-                  if (f === 'Não Lidos') setSearch('is:unread')
-                  else if (f === 'Com Anexo') setSearch('has:attachment')
-                  else setSearch('')
-                }}
-                className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-colors ${
-                  (f === 'Todos' && !search) ||
-                  (f === 'Não Lidos' && search === 'is:unread') ||
-                  (f === 'Com Anexo' && search === 'has:attachment')
-                    ? 'bg-nexo-primary/20 text-nexo-primary border border-nexo-primary/30'
-                    : 'text-nexo-muted hover:text-nexo-text'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        <EmailList
-          emails={emails}
-          selectedId={selectedEmailId}
-          onSelect={handleSelectEmail}
-          onStar={handleStar}
-          loading={loading}
-          page={page}
-          hasMore={hasMore}
-          onPageChange={handlePageChange}
-        />
-      </div>
+          <EmailList
+            emails={emails}
+            selectedId={selectedEmailId}
+            onSelect={handleSelectEmail}
+            onStar={handleStar}
+            loading={loading}
+            page={page}
+            hasMore={hasMore}
+            onPageChange={handlePageChange}
+            density={density}
+          />
+        </div>
+      </ResizablePanel>
 
       {/* Leitor / Compose */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative">
         {showCompose ? (
           <div className="flex-1 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-nexo-border">
               <h3 className="font-bold text-sm">Novo Email</h3>
-              <button
-                onClick={() => setShowCompose(false)}
-                className="p-1.5 rounded-lg text-nexo-muted hover:bg-nexo-bg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowLuna(!showLuna)}
+                  className={`p-1.5 rounded-lg transition-colors ${showLuna ? 'text-nexo-primary bg-nexo-primary/10' : 'text-nexo-muted hover:bg-nexo-bg'}`}
+                  title="Luna Assistant"
+                >
+                  {showLuna ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setShowCompose(false)}
+                  className="p-1.5 rounded-lg text-nexo-muted hover:bg-nexo-bg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-hidden">
               <EmailCompose onSent={() => { setShowCompose(false); fetchEmails() }} onCancel={() => setShowCompose(false)} />
             </div>
           </div>
         ) : (
-          <EmailReader
-            thread={selectedThread}
-            onAction={handleAction}
-            onReplySent={handleReplySent}
-          />
+          <>
+            {/* Header do leitor com botão Luna */}
+            <div className="absolute top-3 right-3 z-10">
+              <button
+                onClick={() => setShowLuna(!showLuna)}
+                className={`p-1.5 rounded-lg transition-colors ${showLuna ? 'text-nexo-primary bg-nexo-primary/10' : 'text-nexo-muted hover:bg-nexo-bg'}`}
+                title="Luna Assistant"
+              >
+                {showLuna ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+              </button>
+            </div>
+            <EmailReader
+              thread={selectedThread}
+              onAction={handleAction}
+              onReplySent={handleReplySent}
+            />
+          </>
         )}
       </div>
 
-      {/* Luna Assistant Modal */}
-      {showLuna && selectedThread && (
-        <LunaEmailAssistant
-          threadMessages={selectedThread.messages}
-          onApplyDraft={(text) => {
-            // Abrir compose com o rascunho
-            setShowCompose(true)
-          }}
-          onClose={() => setShowLuna(false)}
-        />
+      {/* Luna — painel lateral fixo */}
+      {showLuna && (
+        <div className="w-80 border-l border-nexo-border bg-nexo-card/30 flex flex-col flex-shrink-0">
+          <div className="flex items-center justify-between p-3 border-b border-nexo-border">
+            <h3 className="text-sm font-bold text-nexo-primary flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Luna
+            </h3>
+            <button
+              onClick={() => setShowLuna(false)}
+              className="p-1 rounded-lg text-nexo-muted hover:bg-nexo-bg transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <LunaEmailAssistant
+              threadMessages={selectedThread?.messages || []}
+              onApplyDraft={(text) => {
+                setShowCompose(true)
+              }}
+              onClose={() => setShowLuna(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   )
