@@ -42,26 +42,28 @@ last_updated: 2026-05-19
 
 ## 2. Current Focus
 
-### 🎯 Sprint Ativo: NEXO Mail v2.0 — Luna Integrada (Sprint 2)
+### 🎯 Sprint Ativo: Workspace-Leads Unification + Active Learning
 
-**Status:** 🔄 Em andamento — código escrito, build passando, aguardando deploy/teste
+**Status:** ✅ Concluído — build passando, commit `3ea779f` enviado
 
-#### Sprint 1 — Layout & Espaço ✅ 100% (deployed)
-- [x] Modo foco tela cheia (ESC sai, botão Minimize2 no header)
-- [x] Sidebar colapsável com toggle sempre visível
-- [x] ResizablePanel para lista de emails
-- [x] Densidade ajustável (compact/normal/comfortable)
-- [x] Luna como painel lateral inline de 320px (não modal)
-- [x] Renderização de body HTML corrigida (suporta objeto {html,text} ou string)
+#### Workspace-Leads Unification ✅
+- [x] `GET /api/workspace/clients` retorna leads (`kind: 'lead'`) + clientes (`kind: 'client'`) unificados
+- [x] Sidebar do Workspace separada em seções "Leads" e "Clientes"
+- [x] LeadPreviewPanel: preview de lead com botão "Converter em Cliente"
+- [x] `POST /api/leads/:id/convert` cria workspace automaticamente + README.md
+- [x] workspace-manager.js: `clientExists()` para evitar duplicação
 
-#### Sprint 2 — Luna Integrada 🔄 Código pronto
-- [x] Banner de drafts pendentes da Luna no EmailHub
-- [x] Aprovar/Rejeitar draft → abre compose pré-preenchido
-- [x] Action items do summary → tarefas em batch (checkboxes + botão)
-- [x] Endpoint `POST /api/email/ai/action-items-to-tasks`
-- [x] Notificações automáticas para drafts e tasks
+#### Active Learning ✅
+- [x] SmartFormModal mostra "Não era isso?" quando NLU score < 0.85
+- [x] Picker de intents corretas busca de `/api/luna/intents`
+- [x] POST `/api/luna/learn` re-treina modelo em ~3-5s
+- [x] Feedback visual com toasts ("Luna aprendeu!")
+
+#### Próximos passos pendentes
+- [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
+- [ ] FASE 4 — Expandir corpus NLU de ~25 para 50-100 exemplos por intent
+- [ ] FASE 5 — Melhorar extração de título (regex atual remove objeto)
 - [ ] Deploy para Render
-- [ ] Teste end-to-end no browser
 
 **Branch ativa:** `codex/initial-nexo-dashboard-pro-v16`
 
