@@ -95,11 +95,16 @@ NÍVEL 3 — Consciência de DOM
 NÍVEL 4 — Consciência Preditiva
   └─ Luna sugere antes de perguntar: "Quer aprovar este draft?" quando usuário abre email da Luna
 
-NÍVEL 5 — Execução Autônoma
+NÍVEL 5 — Consciência Total do Sistema (SYSTEM AWARENESS)
+  └─ Luna sabe TUDO que o sistema faz, em TODOS os módulos, e cruza informações entre eles
+  └─ "Você tem 3 tarefas atrasadas do projeto do cliente X, e o email dele está na caixa de entrada"
+  └─ "O lead Y que você contatou ontem ainda não respondeu. Quer mandar um zap de follow-up?"
+
+NÍVEL 6 — Execução Autônoma
   └─ Luna executa ações de rotina sem pedir: arquivar spam, criar tarefas de action items
 ```
 
-Meta: Implementar Níveis 1-3 no curto prazo. Níveis 4-5 no médio prazo.
+Meta: Implementar Níveis 1-3 no curto prazo. Níveis 4-5 no médio prazo. Nível 6 no longo prazo.
 
 ---
 
@@ -115,7 +120,7 @@ interface LunaContextMap {
   currentRoute: '/tarefas' | '/financeiro' | '/email' | '/leads' | ...;
   currentModule: 'tasks' | 'finance' | 'email' | 'leads' | ...;
   
-  // 2. O QUE ESTÁ VISÍVEL
+  // 2. O QUE ESTÁ VISÍVEL (contexto local)
   visibleData: {
     tasks?: Task[];           // lista de tarefas renderizadas
     selectedTasks?: string[]; // IDs selecionados
@@ -143,8 +148,48 @@ interface LunaContextMap {
   // 5. ESTADO DO CHAT
   chatState: 'idle' | 'listening' | 'thinking' | 'acting';
   isOpen: boolean;
+  
+  // ═══════════════════════════════════════════
+  // 6. CONSCIÊNCIA TOTAL DO SISTEMA (SystemMap)
+  // ═══════════════════════════════════════════
+  systemMap: {
+    // Todos os módulos disponíveis e suas capacidades
+    modules: Array<{
+      id: string;              // 'tasks', 'finance', 'email', 'leads', ...
+      name: string;            // 'Tarefas', 'Financeiro', ...
+      route: string;           // '/tarefas', '/financeiro', ...
+      description: string;     // "Gerencia tarefas e atribuições"
+      capabilities: string[];  // ['create', 'delete', 'update', 'list', 'batch']
+      entities: string[];      // ['task', 'project', 'client']
+      active: boolean;         // está na página atual?
+      dataSnapshot?: any;      // snapshot dos dados principais (se ativo)
+    }>;
+    
+    // Dados transversais (cross-module)
+    crossModuleInsights: {
+      overdueTasks: Task[];           // tarefas atrasadas de TODOS os projetos
+      unreadEmails: number;           // emails não lidos
+      pendingLeads: Lead[];           // leads sem follow-up
+      negativeCash: boolean;          // caixa negativo?
+      draftsPending: number;          // drafts da Luna pendentes
+    };
+    
+    // Memória de longo prazo do sistema
+    systemMemory: {
+      lastBackup: number;             // último backup
+      lastUpdate: number;             // última modificação em qualquer JSON
+      whoDidWhat: Array<{             // log de ações recentes do sistema
+        user: string;                 // quem
+        action: string;               // o que
+        module: string;               // onde
+        timestamp: number;            // quando
+      }>;
+    };
+  };
 }
 ```
+
+**A diferença crucial:** `visibleData` é o que o usuário VÊ AGORA. `systemMap` é o que Luna SABE que EXISTE no sistema INTEIRO — mesmo que o usuário esteja em outra página.
 
 ### 3.2 O Sistema de Nervos (Event Bus)
 
@@ -185,6 +230,145 @@ useEffect(() => {
 ```
 
 Isso é inspirado no **Model Context Protocol (MCP)** da Anthropic — cada módulo expõe um "Server Card" com suas capacidades.
+
+### 3.4 O Sistema Nervoso Expandido (Cross-Module)
+
+O Event Bus da §3.2 captura eventos LOCAIS (da página atual). Mas Luna precisa também de um **Sistema Nervoso Global** que monitora TODOS os módulos, mesmo os inativos:
+
+```
+LUNA_GLOBAL_NERVOUS_SYSTEM
+├── system:boot              → Luna carrega SystemMap completo
+├── module:data-changed      → Qualquer JSON foi modificado
+├── module:entity-created    → Nova tarefa, lead, email, etc
+├── module:entity-deleted    → Algo foi removido
+├── module:entity-updated    → Algo foi alterado
+├── cross:task-email-link    → Tarefa criada a partir de email
+├── cross:lead-task-link     → Lead convertido em projeto
+├── cross:client-project-link → Cliente vinculado a projeto
+├── user:pattern-detected    → Padrão de comportamento detectado
+│   └─ ex: "Abner sempre cria tarefa após ler email do cliente X"
+└── system:anomaly           → Anomalia detectada
+    └─ ex: "Caixa ficou negativo", "Lead sem contato há 7 dias"
+```
+
+**Como funciona:**
+1. Todo endpoint que modifica dados (`POST/PUT/DELETE`) emite evento no bus
+2. Luna escuta esses eventos e atualiza seu `systemMap`
+3. Mesmo quando Luna está "dormindo" (chat fechado), ela acumula esses eventos
+4. Quando o usuário abre Luna, ela já sabe tudo o que aconteceu
+
+### 3.5 Consciência Transversal (Cross-Module Insights)
+
+Esta é a habilidade mais poderosa de Luna. Ela cruza informações entre módulos para gerar insights que nenhum humano teria paciência de buscar:
+
+**Exemplos de insights transversais:**
+
+```yaml
+insight_1:
+  trigger: "Usuário abre tarefas"
+  cruzamento:
+    - tarefas: 3 tarefas atrasadas do "Projeto Website Nexo"
+    - clientes: projeto pertence ao cliente "Acme Corp"
+    - emails: existe email NÃO LIDO de "joao@acme.com" na caixa de entrada
+  acao_luna: "Você tem 3 tarefas atrasadas do Acme Corp. E olha só — chegou email do João de lá. Quer que eu abra?"
+
+insight_2:
+  trigger: "Usuário abre financeiro"
+  cruzamento:
+    - financeiro: despesa de R$ 3.500 com fornecedor "Hostinger"
+    - projetos: existe projeto "Site da Hostinger" no workspace
+    - tarefas: projeto está 80% concluído
+  acao_luna: "Você pagou R$ 3.500 pra Hostinger. O projeto deles está 80% pronto. Quer que eu gere um relatório de horas investidas vs valor pago?"
+
+insight_3:
+  trigger: "Usuário abre leads"
+  cruzamento:
+    - leads: lead "Maria Silva" está na etapa "Proposta Enviada" há 5 dias
+    - whatsapp: nenhuma mensagem enviada para o número dela
+    - tarefas: existe tarefa "Follow-up Maria" marcada como concluída ontem
+  acao_luna: "A Maria Silva ainda não respondeu à proposta (5 dias). Você marcou follow-up como feito ontem, mas não mandou mensagem. Quer que eu prepare um zap de lembrete?"
+
+insight_4:
+  trigger: "Proativo (a cada 30 min)"
+  cruzamento:
+    - emails: 2 drafts pendentes de aprovação da Luna
+    - tarefas: 1 tarefa vencendo HOJE sem responsável
+    - financeiro: caixa abaixo de R$ 1.000
+  acao_luna: "Atenção: 2 drafts esperando aprovação, 1 tarefa vence hoje sem dono, e o caixa está baixo. Quer que eu te mostre os detalhes?"
+```
+
+**Referência:** McKinsey Global Tech Agenda 2026 — "AI has surpassed cybersecurity as companies' top investment priority." A vantagem competitiva não é ter dados, é CRUZAR dados.
+
+### 3.6 Descoberta de Funcionalidades (Feature Discovery)
+
+Luna não só executa — ela ENSINA. Quando detecta que o usuário poderia se beneficiar de uma funcionalidade que ele não usa, ela sugere:
+
+```yaml
+exemplo_1:
+  situacao: "Usuário sempre cria tarefas manualmente para cada email"
+  descoberta: "Você sabia que posso extrair action items de emails e criar tarefas automaticamente? Na próxima, é só pedir 'cria tarefas deste email'."
+
+exemplo_2:
+  situacao: "Usuário nunca usou filtros de tarefas"
+  descoberta: "Posso mostrar só suas tarefas urgentes? Diga 'mostrar urgentes'."
+
+exemplo_3:
+  situacao: "Usuário pergunta 'quanto gastamos com fornecedores?'"
+  descoberta: "Você sabia que tenho um relatório de despesas por fornecedor? Quer que eu gere?"
+```
+
+**Regras para descoberta:**
+- NUNCA ser intrusivo (só sugere quando usuário demonstra necessidade)
+- Limitar a 1 sugestão por sessão
+- Se usuário disser "não quero" → marcar como "não perturbar sobre isso"
+- Usar badge sutil no botão, nunca popup
+
+### 3.7 Memória de Longo Prazo (System Memory)
+
+Luna precisa lembrar não só o que aconteceu HOJE, mas padrões ao longo do tempo:
+
+```typescript
+interface SystemMemory {
+  // Padrões de comportamento do usuário
+  userPatterns: Array<{
+    pattern: string;           // "cria tarefa após ler email do cliente X"
+    frequency: number;         // quantas vezes aconteceu
+    lastOccurred: number;      // timestamp
+    confidence: number;        // 0-1
+  }>;
+  
+  // Histórico de decisões
+  decisionLog: Array<{
+    situation: string;         // "Usuário rejeitou draft #3"
+    decision: string;          // "rejected"
+    reason?: string;           // "tom muito formal"
+    timestamp: number;
+  }>;
+  
+  // Estado do sistema em pontos do tempo
+  systemSnapshots: Array<{
+    date: string;              // "2026-05-19"
+    tasksCount: number;
+    leadsCount: number;
+    cashBalance: number;
+    pendingEmails: number;
+  }>;
+  
+  // Entidades importantes (VIP)
+  vipEntities: {
+    clients: string[];         // clientes mais mencionados
+    projects: string[];        // projetos mais ativos
+    contacts: string[];        // contatos mais frequentes
+  };
+}
+```
+
+**Para que serve:**
+- "Você sempre deixa a tarefa do Acme para depois. Já são 3 vezes. Quer que eu priorize?"
+- "Você rejeitou meus últimos 2 drafts por tom formal. Vou ajustar para mais casual."
+- "Em comparação com a semana passada, você tem 40% mais tarefas pendentes."
+
+**Implementação:** Salvar em `backend/data/luna-memory.json` (arquivo JSON simples, atualizado a cada ação).
 
 ---
 

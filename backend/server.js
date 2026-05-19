@@ -4099,9 +4099,10 @@ app.post('/api/luna/chat', async (req, res) => {
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
 
-    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM) apenas para saudações óbvias (regex)
-    const isGreeting = parsed.source === 'regex' && parsed.intent === 'social';
-    if (isGreeting || (parsed.actions.length === 1 && parsed.actions[0].type === 'social' && parsed.actions[0].source === 'regex')) {
+    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
+    const isGreeting = parsed.intent === 'social' ||
+      (parsed.actions.length === 1 && parsed.actions[0].type === 'social');
+    if (isGreeting) {
       const greetings = [
         `Oi, ${authorName.split(' ')[0]}! 👋 Tô por aqui, pronta pra ajudar.`,
         `Opa, ${authorName.split(' ')[0]}! 😊 O que temos hoje?`,
@@ -5967,21 +5968,54 @@ app.put('/api/leads/:id', (req, res) => {
   }
 });
 
-// POST /api/leads/:id/convert — Converter lead em cliente
-app.post('/api/leads/:id/convert', (req, res) => {
+// POST /api/leads/:id/convert — Converter lead em cliente + criar workspace
+app.post('/api/leads/:id/convert', async (req, res) => {
   try {
     const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
-    if (!registry.clients?.[req.params.id]) {
+    const leadId = req.params.id;
+    if (!registry.clients?.[leadId]) {
       return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     }
-    registry.clients[req.params.id].type = 'cliente-externo';
-    registry.clients[req.params.id].status = 'ativo';
-    registry.clients[req.params.id].pipelineStatus = 'ganho';
-    registry.clients[req.params.id].convertedAt = new Date().toISOString();
+
+    registry.clients[leadId].type = 'cliente-externo';
+    registry.clients[leadId].status = 'ativo';
+    registry.clients[leadId].pipelineStatus = 'ganho';
+    registry.clients[leadId].convertedAt = new Date().toISOString();
     writeJSON(CLIENTS_REGISTRY_FILE, registry);
-    broadcast({ type: 'leads:convert', data: { id: req.params.id, ...registry.clients[req.params.id] } });
-    res.json({ success: true, lead: { id: req.params.id, ...registry.clients[req.params.id] } });
+
+    // Cria workspace se ainda não existir
+    let workspace = null;
+    if (!workspaceManager.clientExists(leadId)) {
+      const lead = registry.clients[leadId];
+      const displayName = lead.name || lead.displayName || lead.company || leadId;
+      workspace = workspaceManager.createClient(leadId, {
+        nome: displayName,
+        status: 'ativo',
+        responsavel: lead.assignedTo || 'todos',
+        cor: lead.cor || lead.color || '#22C55E'
+      });
+
+      // Cria README.md na raiz do workspace
+      const readmePath = path.join(workspaceManager.WORKSPACE_DIR, leadId, 'README.md');
+      const readmeContent = `# ${displayName}
+
+**Status:** Ativo  
+**Convertido em:** ${new Date().toISOString()}  
+**Pipeline:** Ganho  
+
+---
+
+Pasta padrão do workspace NEXO.
+`;
+      fs.writeFileSync(readmePath, readmeContent, 'utf8');
+    } else {
+      workspace = workspaceManager.getClient(leadId);
+    }
+
+    broadcast({ type: 'leads:convert', data: { id: leadId, ...registry.clients[leadId] } });
+    res.json({ success: true, lead: { id: leadId, ...registry.clients[leadId] }, workspace });
   } catch (e) {
+    console.error('[Convert Lead] Erro:', e);
     res.status(500).json({ success: false, error: e.message });
   }
 });
@@ -6796,7 +6830,37 @@ const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB
 app.get('/api/workspace/clients', requireAuth, (req, res) => {
   try {
     const index = workspaceManager.getIndex();
-    res.json({ success: true, clientes: index.clientes });
+    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    const merged = new Map();
+
+    // 1. Clientes já existentes no workspace
+    for (const c of index.clientes || []) {
+      merged.set(c.id, { ...c, kind: 'client' });
+    }
+
+    // 2. Leads/clientes do registry que ainda não têm workspace
+    for (const [id, data] of Object.entries(registry.clients || {})) {
+      if (merged.has(id)) continue;
+      const displayName = data.name || data.displayName || data.company || id;
+      merged.set(id, {
+        id,
+        nome: displayName,
+        caminho: id,
+        status: data.status || 'ativo',
+        cor: data.cor || data.color || '#8B5CF6',
+        responsavel: data.assignedTo || 'todos',
+        kind: 'lead',
+        pipelineStatus: data.pipelineStatus || 'novo',
+        email: data.email || data.contactInfo?.email || null,
+        phone: data.phone || data.contactInfo?.phone || null,
+        source: data.source || null,
+        estimatedValue: data.estimatedValue || null,
+        type: data.type || 'lead'
+      });
+    }
+
+    const clientes = Array.from(merged.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
+    res.json({ success: true, clientes });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }

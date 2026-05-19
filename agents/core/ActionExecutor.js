@@ -364,6 +364,11 @@ class ActionExecutor {
       return { type: 'task_done', id: match.id, titulo: match.titulo, source: 'file' };
     }
 
+    // Se não achou e não tem título, retorna erro
+    if (!titulo || titulo.trim() === '') {
+      return { type: 'task_done', error: true, message: 'Não consegui identificar qual tarefa concluir. Tente ser mais específico, tipo "concluir tarefa revisar código".', source: 'file' };
+    }
+
     // Se não achou, cria como tarefa concluída
     const task = {
       id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -2697,7 +2702,7 @@ class ActionExecutor {
           parts.push(`tarefa "${res.title || res.titulo}"`);
           break;
         case 'task_done':
-          parts.push(`tarefa "${res.title || res.titulo}" como concluída`);
+          parts.push(`tarefa "${res.title || res.titulo || 'desconhecida'}" como concluída`);
           break;
         case 'lead':
           parts.push(`lead "${res.displayName || res.nome}"`);

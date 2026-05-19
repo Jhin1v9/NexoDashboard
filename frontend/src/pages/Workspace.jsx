@@ -7,7 +7,8 @@ import {
   ChevronRight, Plus, X, Upload, Trash2, Download, Grid, List,
   Search, HardDrive, ArrowLeft, MoreVertical, Edit3, CheckCircle2,
   AlertCircle, LayoutGrid, AlignJustify, ChevronDown, FolderPlus,
-  Play, Square, Terminal, RefreshCw, Loader2, ExternalLink, MousePointerClick
+  Play, Square, Terminal, RefreshCw, Loader2, ExternalLink, MousePointerClick,
+  User, Target, Mail, Phone, Euro, Tag, CheckCircle
 } from 'lucide-react'
 import DevLogTerminal from '../components/workspace/DevLogTerminal'
 import ContextMenu from '../components/workspace/ContextMenu'
@@ -152,6 +153,98 @@ function CreateFolderModal({ onClose, onCreate }) {
   )
 }
 
+// ── Lead Preview Panel ──
+function LeadPreviewPanel({ lead, onConvert, isConverting }) {
+  const pipelineColors = {
+    novo: '#6B7280',
+    contatado: '#3B82F6',
+    proposta_enviada: '#F59E0B',
+    negociacao: '#8B5CF6',
+    ganho: '#22C55E',
+    perdido: '#EF4444'
+  }
+  const statusLabel = lead.pipelineStatus?.replace(/_/g, ' ') || 'novo'
+  const statusColor = pipelineColors[lead.pipelineStatus] || '#6B7280'
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-lg glass-card rounded-xl border border-nexo-border p-6 space-y-5"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-nexo-primary/10 flex items-center justify-center">
+            <Target size={24} className="text-nexo-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">{lead.nome}</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full border" style={{ color: statusColor, borderColor: statusColor + '40', backgroundColor: statusColor + '10' }}>
+              {statusLabel}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {lead.email && (
+            <div className="flex items-center gap-3 text-sm">
+              <Mail size={16} className="text-nexo-info" />
+              <span className="text-nexo-muted">Email:</span>
+              <span>{lead.email}</span>
+            </div>
+          )}
+          {lead.phone && (
+            <div className="flex items-center gap-3 text-sm">
+              <Phone size={16} className="text-nexo-info" />
+              <span className="text-nexo-muted">Telefone:</span>
+              <span>{lead.phone}</span>
+            </div>
+          )}
+          {lead.source && (
+            <div className="flex items-center gap-3 text-sm">
+              <Tag size={16} className="text-nexo-muted" />
+              <span className="text-nexo-muted">Fonte:</span>
+              <span className="capitalize">{lead.source.replace(/-/g, ' ')}</span>
+            </div>
+          )}
+          {lead.estimatedValue > 0 && (
+            <div className="flex items-center gap-3 text-sm">
+              <Euro size={16} className="text-nexo-success" />
+              <span className="text-nexo-muted">Valor estimado:</span>
+              <span>€{lead.estimatedValue.toLocaleString('pt-BR')}</span>
+            </div>
+          )}
+          {lead.responsavel && lead.responsavel !== 'todos' && (
+            <div className="flex items-center gap-3 text-sm">
+              <User size={16} className="text-nexo-muted" />
+              <span className="text-nexo-muted">Responsável:</span>
+              <span className="capitalize">{lead.responsavel}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-3 border-t border-nexo-border">
+          <button
+            onClick={() => onConvert(lead.id)}
+            disabled={isConverting}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-nexo-success/10 hover:bg-nexo-success/20 text-nexo-success rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {isConverting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckCircle size={16} />
+            )}
+            {isConverting ? 'Convertendo...' : 'Converter em Cliente'}
+          </button>
+          <p className="text-center text-[11px] text-nexo-muted mt-2">
+            Isso criará a pasta do workspace com a estrutura padrão.
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 // ── Main Page ──
 export default function Workspace() {
   const { clientId: urlClientId } = useParams()
@@ -175,6 +268,7 @@ export default function Workspace() {
   const [renameValue, setRenameValue] = useState('')
   const [activeLogServer, setActiveLogServer] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
+  const [isConverting, setIsConverting] = useState(false)
 
   const token = localStorage.getItem('token') || ''
   const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
@@ -360,6 +454,22 @@ export default function Workspace() {
     handleSelectClient(res.data.client)
   }
 
+  const handleConvertLead = async (leadId) => {
+    setIsConverting(true)
+    try {
+      const res = await api.post(`/api/leads/${leadId}/convert`)
+      if (res.data.success) {
+        await fetchClients()
+        // Navega para o workspace recém-criado
+        navigate(`/workspace/${leadId}`)
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || err.message)
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
   const handleCreateFolder = async (name) => {
     await api.post(`/api/workspace/clients/${selectedClient.id}/folders`, {
       path: currentPath,
@@ -508,24 +618,70 @@ export default function Workspace() {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-          {clients.filter(c => c.nome.toLowerCase().includes(search.toLowerCase())).map(c => (
-            <button
-              key={c.id}
-              onClick={() => handleSelectClient(c)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${selectedClient?.id === c.id ? 'bg-nexo-info/10 border border-nexo-info/30 text-nexo-info' : 'hover:bg-nexo-card/60 border border-transparent'}`}
-            >
-              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.cor || '#3b82f6' }} />
-              <span className="truncate font-medium">{c.nome}</span>
-              {c.status === 'ativo' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-nexo-success" />}
-            </button>
-          ))}
-          {clients.length === 0 && (
-            <div className="text-center py-8 text-nexo-muted text-sm">
-              <Folder size={32} className="mx-auto mb-2 opacity-30" />
-              Nenhum cliente ainda
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {(() => {
+            const q = search.toLowerCase()
+            const filtered = clients.filter(c => (c.nome || '').toLowerCase().includes(q))
+            const leads = filtered.filter(c => c.kind === 'lead')
+            const workspaceClients = filtered.filter(c => c.kind === 'client')
+            const pipelineColors = {
+              novo: '#6B7280',
+              contatado: '#3B82F6',
+              proposta_enviada: '#F59E0B',
+              negociacao: '#8B5CF6',
+              ganho: '#22C55E',
+              perdido: '#EF4444'
+            }
+
+            return (
+              <>
+                {/* Workspace Clients */}
+                {workspaceClients.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 text-[10px] font-bold text-nexo-muted uppercase tracking-wider">Clientes</div>
+                    {workspaceClients.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleSelectClient(c)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors ${selectedClient?.id === c.id ? 'bg-nexo-info/10 border border-nexo-info/30 text-nexo-info' : 'hover:bg-nexo-card/60 border border-transparent'}`}
+                      >
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.cor || '#3b82f6' }} />
+                        <span className="truncate font-medium">{c.nome}</span>
+                        {c.status === 'ativo' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-nexo-success" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Leads */}
+                {leads.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 text-[10px] font-bold text-nexo-muted uppercase tracking-wider">Leads</div>
+                    {leads.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleSelectClient(c)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors ${selectedClient?.id === c.id ? 'bg-nexo-info/10 border border-nexo-info/30 text-nexo-info' : 'hover:bg-nexo-card/60 border border-transparent'}`}
+                      >
+                        <Target size={14} className="flex-shrink-0" style={{ color: pipelineColors[c.pipelineStatus] || '#6B7280' }} />
+                        <span className="truncate font-medium">{c.nome}</span>
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-card border border-nexo-border" style={{ color: pipelineColors[c.pipelineStatus] || '#6B7280' }}>
+                          {c.pipelineStatus?.replace(/_/g, ' ') || 'novo'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {clients.length === 0 && (
+                  <div className="text-center py-8 text-nexo-muted text-sm">
+                    <Folder size={32} className="mx-auto mb-2 opacity-30" />
+                    Nenhum cliente ainda
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       </aside>
 
@@ -537,6 +693,8 @@ export default function Workspace() {
             <p className="text-lg font-medium">Selecione um cliente para visualizar o workspace</p>
             <p className="text-sm mt-1">Ou crie um novo cliente no botão <Plus size={14} className="inline" /></p>
           </div>
+        ) : selectedClient.kind === 'lead' ? (
+          <LeadPreviewPanel lead={selectedClient} onConvert={handleConvertLead} isConverting={isConverting} />
         ) : (
           <>
             {/* Toolbar */}
