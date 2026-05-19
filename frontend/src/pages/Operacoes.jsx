@@ -306,7 +306,7 @@ export default function Operacoes() {
   const dismissAlert = async (id) => {
     setAlerts(prev => prev.filter(a => a.id !== id))
     try {
-      await fetch('http://127.0.0.1:3456/api/ops/alerts/' + id, { method: 'DELETE' })
+      await fetch('/api/ops/alerts/' + id, { method: 'DELETE' })
     } catch {}
   }
 
