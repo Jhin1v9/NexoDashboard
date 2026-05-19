@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import {
   Search, X, Mail, PanelRightOpen, PanelRightClose,
-  AlignJustify, LayoutList, LayoutTemplate
+  AlignJustify, LayoutList, LayoutTemplate, Sparkles
 } from 'lucide-react'
 import EmailSidebar from '../components/email/EmailSidebar'
 import EmailList from '../components/email/EmailList'
@@ -32,6 +32,8 @@ export default function EmailHub() {
   const [showLuna, setShowLuna] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
+  const [pendingDrafts, setPendingDrafts] = useState([])
+  const [approvedDraftBody, setApprovedDraftBody] = useState('')
   const [unreadCounts, setUnreadCounts] = useState({})
   const searchInputRef = useRef(null)
 
@@ -91,6 +93,13 @@ export default function EmailHub() {
                 : e
             )
           )
+        }
+        // Buscar drafts pendentes da Luna para esta thread
+        try {
+          const draftsRes = await axios.get(`/api/email/drafts?threadId=${threadId}&status=pending`)
+          setPendingDrafts(draftsRes.data.drafts || [])
+        } catch {
+          setPendingDrafts([])
         }
       }
     } catch (e) {
@@ -193,6 +202,26 @@ export default function EmailHub() {
   const handleReplySent = () => {
     fetchEmails()
     if (selectedThread?.id) fetchThread(selectedThread.id)
+  }
+
+  const handleApproveDraft = async (draft) => {
+    try {
+      await axios.post(`/api/email/drafts/${draft.id}/approve`)
+      setPendingDrafts((prev) => prev.filter((d) => d.id !== draft.id))
+      setApprovedDraftBody(draft.body || '')
+      setShowCompose(true)
+    } catch (e) {
+      console.error('Erro ao aprovar draft:', e)
+    }
+  }
+
+  const handleRejectDraft = async (draft) => {
+    try {
+      await axios.post(`/api/email/drafts/${draft.id}/reject`)
+      setPendingDrafts((prev) => prev.filter((d) => d.id !== draft.id))
+    } catch (e) {
+      console.error('Erro ao rejeitar draft:', e)
+    }
   }
 
   const handlePageChange = (newPage) => {
@@ -337,6 +366,34 @@ export default function EmailHub() {
 
       {/* Leitor / Compose */}
       <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Banner de drafts pendentes da Luna */}
+        {pendingDrafts.length > 0 && (
+          <div className="p-3 border-b border-amber-500/30 bg-amber-500/10 space-y-2">
+            {pendingDrafts.map((draft) => (
+              <div key={draft.id} className="flex items-center gap-3 text-sm">
+                <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span className="text-nexo-text truncate flex-1">
+                  <span className="font-medium">Luna sugeriu resposta:</span>{' '}
+                  {draft.subject}
+                </span>
+                <button
+                  onClick={() => handleApproveDraft(draft)}
+                  className="px-2 py-1 rounded-md bg-nexo-primary text-nexo-bg text-xs font-medium hover:bg-nexo-primary/90 transition-colors"
+                  title="Aprovar e abrir rascunho"
+                >
+                  Aprovar
+                </button>
+                <button
+                  onClick={() => handleRejectDraft(draft)}
+                  className="px-2 py-1 rounded-md bg-nexo-bg border border-nexo-border text-nexo-muted text-xs hover:bg-nexo-border/50 transition-colors"
+                  title="Rejeitar sugestão"
+                >
+                  Rejeitar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {showCompose ? (
           <div className="flex-1 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-nexo-border">
@@ -358,7 +415,11 @@ export default function EmailHub() {
               </div>
             </div>
             <div className="flex-1 overflow-hidden">
-              <EmailCompose onSent={() => { setShowCompose(false); fetchEmails() }} onCancel={() => setShowCompose(false)} />
+              <EmailCompose
+                onSent={() => { setShowCompose(false); setApprovedDraftBody(''); fetchEmails() }}
+                onCancel={() => setShowCompose(false)}
+                initialBody={approvedDraftBody}
+              />
             </div>
           </div>
         ) : (
@@ -401,9 +462,14 @@ export default function EmailHub() {
             <LunaEmailAssistant
               threadMessages={selectedThread?.messages || []}
               onApplyDraft={(text) => {
+                setApprovedDraftBody(text || '')
                 setShowCompose(true)
               }}
               onClose={() => setShowLuna(false)}
+              emailId={selectedEmailId}
+              threadId={selectedThread?.id}
+              subject={selectedThread?.messages?.[0]?.subject}
+              from={selectedThread?.messages?.[0]?.from}
             />
           </div>
         </div>

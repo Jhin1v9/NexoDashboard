@@ -5410,6 +5410,176 @@ app.post('/api/email/ai/analyze', async (req, res) => {
   }
 });
 
+// Criar tarefas a partir de action items extraídos do email
+app.post('/api/email/ai/action-items-to-tasks', requireAuth, async (req, res) => {
+  try {
+    const { threadId, subject, actionItems } = req.body;
+    if (!Array.isArray(actionItems) || actionItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'actionItems é obrigatório e deve ser um array' });
+    }
+
+    const createdTasks = [];
+    for (const item of actionItems) {
+      const taskResult = await lunaActionExecutor.execute([
+        {
+          type: 'criar_tarefa',
+          params: {
+            titulo: item,
+            descricao: `Action item extraído do email: "${subject || 'Email'}" (thread: ${threadId || 'N/A'})`,
+            prioridade: 'P2',
+            responsavel: req.user?.userId || 'abner'
+          }
+        }
+      ], { authorName: 'Luna' });
+      const task = taskResult?.results?.[0];
+      if (task) createdTasks.push(task);
+    }
+
+    if (createdTasks.length > 0) {
+      addNotification({
+        type: 'luna_email_tasks',
+        title: `${createdTasks.length} tarefa(s) criada(s) do email`,
+        message: `Action items de "${subject || 'Email'}" foram convertidos em tarefas.`,
+        severity: 'low',
+        metadata: { threadId, subject, taskIds: createdTasks.map((t) => t.id) }
+      });
+    }
+
+    res.json({ success: true, tasks: createdTasks });
+  } catch (e) {
+    console.error('[ActionItems→Tasks] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── LUNA EMAIL DRAFTS: rascunhos de resposta para aprovação ──
+
+const EMAIL_DRAFTS_FILE = path.join(DATA_DIR, 'email-drafts.json');
+
+function readEmailDrafts() {
+  return readJSON(EMAIL_DRAFTS_FILE, { drafts: [], lastId: 0 });
+}
+
+function writeEmailDrafts(data) {
+  writeJSON(EMAIL_DRAFTS_FILE, data);
+}
+
+// Gerar rascunho da Luna e criar tarefa + notificação para aprovação
+app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
+  try {
+    const { threadMessages, instructions, emailId, threadId, subject, from } = req.body;
+    if (!threadMessages || !emailId || !threadId) {
+      return res.status(400).json({ success: false, error: 'threadMessages, emailId e threadId são obrigatórios' });
+    }
+
+    // Gerar draft via AI
+    const draftResult = await emailAI.createDraft(
+      threadMessages,
+      instructions || 'Sugira uma resposta profissional e completa.',
+      { from, subject }
+    );
+
+    // Salvar rascunho local
+    const draftsData = readEmailDrafts();
+    draftsData.lastId = (draftsData.lastId || 0) + 1;
+    const draftId = `luna-draft-${draftsData.lastId}`;
+    const draft = {
+      id: draftId,
+      emailId,
+      threadId,
+      subject: draftResult.subject || `Re: ${subject || 'Email'}`,
+      body: draftResult.body || draftResult.text || '',
+      notes: draftResult.notes || '',
+      tone: draftResult.tone || 'professional',
+      status: 'pending',
+      createdBy: 'luna',
+      approvedBy: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    draftsData.drafts.unshift(draft);
+    if (draftsData.drafts.length > 200) draftsData.drafts = draftsData.drafts.slice(0, 200);
+    writeEmailDrafts(draftsData);
+
+    // Criar tarefa para aprovação via ActionExecutor
+    const taskResult = await lunaActionExecutor.execute([
+      {
+        type: 'criar_tarefa',
+        params: {
+          titulo: `Revisar resposta da Luna para: ${subject || 'Email'}`,
+          descricao: `Luna gerou um rascunho de resposta para o email de ${from || 'remetente'}.\n\nAcesse o Email Hub para revisar e aprovar.`,
+          prioridade: 'P1',
+          responsavel: req.user?.userId || 'abner'
+        }
+      }
+    ], { authorName: 'Luna' });
+
+    // Notificação
+    const notif = addNotification({
+      type: 'luna_email_draft',
+      title: 'Luna sugeriu uma resposta',
+      message: `Rascunho gerado para "${subject || 'Email'}". Revise antes de enviar.`,
+      severity: 'medium',
+      metadata: { draftId, threadId, emailId, subject }
+    });
+
+    res.json({
+      success: true,
+      draft,
+      task: taskResult?.results?.[0] || null,
+      notification: notif
+    });
+  } catch (e) {
+    console.error('[LunaDraft] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Listar rascunhos (opcionalmente filtrar por threadId)
+app.get('/api/email/drafts', requireAuth, (req, res) => {
+  try {
+    const { threadId, status } = req.query;
+    const draftsData = readEmailDrafts();
+    let drafts = draftsData.drafts || [];
+    if (threadId) drafts = drafts.filter(d => d.threadId === threadId);
+    if (status) drafts = drafts.filter(d => d.status === status);
+    res.json({ success: true, drafts });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Aprovar rascunho
+app.post('/api/email/drafts/:id/approve', requireAuth, (req, res) => {
+  try {
+    const draftsData = readEmailDrafts();
+    const draft = draftsData.drafts.find(d => d.id === req.params.id);
+    if (!draft) return res.status(404).json({ success: false, error: 'Rascunho não encontrado' });
+    draft.status = 'approved';
+    draft.approvedBy = req.user?.userId || 'user';
+    draft.updatedAt = new Date().toISOString();
+    writeEmailDrafts(draftsData);
+    res.json({ success: true, draft });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Rejeitar rascunho
+app.post('/api/email/drafts/:id/reject', requireAuth, (req, res) => {
+  try {
+    const draftsData = readEmailDrafts();
+    const draft = draftsData.drafts.find(d => d.id === req.params.id);
+    if (!draft) return res.status(404).json({ success: false, error: 'Rascunho não encontrado' });
+    draft.status = 'rejected';
+    draft.updatedAt = new Date().toISOString();
+    writeEmailDrafts(draftsData);
+    res.json({ success: true, draft });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── LEGACY: rotas antigas IMAP/SMTP (mantidas para compatibilidade) ──
 
 app.get('/api/emails/config', (req, res) => {

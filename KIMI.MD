@@ -1,28 +1,57 @@
 # KIMI.MD — NEXO Dashboard Pro
 
 > Este arquivo é contexto operacional, NÃO documentação. Carrega no início de toda sessão. Mantenha curto, opinado e atualizado.
+> 
+> **🧠 Sistema de persistência:** Este projeto usa `.kimi-context/` para manter contexto entre sessões. LEIA `.kimi-context/handoff.md` e `.kimi-context/index.json` antes de agir.
+
+---
+
+## 0. Instance Identity
+
+```yaml
+active_instance: kimi-bbf526dc
+signature: KIMI-BBF526DC 🔵
+context_system: .kimi-context/ (v1)
+last_updated: 2026-05-18
+```
+
+**Regra para múltiplas instâncias Kimi:**
+- Cada instância deve gerar seu próprio `kimi-XXXXXXXX` ID
+- NUNCA sobrescreva trabalho de outra instância sem confirmar com o usuário
+- Se `index.json` mostrar outra instância como `active`, pergunte antes de continuar
 
 ---
 
 ## 1. Project Identity
 
-**NEXO Dashboard Pro** — ERP interno da NEXO Digital (empresa de 3 founders: Abner, Nonoke, Elias). Stack Node.js + React. Todos os dados em JSON files (sem banco de dados). Deploy manual em servidor Windows (RDP).
+**NEXO Dashboard Pro** — ERP interno da NEXO Digital (empresa de 3 founders: Abner, Nonoke, Elias). Stack Node.js + React. Todos os dados em JSON files (sem banco de dados). Deploy na Render.com free tier.
 
-**Propósito:** Centralizar clientes, projetos, tarefas, WhatsApp (Luna agent), financeiro, leads, pipeline de vendas e agora **IDEIAS** (sessão de brainstorm com IA Gemini).
+**Propósito:** Centralizar clientes, projetos, tarefas, WhatsApp (Luna agent), financeiro, leads, pipeline de vendas, **IDEIAS** (brainstorm com IA Gemini), e agora **EMAIL HUB** (integração Gmail + IA).
 
 ---
 
 ## 2. Current Focus
 
-- [x] **Sessão IDEIAS mergeada** — CRUD completo + editor TipTap + chat Gemini + templates + conversão em tarefas
-- [x] **GEMINI_API_KEY inserida no `.env`** do backend (usando chave `AIzaSy...` do Google AI Studio)
-- [x] **dotenv instalado** — `backend/server.js` agora carrega `.env` corretamente
-- [x] **IA polida com Tool Calling** — IA pode criar, editar, apagar, listar, comentar, mudar status e converter em tarefa
-- [x] **Prompt enxuto** — IA não se apresenta mais, respostas curtas e diretas
-- [x] **Ollama removido** — Chat da Luna e IntentParser agora usam Gemini API (gemini-2.5-flash-lite)
-- [x] **Badge Gemini no frontend** — Indicador visual na aba LUNA/CHAT
-- [ ] **Testar navegação visual** da aba Ideias no browser
-- [ ] **Corrigir chunk size warning** do frontend (1.869KB > 500KB)
+### 🎯 Sprint Ativo: NEXO Mail v2.0 — Luna Integrada (Sprint 2)
+
+**Status:** 🔄 Em andamento — código escrito, build passando, aguardando deploy/teste
+
+#### Sprint 1 — Layout & Espaço ✅ 100% (deployed)
+- [x] Modo foco tela cheia (ESC sai, botão Minimize2 no header)
+- [x] Sidebar colapsável com toggle sempre visível
+- [x] ResizablePanel para lista de emails
+- [x] Densidade ajustável (compact/normal/comfortable)
+- [x] Luna como painel lateral inline de 320px (não modal)
+- [x] Renderização de body HTML corrigida (suporta objeto {html,text} ou string)
+
+#### Sprint 2 — Luna Integrada 🔄 Código pronto
+- [x] Banner de drafts pendentes da Luna no EmailHub
+- [x] Aprovar/Rejeitar draft → abre compose pré-preenchido
+- [x] Action items do summary → tarefas em batch (checkboxes + botão)
+- [x] Endpoint `POST /api/email/ai/action-items-to-tasks`
+- [x] Notificações automáticas para drafts e tasks
+- [ ] Deploy para Render
+- [ ] Teste end-to-end no browser
 
 **Branch ativa:** `codex/initial-nexo-dashboard-pro-v16`
 
@@ -35,12 +64,13 @@
 | Backend | Node.js 18+, Express 4, WebSocket (ws), CommonJS |
 | Frontend | React 18, Vite 6, TailwindCSS 3, Framer Motion |
 | Auth | JWT (jsonwebtoken), bcryptjs, localStorage |
-| IA | Gemini 2.5 Flash via `@google/genai` (IntentParser + Chat Luna + Ideias) |
+| IA | Gemini 2.5 Flash via `@google/genai` (IntentParser + Chat Luna + Ideias + Email AI) |
 | Rich Text | TipTap v3 (StarterKit + Table + TaskList + Image + Highlight + Typography) |
 | DnD | `@dnd-kit/core`, `@dnd-kit/sortable` |
 | Charts | Recharts |
 | Icons | lucide-react |
 | Data | JSON files puros (sem DB) |
+| Email | Gmail OAuth 2.0 (Client ID: 644081746963-qmop60bnprhslm6v5j5t4sc46f36hcr5) |
 
 ---
 
@@ -49,45 +79,57 @@
 ```
 NEXO_DASHBOARD_PRO/
 ├── backend/
-│   ├── server.js              # Entry point Express (~5600 linhas)
+│   ├── server.js              # Entry point Express (~6800 linhas)
 │   ├── routes/
-│   │   └── ideas.js           # API Sessão IDEIAS (factory function(requireAuth))
+│   │   └── ideas.js           # API Sessão IDEIAS
+│   ├── services/
+│   │   ├── email-ai.js        # Gemini prompts para email (suggest/draft/summarize/analyze)
+│   │   └── ...
 │   ├── data/                  # TODOS os dados JSON
-│   │   ├── schema/            # Schemas estruturados (clients, projects, contacts)
-│   │   └── *.json             # Arquivos de dados flat
-│   ├── services/              # WhatsApp sender, link preview, cache
-│   ├── cache-manager.js       # Cache de comandos CLI
-│   └── external-services.js   # GitHub, Vercel, tools
+│   │   ├── schema/            # Schemas estruturados
+│   │   ├── email-drafts.json  # Rascunhos da Luna (pending/approved/rejected)
+│   │   └── *.json
+│   └── agents/
+│       └── core/ActionExecutor.js  # Executa ações da Luna (criar tarefa, etc)
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx            # Router principal
-│   │   ├── pages/             # 29 páginas
-│   │   ├── components/        # Componentes reutilizáveis
-│   │   ├── components/ideas/  # IdeiasTable, IdeasKanban, IdeasGallery, IdeasList
-│   │   ├── components/editor/ # BlockEditor, SlashCommandMenu, BubbleToolbar
-│   │   ├── components/ai/     # AIChatSidebar
-│   │   ├── context/           # AuthContext, DataContext
-│   │   └── styles/index.css   # Tailwind + classes custom
+│   │   ├── App.jsx
+│   │   ├── pages/
+│   │   │   └── EmailHub.jsx   # Página principal de email (Sprint 1+2)
+│   │   ├── components/email/
+│   │   │   ├── EmailSidebar.jsx
+│   │   │   ├── EmailReader.jsx
+│   │   │   ├── EmailCompose.jsx
+│   │   │   ├── EmailList.jsx
+│   │   │   ├── LunaEmailAssistant.jsx  # Assistente AI inline
+│   │   │   └── ResizablePanel.jsx
+│   │   ├── components/ideas/
+│   │   ├── components/editor/
+│   │   └── context/
+│   │       ├── EmailFocusModeContext.jsx
+│   │       └── EmailDensityContext.jsx
 │   └── package.json
-├── agents/                    # Luna CTO agent, WhatsApp agent (fora do scope)
+├── .kimi-context/             # 🧠 PERSISTÊNCIA DE CONTEXTO (ver seção 15)
+│   ├── index.json
+│   ├── handoff.md
+│   └── sessions/
 └── KIMI.MD                    # Este arquivo
 ```
 
-**Regra de ouro:** NUNCA modifique arquivos fora do que for necessário. O projeto é monolito flat — server.js tem ~5600 linhas e muita lógica vive ali.
+**Regra de ouro:** NUNCA modifique arquivos fora do que for necessário. O projeto é monolito flat — server.js tem muita lógica viva ali.
 
 ---
 
 ## 5. Operational Rules
 
-- **JavaScript puro** — NUNCA use TypeScript. O projeto é 100% JS (CommonJS backend, ESM frontend).
-- **axios no frontend** — NUNCA use fetch. Sempre axios com headers `{ Authorization: Bearer ${token} }`.
-- **JSON files** — Todos os dados são JSON. Use `readJSON`/`writeJSON` helpers (já existem no server.js e ideas.js).
+- **JavaScript puro** — NUNCA use TypeScript. CommonJS backend, ESM frontend.
+- **axios no frontend** — Sempre axios com headers `{ Authorization: Bearer ${token} }`.
+- **JSON files** — Use `readJSON`/`writeJSON` helpers do server.js.
 - **Auth middleware** — Sempre `requireAuth` para rotas protegidas. NUNCA `authMiddleware`.
-- **Design system NEXO** — Usar tokens `bg-nexo-bg`, `glass-card`, `text-nexo-muted`, `text-nexo-primary`. NUNCA cores hardcoded.
+- **Design system NEXO** — Tokens `bg-nexo-bg`, `glass-card`, `text-nexo-muted`, `text-nexo-primary`.
 - **Broadcast WebSocket** — Após modificar dados, sempre `broadcast({ type: 'MODULE', data })`.
-- **Não quebre rotas existentes** — Ao adicionar features, NUNCA remova ou renomeie endpoints existentes.
-- **Factory pattern para rotas** — Novas rotas devem exportar `module.exports = function(requireAuth) { ... }`.
-- **Path corrections** — Se swarm gerar path errado (ex: `data/schema/ideas-registry.json`), CORRIJA para `data/ideas-registry.json`.
+- **Não quebre rotas existentes** — Ao adicionar features, NUNCA remova ou renomeie endpoints.
+- **Factory pattern para rotas** — Novas rotas exportam `module.exports = function(requireAuth) { ... }`.
 
 ---
 
@@ -95,20 +137,17 @@ NEXO_DASHBOARD_PRO/
 
 | Arquivo | Tipo | Descrição |
 |---------|------|-----------|
-| `data/users.json` | Dict | `{ active, users: { abner, nonoke, elias } }` — cada user tem name, role, color |
-| `data/tasks.json` | Array | Tarefas do sistema com status, priority, assignedTo |
-| `data/company-tasks.json` | Array | Tarefas da empresa (separado de tasks.json) |
-| `data/schema/clients-registry.json` | Dict | `{ clients: { [clientId]: {...} } }` |
-| `data/schema/projects-registry.json` | Dict | `{ projects: { [projectId]: {...} } }` |
-| `data/schema/contacts-map.json` | Dict | `{ contacts: { [phone]: { displayName, shortName, role, avatar } } }` |
-| `data/payments.json` | Array | Receitas com transactions, revenueSplit, status |
-| `data/expenses.json` | Array | Despesas com splitAmong, paidBy, recurring |
-| `data/cash-box.json` | Dict | Caixa com balance, history, projections |
+| `data/users.json` | Dict | `{ active, users: { abner, nonoke, elias } }` |
+| `data/tasks.json` | Array | Tarefas do sistema |
+| `data/company-tasks.json` | Array | Tarefas da empresa |
+| `data/schema/clients-registry.json` | Dict | `{ clients: { [id]: {...} } }` |
+| `data/schema/projects-registry.json` | Dict | `{ projects: { [id]: {...} } }` |
+| `data/payments.json` | Array | Receitas |
+| `data/expenses.json` | Array | Despesas |
+| `data/cash-box.json` | Dict | Caixa |
 | `data/ideas-registry.json` | Dict | `{ _schema, ideas: [], templates: [], categories: [] }` |
-| `data/whatsapp-history.json` | Array | Mensagens do WhatsApp com classification |
-| `data/luna-buffer.json` | Dict | Buffer volátil do agente Luna |
-
-**Obs:** `clients-registry.json` e `projects-registry.json` são **dicts** (objeto com IDs como keys), NÃO arrays.
+| `data/email-drafts.json` | Dict | `{ drafts: [], lastId: 0 }` — rascunhos Luna |
+| `data/notifications.json` | Array | Notificações do dashboard |
 
 ---
 
@@ -117,70 +156,49 @@ NEXO_DASHBOARD_PRO/
 ### Auth
 - `POST /api/auth/login` → `{ token }`
 - `GET /api/auth/me` → `{ user }`
-- Todas as rotas abaixo usam `requireAuth`
 
 ### Core
 - `GET /api/state` → clients + tasks + users + predictions
 - `GET|POST|PUT|DELETE /api/tasks` → CRUD tarefas
 - `GET|POST /api/whatsapp` → Buffer WhatsApp
-- `GET /api/whatsapp/history` → Histórico de mensagens
-- `GET /api/whatsapp-agent` → Dados do agente inteligente
 
-### Financeiro
-- `GET|POST /api/payments` → Receitas
-- `POST /api/payments/:id/transactions` → Adicionar pagamento
-- `GET|POST /api/expenses` → Despesas
-- `GET|PUT /api/cash-box` → Caixa
-- `GET /api/cash-box/projection` → Projeção 6 meses
+### Email Hub (Sprint 2)
+- `GET /api/email/messages` → Lista emails
+- `GET /api/email/threads/:id` → Thread completa
+- `POST /api/email/messages/send` → Enviar email
+- `POST /api/email/messages/:id/read|unread|star|archive|trash|spam` → Ações
+- `POST /api/email/ai/suggest-reply` → 3 sugestões de tom
+- `POST /api/email/ai/draft` → Gera rascunho com instruções
+- `POST /api/email/ai/summarize` → Resumo + actionItems + sentiment + priority
+- `POST /api/email/ai/analyze` → Análise de segurança
+- `POST /api/email/ai/draft-for-approval` → Gera draft pending + task + notificação
+- `POST /api/email/ai/action-items-to-tasks` → Converte action items em tarefas
+- `GET /api/email/drafts?threadId=&status=` → Listar rascunhos
+- `POST /api/email/drafts/:id/approve` → Aprovar rascunho
+- `POST /api/email/drafts/:id/reject` → Rejeitar rascunho
 
-### IDEIAS (nova)
-- `GET /api/ideas` → Lista de ideias
-- `POST /api/ideas` → Criar ideia
-- `GET /api/ideas/:id` → Detalhe
-- `PUT /api/ideas/:id` → Atualizar
-- `DELETE /api/ideas/:id` → Deletar
-- `GET /api/ideas/templates` → Templates
-- `POST /api/ideas/from-template` → Criar do template
-- `GET /api/ideas/stats` → Estatísticas
-- `POST /api/ideas/:id/comments` → Comentário
-- `POST /api/ideas/:id/ai-chat` → Chat com Gemini (+ Tool Calling interno)
-- `POST /api/ideas/:id/apply-ai` → Aplicar sugestão da IA
+### IDEIAS
+- `GET|POST|PUT|DELETE /api/ideas` → CRUD
+- `POST /api/ideas/:id/ai-chat` → Chat Gemini com Tool Calling
 - `POST /api/ideas/:id/convert-task` → Converter em tarefa
-
-**Tool Calling da IA (7 ferramentas):**
-A IA pode executar acoes automaticamente via chat usando o formato `<TOOL_CALL>{"tool": "...", "params": {...}}</TOOL_CALL>`:
-1. `create_idea` — Cria nova ideia no workspace
-2. `update_idea` — Atualiza titulo, conteudo, status, prioridade, tags
-3. `delete_idea` — Arquiva ideia (soft delete)
-4. `list_ideas` — Lista ideias com filtros
-5. `add_comment` — Adiciona comentario
-6. `change_status` — Muda status da ideia
-7. `convert_to_task` — Converte em tarefa do sistema
-
-**Prompt da IA:** Direto, sem apresentacao, maximo 150 palavras. Nunca pede confirmacao antes de executar.
 
 ---
 
 ## 8. Design System
 
-### Tokens Tailwind (tailwind.config.js)
+### Tokens Tailwind
 ```
 bg: '#08080c'          card: '#0f0f16'       border: '#1a1a2e'
 success: '#2ed573'     danger: '#ff4757'     warning: '#ffa502'
 info: '#6c5ce7'        text: '#e0e0e0'       muted: '#6c757d'
 ```
 
-### Classes Custom (index.css)
+### Classes Custom
 - `.glass` — backdrop blur + borda sutil
-- `.glass-card` — card padrão do NEXO (usado EM TODA UI)
-- `.btn-primary` — botão primário (bg-nexo-info)
+- `.glass-card` — card padrão do NEXO
+- `.btn-primary` — botão primário
 - `.nav-item` — itens da sidebar
 - `.gradient-text` — gradiente violeta-cyan-verde
-
-### Fontes
-- **Body:** Inter
-- **Heading:** Space Grotesk
-- **Mono:** JetBrains Mono
 
 ---
 
@@ -188,20 +206,19 @@ info: '#6c5ce7'        text: '#e0e0e0'       muted: '#6c757d'
 
 - **Users:** abner, nonoke, elias — todos Admin
 - **Senha padrão:** `7741`
-- **JWT_SECRET:** definido no `.env` do backend
-- **Token:** armazenado em `localStorage.getItem('nexo_token')`
-- **Logout automático:** Interceptador 401 no axios remove token e redireciona
-- **Switch user:** `POST /api/users/switch` atualiza `users.json.active`
+- **JWT_SECRET:** `backend/.env`
+- **Token:** `localStorage.getItem('nexo_token')`
+- **Logout automático:** Interceptador 401 no axios
 
 ---
 
 ## 10. Active Issues & TODO
 
-- [ ] **Testar Ideias no browser** — APIs funcionam via curl, mas navegação visual não testada
-- [ ] **Testar IA Gemini** — API key inserida, mas chat não testado end-to-end
-- [ ] **Chunk size warning** — Bundle frontend >500KB (não crítico, mas pode otimizar lazy loading)
-- [ ] **Playwright browser lock** — Ferramenta de screenshot com erro, não bloqueia o projeto
-- [ ] **Rota /api/users GET** — Não existe; lista de users vem de `/api/state` ou `/api/auth/me`
+- [ ] **Deploy Sprint 2** — Branch `codex/initial-nexo-dashboard-pro-v16` para Render
+- [ ] **Teste browser** — Banner de drafts, aprovação, action items → tasks
+- [ ] **Chunk size warning** — Bundle frontend ~1.8MB (não crítico)
+- [ ] **Preencher `to` no compose** — Quando aprovar draft de reply, preencher destinatário
+- [ ] **Verificar `requireAuth`** — Nos novos endpoints `/api/email/ai/*`
 
 ---
 
@@ -209,7 +226,7 @@ info: '#6c5ce7'        text: '#e0e0e0'       muted: '#6c757d'
 
 ### Backend (porta 3456)
 ```bash
-cd backend && npm start   # ou node server.js
+cd backend && npm start
 ```
 
 ### Frontend (porta 3457)
@@ -223,24 +240,25 @@ cd frontend && npm run build
 # Dist vai para backend/public/ (serve estático pelo Express)
 ```
 
+**Render:** Auto-deploy na branch `codex/initial-nexo-dashboard-pro-v16`.
+
 ---
 
 ## 12. Session History
 
-| Data | O que foi feito |
-|------|----------------|
-| 2026-05-10 | FIX WhatsApp gray screen (normalizeAgentData com hooks errados) |
-| 2026-05-11 | Criação do MISSION BRIEF para Sessão IDEIAS |
-| 2026-05-12 | Agent Swarm gera código completo da Sessão IDEIAS |
-| 2026-05-13 | Merge inteligente no projeto real (15 arquivos novos) |
-| 2026-05-14 | Build passa, APIs testadas com sucesso, path corrigido |
-| 2026-05-18 | GEMINI_API_KEY inserida no `.env`, KIMI.MD criado |
-| 2026-05-18 | dotenv instalado no backend para carregar `.env` corretamente |
-| 2026-05-18 | IA polida: prompt enxuto sem apresentacao, respostas curtas |
-| 2026-05-18 | Tool Calling implementado: 7 ferramentas para IA manipular ideias |
-| 2026-05-18 | Frontend atualizado para mostrar acoes executadas pela IA no chat |
-| 2026-05-18 | Ollama removido do sistema; Gemini API integrada no chat da Luna e no IntentParser |
-| 2026-05-18 | Badge Gemini adicionado no header do chat da Luna |
+| Data | O que foi feito | Instância |
+|------|----------------|-----------|
+| 2026-05-10 | FIX WhatsApp gray screen | — |
+| 2026-05-11 | Criação do MISSION BRIEF para Sessão IDEIAS | — |
+| 2026-05-12 | Agent Swarm gera código completo da Sessão IDEIAS | — |
+| 2026-05-13 | Merge inteligente no projeto real (15 arquivos) | — |
+| 2026-05-14 | Build passa, APIs testadas com sucesso | — |
+| 2026-05-18 | GEMINI_API_KEY no `.env`, KIMI.MD criado | — |
+| 2026-05-18 | dotenv instalado, IA polida, Ollama removido | — |
+| 2026-05-18 | Tool Calling implementado (7 ferramentas) | — |
+| 2026-05-18 | **NEXO Mail Sprint 1** — Layout, modo foco, sidebar, Luna painel inline | kimi-bbf526dc 🔵 |
+| 2026-05-18 | **NEXO Mail Sprint 2** — Drafts pendentes, action items→tasks, notificações | kimi-bbf526dc 🔵 |
+| 2026-05-18 | **Sistema `.kimi-context/` criado** — Persistência de contexto entre sessões | kimi-bbf526dc 🔵 |
 
 ---
 
@@ -251,17 +269,60 @@ cd frontend && npm run build
 | Secret | Local |
 |--------|-------|
 | GEMINI_API_KEY | `backend/.env` |
-| JWT_SECRET | `backend/.env` (fallback hardcoded em server.js) |
-| User passwords | `backend/data/users.json` (bcrypt hashed) |
+| JWT_SECRET | `backend/.env` |
+| Gmail OAuth Client ID | Hardcoded no frontend (público) |
+| User passwords | `backend/data/users.json` (bcrypt) |
 
 ---
 
 ## 14. Dicas para Continuação
 
-- Para nova feature: crie `plan.md` primeiro, depois execute swarm ou manual
+- Para nova feature: crie `plan.md` primeiro, depois execute
 - Para bug no frontend: cheque `AuthContext` e interceptador 401
-- Para bug no backend: cheque se o arquivo JSON existe e tem schema válido
-- Para dados do WhatsApp: fonte da verdade é `whatsapp-history.json` (não o buffer)
+- Para bug no backend: cheque se arquivo JSON existe e tem schema válido
+- Para dados do WhatsApp: fonte da verdade é `whatsapp-history.json`
 - Para adicionar nova página: editar `App.jsx` + `Sidebar.jsx` apenas
 - Para nova rota API: seguir pattern factory `module.exports = function(requireAuth)`
 - Sempre testar com `curl` antes de testar no browser
+
+---
+
+## 15. 🧠 Sistema de Persistência de Contexto (.kimi-context)
+
+> Criado em 2026-05-18 para mitigar perda de informação por context compaction.
+> Baseado em: Context Anchoring, memo-agent, OpenClaw memory patterns.
+
+### Estrutura
+```
+.kimi-context/
+├── index.json          # Índice mestre: sessões, instâncias, regras
+├── handoff.md          # 🔄 O QUE FAZER AGORA — leia isto primeiro!
+└── sessions/
+    └── YYYY-MM-DD-kimi-XXXXXXXX.md  # Snapshot completo por sessão
+```
+
+### Protocolo para Nova Sessão
+1. **LER** `.kimi-context/index.json` — qual instância está ativa?
+2. **LER** `.kimi-context/handoff.md` — o que está pendente?
+3. **LER** `KIMI.MD` — contexto operacional geral
+4. **SE** outra instância estiver `active`: confirmar com usuário antes de prosseguir
+5. **GERAR** novo `kimi-XXXXXXXX` ID único
+6. **ATUALIZAR** `index.json` com nova sessão
+7. **TRABALHAR** normalmente
+8. **ANTES de context compaction:** salvar snapshot em `sessions/`
+9. **ANTES de encerrar:** atualizar `handoff.md`
+
+### Geração de ID de Instância
+```bash
+kimi_id="kimi-$(date +%s%N | sha256sum | head -c 8)"
+# Ex: kimi-bbf526dc
+```
+
+### Regras de Conflito
+- NUNCA duas instâncias `active` ao mesmo tempo
+- Se encontrar trabalho não-finalizado de outra instância: pergunte ao usuário
+- Snapshots são READ-ONLY após criação (exceto para marcar como `archived`)
+
+---
+
+*Última atualização: 2026-05-18 por kimi-bbf526dc 🔵*
