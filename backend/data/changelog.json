@@ -1,26 +1,7 @@
 {
-  "version": "1.0",
-  "lastUpdated": "2026-05-19T17:25:00.000Z",
+  "version": "1.1",
+  "lastUpdated": "2026-05-19T18:30:00.000Z",
   "entries": [
-    {
-      "id": "changelog-workspace-v1",
-      "version": "3.2.0",
-      "title": "Workspace v1.0 — Terminal SSE, Context Menu & Drag-Drop",
-      "description": "Primeira versão polida do Workspace: terminal de logs em tempo real via Server-Sent Events (SSE) para servidores de desenvolvimento, menu de contexto (clique direito) para arquivos e pastas com ações rápidas, drag-and-drop de arquivos para upload, e detecção automática de tipo de projeto (React, Next.js, Vue, etc.) nas pastas de demos.",
-      "category": "feature",
-      "emoji": "💻",
-      "author": "Abner",
-      "tier": 2,
-      "date": "2026-05-19T15:30:00.000Z",
-      "tags": [
-        "workspace",
-        "terminal",
-        "sse",
-        "context-menu",
-        "drag-drop"
-      ],
-      "readBy": []
-    },
     {
       "id": "changelog-workspace-leads-active-learning",
       "version": "3.2.0",
@@ -74,6 +55,44 @@
         "chat",
         "nlu",
         "action-executor"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-ux-polimento-19",
+      "version": "3.2.0",
+      "title": "Polimento UX — Modal Responsivo, Auth JWT & Labels",
+      "description": "Correções de usabilidade críticas: SmartFormModal agora scrolla internamente (max-h-[90vh]) mantendo header/footer fixos; requisições do modal enviam token JWT explicitamente no header Authorization; label 'Assunto:' no EmailCompose corrigido para não transbordar sobre o placeholder (w-14 shrink-0); payloads NLU 100% alinhados com schemas do backend.",
+      "category": "improvement",
+      "emoji": "🎨",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-19T16:00:00.000Z",
+      "tags": [
+        "ux",
+        "modal",
+        "jwt",
+        "responsive",
+        "polimento"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-workspace-v1",
+      "version": "3.2.0",
+      "title": "Workspace v1.0 — Terminal SSE, Context Menu & Drag-Drop",
+      "description": "Primeira versão polida do Workspace: terminal de logs em tempo real via Server-Sent Events (SSE) para servidores de desenvolvimento, menu de contexto (clique direito) para arquivos e pastas com ações rápidas, drag-and-drop de arquivos para upload, e detecção automática de tipo de projeto (React, Next.js, Vue, etc.) nas pastas de demos.",
+      "category": "feature",
+      "emoji": "💻",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-19T15:30:00.000Z",
+      "tags": [
+        "workspace",
+        "terminal",
+        "sse",
+        "context-menu",
+        "drag-drop"
       ],
       "readBy": []
     },
@@ -134,6 +153,24 @@
       "readBy": []
     },
     {
+      "id": "changelog-persistencia-contexto",
+      "version": "3.2.0",
+      "title": "Sistema de Persistência de Contexto (.kimi-context)",
+      "description": "Novo sistema para mitigar perda de contexto por compaction entre sessões Kimi: index.json (índice mestre com hashes únicos por instância), handoff.md (próximas ações pendentes entre sessões), sessions/ (snapshots completos por sessão). KIMI.MD atualizado com seção 15 (persistência).",
+      "category": "improvement",
+      "emoji": "💾",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T12:00:00.000Z",
+      "tags": [
+        "persistencia",
+        "contexto",
+        "kimi",
+        "docs"
+      ],
+      "readBy": []
+    },
+    {
       "id": "changelog-nexo-mail-sprint1",
       "version": "3.2.0",
       "title": "NEXO Mail v2.0 Sprint 1 — Layout, Modo Foco & Densidade",
@@ -153,39 +190,19 @@
       "readBy": []
     },
     {
-      "id": "changelog-ux-polimento-19",
-      "version": "3.2.0",
-      "title": "Polimento UX — Modal Responsivo, Auth JWT & Labels",
-      "description": "Correções de usabilidade críticas: SmartFormModal agora scrolla internamente (max-h-[90vh]) mantendo header/footer fixos; requisições do modal enviam token JWT explicitamente no header Authorization; label 'Assunto:' no EmailCompose corrigido para não transbordar sobre o placeholder (w-14 shrink-0); payloads NLU 100% alinhados com schemas do backend.",
-      "category": "improvement",
-      "emoji": "🎨",
-      "author": "Abner",
-      "tier": 2,
-      "date": "2026-05-19T16:00:00.000Z",
-      "tags": [
-        "ux",
-        "modal",
-        "jwt",
-        "responsive",
-        "polimento"
-      ],
-      "readBy": []
-    },
-    {
-      "id": "changelog-persistencia-contexto",
-      "version": "3.2.0",
-      "title": "Sistema de Persistência de Contexto (.kimi-context)",
-      "description": "Novo sistema para mitigar perda de contexto por compaction entre sessões Kimi: index.json (índice mestre com hashes únicos por instância), handoff.md (próximas ações pendentes entre sessões), sessions/ (snapshots completos por sessão). KIMI.MD atualizado com seção 15 (persistência).",
-      "category": "improvement",
-      "emoji": "💾",
+      "id": "changelog-001",
+      "version": "3.1.0",
+      "title": "Sistema de Changelog e Release Notes",
+      "description": "Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.",
+      "category": "feature",
+      "emoji": "✨",
       "author": "Luna",
       "tier": 2,
-      "date": "2026-05-19T12:00:00.000Z",
+      "date": "2026-05-18T20:32:30.570Z",
       "tags": [
-        "persistencia",
-        "contexto",
-        "kimi",
-        "docs"
+        "changelog",
+        "ui",
+        "notificacoes"
       ],
       "readBy": []
     },
@@ -205,23 +222,6 @@
         "drafts",
         "action-items",
         "v2"
-      ],
-      "readBy": []
-    },
-    {
-      "id": "changelog-001",
-      "version": "3.1.0",
-      "title": "Sistema de Changelog e Release Notes",
-      "description": "Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.",
-      "category": "feature",
-      "emoji": "✨",
-      "author": "Luna",
-      "tier": 2,
-      "date": "2026-05-18T20:32:30.570Z",
-      "tags": [
-        "changelog",
-        "ui",
-        "notificacoes"
       ],
       "readBy": []
     },
