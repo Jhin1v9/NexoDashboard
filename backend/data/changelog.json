@@ -1,7 +1,82 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-19T16:12:00.000Z",
+  "lastUpdated": "2026-05-19T17:25:00.000Z",
   "entries": [
+    {
+      "id": "changelog-workspace-v1",
+      "version": "3.2.0",
+      "title": "Workspace v1.0 — Terminal SSE, Context Menu & Drag-Drop",
+      "description": "Primeira versão polida do Workspace: terminal de logs em tempo real via Server-Sent Events (SSE) para servidores de desenvolvimento, menu de contexto (clique direito) para arquivos e pastas com ações rápidas, drag-and-drop de arquivos para upload, e detecção automática de tipo de projeto (React, Next.js, Vue, etc.) nas pastas de demos.",
+      "category": "feature",
+      "emoji": "💻",
+      "author": "Abner",
+      "tier": 2,
+      "date": "2026-05-19T15:30:00.000Z",
+      "tags": [
+        "workspace",
+        "terminal",
+        "sse",
+        "context-menu",
+        "drag-drop"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-workspace-leads-active-learning",
+      "version": "3.2.0",
+      "title": "Workspace Unificado + Active Learning NLU",
+      "description": "A sidebar do Workspace agora mostra Leads e Clientes unificados do clients-registry.json. Leads não convertidos abrem um preview panel com botão 'Converter em Cliente' que cria automaticamente a pasta no workspace com estrutura padrão (01_orcamentos a 07_entregas) + README.md. Além disso, Active Learning no SmartFormModal: quando NLU retorna score < 0.85, o usuário pode corrigir a intent, re-treinando o modelo via /api/luna/learn.",
+      "category": "feature",
+      "emoji": "🎯",
+      "author": "Luna",
+      "tier": 1,
+      "date": "2026-05-19T17:20:00.000Z",
+      "tags": [
+        "workspace",
+        "leads",
+        "active-learning",
+        "nlu",
+        "unificação"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-executor-ajuda-navegar",
+      "version": "3.2.0",
+      "title": "ActionExecutor: Comandos sistema.ajuda + sistema.navegar",
+      "description": "Novas ações no ActionExecutor: 'ajuda' responde com lista de capacidades da Luna e 'navegar' redireciona para páginas do dashboard. Além disso, 'task_done' agora retorna erro quando não encontra a tarefa (não cria mais automaticamente uma tarefa concluída desconhecida).",
+      "category": "feature",
+      "emoji": "🧭",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T17:00:00.000Z",
+      "tags": [
+        "action-executor",
+        "ajuda",
+        "navegação",
+        "task_done"
+      ],
+      "readBy": []
+    },
+    {
+      "id": "changelog-luna-fluxo-unificado",
+      "version": "3.2.0",
+      "title": "Luna: Fluxo Floating Button + Chat Unificado",
+      "description": "O LunaFloatingButton agora usa o mesmo endpoint /api/luna/chat que a página dedicada de chat, com fallback automático para o SmartFormModal quando a intenção detectada requer preenchimento de formulário. NLU e ActionExecutor sincronizados para evitar divergências entre os dois fluxos de interação.",
+      "category": "fix",
+      "emoji": "🔧",
+      "author": "Luna",
+      "tier": 2,
+      "date": "2026-05-19T16:45:00.000Z",
+      "tags": [
+        "luna",
+        "floating-button",
+        "chat",
+        "nlu",
+        "action-executor"
+      ],
+      "readBy": []
+    },
     {
       "id": "changelog-luna-v20",
       "version": "3.2.0",
