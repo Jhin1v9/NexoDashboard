@@ -7756,6 +7756,17 @@ app.post('/api/auth/login', async (req, res) => {
           event.notified = true;
           event.notificationChannel = (event.notificationChannel || '') + '+whatsapp';
         }
+
+        // Persistir status de notificação no security log
+        if (event.notified) {
+          const secLog = readJSON(SECURITY_LOG_FILE, { events: [] });
+          const evtIdx = secLog.events.findIndex(e => e.id === event.id);
+          if (evtIdx !== -1) {
+            secLog.events[evtIdx].notified = event.notified;
+            secLog.events[evtIdx].notificationChannel = event.notificationChannel;
+            writeJSON(SECURITY_LOG_FILE, secLog);
+          }
+        }
       }
 
       return res.status(401).json({ success: false, error: 'Credenciais inválidas' });
