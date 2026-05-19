@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, X, Send, Loader2, Bot, CheckCircle, ArrowRight, Wand2 } from 'lucide-react'
 import { useLunaNLU } from '../../hooks/useLunaNLU'
 import { useLunaContext } from '../../hooks/useLunaContext'
+import { useToast } from '../../context/ToastContext'
 import { lunaEventBus } from '../../lib/lunaEventBus'
 import { hasFormFields, getSchema } from './LunaIntentSchemas'
 import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
@@ -37,6 +38,7 @@ export default function LunaFloatingButton() {
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
+  const { addToast } = useToast()
 
   // Sugestões globais — não limitadas por página. O currentModule é enviado
   // como contexto pro NLU (melhora precisão) mas o usuário pode executar

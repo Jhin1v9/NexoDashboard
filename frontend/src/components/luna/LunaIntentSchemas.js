@@ -478,6 +478,1179 @@ export const INTENT_SCHEMAS = {
     description: 'Oi! Tô por aqui, pronta pra ajudar.\n\nPosso te ajudar com:\n• Criar tarefas, leads, ideias\n• Registrar pagamentos e despesas\n• Consultar caixa, projetos, links\n• Enviar emails e mensagens WhatsApp\n• Verificar menções e notificações\n\nO que você precisa?',
     isInfo: true,
   },
+  'email.resumir': {
+    title: 'Resumir',
+    description: 'Gerar resumo do conteúdo.',
+    isInfo: true,
+  },
+
+  'email.analisar': {
+    title: 'Analisar',
+    description: 'Analisar conteúdo e fornecer insights.',
+    isInfo: true,
+  },
+
+  'email.enviar': {
+    title: 'Enviar',
+    description: 'Enviar mensagem ou documento.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'email.enviar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'email.arquivar': {
+    title: 'Arquivar',
+    description: 'Mover item para arquivo.',
+    isInfo: true,
+  },
+
+  'email.mover_lixeira': {
+    title: 'Mover para Lixeira',
+    description: 'Mover item para lixeira.',
+    isInfo: true,
+  },
+
+  'email.marcar_lido': {
+    title: 'Marcar como Lido',
+    description: 'Marcar como lido.',
+    isInfo: true,
+  },
+
+  'email.sincronizar': {
+    title: 'Sincronizar',
+    description: 'Sincronizar dados atualizados.',
+    isInfo: true,
+  },
+
+  'tarefa.atribuir': {
+    title: 'Atribuir',
+    description: 'Atribuir a um responsável.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'tarefa.atribuir',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'whatsapp.responder_cliente': {
+    title: 'responder_cliente',
+    description: 'Executar ação: responder_cliente',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'whatsapp.responder_cliente',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'orcamento.enviar_cliente': {
+    title: 'Enviar ao Cliente',
+    description: 'Enviar ao cliente.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'orcamento.enviar_cliente',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'projeto.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'projeto.criar': {
+    title: 'Criar',
+    description: 'Preencha os detalhes para criar um novo item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'projeto.criar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'ideia.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'ideia.criar': {
+    title: 'Criar',
+    description: 'Preencha os detalhes para criar um novo item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'ideia.criar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'whatsapp.verificar_mencoes': {
+    title: 'Verificar Menções',
+    description: 'Verificar menções pendentes.',
+    isInfo: true,
+  },
+
+  'link.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'link.adicionar': {
+    title: 'Adicionar',
+    description: 'Adicionar novo item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'link.adicionar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'sistema.notificacoes': {
+    title: 'Notificações',
+    description: 'Ver notificações.',
+    isInfo: true,
+  },
+
+  'email.listar_rascunhos': {
+    title: 'Rascunhos Pendentes',
+    description: 'Listar rascunhos pendentes de aprovação.',
+    isInfo: true,
+  },
+
+  'email.aprovar_rascunho': {
+    title: 'Aprovar Rascunho',
+    description: 'Aprovar rascunho e enviar.',
+    isInfo: true,
+  },
+
+  'email.rejeitar_rascunho': {
+    title: 'Rejeitar Rascunho',
+    description: 'Rejeitar rascunho.',
+    isInfo: true,
+  },
+
+  'email.favoritar': {
+    title: 'Favoritar',
+    description: 'Marcar como favorito.',
+    isInfo: true,
+  },
+
+  'email.desfavoritar': {
+    title: 'Desfavoritar',
+    description: 'Remover dos favoritos.',
+    isInfo: true,
+  },
+
+  'email.marcar_spam': {
+    title: 'Marcar como Spam',
+    description: 'Marcar como spam.',
+    isInfo: true,
+  },
+
+  'email.restaurar_lixeira': {
+    title: 'Restaurar da Lixeira',
+    description: 'Restaurar item da lixeira.',
+    isInfo: true,
+  },
+
+  'email.listar_arquivados': {
+    title: 'Emails Arquivados',
+    description: 'Listar itens arquivados.',
+    isInfo: true,
+  },
+
+  'email.listar_lixeira': {
+    title: 'Lixeira',
+    description: 'Listar itens na lixeira.',
+    isInfo: true,
+  },
+
+  'email.listar_enviados': {
+    title: 'Emails Enviados',
+    description: 'Listar itens enviados.',
+    isInfo: true,
+  },
+
+  'email.listar_com_estrela': {
+    title: 'Emails com Estrela',
+    description: 'Listar itens favoritos.',
+    isInfo: true,
+  },
+
+  'tarefa.minhas': {
+    title: 'Minhas Tarefas',
+    description: 'Listar minhas tarefas.',
+    isInfo: true,
+  },
+
+  'tarefa.atrasadas': {
+    title: 'Tarefas Atrasadas',
+    description: 'Listar tarefas atrasadas.',
+    isInfo: true,
+  },
+
+  'tarefa.por_projeto': {
+    title: 'Tarefas por Projeto',
+    description: 'Filtrar tarefas por projeto.',
+    isInfo: true,
+  },
+
+  'tarefa.por_responsavel': {
+    title: 'Tarefas por Responsável',
+    description: 'Filtrar tarefas por responsável.',
+    isInfo: true,
+  },
+
+  'tarefa.concluidas': {
+    title: 'Tarefas Concluídas',
+    description: 'Listar tarefas concluídas.',
+    isInfo: true,
+  },
+
+  'financeiro.extrato': {
+    title: 'Extrato Financeiro',
+    description: 'Visualizar extrato financeiro completo.',
+    isInfo: true,
+  },
+
+  'financeiro.gastos_do_mes': {
+    title: 'Gastos do Mês',
+    description: 'Visualizar gastos do mês.',
+    isInfo: true,
+  },
+
+  'financeiro.receitas_do_mes': {
+    title: 'Receitas do Mês',
+    description: 'Visualizar receitas do mês.',
+    isInfo: true,
+  },
+
+  'financeiro.balanco': {
+    title: 'Balanço',
+    description: 'Visualizar balanço financeiro.',
+    isInfo: true,
+  },
+
+  'financeiro.projecao': {
+    title: 'Projeção',
+    description: 'Visualizar projeção financeira.',
+    isInfo: true,
+  },
+
+  'financeiro.historico_caixa': {
+    title: 'Histórico do Caixa',
+    description: 'Visualizar histórico do caixa.',
+    isInfo: true,
+  },
+
+  'financeiro.reconciliar': {
+    title: 'Reconciliar Caixa',
+    description: 'Reconciliar caixa.',
+    isInfo: true,
+  },
+
+  'financeiro.ajustar_caixa': {
+    title: 'Ajustar Caixa',
+    description: 'Ajustar saldo do caixa.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'financeiro.ajustar_caixa',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'financeiro.pagar_despesa': {
+    title: 'Pagar Despesa',
+    description: 'Registrar pagamento de despesa.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'financeiro.pagar_despesa',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'financeiro.split': {
+    title: 'Split',
+    description: 'Gerenciar split financeiro.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'financeiro.split',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'financeiro.excluir_despesa': {
+    title: 'Excluir Despesa',
+    description: 'Excluir despesa registrada.',
+    isInfo: true,
+  },
+
+  'financeiro.excluir_pagamento': {
+    title: 'Excluir Pagamento',
+    description: 'Excluir pagamento registrado.',
+    isInfo: true,
+  },
+
+  'financeiro.atualizar_despesa': {
+    title: 'Atualizar Despesa',
+    description: 'Atualizar despesa.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'financeiro.atualizar_despesa',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'financeiro.atualizar_pagamento': {
+    title: 'Atualizar Pagamento',
+    description: 'Atualizar pagamento.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'financeiro.atualizar_pagamento',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'whatsapp.mensagens_recentes': {
+    title: 'Mensagens Recentes',
+    description: 'Visualizar mensagens recentes.',
+    isInfo: true,
+  },
+
+  'whatsapp.scan': {
+    title: 'Scan',
+    description: 'Escanear mensagens.',
+    isInfo: true,
+  },
+
+  'whatsapp.classificar': {
+    title: 'Classificar Mensagens',
+    description: 'Classificar mensagens.',
+    isInfo: true,
+  },
+
+  'whatsapp.relatorio': {
+    title: 'Relatório',
+    description: 'Gerar relatório.',
+    isInfo: true,
+  },
+
+  'whatsapp.limpar_buffer': {
+    title: 'Limpar Buffer',
+    description: 'Limpar buffer de mensagens.',
+    isInfo: true,
+  },
+
+  'whatsapp.checkpoint': {
+    title: 'Checkpoint',
+    description: 'Criar checkpoint.',
+    isInfo: true,
+  },
+
+  'whatsapp.configurar': {
+    title: 'Configurar',
+    description: 'Configurar integração.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'whatsapp.configurar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'sistema.notificacoes_lidas': {
+    title: 'Marcar Notificações como Lidas',
+    description: 'Marcar todas as notificações como lidas.',
+    isInfo: true,
+  },
+
+  'sistema.configuracoes': {
+    title: 'Configurações',
+    description: 'Abrir configurações.',
+    isInfo: true,
+  },
+
+  'sistema.trocar_usuario': {
+    title: 'Trocar Usuário',
+    description: 'Trocar de usuário.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'sistema.trocar_usuario',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'sistema.alterar_senha': {
+    title: 'Alterar Senha',
+    description: 'Alterar senha.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'sistema.alterar_senha',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'sistema.usuarios': {
+    title: 'Usuários',
+    description: 'Listar usuários.',
+    isInfo: true,
+  },
+
+  'sistema.changelog': {
+    title: 'Changelog',
+    description: 'Visualizar changelog.',
+    isInfo: true,
+  },
+
+  'sistema.relatorios_bug': {
+    title: 'Relatórios de Bug',
+    description: 'Visualizar relatórios de bug.',
+    isInfo: true,
+  },
+
+  'sistema.auto_fix': {
+    title: 'Auto Fix',
+    description: 'Executar auto fix.',
+    isInfo: true,
+  },
+
+  'sistema.controlar_servico': {
+    title: 'Controlar Serviço',
+    description: 'Controlar serviço.',
+    isInfo: true,
+  },
+
+  'workspace.listar_clientes': {
+    title: 'Listar Clientes',
+    description: 'Listar clientes do workspace.',
+    isInfo: true,
+  },
+
+  'workspace.abrir': {
+    title: 'Abrir',
+    description: 'Abrir workspace.',
+    isInfo: true,
+  },
+
+  'workspace.criar_cliente': {
+    title: 'Criar Cliente',
+    description: 'Criar novo cliente no workspace.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'workspace.criar_cliente',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'workspace.criar_pasta': {
+    title: 'Criar Pasta',
+    description: 'Criar nova pasta.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'workspace.criar_pasta',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'workspace.upload': {
+    title: 'Upload',
+    description: 'Fazer upload de arquivo.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'workspace.upload',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'workspace.servidores': {
+    title: 'Servidores',
+    description: 'Visualizar status dos servidores.',
+    isInfo: true,
+  },
+
+  'workspace.iniciar_demo': {
+    title: 'Iniciar Demo',
+    description: 'Iniciar servidor de demo.',
+    isInfo: true,
+  },
+
+  'workspace.parar_demo': {
+    title: 'Parar Demo',
+    description: 'Parar servidor de demo.',
+    isInfo: true,
+  },
+
+  'workspace.logs': {
+    title: 'Logs',
+    description: 'Visualizar logs.',
+    isInfo: true,
+  },
+
+  'instagram.importar': {
+    title: 'Importar',
+    description: 'Importar dados.',
+    isInfo: true,
+  },
+
+  'instagram.mensagens': {
+    title: 'Mensagens',
+    description: 'Visualizar mensagens.',
+    isInfo: true,
+  },
+
+  'instagram.configurar': {
+    title: 'Configurar',
+    description: 'Configurar integração.',
+    isInfo: true,
+  },
+
+  'github.repos': {
+    title: 'Repositórios',
+    description: 'Listar repositórios.',
+    isInfo: true,
+  },
+
+  'github.git_push': {
+    title: 'Git Push',
+    description: 'Executar git push.',
+    isInfo: true,
+  },
+
+  'github.status': {
+    title: 'Status',
+    description: 'Verificar status atual.',
+    isInfo: true,
+  },
+
+  'vercel.projetos': {
+    title: 'Projetos na Vercel',
+    description: 'Listar projetos na Vercel.',
+    isInfo: true,
+  },
+
+  'vercel.status': {
+    title: 'Status',
+    description: 'Verificar status atual.',
+    isInfo: true,
+  },
+
+  'seguranca.configuracoes': {
+    title: 'Configurações',
+    description: 'Abrir configurações.',
+    isInfo: true,
+  },
+
+  'seguranca.logs': {
+    title: 'Logs',
+    description: 'Visualizar logs.',
+    isInfo: true,
+  },
+
+  'seguranca.testar_whatsapp': {
+    title: 'Testar WhatsApp',
+    description: 'Testar integração WhatsApp.',
+    isInfo: true,
+  },
+
+  'seguranca.alerta': {
+    title: 'Criar Alerta',
+    description: 'Criar alerta.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'seguranca.alerta',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'operacao.alerta': {
+    title: 'Criar Alerta',
+    description: 'Criar alerta.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'operacao.alerta',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'operacao.excluir_alerta': {
+    title: 'Excluir Alerta',
+    description: 'Excluir alerta.',
+    isInfo: true,
+  },
+
+  'operacao.mudanca': {
+    title: 'Registrar Mudança',
+    description: 'Registrar mudança no sistema.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'operacao.mudanca',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'operacao.status': {
+    title: 'Status',
+    description: 'Verificar status atual.',
+    isInfo: true,
+  },
+
+  'email.marcar_importante': {
+    title: 'Marcar como Importante',
+    description: 'Marcar como importante.',
+    isInfo: true,
+  },
+
+  'tarefa.atualizar': {
+    title: 'Atualizar',
+    description: 'Atualizar informações do item selecionado.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'tarefa.atualizar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'tarefa.deletar': {
+    title: 'Excluir',
+    description: 'Confirmar exclusão do item.',
+    isInfo: true,
+  },
+
+  'tarefa.adicionar_comentario': {
+    title: 'Adicionar Comentário',
+    description: 'Adicionar comentário.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'tarefa.adicionar_comentario',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'projeto.atualizar': {
+    title: 'Atualizar',
+    description: 'Atualizar informações do item selecionado.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'projeto.atualizar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'projeto.deletar': {
+    title: 'Excluir',
+    description: 'Confirmar exclusão do item.',
+    isInfo: true,
+  },
+
+  'projeto.adicionar_cliente': {
+    title: 'adicionar_cliente',
+    description: 'Executar ação: adicionar_cliente',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'projeto.adicionar_cliente',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'projeto.ver_status': {
+    title: 'ver_status',
+    description: 'Executar ação: ver_status',
+    isInfo: true,
+  },
+
+  'cliente.criar': {
+    title: 'Criar',
+    description: 'Preencha os detalhes para criar um novo item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'cliente.criar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'cliente.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'cliente.buscar': {
+    title: 'buscar',
+    description: 'Executar ação: buscar',
+    isInfo: true,
+  },
+
+  'cliente.atualizar': {
+    title: 'Atualizar',
+    description: 'Atualizar informações do item selecionado.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'cliente.atualizar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'cliente.deletar': {
+    title: 'Excluir',
+    description: 'Confirmar exclusão do item.',
+    isInfo: true,
+  },
+
+  'financeiro.projetar_caixa': {
+    title: 'Projetar Caixa',
+    description: 'Projeção financeira futura.',
+    isInfo: true,
+  },
+
+  'financeiro.ver_balanco': {
+    title: 'Ver Balanço',
+    description: 'Visualizar balanço financeiro.',
+    isInfo: true,
+  },
+
+  'whatsapp.ver_historico': {
+    title: 'Ver Histórico',
+    description: 'Ver histórico de conversas.',
+    isInfo: true,
+  },
+
+  'whatsapp.sincronizar': {
+    title: 'Sincronizar',
+    description: 'Sincronizar dados atualizados.',
+    isInfo: true,
+  },
+
+  'whatsapp.marcar_nao_lido': {
+    title: 'Marcar como Não Lido',
+    description: 'Marcar como não lido.',
+    isInfo: true,
+  },
+
+  'link.excluir': {
+    title: 'Excluir',
+    description: 'Excluir item selecionado.',
+    isInfo: true,
+  },
+
+  'orcamento.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'orcamento.atualizar': {
+    title: 'Atualizar',
+    description: 'Atualizar informações do item selecionado.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'orcamento.atualizar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'orcamento.aprovar': {
+    title: 'Aprovar',
+    description: 'Aprovar item.',
+    isInfo: true,
+  },
+
+  'orcamento.rejeitar': {
+    title: 'Rejeitar',
+    description: 'Rejeitar item.',
+    isInfo: true,
+  },
+
+  'lead.criar': {
+    title: 'Criar',
+    description: 'Preencha os detalhes para criar um novo item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'lead.criar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'lead.listar': {
+    title: 'Listar',
+    description: 'Listar todos os itens disponíveis.',
+    isInfo: true,
+  },
+
+  'lead.atualizar_status': {
+    title: 'Atualizar Status',
+    description: 'Atualizar status do item.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'lead.atualizar_status',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'lead.converter': {
+    title: 'Converter',
+    description: 'Converter para outro tipo.',
+    isInfo: true,
+  },
+
+  'lead.deletar': {
+    title: 'Excluir',
+    description: 'Confirmar exclusão do item.',
+    isInfo: true,
+  },
+
+  'ideia.atualizar': {
+    title: 'Atualizar',
+    description: 'Atualizar informações do item selecionado.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'ideia.atualizar',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
+
+  'ideia.deletar': {
+    title: 'Excluir',
+    description: 'Confirmar exclusão do item.',
+    isInfo: true,
+  },
+
+  'ideia.converter_tarefa': {
+    title: 'Converter em Tarefa',
+    description: 'Converter ideia em tarefa.',
+    isInfo: true,
+  },
+
+  'ideia.adicionar_comentario': {
+    title: 'Adicionar Comentário',
+    description: 'Adicionar comentário.',
+    fields: {
+      confirmar: {
+        label: 'Confirmar ação',
+        type: 'checkbox',
+        required: true,
+      },
+    },
+    submitConfig: {
+      method: 'POST',
+      endpoint: '/api/luna/action',
+      transform: (values) => ({
+        intent: 'ideia.adicionar_comentario',
+        confirmed: values.confirmar,
+      }),
+    },
+  },
 }
 
 // ── Fallback para intents sem schema ──
