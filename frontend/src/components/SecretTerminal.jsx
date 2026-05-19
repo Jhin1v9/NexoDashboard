@@ -1,26 +1,138 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-// Coletar device fingerprint no frontend
-function collectFingerprint() {
+// Coletar device fingerprint AVANÇADO no frontend
+// Coleta TUDO que é possível para identificar o intruso
+async function collectFingerprint() {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   ctx.textBaseline = 'top'
   ctx.font = '14px Arial'
-  ctx.fillText('NEXO fingerprint', 2, 2)
+  ctx.fillText('NEXO fingerprint v2.0', 2, 2)
   const canvasHash = canvas.toDataURL().slice(-32)
 
-  const gl = document.createElement('canvas').getContext('webgl')
-  const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info')
-  const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'unknown'
+  // WebGL detalhado
+  const glCanvas = document.createElement('canvas')
+  const gl = glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl')
+  let webgl = 'unknown'
+  let webglVendor = 'unknown'
+  let webglRenderer = 'unknown'
+  if (gl) {
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
+    if (debugInfo) {
+      webglVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'unknown'
+      webglRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'unknown'
+      webgl = `${webglVendor} / ${webglRenderer}`
+    }
+  }
+
+  // Plugins
+  const plugins = Array.from(navigator.plugins || []).map(p => ({
+    name: p.name,
+    filename: p.filename,
+    description: p.description,
+    version: p.version || 'N/A'
+  }))
+
+  // Font detection básica
+  const testFonts = ['Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Helvetica', 'Comic Sans MS']
+  const fonts = []
+  const testCanvas = document.createElement('canvas')
+  const testCtx = testCanvas.getContext('2d')
+  const baseText = 'mmmmmmmmlli'
+  testCtx.font = '72px monospace'
+  const baseWidth = testCtx.measureText(baseText).width
+  testFonts.forEach(font => {
+    testCtx.font = `72px "${font}", monospace`
+    if (testCtx.measureText(baseText).width !== baseWidth) {
+      fonts.push(font)
+    }
+  })
+
+  // Audio fingerprint
+  let audio = 'N/A'
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const oscillator = audioCtx.createOscillator()
+    const analyser = audioCtx.createAnalyser()
+    const gainNode = audioCtx.createGain()
+    oscillator.connect(analyser)
+    analyser.connect(gainNode)
+    gainNode.connect(audioCtx.destination)
+    oscillator.type = 'sine'
+    oscillator.frequency.value = 1000
+    oscillator.start()
+    const buffer = new Uint8Array(analyser.frequencyBinCount)
+    analyser.getByteFrequencyData(buffer)
+    audio = Array.from(buffer.slice(0, 10)).join(',')
+    oscillator.stop()
+    audioCtx.close()
+  } catch (e) {}
+
+  // Battery
+  let battery = 'N/A'
+  try {
+    if (navigator.getBattery) {
+      const bat = await navigator.getBattery()
+      battery = {
+        level: bat.level,
+        charging: bat.charging,
+        chargingTime: bat.chargingTime,
+        dischargingTime: bat.dischargingTime
+      }
+    }
+  } catch (e) {}
+
+  // Network info
+  let network = 'N/A'
+  try {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+    if (conn) {
+      network = {
+        effectiveType: conn.effectiveType,
+        downlink: conn.downlink,
+        rtt: conn.rtt,
+        saveData: conn.saveData
+      }
+    }
+  } catch (e) {}
+
+  // Touch support
+  const touchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
   return {
     canvas: canvasHash,
-    webgl: gpu,
+    webgl,
+    webglVendor,
+    webglRenderer,
     userAgent: navigator.userAgent,
     screen: `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`,
+    colorDepth: window.screen.colorDepth,
+    pixelRatio: window.devicePixelRatio,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    language: navigator.language
+    timezoneOffset: new Date().getTimezoneOffset(),
+    language: navigator.language,
+    languages: navigator.languages,
+    platform: navigator.platform,
+    vendor: navigator.vendor,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: navigator.deviceMemory,
+    maxTouchPoints: navigator.maxTouchPoints,
+    touchSupport,
+    cpuClass: navigator.cpuClass || 'N/A',
+    oscpu: navigator.oscpu || 'N/A',
+    product: navigator.product,
+    productSub: navigator.productSub,
+    doNotTrack: navigator.doNotTrack,
+    cookieEnabled: navigator.cookieEnabled,
+    online: navigator.onLine,
+    pdfViewerEnabled: navigator.pdfViewerEnabled,
+    webdriver: navigator.webdriver,
+    plugins: plugins.length > 0 ? plugins.map(p => p.name) : 'N/A',
+    fonts: fonts.length > 0 ? fonts : 'N/A',
+    audio,
+    battery,
+    network,
   }
 }
 
@@ -70,7 +182,7 @@ function SecretTerminal({ isOpen, onClose }) {
       setLines(prev => [...prev, { type: 'loading', text: 'Authenticating...' }])
 
       try {
-        const fingerprint = collectFingerprint()
+        const fingerprint = await collectFingerprint()
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
