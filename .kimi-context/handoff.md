@@ -1,69 +1,65 @@
 # 🔄 HANDOFF — Próximas Ações Pendentes
 
-> **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
+> **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão.
 > 
-> **Sessão ativa:** `kimi-c4b19cd8` 🟢 — última atualização: 2026-05-19
+> **Sessão ativa:** `kimi-19007e56` 🔴 — última atualização: 2026-05-19
 
 ---
 
-## 🎯 Foco Atual (Luna ADM Gestora Única — FASE 2)
+## 🎯 Foco Atual
 
-### ✅ Concluído em sessões anteriores
-- [x] **kimi-bbf526dc 🔵** — NEXO Mail v2.0 Sprint 2:
-  - LunaEmailAssistant convertido de modal → painel inline fixo (320px)
-  - Banner de drafts pendentes no EmailHub
-  - Endpoints `POST /api/email/ai/action-items-to-tasks` e `POST /api/email/ai/draft-for-approval`
-  - Notificações automáticas para drafts e tasks
-- [x] **kimi-c4b19cd8 🟢** — FASE 1 completa:
-  - Luna transformada em item normal de nav na sidebar (`/luna`)
-  - Chat flutuante removido do App.jsx
-  - Threads renomeadas para `luna-threads.json`
-  - Botões "Chat com Luna 💬" nas páginas EmailHub, Ideias, WhatsApp
+### ✅ Concluído nesta sessão (kimi-19007e56 🔴)
+- [x] **Testes completos locais** — Backend, frontend build, endpoints com curl
+- [x] **Testes online (Render)** — API responde, bundle novo deployado (`index-DATHYlcm.js`)
+- [x] **Teste browser via Playwright** — Email Hub carrega, Luna painel inline funciona
+- [x] **Fix deploy Render** — `npm install --legacy-peer-deps` no root `package.json`
+- [x] **Descoberta da instância 🟢** — `kimi-c4b19cd8` deixou mudanças não commitadas; foram integradas no commit `7ed2c6c`
+- [x] **Sistema `.kimi-context/` funcional** — Index, handoff, snapshots salvos
 
-### ⏳ Pendente / Próximo passo (esta sessão)
-- [ ] **FASE 2 — Expansão do ActionExecutor**: Adicionar ações que faltam
-  - `criar_orcamento`, `atualizar_orcamento`, `deletar_orcamento`
-  - `criar_projeto`, `atualizar_projeto`
-  - `adicionar_cliente_workspace`, `atualizar_cliente_workspace`
-  - `enviar_email`, `responder_email`, `gerar_rascunho_email`
-  - `deletar_orcamento`, `listar_orcamentos`
-- [ ] **Atualizar `knownActions` no `server.js`** com as novas ações
-- [ ] **Sincronizar com endpoints da sessão 🔵**: `action-items-to-tasks` já usa ActionExecutor — OK
-- [ ] **FASE 3 PENDENTE**: Unificar IAs de Ideias e Email para usar `/api/luna/chat`
-- [ ] **FASE 4 PENDENTE**: Frontend polimento — input universal, acesso rápido
-
-### 🚨 Modificações de outras sessões que afetam este trabalho
-| Sessão | Arquivos modificados | Impacto |
-|---|---|---|
-| `kimi-bbf526dc` 🔵 | `backend/server.js` (+170 linhas) | Novos endpoints `/api/email/ai/*` — ActionExecutor já é usado por eles, mas verificar se precisa de novos cases |
-| `kimi-bbf526dc` 🔵 | `frontend/src/components/email/LunaEmailAssistant.jsx` | Painel inline — NÃO reverter para modal |
-| `kimi-bbf526dc` 🔵 | `frontend/src/pages/EmailHub.jsx` | Banner drafts — integrado com compose |
+### ❌ Problema CRÍTICO descoberto
+- [ ] **API Key Gemini revogada** — Google reportou como "leaked". Toda a IA do sistema está quebrada.
 
 ---
 
-## 🚨 Blockers / Problemas conhecidos
+## 🚨 Blockers / Problemas Conhecidos
 
-| Problema | Severidade | Contexto |
-|---|---|---|
-| Contexto do Kimi pode ser compactado | 🔴 Alta | Sistema `.kimi-context/` ativo |
-| Chunk size warning Vite | 🟡 Média | Bundle > 500KB — não crítico |
-| Rota `/api/users` GET não existe | 🟡 Média | Lista de users vem de `/api/state` ou `/api/auth/me` |
+| Problema | Severidade | Status | Contexto |
+|---|---|---|---|
+| API Key Gemini revogada | 🔴 CRÍTICO | **NÃO RESOLVIDO** | `backend/.env` — key `AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g` bloqueada |
+| Frontend não mostra erro quando IA falha | 🟡 ALTO | Pendente | LunaEmailAssistant precisa de estado de erro |
+| EmailCompose não preenche `to` | 🟡 MÉDIO | Pendente | Ao aprovar draft de reply, destinatário fica vazio |
+| Chunk size warning | 🟢 BAIXO | Pendente | Bundle ~1.8MB |
 
 ---
 
-## 🔗 Arquivos chave desta sessão
+## 🔗 Arquivos Chave
 
 ```
-agents/core/ActionExecutor.js              # Expansão com novas ações
-backend/server.js                            # knownActions + endpoints Luna
-frontend/src/pages/LunaControl.jsx           # Chat unificado
-plans/PLANO_LUNA_UNICA_ADM_GESTORA_v20.md    # Plano completo
+backend/.env                                 # ⚠️ Precisa de nova GEMINI_API_KEY
+backend/services/email-ai.js                 # Prompts de email (funciona quando API key OK)
+backend/services/gemini-client.js            # Cliente Gemini multi-key
+frontend/src/components/email/LunaEmailAssistant.jsx  # Painel inline
+frontend/src/pages/EmailHub.jsx              # Banner drafts, handlers
+frontend/src/components/email/EmailCompose.jsx        # initialBody prop
+agents/core/ActionExecutor.js                # Expandido pela instância 🟢
+.kimi-context/index.json                     # Índice de sessões
+.kimi-context/handoff.md                     # Este arquivo
 ```
 
 ---
 
-## 📝 Notas da instância
+## 📝 Notas da Instância Atual
 
-**Instância:** `kimi-c4b19cd8` 🟢  
-**Última ação:** Atualizando .kimi-context e continuando FASE 2 do ActionExecutor.  
-**Contexto salvo em:** `.kimi-context/sessions/2026-05-19-kimi-c4b19cd8.md`
+**Instância:** `kimi-19007e56` 🔴  
+**Última ação:** Commit `7ed2c6c` feito e deployado no Render. Aguardando nova GEMINI_API_KEY.  
+**Contexto salvo em:** `.kimi-context/sessions/2026-05-19-kimi-19007e56.md`
+
+---
+
+## 🧠 Protocolo para Próxima Sessão
+
+1. **LER** `.kimi-context/index.json` — verificar `activeSessionId`
+2. **SE** `activeSessionId` for diferente de `kimi-19007e56`: confirmar com usuário
+3. **GERAR** novo ID `kimi-XXXXXXXX`
+4. **ATUALIZAR** `index.json` com nova sessão
+5. **TRABALHO:** Substituir API key → testar IA → polir frontend → deploy
