@@ -7745,7 +7745,7 @@ app.post('/api/auth/login', async (req, res) => {
         new Date(e.timestamp) > new Date(Date.now() - 60 * 60 * 1000)
       );
       const settings = log.settings || {};
-      const maxAttempts = settings.maxAttemptsBeforeAlert || 5;
+      const maxAttempts = settings.maxAttemptsBeforeAlert || 1;
 
       if (recentAttempts.length >= maxAttempts) {
         // Envia para Discord (sempre, sem rate limit por tentativa)
