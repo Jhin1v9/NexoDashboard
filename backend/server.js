@@ -288,23 +288,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
-// Debug: verificar estado do changelog no Render
-app.get('/api/debug/changelog-file', (req, res) => {
-  try {
-    const exists = fs.existsSync(CHANGELOG_FILE);
-    const size = exists ? fs.statSync(CHANGELOG_FILE).size : 0;
-    const content = exists ? readJSON(CHANGELOG_FILE) : null;
-    res.json({
-      exists,
-      size,
-      path: CHANGELOG_FILE,
-      entriesCount: content?.entries?.length || 0,
-      ids: content?.entries?.map(e => e.id) || []
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 // ── DEBUG: Gmail OAuth config ──
 app.get('/api/debug/gmail-config', (req, res) => {
@@ -3047,7 +3031,20 @@ if (!fs.existsSync(LINKS_INDEX_FILE)) {
 }
 
 function ensureChangelog() {
-  const hardcodedEntries = [
+  // Carrega entradas seed do arquivo versionado (fora de DATA_DIR para não ser afetado por .gitignore no Render)
+  const seedFile = path.join(__dirname, 'changelog-seed.json');
+  let seedEntries = [];
+  try {
+    if (fs.existsSync(seedFile)) {
+      const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+      seedEntries = seedData.entries || [];
+    }
+  } catch (err) {
+    console.error('[CHANGELOG] Erro ao carregar seed:', err.message);
+  }
+
+  // Fallback hardcoded se seed não existir
+  const hardcodedEntries = seedEntries.length > 0 ? seedEntries : [
     {
       id: 'changelog-001',
       version: '3.1.0',
@@ -3142,17 +3139,18 @@ function ensureChangelog() {
   ];
 
   if (!fs.existsSync(CHANGELOG_FILE)) {
-    // Primeira vez — cria do zero
+    // Primeira vez — cria do zero usando seed
     const initialData = {
       version: '1.0',
       lastUpdated: new Date().toISOString(),
       entries: hardcodedEntries
     };
     writeJSON(CHANGELOG_FILE, initialData);
+    console.log(`[CHANGELOG] Criado com ${hardcodedEntries.length} entradas (seed: ${seedEntries.length > 0 ? 'sim' : 'nao'}).`);
     return;
   }
 
-  // Arquivo existe — faz merge das entradas hardcoded que faltam
+  // Arquivo existe — faz merge das entradas seed/hardcoded que faltam
   const existingData = readJSON(CHANGELOG_FILE) || { entries: [] };
   const existingIds = new Set(existingData.entries.map(e => e.id));
   const missingEntries = hardcodedEntries.filter(e => !existingIds.has(e.id));
@@ -3161,7 +3159,7 @@ function ensureChangelog() {
     existingData.entries.push(...missingEntries);
     existingData.lastUpdated = new Date().toISOString();
     writeJSON(CHANGELOG_FILE, existingData);
-    console.log(`[CHANGELOG] Adicionadas ${missingEntries.length} entradas hardcoded que faltavam.`);
+    console.log(`[CHANGELOG] Adicionadas ${missingEntries.length} entradas que faltavam (seed: ${seedEntries.length > 0 ? 'sim' : 'nao'}).`);
   }
 }
 
