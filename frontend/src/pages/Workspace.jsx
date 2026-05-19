@@ -270,7 +270,7 @@ export default function Workspace() {
   const [contextMenu, setContextMenu] = useState(null)
   const [isConverting, setIsConverting] = useState(false)
 
-  const token = localStorage.getItem('token') || ''
+  const token = localStorage.getItem('nexo_token') || ''
   const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
 
   const fetchServers = useCallback(async () => {
