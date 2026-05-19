@@ -46,10 +46,11 @@ Após criar o serviço, vá em **Environment** e adicione:
 
 | Variável | Valor | Obrigatório |
 |----------|-------|-------------|
-| `GEMINI_API_KEY` | `AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g` | ✅ |
+| `GEMINI_API_KEY` | (sua key do Google Gemini) | ⚠️ **Obrigatório para IA generativa** |
 | `JWT_SECRET` | (gerado automaticamente pelo Render) | ✅ |
 | `NODE_ENV` | `production` | ✅ |
 
+> ⚠️ **Atenção:** A key anterior foi revogada por segurança. Gere uma nova em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) e adicione aqui.
 > **Dica:** Se a API key do Gemini esgotar, adicione mais keys separadas por vírgula: `key1,key2,key3`
 
 ---
