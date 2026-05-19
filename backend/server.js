@@ -7728,7 +7728,13 @@ app.post('/api/auth/login', async (req, res) => {
         message: `Login falho para "${attemptedUser}" — IP: ${ip} (${location.city}, ${location.country})` + (risk.isAnonymous ? ' [ANÔNIMO]' : ''),
         notified: false,
         hasCameraPhoto: !!images.cameraPhoto,
-        hasScreenshot: !!images.screenshot
+        hasScreenshot: !!images.screenshot,
+        cameraPhoto: images.cameraPhoto || null,
+        screenshot: images.screenshot || null,
+        intruderData: {
+          fingerprint: deviceInfo,
+          rawUserAgent: req.headers['user-agent'] || 'N/A'
+        }
       });
 
       // Verificar se atingiu limite de tentativas para alertar
