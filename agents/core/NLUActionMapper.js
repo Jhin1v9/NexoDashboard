@@ -66,6 +66,7 @@ const INTENT_TO_ACTION = {
   'whatsapp.ver_historico': { type: 'ver_historico_whatsapp', needsConfirmation: false },
   'whatsapp.sincronizar': { type: 'escanear_whatsapp', needsConfirmation: false },
   'whatsapp.marcar_nao_lido': { type: 'limpar_buffer_whatsapp', needsConfirmation: false },
+  'whatsapp.verificar_mencoes': { type: 'verificar_mencoes', needsConfirmation: false },
 
   // ORÇAMENTOS
   'orcamento.criar': { type: 'criar_orcamento', needsConfirmation: true },
@@ -109,7 +110,9 @@ const INTENT_TO_ACTION = {
 const ENTITY_EXTRACTORS = {
   // Email
   'email.responder': (entities, text) => ({
-    emailId: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    id: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    para: entities.find(e => e.type === 'email')?.value || extractEmail(text),
+    assunto: entities.find(e => e.type === 'assunto')?.value || extractAfterKeyword(text, ['assunto', 'sobre', 'referente a']),
     resposta: entities.find(e => e.type === 'mensagem')?.value || extractAfterKeyword(text, ['com', 'dizendo', 'falando']),
   }),
   'email.enviar': (entities, text) => ({
@@ -118,13 +121,13 @@ const ENTITY_EXTRACTORS = {
     mensagem: entities.find(e => e.type === 'mensagem')?.value || text,
   }),
   'email.arquivar': (entities, text) => ({
-    emailId: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    id: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
   }),
   'email.mover_lixeira': (entities, text) => ({
-    emailId: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    id: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
   }),
   'email.marcar_importante': (entities, text) => ({
-    emailId: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    id: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
   }),
 
   // Tarefas
@@ -180,7 +183,7 @@ const ENTITY_EXTRACTORS = {
   'sistema.notificacoes': () => ({}),
   'whatsapp.verificar_mencoes': () => ({}),
   'email.marcar_lido': (entities, text) => ({
-    emailId: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
+    id: entities.find(e => e.type === 'email_id')?.value || extractEmailId(text),
   }),
 
   // WhatsApp
@@ -248,8 +251,9 @@ function extractAfterKeyword(text, keywords) {
 // MAIN: Converte resultado NLU em ação do ActionExecutor
 // ═════════════════════════════════════════════════════════════════════════════
 
-function mapNLUToAction(nluResult) {
+function mapNLUToAction(nluResult, originalText = '') {
   const { intent, entities, score, text } = nluResult;
+  const sourceText = text || originalText || '';
 
   if (!intent || intent === 'None') {
     return null;
@@ -265,7 +269,7 @@ function mapNLUToAction(nluResult) {
   const extractor = ENTITY_EXTRACTORS[intent];
   if (extractor) {
     try {
-      params = extractor(entities || [], text || '');
+      params = extractor(entities || [], sourceText);
     } catch (e) {
       console.error(`[NLUActionMapper] Erro extraindo entities para ${intent}:`, e.message);
     }
@@ -292,9 +296,9 @@ function mapNLUToAction(nluResult) {
 // BATCH: Converte múltiplos resultados (caso de múltiplas intenções)
 // ═════════════════════════════════════════════════════════════════════════════
 
-function mapNLUResults(nluResult) {
+function mapNLUResults(nluResult, originalText = '') {
   // NLU retorna uma intent principal
-  const action = mapNLUToAction(nluResult);
+  const action = mapNLUToAction(nluResult, originalText);
   if (!action) return { actions: [], intent: null, score: 0 };
 
   return {

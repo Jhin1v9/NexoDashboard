@@ -1727,9 +1727,27 @@ class ActionExecutor {
   }
 
   async replyEmail(params, authorName) {
+    let to = params.para || params.to;
+    let subject = params.assunto || params.subject;
+    const id = params.id || params.emailId;
+    
+    // Se não temos to/subject mas temos ID do email, busca o email original
+    if ((!to || !subject) && id) {
+      try {
+        const emailData = await this.apiGet(`/email/messages/${id}`);
+        if (emailData && emailData.message) {
+          const msg = emailData.message;
+          to = to || msg.from;
+          subject = subject || (msg.subject ? `Re: ${msg.subject}` : 'Re: ');
+        }
+      } catch (e) {
+        console.warn('[ActionExecutor] Não foi possível buscar email original:', e.message);
+      }
+    }
+    
     const payload = {
-      to: params.para || params.to,
-      subject: params.assunto || params.subject,
+      to,
+      subject,
       text: params.texto || params.text || params.body,
       html: params.html,
       threadId: params.threadId,
