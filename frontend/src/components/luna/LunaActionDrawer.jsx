@@ -232,7 +232,7 @@ export default function LunaActionDrawer({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 380, opacity: 0.8 }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-        className="fixed top-0 right-0 bottom-0 w-[380px] z-[90] bg-nexo-card border-l border-nexo-border shadow-2xl flex flex-col"
+        className="fixed top-0 right-0 bottom-0 w-[380px] z-[110] bg-nexo-card border-l border-nexo-border shadow-2xl flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
