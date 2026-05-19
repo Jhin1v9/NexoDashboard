@@ -3031,135 +3031,127 @@ if (!fs.existsSync(LINKS_INDEX_FILE)) {
 }
 
 function ensureChangelog() {
-  // Carrega entradas seed do arquivo versionado (fora de DATA_DIR para não ser afetado por .gitignore no Render)
+  // Sempre sobrescreve com o seed do repo — garante que o Render tenha os dados atualizados
   const seedFile = path.join(__dirname, 'changelog-seed.json');
-  let seedEntries = [];
+  let seedData = null;
+
   try {
     if (fs.existsSync(seedFile)) {
-      const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
-      seedEntries = seedData.entries || [];
+      seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
     }
   } catch (err) {
     console.error('[CHANGELOG] Erro ao carregar seed:', err.message);
   }
 
-  // Fallback hardcoded se seed não existir
-  const hardcodedEntries = seedEntries.length > 0 ? seedEntries : [
-    {
-      id: 'changelog-001',
-      version: '3.1.0',
-      title: 'Sistema de Changelog e Release Notes',
-      description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
-      category: 'feature',
-      emoji: '✨',
-      author: 'Luna',
-      tier: 2,
-      date: new Date().toISOString(),
-      tags: ['changelog', 'ui', 'notificacoes'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-002',
-      version: '3.1.0',
-      title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
-      description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
-      category: 'whatsapp',
-      emoji: '📱',
-      author: 'Luna',
-      tier: 1,
-      date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      tags: ['whatsapp', 'luna', 'automation'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-003',
-      version: '3.1.0',
-      title: 'Sistema Financeiro v3.1 — CRUD Completo',
-      description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
-      category: 'finance',
-      emoji: '💰',
-      author: 'Abner',
-      tier: 2,
-      date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      tags: ['financeiro', 'crud', 'transacoes'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-004',
-      version: '3.0.0',
-      title: 'Centro de Operacoes NEXO Digital',
-      description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
-      category: 'feature',
-      emoji: '✨',
-      author: 'Abner',
-      tier: 2,
-      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: ['dashboard', 'operacoes', 'metrics'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-005',
-      version: '3.0.0',
-      title: 'Orcamentos — Sistema de Acompanhamento',
-      description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.',
-      category: 'feature',
-      emoji: '✨',
-      author: 'Abner',
-      tier: 3,
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: ['orcamentos', 'clientes', 'projetos'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-006',
-      version: '2.5.0',
-      title: 'Integracao GitHub + Vercel',
-      description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
-      category: 'improvement',
-      emoji: '🚀',
-      author: 'Nonoke',
-      tier: 3,
-      date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: ['github', 'vercel', 'devops'],
-      readBy: [],
-    },
-    {
-      id: 'changelog-007',
-      version: '2.0.0',
-      title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
-      description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
-      category: 'whatsapp',
-      emoji: '📱',
-      author: 'Luna',
-      tier: 2,
-      date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: ['whatsapp', 'luna', 'v1'],
-      readBy: [],
-    },
-  ];
-
-  if (!fs.existsSync(CHANGELOG_FILE)) {
-    // Primeira vez — cria do zero usando seed
-    const initialData = {
-      version: '1.0',
-      lastUpdated: new Date().toISOString(),
-      entries: hardcodedEntries
-    };
-    writeJSON(CHANGELOG_FILE, initialData);
-    console.log(`[CHANGELOG] Criado com ${hardcodedEntries.length} entradas (seed: ${seedEntries.length > 0 ? 'sim' : 'nao'}).`);
+  if (seedData && seedData.entries) {
+    writeJSON(CHANGELOG_FILE, {
+      ...seedData,
+      lastUpdated: new Date().toISOString()
+    });
+    console.log(`[CHANGELOG] Sobrescrito com ${seedData.entries.length} entradas do seed.`);
     return;
   }
 
-  // Arquivo existe — faz merge das entradas seed/hardcoded que faltam
-  const existingData = readJSON(CHANGELOG_FILE) || { entries: [] };
-  const existingIds = new Set(existingData.entries.map(e => e.id));
-  const missingEntries = hardcodedEntries.filter(e => !existingIds.has(e.id));
-
-  if (missingEntries.length > 0) {
-    existingData.entries.push(...missingEntries);
-    existingData.lastUpdated = new Date().toISOString();
-    writeJSON(CHANGELOG_FILE, existingData);
-    console.log(`[CHANGELOG] Adicionadas ${missingEntries.length} entradas que faltavam (seed: ${seedEntries.length > 0 ? 'sim' : 'nao'}).`);
+  // Fallback hardcoded se seed não existir
+  if (!fs.existsSync(CHANGELOG_FILE)) {
+    const initialData = {
+      version: '1.0',
+      lastUpdated: new Date().toISOString(),
+      entries: [
+        {
+          id: 'changelog-001',
+          version: '3.1.0',
+          title: 'Sistema de Changelog e Release Notes',
+          description: 'Novo sistema de notificacoes de atualizacoes no Dashboard. Agora todos os usuarios podem acompanhar o historico de mudancas, novas features e correcoes do app em tempo real.',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Luna',
+          tier: 2,
+          date: new Date().toISOString(),
+          tags: ['changelog', 'ui', 'notificacoes'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-002',
+          version: '3.1.0',
+          title: 'WhatsApp Intelligence v10.2 — Correcao Completa',
+          description: 'Sistema de monitoramento WhatsApp totalmente reconstruido. Agora com: scan automatico a cada 10 minutos, relatorios a cada 30 minutos no grupo Production, logica anti-spam (so envia quando ha novidades), e servico Windows permanente que reinicia automaticamente.',
+          category: 'whatsapp',
+          emoji: '📱',
+          author: 'Luna',
+          tier: 1,
+          date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          tags: ['whatsapp', 'luna', 'automation'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-003',
+          version: '3.1.0',
+          title: 'Sistema Financeiro v3.1 — CRUD Completo',
+          description: 'Modulo financeiro unificado com extrato completo, CRUD de transacoes, saldo acumulado, filtros por tipo (entrada/saida), e sincronizacao em tempo real entre todas as abas. Split financeiro: 25% cada (Abner, Nonoke/Enoque, Elias, NEXO Digital).',
+          category: 'finance',
+          emoji: '💰',
+          author: 'Abner',
+          tier: 2,
+          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['financeiro', 'crud', 'transacoes'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-004',
+          version: '3.0.0',
+          title: 'Centro de Operacoes NEXO Digital',
+          description: 'Dashboard principal com metricas em tempo real, status de projetos, tarefas pendentes, e visao consolidada de todos os clientes e orcamentos.',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Abner',
+          tier: 2,
+          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['dashboard', 'operacoes', 'metrics'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-005',
+          version: '3.0.0',
+          title: 'Orcamentos — Sistema de Acompanhamento',
+          description: 'Sistema de orcamentos com acompanhamento de pagamentos, parcelas pendentes, e status de cada projeto. Valores e clientes baseados nos dados reais do registro.',
+          category: 'feature',
+          emoji: '✨',
+          author: 'Abner',
+          tier: 3,
+          date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['orcamentos', 'clientes', 'projetos'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-006',
+          version: '2.5.0',
+          title: 'Integracao GitHub + Vercel',
+          description: 'Monitoramento de repositorios GitHub e projetos Vercel diretamente no dashboard. Status de deploys, commits recentes, e metricas de CI/CD.',
+          category: 'improvement',
+          emoji: '🚀',
+          author: 'Nonoke',
+          tier: 3,
+          date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['github', 'vercel', 'devops'],
+          readBy: [],
+        },
+        {
+          id: 'changelog-007',
+          version: '2.0.0',
+          title: 'WhatsApp Agent v1.0 — Monitoramento Inicial',
+          description: 'Primeira versao do agente Luna para monitoramento de grupos WhatsApp. Extracao de mensagens, deteccao de tarefas, e geracao de relatorios.',
+          category: 'whatsapp',
+          emoji: '📱',
+          author: 'Luna',
+          tier: 2,
+          date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tags: ['whatsapp', 'luna', 'v1'],
+          readBy: [],
+        },
+      ]
+    };
+    writeJSON(CHANGELOG_FILE, initialData);
   }
 }
 
