@@ -29,7 +29,7 @@ export default function SyncSessionModal({ open, onClose }) {
       })
       if (res.data.success) {
         localStorage.setItem('nexo_token', res.data.token)
-        window.location.href = '/'
+        window.location.href = '/dashboard'
       } else {
         setError('Falha ao sincronizar')
       }
