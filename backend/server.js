@@ -4008,9 +4008,11 @@ app.post('/api/luna/chat', async (req, res) => {
     // 2A. TENTA NLU (node-nlp) — 100% offline, mais preciso que regex
     try {
       const nluResult = await lunaNLU.process(msg, 'pt');
-      if (nluResult && nluResult.score >= 0.7 && nluResult.intent !== 'None') {
+      // NLU debug: intent=${nluResult.intent}, score=${nluResult.score}
+      if (nluResult && nluResult.score >= 0.5 && nluResult.intent !== 'None') {
         const { mapNLUResults } = require('../agents/core/NLUActionMapper');
-        const nluParsed = mapNLUResults(nluResult);
+        const nluParsed = mapNLUResults(nluResult, msg);
+        // NLU mapped actions
         if (nluParsed && nluParsed.actions.length > 0) {
           parsed = nluParsed;
           nluUsed = true;
