@@ -88,6 +88,16 @@ export default function LunaFloatingButton() {
     return () => clearInterval(interval)
   }, [])
 
+  // ── Ouve clique em toast proativo ──
+  useEffect(() => {
+    const handleProactive = ({ text }) => {
+      setText(text)
+      setIsOpen(true)
+    }
+    lunaEventBus.on('luna:proactiveClick', handleProactive)
+    return () => lunaEventBus.off('luna:proactiveClick', handleProactive)
+  }, [])
+
   // Fecha com ESC
   useEffect(() => {
     const handleKey = (e) => {

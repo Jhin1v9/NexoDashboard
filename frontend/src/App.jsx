@@ -10,6 +10,7 @@ import CommandPalette from './components/CommandPalette'
 import ToastContainer from './components/ToastContainer'
 import MobileBottomNav from './components/MobileBottomNav'
 import LunaFloatingButton from './components/luna/LunaFloatingButton'
+import LunaProactiveToast from './components/luna/LunaProactiveToast'
 import { RouteHarvester } from './components/luna/harvesters'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -94,6 +95,7 @@ function ProtectedLayout() {
       <ToastContainer />
       <MobileBottomNav />
       <LunaFloatingButton />
+      <LunaProactiveToast />
     </div>
   )
 }
