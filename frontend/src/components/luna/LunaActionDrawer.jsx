@@ -22,6 +22,7 @@ import axios from 'axios'
 import { useToast } from '../../context/ToastContext'
 import { getSchema } from './LunaIntentSchemas'
 import LunaSafetyDelay from './LunaSafetyDelay'
+import LunaInlinePreview from './LunaInlinePreview'
 
 export default function LunaActionDrawer({
   result,
@@ -280,6 +281,25 @@ export default function LunaActionDrawer({
           )}
 
           {/* Campos */}
+          {/* Preview visual da ação */}
+          {(mode === 'preview' || mode === 'confirm') && (
+            <LunaInlinePreview
+              intent={intent}
+              values={values}
+              onConfirm={() => {
+                if (mode === 'confirm') {
+                  setSafetyDelayDone(true)
+                }
+                handleSubmit()
+              }}
+              onCancel={() => {
+                addToast('Ação cancelada', 'info')
+                onCancel?.()
+                onClose()
+              }}
+            />
+          )}
+
           {schema.fields && Object.entries(schema.fields).map(([key, field]) => renderField(key, field))}
 
           {/* Erro */}

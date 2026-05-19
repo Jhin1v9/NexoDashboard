@@ -5,10 +5,11 @@ import { useLunaNLU } from '../../hooks/useLunaNLU'
 import { useLunaContext } from '../../hooks/useLunaContext'
 import { useToast } from '../../context/ToastContext'
 import { lunaEventBus } from '../../lib/lunaEventBus'
-import { hasFormFields, getSchema } from './LunaIntentSchemas'
+import { hasFormFields, getSchema, isKnownIntent } from './LunaIntentSchemas'
 import { getSuggestionsForModule, formatHelpForModule } from './LunaModuleSuggestions'
 import SmartFormModal from './SmartFormModal'
 import LunaActionFlow from './LunaActionFlow'
+import LunaBatchAction from './LunaBatchAction'
 import { decideExecution, logDecision } from '../../lib/lunaDecisionEngine'
 import axios from 'axios'
 
@@ -35,6 +36,8 @@ export default function LunaFloatingButton() {
   const [pendingActions, setPendingActions] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
   const [actionFlow, setActionFlow] = useState(null) // { result, mode }
+  const [batchAction, setBatchAction] = useState(null) // { intent }
+  const [proactiveBadge, setProactiveBadge] = useState(null) // { count, type }
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
@@ -62,6 +65,28 @@ export default function LunaFloatingButton() {
       lunaEventBus.emit('luna:stateChange', { chatState: 'idle', isOpen: false })
     }
   }, [isOpen])
+
+  // ── Badge Proativo: busca pendências a cada 60s ──
+  useEffect(() => {
+    const fetchProactive = async () => {
+      try {
+        const token = localStorage.getItem('nexo_token') || ''
+        const res = await axios.get('/api/luna/proactive', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.data?.total > 0) {
+          setProactiveBadge({ count: res.data.total, type: res.data.topPriority })
+        } else {
+          setProactiveBadge(null)
+        }
+      } catch {
+        setProactiveBadge(null)
+      }
+    }
+    fetchProactive()
+    const interval = setInterval(fetchProactive, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Fecha com ESC
   useEffect(() => {
@@ -125,6 +150,10 @@ export default function LunaFloatingButton() {
       if (decision.mode === 'auto') {
         // Execução direta — sem UI
         executeAutoAction(nluResult, schema)
+      } else if (decision.mode === 'transform') {
+        // Modo C: Transformação de Interface — seleção múltipla
+        setBatchAction({ intent, result: nluResult })
+        setIsOpen(false)
       } else {
         // Abre drawer com modo decidido
         setActionFlow({ result: nluResult, mode: decision.mode })
@@ -480,6 +509,12 @@ export default function LunaFloatingButton() {
         <span className="text-sm font-semibold hidden sm:inline tracking-wide">
           {isOpen ? 'Fechar' : 'Luna'}
         </span>
+        {/* Badge Proativo */}
+        {!isOpen && proactiveBadge && proactiveBadge.count > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-lg animate-pulse">
+            {proactiveBadge.count > 9 ? '9+' : proactiveBadge.count}
+          </span>
+        )}
       </motion.button>
 
       {/* Luna Action Flow — drawer inline para coleta/preview/confirm (Passo 3) */}
@@ -489,6 +524,21 @@ export default function LunaFloatingButton() {
           mode={actionFlow.mode}
           onDone={handleActionFlowDone}
         />
+      )}
+
+      {/* Luna Batch Action — Modo C: Transformação de Interface */}
+      {batchAction && (
+        <div className="fixed bottom-24 right-6 left-6 sm:left-auto sm:w-[420px] z-[95]">
+          <LunaBatchAction
+            intent={batchAction.intent}
+            onClose={() => setBatchAction(null)}
+            onSuccess={(data) => {
+              addToast(`${data.count} itens processados ✓`, 'success')
+              setBatchAction(null)
+              lunaEventBus.emit('luna:actionCompleted', { intent: batchAction.intent, mode: 'transform', ...data })
+            }}
+          />
+        </div>
       )}
 
       {/* Smart Form Modal (fallback de segurança) */}
