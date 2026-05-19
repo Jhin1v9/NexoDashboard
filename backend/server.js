@@ -24,6 +24,9 @@ const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
 const { restoreAllFromPG, syncFileToPG } = require('./pg-sync');
 
+// Discord Mention Notifier
+const { sendMentionNotification, setWebhookUrl } = require('./services/discord-notifier');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -403,6 +406,7 @@ function addNotification({ type, title, message, severity = 'medium', metadata =
 
 // Discord Webhook para alertas de segurança
 const DISCORD_SECURITY_WEBHOOK = 'https://discord.com/api/webhooks/1506384996305338518/NVJ5yYsBCd7JXFGsczUxTuVV0rpL2pt2dICREfNzKxuJ26TgY5--5diOpUdmEVXp3vza';
+setWebhookUrl(DISCORD_SECURITY_WEBHOOK);
 
 // Helper: coletar TODOS os dados possíveis do request
 function collectIntruderData(req, fingerprint = {}, risk = {}) {
@@ -1280,7 +1284,7 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/tasks/:id/comments', (req, res) => {
+app.post('/api/tasks/:id/comments', async (req, res) => {
   let tasks = readJSON(TASKS_FILE) || [];
   const task = tasks.find(t => t.id === req.params.id);
   if (!task) return res.status(404).json({ error: 'Tarefa não encontrada' });
@@ -1297,6 +1301,22 @@ app.post('/api/tasks/:id/comments', (req, res) => {
   task.updatedAt = new Date().toISOString();
   writeJSON(TASKS_FILE, tasks);
   broadcast({ type: 'tasks', data: tasks });
+
+  // Notifica no Discord usuários mencionados
+  if (comment.mentions.length > 0) {
+    try {
+      await sendMentionNotification({
+        type: 'task',
+        entity: task,
+        comment: comment.text,
+        author: comment.author,
+        mentions: comment.mentions
+      });
+    } catch (err) {
+      console.error('[Tasks] Erro ao enviar notificação Discord:', err.message);
+    }
+  }
+
   res.json(comment);
 });
 

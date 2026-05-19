@@ -4,19 +4,22 @@
       "name": "Abner",
       "role": "Admin",
       "color": "#3742fa",
-      "password": "$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla"
+      "password": "$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla",
+      "discordId": "403660830480269342"
     },
     "nonoke": {
       "name": "Nonoke",
       "role": "Admin",
       "color": "#2ed573",
-      "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm"
+      "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm",
+      "discordId": "564836527205515285"
     },
     "elias": {
       "name": "Elias",
       "role": "Admin",
       "color": "#ffa502",
-      "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm"
+      "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm",
+      "discordId": "1429801695071834190"
     }
   },
   "active": "abner"
