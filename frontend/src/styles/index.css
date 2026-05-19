@@ -241,6 +241,21 @@
     display: none !important;
   }
 
+  /* CRITICAL: Permite que o conteúdo flua por várias páginas
+     O App.jsx usa h-screen + overflow-hidden no root e overflow-y-auto no <main>;
+     sem isso o navegador só imprime a viewport visível (1 página) */
+  .h-screen,
+  [class*="h-screen"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  main,
+  [class*="overflow-y-auto"] {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
   /* Header de impressão */
   @page {
     margin: 15mm;
