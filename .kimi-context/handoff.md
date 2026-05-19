@@ -14,10 +14,14 @@
 - [x] **Conversão automática:** `POST /api/leads/:id/convert` cria workspace + README.md + estrutura padrão
 - [x] **Active Learning NLU:** SmartFormModal mostra "Não era isso?" quando score < 0.85
 - [x] **Picker de intents:** Busca `/api/luna/intents` e POST `/api/luna/learn` para re-treinar
-- [x] **Build passando:** 0 erros, commit `3ea779f` enviado para GitHub
+- [x] **Luna Context + Event Bus:** `LunaContext` provider global, `lunaEventBus` emitter, `RouteHarvester` detecta rotas
+- [x] **LunaFloatingButton integrado:** Estados visuais (thinking/acting/idle), badge de módulo atual, integração com event bus
+- [x] **Render CLI v2.17.0:** Instalada localmente em `~/.local/bin/render`
+- [x] **Build passando:** 0 erros, commits enviados para GitHub
 
 ### ⏳ Próximo passo
 - [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
+- [ ] **Autenticar Render CLI** — Gerar API key no dashboard (Account Settings → API Keys) ou rodar `render login`
 - [ ] **FASE 4 — Expandir corpus NLU:** Aumentar de ~25 para 50-100 exemplos por intent
 - [ ] **FASE 5 — Melhorar extração de título:** Regex atual remove "do cliente Nexo" — precisa ser mais inteligente
 - [ ] **FASE 6 — Deploy para Render**
@@ -46,7 +50,10 @@ frontend/src/pages/Workspace.jsx                     # Sidebar unificada + LeadP
 frontend/src/components/luna/SmartFormModal.jsx      # Active Learning (picker de intents)
 frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário
 frontend/src/hooks/useLunaNLU.js                     # Hook axios
-frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global
+frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global (integrado com LunaContext + lunaEventBus)
+frontend/src/context/LunaContext.jsx                 # Provider global de contexto da Luna
+frontend/src/lib/lunaEventBus.js                     # Event emitter desacoplado
+frontend/src/components/luna/harvesters/RouteHarvester.jsx  # Detecta mudanças de rota
 ```
 
 ---
@@ -54,9 +61,10 @@ frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `3ea779f` — `feat(workspace): Unificação Leads+Clientes no Workspace + Active Learning NLU`  
+**Commit atual:** `228a397` — `docs(changelog): Adiciona entradas de hoje`  
 **Build:** ✅ Vite build passando (0 erros)  
 **Testes manuais:** ✅ Conversão de lead cria workspace + README.md  
+**Render CLI:** ✅ v2.17.0 instalada em `~/.local/bin/render` (aguardando auth)  
 **API Key Gemini:** 🔴 Revogada — endpoints `/api/email/ai/*` e `/api/luna/chat` retornam vazio  
 
 ---
