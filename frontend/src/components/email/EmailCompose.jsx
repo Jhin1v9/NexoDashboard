@@ -40,7 +40,7 @@ const TEMPLATES = [
   { id: 'boas_vindas', name: 'Boas-vindas', subject: 'Bem-vindo à Nexo Digital!' },
 ]
 
-export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSent, onCancel }) {
+export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSent, onCancel, initialBody = '' }) {
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
@@ -60,7 +60,7 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
       Underline,
       Placeholder.configure({ placeholder: 'Escreva seu email...' }),
     ],
-    content: '',
+    content: initialBody ? `<p>${initialBody.replace(/\n/g, '</p><p>')}</p>` : '',
     editorProps: {
       attributes: {
         class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[200px] px-4 py-3',
@@ -68,7 +68,7 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
     },
   })
 
-  // Preencher campos quando é resposta
+  // Preencher campos quando é resposta ou quando recebe initialBody
   useEffect(() => {
     if (replyTo) {
       const fromEmail = replyTo.from?.match(/<([^>]+)>/)?.[1] || replyTo.from
@@ -83,7 +83,10 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
         setSubject(`Fwd: ${replyTo.subject || ''}`)
       }
     }
-  }, [replyTo, mode])
+    if (initialBody && editor) {
+      editor.commands.setContent(`<p>${initialBody.replace(/\n/g, '</p><p>')}</p>`)
+    }
+  }, [replyTo, mode, initialBody, editor])
 
   // Auto-save rascunho a cada 10s
   useEffect(() => {

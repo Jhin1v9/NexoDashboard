@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import axios from 'axios'
-import { Sparkles, X, Loader2, Wand2, Lightbulb, Shield } from 'lucide-react'
+import { Sparkles, X, Loader2, Wand2, Lightbulb, Shield, Save, CheckCircle, Plus, ListChecks } from 'lucide-react'
 
-export default function LunaEmailAssistant({ threadMessages, onApplyDraft, onClose }) {
+export default function LunaEmailAssistant({ threadMessages, onApplyDraft, onClose, emailId, threadId, subject, from }) {
   const [mode, setMode] = useState('menu') // menu | draft | summary | analyze
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [instructions, setInstructions] = useState('')
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(null)
+  const [selectedActionItems, setSelectedActionItems] = useState(new Set())
+  const [creatingTasks, setCreatingTasks] = useState(false)
+  const [tasksCreated, setTasksCreated] = useState(null)
 
   const handleAction = async (actionType) => {
     setLoading(true)
@@ -123,23 +128,96 @@ export default function LunaEmailAssistant({ threadMessages, onApplyDraft, onClo
           <p className="text-xs font-medium text-nexo-primary flex items-center gap-1">
             <Wand2 className="w-3 h-3" /> Rascunho gerado:
           </p>
-          <div className="p-3 rounded-lg bg-nexo-bg border border-nexo-border text-xs text-nexo-text whitespace-pre-wrap">
+          <div className="p-3 rounded-lg bg-nexo-bg border border-nexo-border text-xs text-nexo-text whitespace-pre-wrap max-h-48 overflow-y-auto">
             {result.data.body}
           </div>
           {result.data.notes && (
             <p className="text-[10px] text-nexo-muted">📝 {result.data.notes}</p>
           )}
-          <button
-            onClick={() => { onApplyDraft?.(result.data.body); onClose?.() }}
-            className="w-full py-2 rounded-lg bg-nexo-primary hover:opacity-90 text-white text-sm font-medium transition-opacity"
-          >
-            Usar este rascunho
-          </button>
+          {draftSaved ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+                <span className="text-xs text-green-400">Rascunho salvo para aprovação!</span>
+              </div>
+              <p className="text-[10px] text-nexo-muted">
+                Uma tarefa foi criada para {draftSaved.approver || 'você'} revisar antes de enviar.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => { onApplyDraft?.(result.data.body); onClose?.() }}
+                className="w-full py-2 rounded-lg bg-nexo-primary hover:opacity-90 text-white text-sm font-medium transition-opacity"
+              >
+                Usar este rascunho
+              </button>
+              <button
+                onClick={async () => {
+                  setSavingDraft(true)
+                  try {
+                    const lastMsg = threadMessages[threadMessages.length - 1]
+                    const res = await axios.post('/api/email/ai/draft-for-approval', {
+                      threadMessages,
+                      instructions,
+                      emailId: emailId || lastMsg?.id,
+                      threadId: threadId || lastMsg?.threadId,
+                      subject: subject || lastMsg?.subject,
+                      from: from || lastMsg?.from
+                    })
+                    if (res.data.success) {
+                      setDraftSaved({
+                        draftId: res.data.draft?.id,
+                        taskId: res.data.task?.id,
+                        approver: res.data.task?.assignedTo || 'você'
+                      })
+                    }
+                  } catch (e) {
+                    console.error('Erro ao salvar rascunho:', e)
+                  } finally {
+                    setSavingDraft(false)
+                  }
+                }}
+                disabled={savingDraft}
+                className="w-full py-2 rounded-lg bg-nexo-bg border border-nexo-border hover:border-nexo-primary/30 text-nexo-text text-sm font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Salvar para aprovação
+              </button>
+            </div>
+          )}
         </div>
       )
     }
 
     if (result.type === 'summary') {
+      const actionItems = result.data.actionItems || []
+      const toggleItem = (idx) => {
+        const next = new Set(selectedActionItems)
+        if (next.has(idx)) next.delete(idx)
+        else next.add(idx)
+        setSelectedActionItems(next)
+      }
+      const createTasks = async () => {
+        if (selectedActionItems.size === 0) return
+        setCreatingTasks(true)
+        try {
+          const items = Array.from(selectedActionItems).map((i) => actionItems[i])
+          const res = await axios.post('/api/email/ai/action-items-to-tasks', {
+            threadId,
+            subject: subject || 'Email',
+            actionItems: items
+          })
+          if (res.data.success) {
+            setTasksCreated(res.data.tasks || [])
+            setSelectedActionItems(new Set())
+          }
+        } catch (e) {
+          console.error('Erro ao criar tarefas:', e)
+        } finally {
+          setCreatingTasks(false)
+        }
+      }
       return (
         <div className="p-4 space-y-3">
           <p className="text-xs font-medium text-nexo-primary flex items-center gap-1">
@@ -150,14 +228,39 @@ export default function LunaEmailAssistant({ threadMessages, onApplyDraft, onClo
               <p key={i} className="text-xs text-nexo-text">• {item}</p>
             ))}
           </div>
-          {result.data.actionItems?.length > 0 && (
+          {actionItems.length > 0 && (
             <>
-              <p className="text-xs font-medium text-nexo-muted mt-2">Action items:</p>
+              <p className="text-xs font-medium text-nexo-muted mt-2 flex items-center gap-1">
+                <ListChecks className="w-3 h-3" /> Action items:
+              </p>
               <div className="space-y-1">
-                {result.data.actionItems.map((item, i) => (
-                  <p key={i} className="text-xs text-nexo-text">➤ {item}</p>
+                {actionItems.map((item, i) => (
+                  <label key={i} className="flex items-start gap-2 p-2 rounded-lg bg-nexo-bg border border-nexo-border hover:border-nexo-primary/30 cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedActionItems.has(i)}
+                      onChange={() => toggleItem(i)}
+                      className="mt-0.5 w-3.5 h-3.5 accent-nexo-primary flex-shrink-0"
+                    />
+                    <span className="text-xs text-nexo-text">{item}</span>
+                  </label>
                 ))}
               </div>
+              {tasksCreated ? (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span className="text-xs text-green-400">{tasksCreated.length} tarefa(s) criada(s) com sucesso!</span>
+                </div>
+              ) : (
+                <button
+                  onClick={createTasks}
+                  disabled={selectedActionItems.size === 0 || creatingTasks}
+                  className="w-full py-2 rounded-lg bg-nexo-primary hover:opacity-90 text-white text-sm font-medium transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {creatingTasks ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Criar {selectedActionItems.size > 0 ? `${selectedActionItems.size} ` : ''}tarefa(s)
+                </button>
+              )}
             </>
           )}
           <div className="flex gap-2 mt-2">
@@ -220,28 +323,17 @@ export default function LunaEmailAssistant({ threadMessages, onApplyDraft, onClo
   }
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-nexo-card border border-nexo-border rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-nexo-border">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-nexo-primary" />
-            <h3 className="font-bold text-sm">Luna — Assistente de Email</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-nexo-muted hover:bg-nexo-bg transition-colors">
-            <X className="w-4 h-4" />
+    <div className="w-full h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        {renderContent()}
+      </div>
+      {mode !== 'menu' && !loading && (
+        <div className="p-3 border-t border-nexo-border">
+          <button onClick={() => { setMode('menu'); setResult(null); setDraftSaved(null) }} className="w-full py-2 rounded-lg text-xs text-nexo-muted hover:text-nexo-text hover:bg-nexo-bg transition-colors">
+            ← Voltar ao menu
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {renderContent()}
-        </div>
-        {mode !== 'menu' && !loading && (
-          <div className="p-3 border-t border-nexo-border">
-            <button onClick={() => { setMode('menu'); setResult(null); }} className="w-full py-2 rounded-lg text-xs text-nexo-muted hover:text-nexo-text hover:bg-nexo-bg transition-colors">
-              ← Voltar ao menu
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

@@ -1,0 +1,35 @@
+{
+  "_schema": "kimi-context-index-v1",
+  "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
+  "project": "NEXO Dashboard Pro",
+  "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
+  "lastUpdated": "2026-05-18T11:01:42+02:00",
+  "activeSessionId": "kimi-bbf526dc",
+  "sessions": [
+    {
+      "id": "kimi-bbf526dc",
+      "startedAt": "2026-05-18T11:01:42+02:00",
+      "status": "active",
+      "focus": "NEXO Mail v2.0 — Sprint 2: Luna Integrada (drafts pendentes + action items → tarefas)",
+      "snapshotFile": "sessions/2026-05-18-kimi-bbf526dc.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 12,
+      "lastCompactionAt": null
+    }
+  ],
+  "agents": {
+    "kimi-bbf526dc": {
+      "instanceHash": "bbf526dc",
+      "signature": "KIMI-BBF526DC",
+      "color": "🔵",
+      "role": "coding-agent",
+      "notes": "Sessão atual. Trabalhando no EmailHub Sprint 2."
+    }
+  },
+  "rules": {
+    "beforeCompaction": "SALVAR snapshot da sessão atual em .kimi-context/sessions/",
+    "beforeSessionEnd": "ATUALIZAR handoff.md com próximas ações pendentes",
+    "onNewSession": "LER KIMI.MD + handoff.md + último snapshot antes de agir",
+    "onConflict": "Se múltiplas instâncias Kimi ativas, verificar activeSessionId e NUNCA sobrescrever trabalho de outra instância sem confirmação do usuário"
+  }
+}
