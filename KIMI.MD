@@ -23,7 +23,7 @@
 active_instance: kimi-10a71fc7
 signature: KIMI-10A71FC7 🟡
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-19T18:40:00+02:00
+last_updated: 2026-05-19T20:15:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -49,9 +49,24 @@ last_updated: 2026-05-19T18:40:00+02:00
 
 ## 2. Current Focus
 
-### 🎯 Sprint Ativo: Luna Viva — Passo 3: Execução Inteligente
+### 🎯 Sprint Ativo: Workspace File Viewer v2 + Contexto Luna Enriquecido
 
-**Status:** ✅ Concluído — build passando, commits até `920c182` enviados
+**Status:** ✅ Concluído — build passando, commits até `3e4256e` enviados
+
+#### Workspace File Viewer v2 ✅
+- [x] **Syntax highlighting:** `highlight.js` com 15 linguagens (JS, TS, JSON, CSS, Python, PHP, SQL, YAML, Bash, Dockerfile, GraphQL, etc.)
+- [x] **Modo Preview/Código:** Toggle para Markdown, HTML e arquivos de código
+- [x] **Indicador de alterações não salvas:** ● laranja no header + texto "alterações não salvas"
+- [x] **Atalhos de teclado:** `Ctrl+S` salvar, `ESC` fechar viewer
+- [x] **Scrollbars customizadas:** `.custom-scrollbar` com hover `#3a3a4e`
+- [x] **Preview Markdown:** Headers, bold, italic, listas, links, code blocks, blockquote, hr
+- [x] **Preview HTML:** iframe com sandbox + botão "Abrir no navegador" (nova aba)
+- [x] **Contexto Luna enriquecido:** `buildDashboardContext()` lê o arquivo do workspace e injeta no prompt (até 4000 chars)
+
+#### Endpoints Backend ✅
+- [x] `GET /api/workspace/clients/:id/content` — Lê arquivo textual (limite 5MB)
+- [x] `PUT /api/workspace/clients/:id/content` — Salva arquivo textual
+- [x] `contextFile` repassado em `/api/luna/chat` e `/api/luna/threads/:id/messages`
 
 #### Passo 3 — Execução Inteligente ✅
 - [x] **lunaDecisionEngine.js:** Matriz de decisão (score + dados + risco → auto/collect/confirm/preview/transform)
@@ -87,6 +102,8 @@ last_updated: 2026-05-19T18:40:00+02:00
 - `agents/core/IntentParser.js` — Regex fallback quando NLU não reconhece
 
 ### Frontend (React 18, Vite, Tailwind)
+- `frontend/src/pages/Workspace.jsx` — Página `/workspace` (clientes, pastas, arquivos, viewer)
+- `frontend/src/components/workspace/WorkspaceFileViewer.jsx` — Viewer/editor fullscreen com syntax highlighting
 - `frontend/src/pages/LunaControl.jsx` — Página `/luna` (terminal + chat + comandos)
 - `frontend/src/components/luna/LunaFloatingButton.jsx` — Botão flutuante global (mini-chat + Decision Engine)
 - `frontend/src/components/luna/LunaActionDrawer.jsx` — Drawer inline 380px sem blur (Passo 3)
@@ -119,6 +136,8 @@ last_updated: 2026-05-19T18:40:00+02:00
 | **Modo C: Transformação de Interface** (checkboxes multi-seleção) | ✅ Resolvido | `LunaBatchAction` implementado com seleção múltipla |
 | **Preview visual** antes de executar ação destrutiva | ✅ Resolvido | `LunaInlinePreview` integrado no LunaActionDrawer |
 | **Assistente passivo proativo** (badges, toasts) | ✅ Resolvido | Badge animado no botão flutuante com `/api/luna/proactive` |
+| **Workspace File Viewer** | ✅ Resolvido | Viewer/editor com syntax highlighting, preview Markdown/HTML, contexto Luna |
+| **Backend não reiniciado após deploy** | ✅ Resolvido | `kill` + `nohup node server.js` no script de restart |
 
 ---
 
@@ -129,13 +148,14 @@ last_updated: 2026-05-19T18:40:00+02:00
 | Fase | Progresso Real | Gap Principal |
 |------|---------------|---------------|
 | 1 — Fundação de Consciência | ✅ 100% | — |
-| 2 — Eliminar o Modal | 🟡 ~50% | Faltam Modo C (transformação) e Modo D (passivo) |
-| 3 — Execução Inteligente | ✅ ~80% | Faltam preview visual antes de executar |
+| 2 — Eliminar o Modal | ✅ ~90% | Modo C e D implementados |
+| 3 — Execução Inteligente | ✅ ~90% | Preview visual implementado |
 | 4 — Consciência por Módulo | ✅ 100% | — |
 | 5 — NLP.js + Contexto | ✅ 100% | — |
-| 6 — Sugestões Proativas | ❌ ~10% | Nada implementado ainda |
+| 6 — Sugestões Proativas | 🟡 ~30% | Badge no botão flutuante, falta expandir |
+| 7 — Workspace File Viewer | ✅ 100% | Editor + syntax highlighting + contexto Luna |
 
-**Veredito:** A Luna está **operacional** (~70% do roadmap). Comando-voz → ação está 100% funcional. Gaps são UX avançada (proatividade, transformação de interface) e IA generativa (Gemini).
+**Veredito:** A Luna está **operacional** (~80% do roadmap). Comando-voz → ação está 100% funcional. Workspace tem viewer/editor de arquivos com syntax highlighting. Gaps: IA generativa (Gemini revogada) e deploy contínuo.
 
 ---
 
@@ -178,4 +198,4 @@ git log --oneline -5 && git status
 - **Render Dashboard:** `dashboard.render.com/web/srv-d85gqt...`
 - **App em produção:** `nexodashboard.onrender.com`
 - **Repo GitHub:** `github.com/Jhin1v9/NexoDashboard`
-- **Branch:** `codex/initial-nexo-dashboard-pro-v16`
+- **Branch:** `main` (merge de `codex` feito, commits até `3e4256e`)

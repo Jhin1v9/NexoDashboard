@@ -3,7 +3,7 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-18T11:01:42+02:00",
+  "lastUpdated": "2026-05-19T20:15:00+02:00",
   "activeSessionId": "kimi-10a71fc7",
   "sessions": [
     {
@@ -50,11 +50,11 @@
       "id": "kimi-10a71fc7",
       "startedAt": "2026-05-19T15:00:00+02:00",
       "status": "active",
-      "focus": "Luna v20.0 NLU Unificado + Fluxo Floating Button + SmartFormModal fallback + NLU Expansion 36→137 intents + Changelog recuperado — commits até 920c182"
+      "focus": "Workspace File Viewer v2 — Editor com syntax highlighting (highlight.js), preview Markdown/HTML, indicador não salvo, atalhos Ctrl+S/ESC, contexto Luna enriquecido com arquivo. Commits até 3e4256e.",
       "snapshotFile": "sessions/2026-05-19-kimi-10a71fc7.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
-      "lastCompactionAt": null
+      "lastCompactionAt": "2026-05-19T20:15:00+02:00"
     }
   ],
   "agents": {
