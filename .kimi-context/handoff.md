@@ -6,25 +6,21 @@
 
 ---
 
-## 🎯 Foco Atual (Luna NLU + Smart Form Assistant)
+## 🎯 Foco Atual (Workspace-Leads Unification + Active Learning)
 
 ### ✅ Concluído nesta sessão (kimi-10a71fc7 🟡)
-- [x] **FASE 1 — NLP.js Backend completo:** 23 intents, 3 idiomas (pt/es/ca), modelo treinado
-- [x] **Fallback robusto:** Corpus None com 66 exemplos/idioma, falso positivo corrigido
-- [x] **Entities NER:** 5 entities registradas (cliente, projeto, tarefa, orçamento, prioridade)
-- [x] **Typos tolerados:** Variações de erros de digitação nos intents principais
-- [x] **Testes automatizados:** 34/34 passam (intents + fallback + entities + multi-idioma)
-- [x] **FASE 3 — Smart Form Assistant:** Modal reutilizável + botão flutuante + hook useLunaNLU
-- [x] **Schemas de intents:** 15+ intents mapeados para formulários/redirects/info
-- [x] **Integração frontend:** Botão flutuante em todas as rotas protegidas
-- [x] **Testes end-to-end validados:** Criar tarefa, criar despesa, fallback, redirect
+- [x] **Workspace-Leads Unification:** `GET /api/workspace/clients` retorna leads + clientes unificados
+- [x] **LeadPreviewPanel:** Preview de lead na sidebar do Workspace com botão "Converter em Cliente"
+- [x] **Conversão automática:** `POST /api/leads/:id/convert` cria workspace + README.md + estrutura padrão
+- [x] **Active Learning NLU:** SmartFormModal mostra "Não era isso?" quando score < 0.85
+- [x] **Picker de intents:** Busca `/api/luna/intents` e POST `/api/luna/learn` para re-treinar
+- [x] **Build passando:** 0 erros, commit `3ea779f` enviado para GitHub
 
 ### ⏳ Próximo passo
-- [ ] **FASE 4 — Expandir corpus:** Aumentar de ~25 para 50-100 exemplos por intent
-- [ ] **FASE 5 — Melhorar extração de título:** Regex atual remove "do cliente Nexo" — precisa ser mais inteligente
-- [ ] **FASE 6 — Tratamento de erro visível:** Quando API falha, mostrar mensagem clara no frontend
-- [ ] **FASE 7 — Active Learning:** Quando usuário corrige classificação, enviar para `/api/luna/learn`
 - [ ] **🔴 URGENTE:** Substituir `GEMINI_API_KEY` no `backend/.env` (revogada pelo Google)
+- [ ] **FASE 4 — Expandir corpus NLU:** Aumentar de ~25 para 50-100 exemplos por intent
+- [ ] **FASE 5 — Melhorar extração de título:** Regex atual remove "do cliente Nexo" — precisa ser mais inteligente
+- [ ] **FASE 6 — Deploy para Render**
 
 ---
 
@@ -42,15 +38,15 @@
 ## 🔗 Arquivos chave desta sessão
 
 ```
-backend/services/luna-nlu.js                   # Engine NLP.js (1.226 linhas)
-backend/scripts/test-luna-nlu.js               # Suite de testes (34 casos)
-backend/data/luna-model.nlp                    # Modelo treinado (~690KB)
+backend/server.js                                    # Rotas /api/workspace/clients e /api/leads/:id/convert
+backend/workspace-manager.js                         # clientExists() + createClient()
+backend/services/luna-nlu.js                         # Engine NLP.js + addTrainingExample()
 
-frontend/src/components/luna/LunaIntentSchemas.js    # Mapeamento intent → schema
-frontend/src/components/luna/SmartFormModal.jsx      # Modal inteligente
-frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global
+frontend/src/pages/Workspace.jsx                     # Sidebar unificada + LeadPreviewPanel
+frontend/src/components/luna/SmartFormModal.jsx      # Active Learning (picker de intents)
+frontend/src/components/luna/LunaIntentSchemas.js    # Schemas de formulário
 frontend/src/hooks/useLunaNLU.js                     # Hook axios
-frontend/src/App.jsx                                  # Integração
+frontend/src/components/luna/LunaFloatingButton.jsx  # Botão flutuante global
 ```
 
 ---
@@ -58,11 +54,27 @@ frontend/src/App.jsx                                  # Integração
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Última ação:** Fase 1 (NLP.js) completa + Fase 3 (SmartFormModal) completa. Testes end-to-end validados via browser.  
-**Contexto salvo em:** `.kimi-context/sessions/2026-05-19-kimi-10a71fc7.md`
+**Commit atual:** `3ea779f` — `feat(workspace): Unificação Leads+Clientes no Workspace + Active Learning NLU`  
+**Build:** ✅ Vite build passando (0 erros)  
+**Testes manuais:** ✅ Conversão de lead cria workspace + README.md  
+**API Key Gemini:** 🔴 Revogada — endpoints `/api/email/ai/*` e `/api/luna/chat` retornam vazio  
 
-**Problemas conhecidos:**
-1. API Key Gemini revogada — todos os endpoints de IA retornam vazio
-2. Regex de extração de título é muito agressiva (remove "do cliente Nexo")
-3. SmartFormModal não mostra loading ao confirmar
-4. Bundle Vite >500KB (chunk size warning)
+---
+
+## 🧪 Dados de teste reais
+
+O lead `tpv-sorveteria` foi convertido durante os testes. Pasta criada em:
+```
+backend/workspace/tpv-sorveteria/
+├── 01_orcamentos/
+├── 02_contratos/
+├── 03_briefings/
+├── 04_design/
+├── 05_demos/
+├── 06_documentacao/
+├── 07_entregas/
+├── cliente.json
+└── README.md
+```
+
+**⚠️ Atenção:** `backend/workspace/` foi adicionado ao `.gitignore` — NÃO commitar dados de runtime.
