@@ -3774,7 +3774,10 @@ function buildDashboardContext(contextModule = null, contextId = null) {
       const d = e.date || e.createdAt || '';
       return d.startsWith(today.slice(0, 7));
     });
-    const totalExpensesMonth = monthlyExpenses.reduce((s, e) => s + (e.amount || e.valor || 0), 0);
+    const totalExpensesMonth = monthlyExpenses.reduce((s, e) => {
+      const val = typeof e.amount === 'object' ? (e.amount?.value || 0) : (e.amount || e.valor || 0);
+      return s + (parseFloat(val) || 0);
+    }, 0);
 
     const leads = Object.values(clients.clients || {}).filter(c => c.type === 'lead' || c.status === 'potencial' || c.pipelineStatus);
     const leadsNew = leads.filter(l => l.pipelineStatus === 'novo' || l.status === 'novo');
@@ -3830,7 +3833,7 @@ function buildDashboardContext(contextModule = null, contextId = null) {
     if (pendingPayments.length > 0) {
       ctx += `- Clientes com pagamento pendente: ${pendingPayments.slice(0, 3).map(p => p.clientName || p.clientId || p.de || 'Cliente').join(', ')}\n`;
     }
-    ctx += `- Gastos este mês: €${totalExpensesMonth.toFixed(2)}\n`;
+    ctx += `- Gastos este mês: €${(typeof totalExpensesMonth === 'number' ? totalExpensesMonth : parseFloat(totalExpensesMonth) || 0).toFixed(2)}\n`;
 
     ctx += `\n🎣 LEADS:\n`;
     ctx += `- Total no pipeline: ${leads.length}\n`;
@@ -3998,22 +4001,43 @@ app.post('/api/luna/chat', async (req, res) => {
       return res.json({ success: true, reply, executed: true, result: result.summary, timestamp: new Date().toISOString() });
     }
 
-    // ── 2. PARSE DA INTENÇÃO (regex fast-path ou LLM) ──
-    const buffer = readLunaBuffer();
-    const parseContext = {
-      authorName,
-      contextModule,
-      contextId,
-      bufferSummary: {
-        tasks: (buffer.newTasks || []).length,
-        ideas: (buffer.newIdeas || []).length,
-        links: (buffer.newLinks || []).length,
-        leads: (buffer.newLeads || []).length,
-        finance: (buffer.newFinance || []).length
-      }
-    };
+    // ── 2. PARSE DA INTENÇÃO (NLU primeiro → regex → LLM fallback) ──
+    let parsed = null;
+    let nluUsed = false;
 
-    const parsed = await lunaIntentParser.parse(msg, parseContext);
+    // 2A. TENTA NLU (node-nlp) — 100% offline, mais preciso que regex
+    try {
+      const nluResult = await lunaNLU.process(msg, 'pt');
+      if (nluResult && nluResult.score >= 0.7 && nluResult.intent !== 'None') {
+        const { mapNLUResults } = require('../agents/core/NLUActionMapper');
+        const nluParsed = mapNLUResults(nluResult);
+        if (nluParsed && nluParsed.actions.length > 0) {
+          parsed = nluParsed;
+          nluUsed = true;
+          console.log(`[LunaChat] NLU reconheceu: ${nluResult.intent} (score: ${nluResult.score.toFixed(2)})`);
+        }
+      }
+    } catch (nluErr) {
+      console.error('[LunaChat] NLU erro:', nluErr.message);
+    }
+
+    // 2B. SE NLU NÃO RECONHECEU → usa regex fast-path ou LLM
+    if (!parsed) {
+      const buffer = readLunaBuffer();
+      const parseContext = {
+        authorName,
+        contextModule,
+        contextId,
+        bufferSummary: {
+          tasks: (buffer.newTasks || []).length,
+          ideas: (buffer.newIdeas || []).length,
+          links: (buffer.newLinks || []).length,
+          leads: (buffer.newLeads || []).length,
+          finance: (buffer.newFinance || []).length
+        }
+      };
+      parsed = await lunaIntentParser.parse(msg, parseContext);
+    }
 
     // Filtra ações desconhecidas — se sobrar nenhuma, cai no fallback LLM
     const knownActions = [
@@ -4654,6 +4678,49 @@ function buildConciergeReply(result, authorName) {
           parts.push(`📧 Emails (${res.filtro}): ${res.total} total, ${res.naoLidos} não lidos`);
           if (res.items?.length > 0) {
             parts.push(res.items.map(e => `  • ${e.unread ? '🆕 ' : ''}${e.from}: "${e.subject}"`).join('\n'));
+          }
+          break;
+        case 'ideas':
+          if (res.items?.length > 0) {
+            parts.push(`💡 Ideias (${res.items.length}):\n${res.items.slice(0, 10).map(i => `  • [${i.status || 'novo'}] ${i.title || i.id}${i.type ? ` (${i.type})` : ''}`).join('\n')}`);
+          } else {
+            parts.push(`💡 Nenhuma ideia registrada ainda.`);
+          }
+          break;
+        case 'projects':
+          if (res.items?.length > 0) {
+            parts.push(`📁 Projetos (${res.items.length}):\n${res.items.slice(0, 10).map(p => `  • ${p.name || p.title || p.id}${p.client ? ` — ${p.client}` : ''}${p.status ? ` [${p.status}]` : ''}`).join('\n')}`);
+          } else {
+            parts.push(`📁 Nenhum projeto ativo no momento.`);
+          }
+          break;
+        case 'links':
+          if (res.items?.length > 0) {
+            parts.push(`🔗 Links (${res.items.length}):\n${res.items.slice(0, 10).map(l => `  • ${l.title || l.url || l.id}${l.platform ? ` (${l.platform})` : ''}`).join('\n')}`);
+          } else {
+            parts.push(`🔗 Nenhum link cadastrado.`);
+          }
+          break;
+        case 'notifications':
+          if (res.items?.length > 0) {
+            parts.push(`🔔 Notificações (${res.items.length}):\n${res.items.slice(0, 10).map(n => `  • ${n.message || n.title || 'Notificação'}${n.module ? ` [${n.module}]` : ''}`).join('\n')}`);
+          } else {
+            parts.push(`🔔 Nenhuma notificação pendente. Tudo tranquilo! ✨`);
+          }
+          break;
+        case 'cash_box':
+          parts.push(`💰 Caixa: €${parseFloat(res.balance?.value || 0).toFixed(2)}`);
+          if (res.history?.length > 0) {
+            parts.push(`Últimas movimentações:\n${res.history.map(h => `  • ${h.date || '?'}: ${h.type === 'income' || h.type === 'payment_received' ? '+' : '-'}€${parseFloat(h.amount || 0).toFixed(2)} ${h.description || ''}`).join('\n')}`);
+          }
+          break;
+        case 'whatsapp':
+          parts.push(`💬 WhatsApp:
+  • Menções @Luna pendentes: ${res.mencoesPendentes || 0}
+  • Links pendentes: ${res.linksPendentes || 0}
+  • Mensagens novas: ${res.mensagensNovas || 0}`);
+          if (res.mencoesRecentes?.length > 0) {
+            parts.push(`Menções recentes:\n${res.mencoesRecentes.map(m => `  - ${m.from}: "${m.text}"`).join('\n')}`);
           }
           break;
       }
@@ -5845,14 +5912,15 @@ app.get('/api/leads/:id', (req, res) => {
 // POST /api/leads — Criar lead
 app.post('/api/leads', (req, res) => {
   try {
-    const { displayName, email, phone, source, estimatedValue, notes, assignedTo, tags } = req.body;
-    if (!displayName) {
+    const { displayName, name, email, phone, source, estimatedValue, notes, assignedTo, tags } = req.body;
+    const leadName = displayName || name;
+    if (!leadName) {
       return res.status(400).json({ success: false, error: 'displayName obrigatorio' });
     }
     const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {}, schema: { version: '16.1.0' } };
     const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     registry.clients[id] = {
-      displayName,
+      displayName: leadName,
       email: email || '',
       phone: phone || '',
       source: source || 'manual',

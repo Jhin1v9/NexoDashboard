@@ -88,9 +88,11 @@ export const INTENT_SCHEMAS = {
         description: values.descricao || '',
         assignedTo: values.assignedTo || 'abner',
         priority: values.priority || 'medium',
-        type: values.type || 'one_time',
+        taskType: values.type || 'one_time',
         dueDate: values.dueDate || null,
         status: 'pending',
+        addedBy: 'luna',
+        source: 'luna-nlu',
       }),
     },
     extractEntities: (entities) => {
@@ -162,7 +164,7 @@ export const INTENT_SCHEMAS = {
       transform: (values) => ({
         to: values.to,
         subject: values.subject,
-        body: values.body,
+        text: values.body,
       }),
     },
   },
@@ -197,7 +199,7 @@ export const INTENT_SCHEMAS = {
       transform: (values) => ({
         to: values.to,
         subject: values.subject,
-        body: values.body,
+        text: values.body,
       }),
     },
   },
@@ -230,7 +232,7 @@ export const INTENT_SCHEMAS = {
         placeholder: 'Ex: Pagamento cliente Nexo',
       },
       amount: {
-        label: 'Valor (R$)',
+        label: 'Valor (€)',
         type: 'text',
         required: true,
         placeholder: '0,00',
@@ -254,8 +256,9 @@ export const INTENT_SCHEMAS = {
         description: values.description,
         amount: parseFloat(values.amount.replace(',', '.')),
         date: values.date,
-        client: values.client || '',
+        category: values.client || 'manual',
         type: 'income',
+        recordedBy: 'luna',
       }),
     },
   },
@@ -264,22 +267,23 @@ export const INTENT_SCHEMAS = {
     title: 'Nova Despesa',
     description: 'Registre uma nova saída de dinheiro.',
     fields: {
+      name: {
+        label: 'Nome',
+        type: 'text',
+        required: true,
+        placeholder: 'Ex: Hostinger Premium',
+      },
       description: {
         label: 'Descrição',
         type: 'text',
-        required: true,
-        placeholder: 'Ex: Compra de material',
+        required: false,
+        placeholder: 'Ex: Renovação anual',
       },
       amount: {
-        label: 'Valor (R$)',
+        label: 'Valor (€)',
         type: 'text',
         required: true,
         placeholder: '0,00',
-      },
-      date: {
-        label: 'Data',
-        type: 'date',
-        required: true,
       },
       category: {
         label: 'Categoria',
@@ -293,16 +297,39 @@ export const INTENT_SCHEMAS = {
           { value: 'outro', label: 'Outro' },
         ],
       },
+      splitAmong: {
+        label: 'Dividir entre',
+        type: 'select',
+        required: false,
+        options: [
+          { value: '', label: 'Não dividir' },
+          { value: 'abner', label: 'Abner' },
+          { value: 'abner,nonoke,elias', label: 'Abner + Nonoke + Elias' },
+          { value: 'abner,nonoke', label: 'Abner + Nonoke' },
+          { value: 'abner,elias', label: 'Abner + Elias' },
+          { value: 'nonoke,elias', label: 'Nonoke + Elias' },
+        ],
+      },
     },
     submitConfig: {
       method: 'POST',
       endpoint: '/api/expenses',
-      transform: (values) => ({
-        description: values.description,
-        amount: parseFloat(values.amount.replace(',', '.')),
-        date: values.date,
-        category: values.category || 'outro',
-      }),
+      transform: (values) => {
+        const split = values.splitAmong ? values.splitAmong.split(',') : []
+        return {
+          name: values.name,
+          description: values.description || '',
+          amount: { value: parseFloat(values.amount.replace(',', '.')), currency: 'EUR' },
+          category: values.category || 'outro',
+          categoryLabel: values.category === 'operacional' ? 'Operacional' :
+                         values.category === 'marketing' ? 'Marketing' :
+                         values.category === 'infraestrutura' ? 'Infraestrutura' :
+                         values.category === 'pessoal' ? 'Pessoal' : 'Outros',
+          splitAmong: split,
+          autoDeductFromCashBox: true,
+          createdBy: 'luna',
+        }
+      },
     },
   },
 
@@ -313,13 +340,18 @@ export const INTENT_SCHEMAS = {
     title: 'Enviar Mensagem WhatsApp',
     description: 'Preencha os dados para enviar uma mensagem.',
     fields: {
-      phone: {
-        label: 'Telefone',
-        type: 'text',
+      chatName: {
+        label: 'Chat',
+        type: 'select',
         required: true,
-        placeholder: '+55 11 99999-9999',
+        options: [
+          { value: '', label: 'Selecionar...' },
+          { value: 'Production', label: 'Production' },
+          { value: 'Dev', label: 'Dev' },
+          { value: 'Test', label: 'Test' },
+        ],
       },
-      message: {
+      text: {
         label: 'Mensagem',
         type: 'textarea',
         required: true,
@@ -331,8 +363,8 @@ export const INTENT_SCHEMAS = {
       method: 'POST',
       endpoint: '/api/whatsapp/send',
       transform: (values) => ({
-        phone: values.phone,
-        message: values.message,
+        chatName: values.chatName,
+        text: values.text,
       }),
     },
   },
