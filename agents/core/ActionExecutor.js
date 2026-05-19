@@ -789,7 +789,7 @@ class ActionExecutor {
           id: m.id,
           subject: m.subject || '(sem assunto)',
           from: m.from || 'Desconhecido',
-          snippet: m.snippet || m.body?.slice(0, 100) || '',
+          snippet: m.snippet || m.body?.text?.slice(0, 100) || m.body?.html?.slice(0, 100) || '',
           unread: !m.read
         }))
       };
@@ -947,7 +947,7 @@ class ActionExecutor {
       mencoesPendentes: ignoreMentions ? 0 : pendingMentions.length,
       mencoesRecentes: ignoreMentions ? [] : pendingMentions.slice(0, 5).map(m => ({
         from: m.author || m.from || 'Desconhecido',
-        text: (m.body || m.text || '').slice(0, 100)
+        text: (m.body?.text || m.body || m.text || '').slice(0, 100)
       }))
     };
   }

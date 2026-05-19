@@ -196,7 +196,7 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
         )}
 
         <div className="flex items-center gap-2 py-2 border-b border-nexo-border/50">
-          <span className="text-xs text-nexo-muted w-10">Assunto:</span>
+          <span className="text-xs text-nexo-muted w-14 shrink-0">Assunto:</span>
           <input
             type="text"
             value={subject}

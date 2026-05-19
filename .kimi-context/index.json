@@ -3,19 +3,9 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-19T14:00:00+02:00",
-  "activeSessionId": "kimi-c3e5bb1c",
+  "lastUpdated": "2026-05-19T15:55:00+02:00",
+  "activeSessionId": "kimi-10a71fc7",
   "sessions": [
-    {
-      "id": "kimi-19007e56",
-      "startedAt": "2026-05-19T13:45:00+02:00",
-      "status": "archived",
-      "focus": "Testes NEXO Mail Sprint 2 + relatório completo + fix deploy Render",
-      "snapshotFile": "sessions/2026-05-19-kimi-19007e56.md",
-      "handoffFile": "handoff.md",
-      "totalTurns": 1,
-      "lastCompactionAt": null
-    },
     {
       "id": "kimi-bbf526dc",
       "startedAt": "2026-05-18T11:01:42+02:00",
@@ -37,11 +27,31 @@
       "lastCompactionAt": null
     },
     {
+      "id": "kimi-19007e56",
+      "startedAt": "2026-05-19T13:45:00+02:00",
+      "status": "archived",
+      "focus": "Testes NEXO Mail Sprint 2 + relatório completo + fix deploy Render",
+      "snapshotFile": "sessions/2026-05-19-kimi-19007e56.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
+      "lastCompactionAt": null
+    },
+    {
       "id": "kimi-c3e5bb1c",
       "startedAt": "2026-05-19T14:00:00+02:00",
-      "status": "active",
+      "status": "archived",
       "focus": "Changelog na sidebar + atualizações do dashboard + contexto compartilhado",
       "snapshotFile": "sessions/2026-05-19-kimi-c3e5bb1c.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
+      "lastCompactionAt": null
+    },
+    {
+      "id": "kimi-10a71fc7",
+      "startedAt": "2026-05-19T15:00:00+02:00",
+      "status": "active",
+      "focus": "Fase 1 (NLP.js backend NLU) + Fase 3 (Smart Form Assistant frontend)",
+      "snapshotFile": "sessions/2026-05-19-kimi-10a71fc7.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
       "lastCompactionAt": null
@@ -74,7 +84,14 @@
       "signature": "KIMI-C3E5BB1C",
       "color": "🟣",
       "role": "coding-agent",
-      "notes": "Sessão atual. Trabalhando em Changelog na sidebar + atualizações do dashboard."
+      "notes": "Sessão anterior. Trabalhando em Changelog na sidebar + atualizações do dashboard."
+    },
+    "kimi-10a71fc7": {
+      "instanceHash": "10a71fc7",
+      "signature": "KIMI-10A71FC7",
+      "color": "🟡",
+      "role": "coding-agent",
+      "notes": "Sessão atual. Implementou NLP.js backend (61 intents, 3 idiomas) + Smart Form Assistant frontend (modal + botão flutuante)."
     }
   },
   "rules": {

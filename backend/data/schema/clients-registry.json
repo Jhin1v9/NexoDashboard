@@ -499,6 +499,22 @@
       "lastContact": null,
       "createdAt": "2026-01-01T00:00:00Z",
       "updatedAt": "2026-05-09T16:05:54.831Z"
+    },
+    "lead-1779199413603-i4kd": {
+      "displayName": "Lead Teste API",
+      "email": "teste@nexo.com",
+      "phone": "5511999999999",
+      "source": "manual",
+      "type": "lead",
+      "status": "potencial",
+      "pipelineStatus": "novo",
+      "estimatedValue": 0,
+      "currency": "EUR",
+      "notes": "",
+      "assignedTo": null,
+      "tags": [],
+      "createdAt": "2026-05-19T14:03:33.603Z",
+      "lastContact": null
     }
   },
   "autoDetect": {
