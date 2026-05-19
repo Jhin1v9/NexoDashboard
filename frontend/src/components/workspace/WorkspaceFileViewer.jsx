@@ -1,0 +1,340 @@
+import { useState, useEffect, useCallback } from 'react'
+import { motion } from 'framer-motion'
+import axios from 'axios'
+import {
+  X, Save, Edit3, Eye, EyeOff, Download, ExternalLink,
+  FileText, FileCode, Globe, Loader2, Bot, CheckCircle2
+} from 'lucide-react'
+
+const CODE_EXTENSIONS = new Set([
+  'js','jsx','ts','tsx','json','css','py','php','sql','yaml',
+  'yml','xml','sh','bash','zsh','env','gitignore','dockerfile',
+  'nginx','conf','ini','toml','graphql','csv','log'
+])
+
+function getFileKind(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  if (ext === 'md') return 'markdown'
+  if (ext === 'html') return 'html'
+  if (CODE_EXTENSIONS.has(ext)) return 'code'
+  return 'text'
+}
+
+function getLanguageLabel(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  const map = {
+    js: 'JavaScript', jsx: 'JSX', ts: 'TypeScript', tsx: 'TSX',
+    json: 'JSON', css: 'CSS', py: 'Python', php: 'PHP', sql: 'SQL',
+    yaml: 'YAML', yml: 'YAML', xml: 'XML', sh: 'Shell', bash: 'Bash',
+    dockerfile: 'Dockerfile', nginx: 'Nginx', conf: 'Config',
+    ini: 'INI', toml: 'TOML', graphql: 'GraphQL', csv: 'CSV',
+    log: 'Log', html: 'HTML', md: 'Markdown', txt: 'Texto',
+  }
+  return map[ext] || 'Texto'
+}
+
+/**
+ * Renderização simples de Markdown para preview.
+ * Suporta: headers, bold, italic, listas, links, code inline/blocks, blockquote, hr.
+ */
+function SimpleMarkdownPreview({ source }) {
+  const html = source
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // code blocks
+    .replace(/```([\s\S]*?)```/g, '<pre class="bg-nexo-card p-3 rounded-lg overflow-auto text-xs my-2"><code>$1</code></pre>')
+    // inline code
+    .replace(/`([^`]+)`/g, '<code class="bg-nexo-card px-1 py-0.5 rounded text-xs">$1</code>')
+    // headers
+    .replace(/^###### (.*$)/gim, '<h6 class="text-xs font-bold mt-3 mb-1">$1</h6>')
+    .replace(/^##### (.*$)/gim, '<h5 class="text-sm font-bold mt-3 mb-1">$1</h5>')
+    .replace(/^#### (.*$)/gim, '<h4 class="text-sm font-bold mt-3 mb-1">$1</h4>')
+    .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold mt-4 mb-2">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold mt-4 mb-2">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>')
+    // blockquote
+    .replace(/^&gt; (.*$)/gim, '<blockquote class="border-l-2 border-nexo-muted pl-3 italic my-2 text-nexo-muted">$1</blockquote>')
+    // hr
+    .replace(/^---$/gim, '<hr class="border-nexo-border my-3" />')
+    // bold / italic
+    .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/___(.*?)___/g, '<strong><em>$1</em></strong>')
+    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+    .replace(/_(.*?)_/g, '<em>$1</em>')
+    // links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="text-nexo-info hover:underline">$1</a>')
+    // listas
+    .replace(/^\s*[-*+] (.*$)/gim, '<li class="ml-4 list-disc">$1</li>')
+    // parágrafos (wrap lines not in tags)
+    .split('\n').map(line => {
+      if (line.trim() === '') return ''
+      if (/^<[a-z]/.test(line)) return line
+      return `<p class="my-1 text-sm leading-relaxed">${line}</p>`
+    }).join('')
+
+  return <div className="prose prose-sm max-w-none p-4" dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+/**
+ * WorkspaceFileViewer
+ *
+ * Props:
+ *  clientId    {string}
+ *  file        {object}   — objeto do arquivo (name, path, size, type)
+ *  token       {string}   — auth token
+ *  onClose     {function}
+ *  onSaved     {function} — chamado após salvar com sucesso
+ */
+export default function WorkspaceFileViewer({ clientId, file, token, onClose, onSaved }) {
+  const [content, setContent] = useState('')
+  const [originalContent, setOriginalContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [editMode, setEditMode] = useState(false)
+  const [showPreview, setShowPreview] = useState(true)
+  const [savedOk, setSavedOk] = useState(false)
+  const kind = getFileKind(file.name)
+
+  const api = axios.create({ headers: { Authorization: `Bearer ${token}` } })
+
+  // Fetch content
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    setEditMode(false)
+    setSavedOk(false)
+    setShowPreview(kind === 'html' || kind === 'markdown')
+
+    api.get(`/api/workspace/clients/${clientId}/content?path=${encodeURIComponent(file.path)}`)
+      .then(res => {
+        if (cancelled) return
+        const text = res.data.content || ''
+        setContent(text)
+        setOriginalContent(text)
+      })
+      .catch(err => {
+        if (cancelled) return
+        setError(err.response?.data?.error || err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [clientId, file.path, kind])
+
+  // Auto-dismiss savedOk
+  useEffect(() => {
+    if (!savedOk) return
+    const t = setTimeout(() => setSavedOk(false), 2000)
+    return () => clearTimeout(t)
+  }, [savedOk])
+
+  const handleSave = useCallback(async () => {
+    setSaving(true)
+    try {
+      await api.put(`/api/workspace/clients/${clientId}/content`, {
+        path: file.path,
+        content,
+      })
+      setOriginalContent(content)
+      setSavedOk(true)
+      onSaved?.()
+    } catch (err) {
+      setError(err.response?.data?.error || err.message)
+    } finally {
+      setSaving(false)
+    }
+  }, [clientId, file.path, content, api, onSaved])
+
+  const hasChanges = content !== originalContent
+
+  // Construir blob URL para preview HTML
+  const htmlBlobUrl = kind === 'html'
+    ? URL.createObjectURL(new Blob([content], { type: 'text/html' }))
+    : null
+
+  // Cleanup blob URL
+  useEffect(() => {
+    return () => {
+      if (htmlBlobUrl) URL.revokeObjectURL(htmlBlobUrl)
+    }
+  }, [htmlBlobUrl])
+
+  // Abrir no navegador (nova aba)
+  const openInNewTab = () => {
+    if (!htmlBlobUrl) return
+    window.open(htmlBlobUrl, '_blank')
+  }
+
+  // Link para Luna com contexto enriquecido
+  const lunaUrl = `/luna?context=workspace&id=${clientId}&file=${encodeURIComponent(file.path)}`
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex flex-col bg-nexo-dark/95 backdrop-blur-sm"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-nexo-border bg-nexo-card/50">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {kind === 'markdown' && <FileText size={18} className="text-nexo-info" />}
+          {kind === 'html' && <Globe size={18} className="text-nexo-warning" />}
+          {kind === 'code' && <FileCode size={18} className="text-nexo-success" />}
+          {kind === 'text' && <FileText size={18} className="text-nexo-muted" />}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate">{file.name}</p>
+            <p className="text-[10px] text-nexo-muted">
+              {getLanguageLabel(file.name)} · {file.path}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Luna context button */}
+          <a
+            href={lunaUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-nexo-border hover:bg-nexo-card transition-colors"
+            title="Conversar com a Luna sobre este arquivo"
+          >
+            <Bot size={14} /> Luna
+          </a>
+
+          {/* Preview toggle (markdown / html) */}
+          {(kind === 'html' || kind === 'markdown') && (
+            <button
+              onClick={() => setShowPreview(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${showPreview ? 'bg-nexo-info/10 border-nexo-info/30 text-nexo-info' : 'border-nexo-border hover:bg-nexo-card'}`}
+            >
+              {showPreview ? <Eye size={14} /> : <EyeOff size={14} />}
+              {showPreview ? 'Preview' : 'Código'}
+            </button>
+          )}
+
+          {/* Edit toggle */}
+          <button
+            onClick={() => setEditMode(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${editMode ? 'bg-nexo-info/10 border-nexo-info/30 text-nexo-info' : 'border-nexo-border hover:bg-nexo-card'}`}
+          >
+            {editMode ? <Eye size={14} /> : <Edit3 size={14} />}
+            {editMode ? 'Visualizar' : 'Editar'}
+          </button>
+
+          {/* Save */}
+          {editMode && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${hasChanges ? 'bg-nexo-success/10 border-nexo-success/30 text-nexo-success hover:bg-nexo-success/20' : 'border-nexo-border text-nexo-muted cursor-not-allowed'}`}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : savedOk ? <CheckCircle2 size={14} /> : <Save size={14} />}
+              {savedOk ? 'Salvo!' : 'Salvar'}
+            </button>
+          )}
+
+          {/* Download */}
+          <a
+            href={`/api/workspace/clients/${clientId}/download?path=${encodeURIComponent(file.path)}&token=${token}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-nexo-border hover:bg-nexo-card transition-colors"
+          >
+            <Download size={14} /> Download
+          </a>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-nexo-card rounded-lg border border-nexo-border transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Content area */}
+      <div className="flex-1 overflow-hidden">
+        {loading && (
+          <div className="flex items-center justify-center h-full text-nexo-muted">
+            <Loader2 size={24} className="animate-spin mr-2" /> Carregando arquivo…
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center justify-center h-full text-nexo-danger gap-2">
+            <p className="text-sm">{error}</p>
+            <button onClick={onClose} className="px-4 py-2 rounded-lg border border-nexo-border hover:bg-nexo-card text-sm">
+              Fechar
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="h-full">
+            {/* Markdown preview */}
+            {kind === 'markdown' && showPreview && (
+              <div className="h-full overflow-auto bg-nexo-dark">
+                <SimpleMarkdownPreview source={content} />
+              </div>
+            )}
+            {kind === 'markdown' && !showPreview && (
+              <textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                readOnly={!editMode}
+                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                spellCheck={false}
+              />
+            )}
+
+            {/* HTML preview */}
+            {kind === 'html' && showPreview && (
+              <div className="h-full flex flex-col">
+                <div className="px-4 py-2 border-b border-nexo-border flex items-center gap-2 bg-nexo-card/30">
+                  <span className="text-xs text-nexo-muted">Preview</span>
+                  <button
+                    onClick={openInNewTab}
+                    className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-nexo-card hover:bg-nexo-card/80 border border-nexo-border transition-colors"
+                  >
+                    <ExternalLink size={10} /> Abrir no navegador
+                  </button>
+                </div>
+                <iframe
+                  src={htmlBlobUrl}
+                  className="flex-1 w-full bg-white"
+                  sandbox="allow-scripts allow-same-origin"
+                  title={file.name}
+                />
+              </div>
+            )}
+            {kind === 'html' && !showPreview && (
+              <textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                readOnly={!editMode}
+                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                spellCheck={false}
+              />
+            )}
+
+            {/* Code / Text — textarea */}
+            {(kind === 'code' || kind === 'text') && (
+              <textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                readOnly={!editMode}
+                className="w-full h-full p-4 bg-nexo-dark font-mono text-xs leading-relaxed resize-none focus:outline-none text-nexo-light"
+                spellCheck={false}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}

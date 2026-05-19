@@ -4036,51 +4036,19 @@ app.post('/api/luna/learn', requireAuth, async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 // GET /api/luna/proactive — Retorna contagem de pendências para badge no botão
-app.get('/api/luna/proactive', requireAuth, async (req, res) => {
+// Agora usa buildActionCenterItems para garantir consistência com o Action Center
+app.get('/api/luna/proactive', requireAuth, (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
     const dataDir = path.join(__dirname, 'data');
+    const items = buildActionCenterItems(dataDir);
 
-    let total = 0;
-    const breakdown = {};
-
-    // Tarefas P0/P1 pendentes
-    try {
-      const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
-      const critical = tasks.filter(t => t.status !== 'completed' && (t.priority === 'P0' || t.priority === 'high'));
-      const overdue = tasks.filter(t => t.status !== 'completed' && t.dueDate && new Date(t.dueDate) < new Date());
-      breakdown.tasksCritical = critical.length;
-      breakdown.tasksOverdue = overdue.length;
-      // Evita duplicar tarefas que são P0 E atrasadas
-      const criticalIds = new Set(critical.map(t => t.id));
-      const overdueOnly = overdue.filter(t => !criticalIds.has(t.id));
-      total += critical.length + overdueOnly.length;
-    } catch (e) { breakdown.tasksCritical = 0; breakdown.tasksOverdue = 0; }
-
-    // Emails não lidos (drafts pendentes de aprovação)
-    try {
-      const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
-      const pendingDrafts = drafts.drafts ? drafts.drafts.filter(d => d.status === 'pending' || d.status === 'pending_approval').length : 0;
-      breakdown.emailsPending = pendingDrafts;
-      total += pendingDrafts;
-    } catch (e) { breakdown.emailsPending = 0; }
-
-    // Leads novos
-    try {
-      const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
-      const newLeads = Array.isArray(leads) ? leads.filter(l => l.status === 'new' || l.pipelineStatus === 'new').length : 0;
-      breakdown.leadsNew = newLeads;
-      total += newLeads;
-    } catch (e) { breakdown.leadsNew = 0; }
-
-    // Alerts ativos
-    try {
-      const alerts = JSON.parse(fs.readFileSync(path.join(dataDir, 'alerts.json'), 'utf8'));
-      const activeAlerts = Array.isArray(alerts) ? alerts.filter(a => a.active !== false && a.resolved !== true).length : 0;
-      breakdown.alertsActive = activeAlerts;
-      total += activeAlerts;
-    } catch (e) { breakdown.alertsActive = 0; }
+    const breakdown = {
+      tasksCritical: items.filter(i => i.type === 'task' && i.priority === 'critical').length,
+      tasksOverdue: items.filter(i => i.type === 'task' && i.priority === 'warning').length,
+      emailsPending: items.filter(i => i.type === 'email').length,
+      leadsNew: items.filter(i => i.type === 'lead').length,
+      alertsActive: items.filter(i => i.type === 'alert').length,
+    };
 
     // Determina prioridade máxima
     let topPriority = 'info';
@@ -4088,7 +4056,7 @@ app.get('/api/luna/proactive', requireAuth, async (req, res) => {
     else if (breakdown.tasksOverdue > 0) topPriority = 'warning';
     else if (breakdown.emailsPending > 0 || breakdown.leadsNew > 0) topPriority = 'info';
 
-    res.json({ success: true, total, breakdown, topPriority });
+    res.json({ success: true, total: items.length, breakdown, topPriority });
   } catch (e) {
     console.error('[LunaProactive] Erro:', e);
     res.status(500).json({ success: false, error: e.message });
@@ -4287,6 +4255,241 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
     res.json({ success: true, modified, errors: errors.length > 0 ? errors : undefined });
   } catch (e) {
     console.error('[LunaBatch] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LUNA ACTION CENTER — Inbox de ações pendentes acionáveis
+// ═════════════════════════════════════════════════════════════════════════════
+
+const LUNA_DISMISSED_FILE = path.join(DATA_DIR, 'luna-dismissed-actions.json');
+
+function readDismissed() {
+  try {
+    const raw = fs.readFileSync(LUNA_DISMISSED_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch { return { version: '1.0', dismissed: [] }; }
+}
+
+function writeDismissed(data) {
+  fs.writeFileSync(LUNA_DISMISSED_FILE, JSON.stringify(data, null, 2));
+}
+
+function isDismissed(id, dismissed) {
+  const entry = dismissed.find(d => d.id === id);
+  if (!entry) return false;
+  // Expira após 24h
+  const age = Date.now() - new Date(entry.dismissedAt).getTime();
+  return age < 24 * 60 * 60 * 1000;
+}
+
+function buildActionCenterItems(dataDir) {
+  const items = [];
+  const now = new Date();
+  const dismissed = readDismissed().dismissed;
+
+  // ── Tarefas ──
+  try {
+    const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
+    const pending = tasks.filter(t => t.status !== 'completed');
+
+    // P0 críticas
+    pending.filter(t => t.priority === 'P0' || t.priority === 'high').forEach(t => {
+      const id = `task-p0-${t.id}`;
+      if (isDismissed(id, dismissed)) return;
+      const daysOverdue = t.dueDate ? Math.max(0, Math.floor((now - new Date(t.dueDate)) / (1000 * 60 * 60 * 24))) : 0;
+      items.push({
+        id,
+        type: 'task',
+        priority: 'critical',
+        title: t.title || 'Tarefa P0',
+        description: daysOverdue > 0 ? `Tarefa P0 crítica — atrasada há ${daysOverdue} dia(s)` : 'Tarefa P0 crítica requer atenção imediata',
+        module: 'tarefas',
+        entityId: t.id,
+        actions: [
+          { label: 'Concluir', intent: 'tarefa.concluir', primary: true },
+          { label: 'Ver', href: `/tarefas?highlight=${t.id}` },
+        ],
+        dismissable: true,
+        createdAt: t.createdAt || t.dueDate || now.toISOString(),
+      });
+    });
+
+    // Atrasadas (não P0)
+    pending.filter(t => {
+      if (!t.dueDate) return false;
+      if (t.priority === 'P0' || t.priority === 'high') return false;
+      return new Date(t.dueDate) < now;
+    }).forEach(t => {
+      const id = `task-overdue-${t.id}`;
+      if (isDismissed(id, dismissed)) return;
+      const days = Math.floor((now - new Date(t.dueDate)) / (1000 * 60 * 60 * 24));
+      items.push({
+        id,
+        type: 'task',
+        priority: 'warning',
+        title: t.title || 'Tarefa atrasada',
+        description: `Tarefa atrasada há ${days} dia(s)`,
+        module: 'tarefas',
+        entityId: t.id,
+        actions: [
+          { label: 'Concluir', intent: 'tarefa.concluir', primary: true },
+          { label: 'Ver', href: `/tarefas?highlight=${t.id}` },
+        ],
+        dismissable: true,
+        createdAt: t.dueDate || now.toISOString(),
+      });
+    });
+  } catch (e) { /* silencioso */ }
+
+  // ── Emails (drafts pendentes) ──
+  try {
+    const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
+    if (drafts.drafts) {
+      drafts.drafts.filter(d => d.status === 'pending' || d.status === 'pending_approval').forEach(d => {
+        const id = `email-draft-${d.id}`;
+        if (isDismissed(id, dismissed)) return;
+        items.push({
+          id,
+          type: 'email',
+          priority: 'info',
+          title: d.subject || 'Rascunho pendente',
+          description: d.to ? `Para: ${d.to}` : 'Aguardando aprovação de envio',
+          module: 'comunicacao',
+          entityId: d.id,
+          actions: [
+            { label: 'Aprovar', intent: 'email.enviar', primary: true },
+            { label: 'Revisar', href: `/comunicacao/emails?draft=${d.id}` },
+          ],
+          dismissable: true,
+          createdAt: d.createdAt || now.toISOString(),
+        });
+      });
+    }
+  } catch (e) { /* silencioso */ }
+
+  // ── Leads novos ──
+  try {
+    const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
+    const arr = Array.isArray(leads) ? leads : [];
+    arr.filter(l => l.status === 'new' || l.pipelineStatus === 'new').forEach(l => {
+      const id = `lead-new-${l.id}`;
+      if (isDismissed(id, dismissed)) return;
+      items.push({
+        id,
+        type: 'lead',
+        priority: 'info',
+        title: l.name || l.company || 'Lead novo',
+        description: l.source ? `Origem: ${l.source}` : 'Novo prospect no pipeline',
+        module: 'leads',
+        entityId: l.id,
+        actions: [
+          { label: 'Ver lead', href: `/leads?highlight=${l.id}`, primary: true },
+          { label: 'Contatar', intent: 'lead.marcar_contatado' },
+        ],
+        dismissable: true,
+        createdAt: l.createdAt || now.toISOString(),
+      });
+    });
+  } catch (e) { /* silencioso */ }
+
+  // ── Financeiro (caixa negativo) ──
+  try {
+    const cash = JSON.parse(fs.readFileSync(path.join(dataDir, 'cash-box.json'), 'utf8'));
+    if ((cash.balance || 0) < 0) {
+      const id = 'finance-negative-balance';
+      if (!isDismissed(id, dismissed)) {
+        items.push({
+          id,
+          type: 'finance',
+          priority: 'warning',
+          title: 'Caixa negativo',
+          description: `Saldo atual: R$ ${cash.balance.toFixed(2).replace('.', ',')}`,
+          module: 'financeiro',
+          entityId: null,
+          actions: [
+            { label: 'Ver caixa', href: '/financeiro/caixa', primary: true },
+          ],
+          dismissable: true,
+          createdAt: now.toISOString(),
+        });
+      }
+    }
+  } catch (e) { /* silencioso */ }
+
+  // ── Alertas ativos ──
+  try {
+    const alerts = JSON.parse(fs.readFileSync(path.join(dataDir, 'alerts.json'), 'utf8'));
+    const active = Array.isArray(alerts) ? alerts.filter(a => a.active !== false && a.resolved !== true) : [];
+    active.forEach(a => {
+      const id = `alert-${a.id}`;
+      if (isDismissed(id, dismissed)) return;
+      items.push({
+        id,
+        type: 'alert',
+        priority: 'critical',
+        title: a.title || 'Alerta ativo',
+        description: a.message || 'Requer atenção no centro de operações',
+        module: 'operacoes',
+        entityId: a.id,
+        actions: [
+          { label: 'Ver operações', href: '/operacoes', primary: true },
+        ],
+        dismissable: true,
+        createdAt: a.createdAt || now.toISOString(),
+      });
+    });
+  } catch (e) { /* silencioso */ }
+
+  // Ordenar: critical > warning > info
+  const order = { critical: 0, warning: 1, info: 2 };
+  items.sort((a, b) => order[a.priority] - order[b.priority]);
+
+  return items;
+}
+
+// GET /api/luna/action-center — Retorna ações pendentes acionáveis
+app.get('/api/luna/action-center', requireAuth, (req, res) => {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    const items = buildActionCenterItems(dataDir);
+    res.json({ success: true, items, count: items.length });
+  } catch (e) {
+    console.error('[LunaActionCenter] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/action-center/dismiss — Ignora uma ação por 24h
+app.post('/api/luna/action-center/dismiss', requireAuth, (req, res) => {
+  try {
+    const { id, dismissAll } = req.body;
+    const data = readDismissed();
+
+    if (dismissAll) {
+      // Requer lista de IDs atuais para não ignorar indefinidamente coisas futuras
+      const dataDir = path.join(__dirname, 'data');
+      const currentItems = buildActionCenterItems(dataDir);
+      currentItems.forEach(item => {
+        if (!data.dismissed.find(d => d.id === item.id)) {
+          data.dismissed.push({ id: item.id, dismissedAt: new Date().toISOString() });
+        }
+      });
+    } else if (id) {
+      // Remove entrada antiga se existir (para renovar o timestamp)
+      data.dismissed = data.dismissed.filter(d => d.id !== id);
+      data.dismissed.push({ id, dismissedAt: new Date().toISOString() });
+    }
+
+    // Limpar entradas com mais de 7 dias para não inflar o arquivo
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    data.dismissed = data.dismissed.filter(d => new Date(d.dismissedAt).getTime() > cutoff);
+
+    writeDismissed(data);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[LunaActionCenter] Erro ao dismiss:', e);
     res.status(500).json({ success: false, error: e.message });
   }
 });

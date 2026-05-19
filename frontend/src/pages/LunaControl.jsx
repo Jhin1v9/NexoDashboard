@@ -197,6 +197,7 @@ export default function LunaControl() {
   const [searchParams] = useSearchParams()
   const contextModule = searchParams.get('context') || null
   const contextId = searchParams.get('id') || null
+  const contextFile = searchParams.get('file') || null
 
   const [activeTab, setActiveTab] = useState(contextModule ? 'chat' : 'terminal')
   const [commands, setCommands] = useState([])
@@ -227,8 +228,8 @@ export default function LunaControl() {
   const [showThreadDropdown, setShowThreadDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
-  // Contexto passado via query params (ex: ?context=email&id=xyz)
-  const contextRef = useRef({ module: contextModule, id: contextId })
+  // Contexto passado via query params (ex: ?context=email&id=xyz&file=path)
+  const contextRef = useRef({ module: contextModule, id: contextId, file: contextFile })
 
   useEffect(() => {
     if (authUser?.name) {
@@ -467,7 +468,8 @@ export default function LunaControl() {
           text,
           authorName: activeUser,
           contextModule: contextRef.current?.module || null,
-          contextId: contextRef.current?.id || null
+          contextId: contextRef.current?.id || null,
+          contextFile: contextRef.current?.file || null,
         })
         const data = res.data
         const newMsgs = []
@@ -544,7 +546,8 @@ export default function LunaControl() {
         pendingActions: pendingConfirmation.actions,
         editedFields,
         contextModule: contextRef.current?.module || null,
-        contextId: contextRef.current?.id || null
+        contextId: contextRef.current?.id || null,
+        contextFile: contextRef.current?.file || null,
       })
       const data = res.data
       const newMsgs = []

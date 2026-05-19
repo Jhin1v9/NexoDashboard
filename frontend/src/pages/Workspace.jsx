@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import DevLogTerminal from '../components/workspace/DevLogTerminal'
 import ContextMenu from '../components/workspace/ContextMenu'
+import WorkspaceFileViewer from '../components/workspace/WorkspaceFileViewer'
 
 function getFileIcon(name, type) {
   if (type === 'folder') return FolderOpen
@@ -22,6 +23,16 @@ function getFileIcon(name, type) {
   if (['js','jsx','ts','tsx','html','css','json','py','php'].includes(ext)) return Code
   if (['pdf','doc','docx','txt','md'].includes(ext)) return FileText
   return File
+}
+
+const VIEWABLE_EXTS = new Set([
+  'md','txt','json','js','jsx','ts','tsx','html','css','py','php',
+  'yaml','yml','xml','sh','bash','zsh','sql','env','gitignore',
+  'csv','log','dockerfile','nginx','conf','ini','toml','graphql',
+])
+function isViewableFile(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  return VIEWABLE_EXTS.has(ext)
 }
 
 function formatSize(bytes) {
@@ -262,6 +273,7 @@ export default function Workspace() {
   const [showCreateClient, setShowCreateClient] = useState(false)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [viewerFile, setViewerFile] = useState(null)
   const [projectTypes, setProjectTypes] = useState({})
   const [runningServers, setRunningServers] = useState([])
   const [renameTarget, setRenameTarget] = useState(null)
@@ -494,7 +506,13 @@ export default function Workspace() {
         <div
           key={f.path}
           onClick={() => setSelectedFile(f)}
-          onDoubleClick={() => f.type === 'folder' && handleNavigate(f.path)}
+          onDoubleClick={() => {
+            if (f.type === 'folder') {
+              handleNavigate(f.path)
+            } else if (f.type === 'file' && isViewableFile(f.name)) {
+              setViewerFile(f)
+            }
+          }}
           onContextMenu={(e) => handleContextMenu(e, f)}
           className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-nexo-info/10 border border-nexo-info/30' : 'hover:bg-nexo-card/60 border border-transparent'}`}
         >
@@ -784,6 +802,11 @@ export default function Workspace() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {selectedFile.type === 'file' && isViewableFile(selectedFile.name) && (
+                        <button onClick={() => setViewerFile(selectedFile)} className="flex items-center gap-1.5 px-3 py-1.5 bg-nexo-info/10 hover:bg-nexo-info/20 text-nexo-info rounded-lg text-xs transition-colors">
+                          <Edit3 size={14} /> Visualizar
+                        </button>
+                      )}
                       {selectedFile.type === 'file' && (
                         <a href={`/api/workspace/clients/${selectedClient.id}/download?path=${encodeURIComponent(selectedFile.path)}&token=${token}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-nexo-card hover:bg-nexo-card/80 rounded-lg text-xs border border-nexo-border transition-colors">
                           <Download size={14} /> Download
@@ -816,6 +839,19 @@ export default function Workspace() {
 
       {/* Dev Log Terminal */}
       <DevLogTerminal serverId={activeLogServer} onClose={() => setActiveLogServer(null)} />
+
+      {/* File Viewer */}
+      <AnimatePresence>
+        {viewerFile && (
+          <WorkspaceFileViewer
+            clientId={selectedClient.id}
+            file={viewerFile}
+            token={token}
+            onClose={() => setViewerFile(null)}
+            onSaved={() => fetchFiles(selectedClient.id, currentPath)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Modals */}
       <AnimatePresence>
