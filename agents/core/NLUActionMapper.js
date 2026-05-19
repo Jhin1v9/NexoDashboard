@@ -97,9 +97,9 @@ const INTENT_TO_ACTION = {
   'link.excluir': { type: 'excluir_link', needsConfirmation: true },
 
   // SISTEMA
-  'sistema.ajuda': { type: 'ideia', needsConfirmation: false },
+  'sistema.ajuda': { type: 'ajuda', needsConfirmation: false },
   'sistema.status': { type: 'consultar_status', needsConfirmation: false },
-  'sistema.navegar': { type: 'ideia', needsConfirmation: false },
+  'sistema.navegar': { type: 'navegar', needsConfirmation: false },
   'sistema.notificacoes': { type: 'listar_notificacoes', needsConfirmation: false },
 
   // SOCIAL
