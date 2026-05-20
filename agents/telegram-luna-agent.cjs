@@ -16,11 +16,60 @@ const CONFIG = {
 
 // NLU e ActionExecutor para execução direta (sem precisar de auth HTTP)
 let lunaNLU = null;
+let semanticNLU = null;
+
 function getNLU() {
   if (!lunaNLU) {
     lunaNLU = require('../backend/services/luna-nlu');
   }
   return lunaNLU;
+}
+
+function getSemanticNLU() {
+  if (!semanticNLU) {
+    semanticNLU = require('../backend/services/luna-semantic-nlu');
+  }
+  return semanticNLU;
+}
+
+// Classificador híbrido: Semantic Embedding + NLP.js ensemble
+async function hybridClassify(text) {
+  try {
+    const nlu = getNLU();
+    const sem = getSemanticNLU();
+    
+    const [nluResult, semResult] = await Promise.all([
+      nlu.process(text, 'pt'),
+      sem.classify(text, { lang: 'pt' }),
+    ]);
+    
+    // Ensemble inteligente
+    const nluOverconfident = nluResult.score >= 0.99 && nluResult.intent === 'financeiro.pagamento';
+    const semanticStrong = semResult.score > 0.45;
+    const semanticDisagrees = semResult.intent !== nluResult.intent;
+    
+    if (semResult.score > 0.80) {
+      return { ...semResult, source: 'semantic', nluScore: nluResult.score };
+    } else if (nluOverconfident && semanticStrong && semanticDisagrees) {
+      return { ...semResult, source: 'semantic', reason: 'NLP.js overconfident', nluScore: nluResult.score };
+    } else if (nluResult.score > semResult.score + 0.15) {
+      return {
+        intent: nluResult.intent,
+        domain: nluResult.domain,
+        score: nluResult.score,
+        action: nluResult.action,
+        entities: nluResult.entities,
+        source: 'nlu',
+        semanticScore: semResult.score,
+      };
+    }
+    return { ...semResult, source: 'semantic', nluScore: nluResult.score };
+  } catch (e) {
+    log('warn', `Hybrid classify erro: ${e.message}`);
+    // Fallback para NLU puro
+    const nlu = getNLU();
+    return await nlu.process(text, 'pt');
+  }
 }
 
 let actionExecutor = null;
@@ -78,11 +127,10 @@ function normalizeTimestamp(value) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
-// ── NLU INTEGRATION ──
+// ── NLU INTEGRATION (Hybrid: Semantic + NLP.js) ──
 async function classifyWithNLU(text) {
   try {
-    const nlu = getNLU();
-    const result = await nlu.process(text, 'pt');
+    const result = await hybridClassify(text);
     if (!result) return null;
     return {
       intent: result.intent,
@@ -90,11 +138,12 @@ async function classifyWithNLU(text) {
       score: result.score,
       action: result.action,
       entities: result.entities,
-      answer: result.answer,
-      sentiment: result.sentiment
+      answer: result.answer || '',
+      sentiment: result.sentiment || { vote: 'neutral', score: 0 },
+      source: result.source || 'nlu',
     };
   } catch (e) {
-    log('warn', `NLU erro: ${e.message}`);
+    log('warn', `Hybrid NLU erro: ${e.message}`);
     return null;
   }
 }

@@ -4762,6 +4762,80 @@ app.post('/api/luna/understand', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/luna/semantic-understand — Semantic Embedding NLU
+app.post('/api/luna/semantic-understand', requireAuth, async (req, res) => {
+  try {
+    const { text, lang } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Texto obrigatório' });
+    }
+
+    const result = await semanticNLU.classify(text.trim(), { lang });
+
+    res.json({
+      success: true,
+      text: text.trim(),
+      intent: result.intent,
+      domain: result.domain,
+      score: result.score,
+      action: result.action,
+      entities: result.entities,
+      semanticMatches: result.semanticMatches,
+      source: 'semantic',
+    });
+  } catch (e) {
+    console.error('[SemanticNLU] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/hybrid-understand — Ensemble: Semantic + NLP.js
+app.post('/api/luna/hybrid-understand', requireAuth, async (req, res) => {
+  try {
+    const { text, lang } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Texto obrigatório' });
+    }
+
+    const [nluResult, semResult] = await Promise.all([
+      lunaNLU.process(text.trim(), lang),
+      semanticNLU.classify(text.trim(), { lang }),
+    ]);
+
+    // Ensemble inteligente: leva em conta overconfidence do NLP.js
+    // NLP.js frequentemente retorna 1.0 para financeiro — desconfiamos
+    let winner;
+    const nluOverconfident = nluResult.score >= 0.99 && nluResult.intent === 'financeiro.pagamento';
+    const semanticStrong = semResult.score > 0.45;
+    const semanticDisagrees = semResult.intent !== nluResult.intent;
+    
+    if (semResult.score > 0.80) {
+      // Semantic muito confiante → usa semantic
+      winner = { ...semResult, source: 'semantic', reason: 'Alta confiança semântica' };
+    } else if (nluOverconfident && semanticStrong && semanticDisagrees) {
+      // NLP.js overconfident em financeiro, semantic sugere outro intent
+      winner = { ...semResult, source: 'semantic', reason: 'NLP.js overconfident (suspeita)' };
+    } else if (nluResult.score > semResult.score + 0.15) {
+      // NLP.js significativamente mais confiante
+      winner = { intent: nluResult.intent, domain: nluResult.domain, score: nluResult.score, action: nluResult.action, entities: nluResult.entities, source: 'nlu', reason: 'NLP.js mais confiante' };
+    } else {
+      // Próximo ou semantic ligeiramente melhor
+      winner = { ...semResult, source: 'semantic', reason: 'Melhor match semântico' };
+    }
+
+    res.json({
+      success: true,
+      text: text.trim(),
+      winner,
+      nlu: { intent: nluResult.intent, score: nluResult.score, domain: nluResult.domain },
+      semantic: { intent: semResult.intent, score: semResult.score, domain: semResult.domain, matches: semResult.semanticMatches?.slice(0, 3) },
+    });
+  } catch (e) {
+    console.error('[HybridNLU] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // GET /api/luna/intents — Lista todos os intents disponíveis
 app.get('/api/luna/intents', requireAuth, (req, res) => {
   try {
@@ -6732,6 +6806,7 @@ const gmailOAuth = require('./services/gmail-oauth');
 const gmailAPI = require('./services/gmail-api');
 const emailAI = require('./services/email-ai');
 const lunaNLU = require('./services/luna-nlu');
+const semanticNLU = require('./services/luna-semantic-nlu');
 
 // ── AUTH: OAuth2 Gmail ──
 
@@ -8676,8 +8751,25 @@ async function startServer() {
       console.error('❌ Database setup failed:', err.message);
     }
   }
-  server.listen(PORT, BIND_IP, () => {
+  server.listen(PORT, BIND_IP, async () => {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+
+    // ── Iniciar Telegram Bot automaticamente (se token configurado) ──
+    try {
+      if (process.env.TELEGRAM_BOT_TOKEN) {
+        const started = await startTelegramAgent();
+        if (started) {
+          const status = getTelegramStatus();
+          console.log(`🤖 Bot do Telegram iniciado automaticamente: @${status.botUsername}`);
+        } else {
+          console.warn('⚠️ Bot do Telegram falhou ao iniciar (verifique TELEGRAM_BOT_TOKEN)');
+        }
+      } else {
+        console.log('ℹ️ TELEGRAM_BOT_TOKEN não configurado — bot do Telegram não será iniciado');
+      }
+    } catch (err) {
+      console.error('❌ Erro ao iniciar bot do Telegram:', err.message);
+    }
   });
 }
 

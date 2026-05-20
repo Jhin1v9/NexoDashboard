@@ -1249,33 +1249,45 @@ class LunaAgent {
 
   async classifyWithNLU(text) {
     try {
-      let fetch;
-      try { fetch = (await import('node-fetch')).default; } catch (e) {
-        log.warn('[NLU] node-fetch nao disponivel');
-        return null;
+      // Hybrid: Semantic Embedding + NLP.js ensemble (direto, sem HTTP)
+      const semanticNLU = require('../backend/services/luna-semantic-nlu');
+      const lunaNLU = require('../backend/services/luna-nlu');
+      
+      const [nluResult, semResult] = await Promise.all([
+        lunaNLU.process(text, 'pt'),
+        semanticNLU.classify(text, { lang: 'pt' }),
+      ]);
+      
+      // Ensemble inteligente: leva em conta overconfidence do NLP.js
+      const nluOverconfident = nluResult.score >= 0.99 && nluResult.intent === 'financeiro.pagamento';
+      const semanticStrong = semResult.score > 0.45;
+      const semanticDisagrees = semResult.intent !== nluResult.intent;
+      
+      let result;
+      if (semResult.score > 0.80) {
+        result = { ...semResult, source: 'semantic', nluScore: nluResult.score };
+      } else if (nluOverconfident && semanticStrong && semanticDisagrees) {
+        result = { ...semResult, source: 'semantic', reason: 'NLP.js overconfident', nluScore: nluResult.score };
+      } else if (nluResult.score > semResult.score + 0.15) {
+        result = {
+          intent: nluResult.intent,
+          domain: nluResult.domain,
+          score: nluResult.score,
+          action: nluResult.action,
+          entities: nluResult.entities,
+          answer: nluResult.answer,
+          sentiment: nluResult.sentiment,
+          source: 'nlu',
+          semanticScore: semResult.score,
+        };
+      } else {
+        result = { ...semResult, source: 'semantic', nluScore: nluResult.score };
       }
-      const res = await fetch('http://localhost:3456/api/luna/understand', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, lang: 'pt' })
-      });
-      if (!res.ok) {
-        log.warn(`[NLU] HTTP ${res.status}`);
-        return null;
-      }
-      const data = await res.json();
-      if (!data.success) return null;
-      return {
-        intent: data.intent,
-        domain: data.domain,
-        score: data.score,
-        action: data.action,
-        entities: data.entities,
-        answer: data.answer,
-        sentiment: data.sentiment
-      };
+      
+      log.info(`[HYBRID] source=${result.source} intent=${result.intent} score=${Math.round(result.score*100)}%`);
+      return result;
     } catch (e) {
-      log.warn(`[NLU] Erro: ${e.message}`);
+      log.warn(`[HYBRID NLU] Erro: ${e.message}`);
       return null;
     }
   }
