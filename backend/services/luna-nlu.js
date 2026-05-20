@@ -4299,13 +4299,32 @@ const ENTITIES = {
 // ═════════════════════════════════════════════════════════════════════════════
 
 let isTrained = false;
+let db = null;
+try {
+  db = require('../db');
+} catch (e) {
+  // DB module not available (e.g. standalone usage)
+}
 
 /**
  * Popula o manager com o corpus de treinamento.
  */
-function populateCorpus() {
+async function loadTrainingExamplesFromPG() {
+  if (!db || !global.process.env.DATABASE_URL) return [];
+  try {
+    const rows = await db.query('SELECT lang, utterance, intent FROM luna_training_examples ORDER BY created_at ASC');
+    console.log(`[LunaNLU] 📚 ${rows.length} exemplos adicionais carregados do PostgreSQL.`);
+    return rows;
+  } catch (e) {
+    console.warn('[LunaNLU] Não foi possível carregar exemplos do PG:', e.message);
+    return [];
+  }
+}
+
+async function populateCorpus() {
   console.log('[LunaNLU] Populando corpus de treinamento...');
 
+  // Corpus base (código-fonte)
   for (const [intent, translations] of Object.entries(TRAINING_CORPUS)) {
     for (const [lang, utterances] of Object.entries(translations)) {
       for (const utterance of utterances) {
@@ -4365,7 +4384,13 @@ function populateCorpus() {
     }
   }
 
-  console.log(`[LunaNLU] Corpus populado: ${Object.keys(TRAINING_CORPUS).length} intents em 3 idiomas.`);
+  // Exemplos adicionais do PostgreSQL (active learning)
+  const pgExamples = await loadTrainingExamplesFromPG();
+  for (const ex of pgExamples) {
+    manager.addDocument(ex.lang, ex.utterance, ex.intent);
+  }
+
+  console.log(`[LunaNLU] Corpus populado: ${Object.keys(TRAINING_CORPUS).length} intents em 3 idiomas + ${pgExamples.length} do PG.`);
   console.log(`[LunaNLU] Entities registradas: ${Object.keys(ENTITIES).join(', ')}.`);
 }
 
@@ -4388,7 +4413,7 @@ async function train() {
     }
   }
 
-  populateCorpus();
+  await populateCorpus();
   console.log('[LunaNLU] Treinando modelo (isso pode levar alguns segundos)...');
   await manager.train();
 
@@ -4488,6 +4513,21 @@ function getIntents() {
 async function addTrainingExample(lang, utterance, intent) {
   manager.addDocument(lang, utterance, intent);
   console.log(`[LunaNLU] Novo exemplo adicionado: [${lang}] "${utterance}" → ${intent}`);
+
+  // Persiste no PostgreSQL (se disponível)
+  if (db && global.process.env.DATABASE_URL) {
+    try {
+      await db.run(
+        `INSERT INTO luna_training_examples (lang, utterance, intent, source)
+         VALUES ($1, $2, $3, 'active_learning')
+         ON CONFLICT (lang, utterance, intent) DO NOTHING`,
+        [lang, utterance, intent]
+      );
+      console.log('[LunaNLU] 💾 Exemplo persistido no PostgreSQL.');
+    } catch (e) {
+      console.warn('[LunaNLU] Falha ao persistir exemplo no PG:', e.message);
+    }
+  }
 
   // Re-treina incrementalmente
   await manager.train();
