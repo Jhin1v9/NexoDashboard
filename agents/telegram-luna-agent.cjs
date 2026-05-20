@@ -139,6 +139,31 @@ function escapeMarkdown(text) {
   return String(text || '').replace(/[_*\[\]()~`>#+=|{}.!-]/g, '\\$&');
 }
 
+/** Envia mensagem com MarkdownV2, e se der erro de parse, envia sem formatação */
+async function safeSendMarkdownV2(bot, method, chatId, text, extra = {}) {
+  try {
+    if (method === 'sendMessage') {
+      return await bot.sendMessage(chatId, text, { ...extra, parse_mode: 'MarkdownV2' });
+    }
+    if (method === 'editMessageText') {
+      return await bot.editMessageText(text, { ...extra, parse_mode: 'MarkdownV2' });
+    }
+  } catch (e) {
+    if (e.message && e.message.includes("can't parse entities")) {
+      log('warn', `MarkdownV2 falhou, enviando sem formatação: ${e.message}`);
+      const safeExtra = { ...extra };
+      delete safeExtra.parse_mode;
+      if (method === 'sendMessage') {
+        return await bot.sendMessage(chatId, text, safeExtra);
+      }
+      if (method === 'editMessageText') {
+        return await bot.editMessageText(text, safeExtra);
+      }
+    }
+    throw e;
+  }
+}
+
 // ── EXTRAÇÃO INTELIGENTE DE PARÂMETROS DO TEXTO ──
 function extractInitialParams(actionType, text) {
   const params = {};
@@ -394,6 +419,12 @@ class TelegramLunaAgent {
     this.bot.on('callback_query', async (query) => {
       try { await this.handleCallback(query); } catch (e) { log('error', `Erro no callback: ${e.message}`); }
     });
+    this.bot.on('polling_error', (err) => {
+      log('warn', `Polling error (bot continua rodando): ${err.message || err}`);
+    });
+    this.bot.on('error', (err) => {
+      log('warn', `Bot error (bot continua rodando): ${err.message || err}`);
+    });
   }
 
   isMention(msg) {
@@ -437,7 +468,7 @@ class TelegramLunaAgent {
 
     this.conversations.set(chatId, { schemaKey, stepIndex, data: { ...initialData }, author: initialData.author, mentionId: initialData.mentionId });
 
-    await this.bot.sendMessage(chatId, `${schema.emoji} *${schema.label}*\n\nVou te fazer algumas perguntas rápidas\.\.\.`, { parse_mode: 'MarkdownV2' });
+    await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, `${schema.emoji} *${escapeMarkdown(schema.label)}*\n\nVou te fazer algumas perguntas rápidas\.\.\.`);
     await this.sendWizardStep(chatId);
     return true;
   }
@@ -454,10 +485,7 @@ class TelegramLunaAgent {
 
     const keyboard = this.buildStepKeyboard(step);
     try {
-      await this.bot.sendMessage(chatId, step.label, {
-        parse_mode: 'MarkdownV2',
-        reply_markup: keyboard,
-      });
+      await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, step.label, { reply_markup: keyboard });
     } catch (e) {
       log('warn', `Falha ao enviar wizard step: ${e.message}`);
     }
@@ -513,7 +541,7 @@ class TelegramLunaAgent {
     const schema = WIZARD_SCHEMAS[conv.schemaKey];
     const summary = schema.formatSummary(conv.data);
 
-    const text = `${schema.emoji} *Resumo — ${schema.label}:*\n\n${summary}\n\n_Tudo certo\?_`;
+    const text = `${schema.emoji} *Resumo — ${escapeMarkdown(schema.label)}:*\n\n${escapeMarkdown(summary)}\n\n_Tudo certo\?_`;
     const keyboard = {
       inline_keyboard: [[
         { text: '✅ Confirmar e criar', callback_data: 'wz:confirmar:sim' },
@@ -521,7 +549,7 @@ class TelegramLunaAgent {
       ]],
     };
     try {
-      await this.bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2', reply_markup: keyboard });
+      await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, text, { reply_markup: keyboard });
     } catch (e) {
       log('warn', `Falha no summary: ${e.message}`);
     }
@@ -551,11 +579,11 @@ class TelegramLunaAgent {
         saveBuffer(buffer);
       }
 
-      const text = `${schema.emoji} *${schema.label} — criado com sucesso!*\n\n${schema.formatSummary(conv.data)}\n\n_Vai aparecer no dashboard em instantes\._`;
-      await this.bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2' });
+      const text = `${schema.emoji} *${escapeMarkdown(schema.label)} — criado com sucesso!*\n\n${escapeMarkdown(schema.formatSummary(conv.data))}\n\n_Vai aparecer no dashboard em instantes\._`;
+      await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, text);
     } catch (e) {
       log('error', `Erro ao executar ${conv.schemaKey}: ${e.message}`);
-      await this.bot.sendMessage(chatId, `❌ Erro: ${escapeMarkdown(e.message)}`, { parse_mode: 'MarkdownV2' });
+      await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, `❌ Erro: ${escapeMarkdown(e.message)}`);
     } finally {
       this.cancelWizard(chatId);
     }
@@ -737,11 +765,7 @@ class TelegramLunaAgent {
     };
 
     try {
-      await this.bot.sendMessage(chatId, text, {
-        parse_mode: 'MarkdownV2',
-        reply_markup: keyboard,
-        reply_to_message_id: replyToMessageId,
-      });
+      await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, text, { reply_markup: keyboard, reply_to_message_id: replyToMessageId });
     } catch (e) {
       log('warn', `Falha ao enviar resposta: ${e.message}`);
     }
@@ -805,13 +829,7 @@ class TelegramLunaAgent {
       mention.executedAction = actionType;
       saveBuffer(buffer);
 
-      await this.bot.editMessageText(`✅ *Ação executada!*
-
-${escapeMarkdown(mention.suggestedAction.label)}
-
-_Vai aparecer no dashboard em instantes._`, {
-        chat_id: chatId, message_id: msgId, parse_mode: 'MarkdownV2',
-      });
+      await safeSendMarkdownV2(this.bot, 'editMessageText', null, `✅ *Ação executada!*\n\n${escapeMarkdown(mention.suggestedAction.label)}\n\n_Vai aparecer no dashboard em instantes\._`, { chat_id: chatId, message_id: msgId });
     } catch (e) {
       log('error', `Erro ao executar: ${e.message}`);
       await this.bot.editMessageText(`❌ Erro: ${escapeMarkdown(e.message)}`, { chat_id: chatId, message_id: msgId });
@@ -825,9 +843,9 @@ _Vai aparecer no dashboard em instantes._`, {
       await this.bot.editMessageText('⚠️ Menção não encontrada.', { chat_id: chatId, message_id: msgId });
       return;
     }
-    await this.bot.editMessageText(
+    await safeSendMarkdownV2(this.bot, 'editMessageText', null,
       `🤔 *Não era isso?*\n\nVai no dashboard e corrige a intenção:\n\`${escapeMarkdown(mention.nlu?.intent || 'sem intent')}\` → ?\n\nOu responda aqui com:\n\`/corrigir ${mentionId} <nova_intencao>\``,
-      { chat_id: chatId, message_id: msgId, parse_mode: 'MarkdownV2' }
+      { chat_id: chatId, message_id: msgId }
     );
   }
 
