@@ -39,9 +39,14 @@ export default function LunaFloatingButton() {
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
 
   // ── Drag state ──
-  // Sempre começa na posição padrão (F5 reseta pro canto inferior direito)
-  const [fabPos, setFabPos] = useState({ x: 0, y: 0 })
-  const dragRef = useRef({ active: false, startX: 0, startY: 0, origX: 0, origY: 0, didDrag: false })
+  // Posição livre: o usuário arrasta pra onde quiser, sem snap
+  const [pos, setPos] = useState(() => {
+    try {
+      const raw = localStorage.getItem('luna_fab_pos')
+      return raw ? JSON.parse(raw) : { x: 0, y: 0 }
+    } catch { return { x: 0, y: 0 } }
+  })
+  const drag = useRef({ active: false, dragged: false, mx: 0, my: 0, bx: 0, by: 0 })
   const fabRef = useRef(null)
 
   const inputRef = useRef(null)
@@ -514,83 +519,55 @@ export default function LunaFloatingButton() {
         )}
       </AnimatePresence>
 
-      {/* Botão flutuante — arrastável */}
+      {/* Botão flutuante — arrastável livre, clique abre/fecha chat */}
       <div
         ref={fabRef}
-        className="fixed bottom-6 right-6 z-[100] touch-none select-none"
-        style={{ transform: `translate3d(${fabPos.x}px, ${fabPos.y}px, 0)`, touchAction: 'none' }}
-        onPointerDown={(e) => {
-          e.preventDefault()
-          const d = dragRef.current
-          d.active = true
-          d.didDrag = false
-          d.startX = e.clientX
-          d.startY = e.clientY
-          d.origX = fabPos.x
-          d.origY = fabPos.y
-          e.currentTarget.setPointerCapture(e.pointerId)
-        }}
-        onPointerMove={(e) => {
-          const d = dragRef.current
-          if (!d.active) return
-          const dx = e.clientX - d.startX
-          const dy = e.clientY - d.startY
-          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.didDrag = true
-          setFabPos({ x: d.origX + dx, y: d.origY + dy })
-        }}
-        onPointerUp={(e) => {
-          const d = dragRef.current
-          if (!d.active) return
-          d.active = false
-          e.currentTarget.releasePointerCapture(e.pointerId)
-
-          // Se não houve drag real, não faz snap — evita teleportar no clique
-          if (!d.didDrag) return
-
-          // Snap para borda mais próxima usando dimensões REAIS do botão
-          const rect = fabRef.current?.getBoundingClientRect()
-          const btnW = rect?.width || 120
-          const btnH = rect?.height || 56
-          const pad = 24
-          const vw = window.innerWidth
-          const vh = window.innerHeight
-
-          // Posição absoluta atual na tela (considerando o translate)
-          const absoluteX = vw - pad - btnW + fabPos.x   // porque base é right-6
-          const absoluteY = vh - pad - btnH + fabPos.y   // porque base é bottom-6
-
-          const distLeft   = absoluteX
-          const distRight  = vw - absoluteX - btnW
-          const distTop    = absoluteY
-          const distBottom = vh - absoluteY - btnH
-
-          let nx = fabPos.x
-          let ny = fabPos.y
-
-          if (distLeft < distRight) {
-            nx = -vw + btnW + pad * 2  // encosta na esquerda
-          } else {
-            nx = 0  // fica no right-6 original
-          }
-
-          if (distTop < distBottom) {
-            ny = -vh + btnH + pad * 2  // encosta no topo
-          } else {
-            ny = 0  // fica no bottom-6 original
-          }
-
-          // Garante que não saia da tela
-          nx = Math.max(-vw + btnW + pad, Math.min(pad, nx))
-          ny = Math.max(-vh + btnH + pad, Math.min(pad, ny))
-
-          setFabPos({ x: nx, y: ny })
-        }}
+        className="fixed bottom-6 right-6 z-[100] select-none"
+        style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, cursor: 'grab' }}
       >
         <motion.button
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
+          className={`flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all ${
+            isOpen || actionCenterOpen
+              ? 'bg-nexo-danger text-white shadow-nexo-danger/30'
+              : 'bg-gradient-to-r from-nexo-primary to-purple-600 text-white shadow-purple-500/30 hover:shadow-purple-500/50'
+          }`}
+          onMouseDown={(e) => {
+            const d = drag.current
+            d.active = true
+            d.dragged = false
+            d.mx = e.clientX
+            d.my = e.clientY
+            d.bx = pos.x
+            d.by = pos.y
+          }}
+          onMouseMove={(e) => {
+            const d = drag.current
+            if (!d.active) return
+            const dx = e.clientX - d.mx
+            const dy = e.clientY - d.my
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.dragged = true
+            if (d.dragged) {
+              e.preventDefault()
+              setPos({ x: d.bx + dx, y: d.by + dy })
+            }
+          }}
+          onMouseUp={() => {
+            const d = drag.current
+            if (!d.active) return
+            d.active = false
+            try { localStorage.setItem('luna_fab_pos', JSON.stringify(pos)) } catch {}
+          }}
+          onMouseLeave={() => {
+            const d = drag.current
+            if (d.active) {
+              d.active = false
+              try { localStorage.setItem('luna_fab_pos', JSON.stringify(pos)) } catch {}
+            }
+          }}
           onClick={() => {
-            if (dragRef.current.didDrag) return
+            if (drag.current.dragged) return
             if (actionCenterOpen) {
               setActionCenterOpen(false)
               return
@@ -601,11 +578,6 @@ export default function LunaFloatingButton() {
               setPendingActions(null)
             }
           }}
-          className={`flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all ${
-            isOpen || actionCenterOpen
-              ? 'bg-nexo-danger text-white shadow-nexo-danger/30'
-              : 'bg-gradient-to-r from-nexo-primary to-purple-600 text-white shadow-purple-500/30 hover:shadow-purple-500/50'
-          }`}
         >
           {isOpen || actionCenterOpen ? (
             <X className="w-5 h-5" />
