@@ -4367,6 +4367,13 @@ app.post('/api/luna/pending/:id/execute', requireAuth, async (req, res) => {
     mention.executedAction = type;
     writeJSON(bufferFile, buffer);
 
+    // Forçar sync do tasks.json para PostgreSQL
+    const tasksFile = path.join(DATA_DIR, 'tasks.json');
+    if (fs.existsSync(tasksFile)) {
+      const tasksData = readJSON(tasksFile) || [];
+      writeJSON('tasks.json', tasksData);
+    }
+
     res.json({ success: true, message: 'Ação executada', result });
   } catch (e) {
     console.error('[LunaPending] Erro ao executar:', e);
