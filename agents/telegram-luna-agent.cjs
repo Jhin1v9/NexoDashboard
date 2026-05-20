@@ -3,13 +3,14 @@
 // Framework declarativo: adicionar wizard em nova ação = 5 linhas.
 // ============================================================
 
+require('dotenv').config({ path: require('path').join(__dirname, '../backend/.env') });
 const fs = require('fs');
 const path = require('path');
 
 // ── CONFIG ──
 const CONFIG = {
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
-  API_BASE: 'http://localhost:3456/api',
+  API_BASE: process.env.API_BASE || 'http://localhost:3456/api',
   CHECKPOINT_FILE: path.join(__dirname, '../backend/data/luna-checkpoint.json'),
   DASHBOARD_URL: process.env.DASHBOARD_URL || 'https://nexodashboard.onrender.com',
 };
@@ -244,7 +245,7 @@ const WIZARD_SCHEMAS = {
       { field: 'responsavel', type: 'select', label: '👤 *Quem é o responsável?*', options: TEAM, map: v => v === 'eu' ? null : v },
       { field: 'prazo', type: 'select', label: '📅 *Qual o prazo?*', options: PRAZOS, map: v => v === 'sem' ? null : getDueDate(v) },
       { field: 'prioridade', type: 'select', label: '⚡ *Qual a prioridade?*', options: PRIORIDADES },
-      { field: 'descricao', type: 'text', label: '📝 *Descrição da tarefa* \(_opcional_\)\n\nEnvie o texto ou digite `/pular`:', optional: true },
+      { field: 'descricao', type: 'text', label: '📝 *Descrição da tarefa* \\(_opcional_\\)\n\nEnvie o texto ou digite `/pular`:', optional: true }
     ],
     buildParams: d => ({ titulo: d.titulo, descricao: d.descricao || d.titulo, responsavel: d.responsavel, prioridade: d.prioridade || 'P2', prazo: d.prazo }),
     formatSummary: d => {
@@ -258,9 +259,9 @@ const WIZARD_SCHEMAS = {
     emoji: '💰',
     label: 'Registrar pagamento',
     steps: [
-      { field: 'valor', type: 'number', label: '💰 *Qual o valor?*\n\nEnvie apenas o número \(ex: 150\):' },
+      { field: 'valor', type: 'number', label: '💰 *Qual o valor?*\n\nEnvie apenas o número \\(ex: 150\\):' },
       { field: 'de', type: 'text', label: '👤 *De quem é o pagamento?*\n\nNome do cliente ou origem:', optional: true },
-      { field: 'descricao', type: 'text', label: '📝 *Descrição* \(_opcional_\):', optional: true },
+      { field: 'descricao', type: 'text', label: '📝 *Descrição* \\(_opcional_\\):', optional: true },
     ],
     buildParams: d => ({ valor: d.valor, de: d.de, descricao: d.descricao }),
     formatSummary: d => `💰 R\$ ${d.valor}\n👤 ${escapeMarkdown(d.de || '—')}\n📝 ${escapeMarkdown(d.descricao || '—')}`,
@@ -270,7 +271,7 @@ const WIZARD_SCHEMAS = {
     emoji: '💸',
     label: 'Registrar despesa',
     steps: [
-      { field: 'valor', type: 'number', label: '💸 *Qual o valor da despesa?*\n\nEnvie apenas o número \(ex: 75\):' },
+      { field: 'valor', type: 'number', label: '💸 *Qual o valor da despesa?*\n\nEnvie apenas o número \\(ex: 75\\):' },
       { field: 'para', type: 'text', label: '📌 *Para quem\/o quê?*\n\nFornecedor ou motivo:', optional: true },
       { field: 'descricao', type: 'text', label: '📝 *Descrição* \(_opcional_\):', optional: true },
     ],
@@ -283,9 +284,9 @@ const WIZARD_SCHEMAS = {
     label: 'Registrar lead',
     steps: [
       { field: 'nome', type: 'text', label: '🤝 *Qual o nome do lead?*' },
-      { field: 'telefone', type: 'text', label: '📞 *Telefone* \(_opcional_\):', optional: true },
-      { field: 'email', type: 'text', label: '✉️ *Email* \(_opcional_\):', optional: true },
-      { field: 'contexto', type: 'text', label: '📝 *Contexto\/notas* \(_opcional_\):', optional: true },
+      { field: 'telefone', type: 'text', label: '📞 *Telefone* \\(_opcional_\\):', optional: true },
+      { field: 'email', type: 'text', label: '✉️ *Email* \\(_opcional_\\):', optional: true },
+      { field: 'contexto', type: 'text', label: '📝 *Contexto\\/notas* \\(_opcional_\\):', optional: true },
     ],
     buildParams: d => ({ nome: d.nome, telefone: d.telefone, email: d.email, contexto: d.contexto }),
     formatSummary: d => `🤝 ${escapeMarkdown(d.nome)}\n📞 ${escapeMarkdown(d.telefone || '—')}\n✉️ ${escapeMarkdown(d.email || '—')}`,
@@ -320,8 +321,8 @@ const WIZARD_SCHEMAS = {
     label: 'Salvar ideia',
     steps: [
       { field: 'titulo', type: 'text', label: '💡 *Qual o título da ideia?*' },
-      { field: 'conteudo', type: 'text', label: '📝 *Conteúdo\/descrição* \(_opcional_\):', optional: true },
-      { field: 'prioridade', type: 'select', label: '⚡ *Prioridade?* \(_opcional_\)', options: [{ key: 'P0', label: '🔴 Alta' }, { key: 'P1', label: '🟡 Média' }, { key: 'P2', label: '🟢 Baixa' }, { key: 'skip', label: '⏭️ Pular' }], optional: true, map: v => v === 'skip' ? null : v },
+      { field: 'conteudo', type: 'text', label: '📝 *Conteúdo\\/descrição* \\(_opcional_\\):', optional: true },
+      { field: 'prioridade', type: 'select', label: '⚡ *Prioridade?* \\(_opcional_\\)', options: [{ key: 'P0', label: '🔴 Alta' }, { key: 'P1', label: '🟡 Média' }, { key: 'P2', label: '🟢 Baixa' }, { key: 'skip', label: '⏭️ Pular' }], optional: true, map: v => v === 'skip' ? null : v }
     ],
     buildParams: d => ({ titulo: d.titulo, conteudo: d.conteudo || d.titulo, prioridade: d.prioridade || 'P2' }),
     formatSummary: d => `💡 ${escapeMarkdown(d.titulo)}\n⚡ ${d.prioridade || 'P2'}`,

@@ -8761,9 +8761,9 @@ async function startServer() {
   server.listen(PORT, BIND_IP, async () => {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
 
-    // ── Iniciar Telegram Bot automaticamente (se token configurado) ──
+    // ── Iniciar Telegram Bot automaticamente (se token configurado e não desabilitado) ──
     try {
-      if (process.env.TELEGRAM_BOT_TOKEN) {
+      if (process.env.AUTO_START_TELEGRAM_BOT !== 'false' && process.env.TELEGRAM_BOT_TOKEN) {
         const started = await startTelegramAgent();
         if (started) {
           const status = getTelegramStatus();
@@ -8771,6 +8771,8 @@ async function startServer() {
         } else {
           console.warn('⚠️ Bot do Telegram falhou ao iniciar (verifique TELEGRAM_BOT_TOKEN)');
         }
+      } else if (process.env.AUTO_START_TELEGRAM_BOT === 'false') {
+        console.log('ℹ️ AUTO_START_TELEGRAM_BOT=false — bot do Telegram não será iniciado pelo server.js (modo standalone)');
       } else {
         console.log('ℹ️ TELEGRAM_BOT_TOKEN não configurado — bot do Telegram não será iniciado');
       }
