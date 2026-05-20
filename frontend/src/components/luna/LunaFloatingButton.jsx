@@ -542,6 +542,10 @@ export default function LunaFloatingButton() {
           const d = dragRef.current
           if (!d.active) return
           d.active = false
+          e.currentTarget.releasePointerCapture(e.pointerId)
+
+          // Se não houve drag real, não faz snap — evita teleportar no clique
+          if (!d.didDrag) return
 
           // Snap para borda mais próxima usando dimensões REAIS do botão
           const rect = fabRef.current?.getBoundingClientRect()
@@ -564,24 +568,22 @@ export default function LunaFloatingButton() {
           let ny = fabPos.y
 
           if (distLeft < distRight) {
-            nx = 0  // fica no right-6 original
-          } else {
             nx = -vw + btnW + pad * 2  // encosta na esquerda
+          } else {
+            nx = 0  // fica no right-6 original
           }
 
           if (distTop < distBottom) {
-            ny = 0  // fica no bottom-6 original
-          } else {
             ny = -vh + btnH + pad * 2  // encosta no topo
+          } else {
+            ny = 0  // fica no bottom-6 original
           }
 
           // Garante que não saia da tela
           nx = Math.max(-vw + btnW + pad, Math.min(pad, nx))
           ny = Math.max(-vh + btnH + pad, Math.min(pad, ny))
 
-          const snapped = { x: nx, y: ny }
-          setFabPos(snapped)
-          e.currentTarget.releasePointerCapture(e.pointerId)
+          setFabPos({ x: nx, y: ny })
         }}
       >
         <motion.button
