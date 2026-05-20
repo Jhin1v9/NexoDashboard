@@ -1,7 +1,7 @@
 // ============================================================
-// LUNA TELEGRAM AGENT v1.0 — MODO RADAR
+// LUNA TELEGRAM AGENT v2.0 — MODO RADAR + WIZARD INTERATIVO
 // Recebe @mentions e comandos no Telegram, classifica com NLP.js,
-// registra no buffer newMentions[], aguarda revisão humana no dashboard.
+// registra no buffer newMentions[], e executa via wizard interativo.
 // ============================================================
 
 const fs = require('fs');
@@ -12,6 +12,7 @@ const CONFIG = {
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
   API_BASE: 'http://localhost:3456/api',
   CHECKPOINT_FILE: path.join(__dirname, '../backend/data/luna-checkpoint.json'),
+  DASHBOARD_URL: process.env.DASHBOARD_URL || 'https://nexodashboard.onrender.com',
 };
 
 // NLU e ActionExecutor para execução direta (sem precisar de auth HTTP)
@@ -127,6 +128,21 @@ function normalizeTimestamp(value) {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
+function getDueDate(label) {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (label === 'hoje') return today.toISOString().slice(0, 10);
+  if (label === 'amanha') {
+    today.setDate(today.getDate() + 1);
+    return today.toISOString().slice(0, 10);
+  }
+  if (label === 'semana') {
+    today.setDate(today.getDate() + 7);
+    return today.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
 // ── NLU INTEGRATION (Hybrid: Semantic + NLP.js) ──
 async function classifyWithNLU(text) {
   try {
@@ -189,6 +205,7 @@ class TelegramLunaAgent {
     this.bot = null;
     this.running = false;
     this.me = null; // bot info
+    this.conversations = new Map(); // chatId -> { step, data, mentionId, messageId }
   }
 
   async start() {
@@ -277,14 +294,277 @@ class TelegramLunaAgent {
       .trim();
   }
 
+  // ── WIZARD HELPERS ──
+  hasActiveWizard(chatId) {
+    return this.conversations.has(chatId);
+  }
+
+  startWizard(chatId, data) {
+    this.conversations.set(chatId, { step: 0, data, mentionId: data.mentionId, messageId: data.messageId });
+  }
+
+  cancelWizard(chatId) {
+    this.conversations.delete(chatId);
+  }
+
+  async askWizardStep(chatId, stepData) {
+    const { text, keyboard } = stepData;
+    try {
+      await this.bot.sendMessage(chatId, text, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      });
+    } catch (e) {
+      log('warn', `Falha ao enviar wizard step: ${e.message}`);
+    }
+  }
+
+  getWizardKeyboard(step) {
+    if (step === 'responsavel') {
+      return {
+        inline_keyboard: [
+          [
+            { text: '👤 Abner', callback_data: 'wiz:resp:abner' },
+            { text: '👤 Nonoke', callback_data: 'wiz:resp:nonoke' },
+          ],
+          [
+            { text: '👤 Elias', callback_data: 'wiz:resp:elias' },
+            { text: '🙋 Eu mesmo', callback_data: 'wiz:resp:eu' },
+          ],
+        ]
+      };
+    }
+    if (step === 'prazo') {
+      return {
+        inline_keyboard: [
+          [
+            { text: '📅 Hoje', callback_data: 'wiz:prazo:hoje' },
+            { text: '📅 Amanhã', callback_data: 'wiz:prazo:amanha' },
+          ],
+          [
+            { text: '📅 1 semana', callback_data: 'wiz:prazo:semana' },
+            { text: '❌ Sem prazo', callback_data: 'wiz:prazo:sem' },
+          ],
+        ]
+      };
+    }
+    if (step === 'prioridade') {
+      return {
+        inline_keyboard: [
+          [
+            { text: '🔴 P0 — Alta', callback_data: 'wiz:prio:P0' },
+            { text: '🟡 P1 — Média', callback_data: 'wiz:prio:P1' },
+            { text: '🟢 P2 — Baixa', callback_data: 'wiz:prio:P2' },
+          ],
+        ]
+      };
+    }
+    if (step === 'confirmar') {
+      return {
+        inline_keyboard: [
+          [
+            { text: '✅ Confirmar e criar', callback_data: 'wiz:confirmar:sim' },
+            { text: '❌ Cancelar', callback_data: 'wiz:confirmar:nao' },
+          ],
+        ]
+      };
+    }
+    return { remove_keyboard: true };
+  }
+
+  async handleWizardMessage(msg) {
+    const chatId = msg.chat.id;
+    const conv = this.conversations.get(chatId);
+    if (!conv) return false;
+
+    const text = msg.text || '';
+    const step = conv.step;
+
+    // Passo 0 = título já veio do comando inicial
+    // Passo 4 = descrição (texto livre)
+    if (step === 4) {
+      conv.data.descricao = text.trim() || null;
+      await this.showWizardSummary(chatId);
+      return true;
+    }
+
+    // Se chegou aqui com mensagem inesperada durante wizard, ignora
+    return true;
+  }
+
+  async showWizardSummary(chatId) {
+    const conv = this.conversations.get(chatId);
+    if (!conv) return;
+
+    const d = conv.data;
+    const dueLabel = d.prazo ? d.prazo.toUpperCase() : 'Sem prazo';
+    const prioEmoji = { P0: '🔴', P1: '🟡', P2: '🟢' }[d.prioridade] || '⚪';
+
+    let text = `📋 *Resumo da tarefa:*\n\n`;
+    text += `*Nome:* ${d.titulo}\n`;
+    text += `*Responsável:* ${d.responsavel ? `@${d.responsavel}` : 'Não definido'}\n`;
+    text += `*Prazo:* ${dueLabel}\n`;
+    text += `*Prioridade:* ${prioEmoji} ${d.prioridade || 'P2'}\n`;
+    text += `*Descrição:* ${d.descricao || '—'}\n`;
+    text += `\n_Tudo certo?_`;
+
+    await this.askWizardStep(chatId, {
+      text,
+      keyboard: this.getWizardKeyboard('confirmar'),
+    });
+  }
+
+  async handleWizardCallback(query) {
+    const data = query.data || '';
+    const chatId = query.message.chat.id;
+    const msgId = query.message.message_id;
+
+    if (!data.startsWith('wiz:')) return false;
+
+    const conv = this.conversations.get(chatId);
+    if (!conv) {
+      await this.bot.editMessageText('⚠️ Sessão expirada. Envie o comando novamente.', { chat_id: chatId, message_id: msgId });
+      return true;
+    }
+
+    const [, action, value] = data.split(':');
+
+    if (action === 'resp') {
+      const nameMap = { abner: 'Abner', nonoke: 'Nonoke', elias: 'Elias', eu: query.from.first_name || query.from.username || 'eu' };
+      conv.data.responsavel = value === 'eu' ? (query.from.username || query.from.first_name || 'eu') : value;
+      conv.step = 2;
+      await this.bot.editMessageText(`👤 Responsável: *${nameMap[value] || value}*`, {
+        chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
+      });
+      await this.askWizardStep(chatId, {
+        text: '📅 *Qual o prazo?*',
+        keyboard: this.getWizardKeyboard('prazo'),
+      });
+      return true;
+    }
+
+    if (action === 'prazo') {
+      conv.data.prazo = value === 'sem' ? null : getDueDate(value);
+      conv.data.prazoLabel = value;
+      conv.step = 3;
+      const label = value === 'sem' ? 'Sem prazo' : value.charAt(0).toUpperCase() + value.slice(1);
+      await this.bot.editMessageText(`📅 Prazo: *${label}*`, {
+        chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
+      });
+      await this.askWizardStep(chatId, {
+        text: '⚡ *Qual a prioridade?*',
+        keyboard: this.getWizardKeyboard('prioridade'),
+      });
+      return true;
+    }
+
+    if (action === 'prio') {
+      conv.data.prioridade = value;
+      conv.step = 4;
+      await this.bot.editMessageText(`⚡ Prioridade: *${value}*`, {
+        chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
+      });
+      await this.askWizardStep(chatId, {
+        text: '📝 *Descrição da tarefa* (opcional)\n\nEnvie o texto ou digite "/pular" para deixar em branco:',
+        keyboard: { remove_keyboard: true },
+      });
+      return true;
+    }
+
+    if (action === 'confirmar') {
+      if (value === 'nao') {
+        this.cancelWizard(chatId);
+        await this.bot.editMessageText('❌ Criação de tarefa cancelada.', { chat_id: chatId, message_id: msgId });
+        return true;
+      }
+      // Executar
+      await this.executeWizardTask(chatId, msgId);
+      return true;
+    }
+
+    return true;
+  }
+
+  async executeWizardTask(chatId, msgId) {
+    const conv = this.conversations.get(chatId);
+    if (!conv) return;
+
+    const d = conv.data;
+    const params = {
+      titulo: d.titulo,
+      descricao: d.descricao || d.titulo,
+      responsavel: d.responsavel,
+      prioridade: d.prioridade || 'P2',
+      prazo: d.prazo,
+    };
+
+    try {
+      const executor = getActionExecutor();
+      const result = await executor.execute(
+        [{ type: 'criar_tarefa', params }],
+        { authorName: d.author }
+      );
+
+      // Atualiza buffer
+      const buffer = loadBuffer();
+      const mention = buffer.newMentions?.find(m => m.id === d.mentionId);
+      if (mention) {
+        mention.processed = true;
+        mention.executedAt = new Date().toISOString();
+        mention.executedAction = 'criar_tarefa';
+        mention.wizardData = { ...d };
+        saveBuffer(buffer);
+      }
+
+      const dueLabel = d.prazo ? d.prazo : 'Sem prazo';
+      const prioEmoji = { P0: '🔴', P1: '🟡', P2: '🟢' }[d.prioridade] || '⚪';
+
+      let text = `✅ *Tarefa criada com sucesso!*\n\n`;
+      text += `*${d.titulo}*\n`;
+      text += `👤 ${d.responsavel || '—'} · ${prioEmoji} ${d.prioridade || 'P2'} · 📅 ${dueLabel}\n\n`;
+      text += `_Vai aparecer no dashboard em instantes._`;
+
+      await this.bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: 'Markdown',
+      });
+    } catch (e) {
+      log('error', `Erro ao criar tarefa: ${e.message}`);
+      await this.bot.editMessageText(`❌ Erro ao criar tarefa: ${e.message}`, { chat_id: chatId, message_id: msgId });
+    } finally {
+      this.cancelWizard(chatId);
+    }
+  }
+
   async handleMessage(msg) {
     const text = msg.text || msg.caption || '';
     if (!text.trim()) return;
 
+    const chatId = msg.chat.id;
+
+    // Se está no meio de um wizard, processa como resposta do wizard
+    if (this.hasActiveWizard(chatId)) {
+      if (text.toLowerCase() === '/pular') {
+        const conv = this.conversations.get(chatId);
+        if (conv && conv.step === 4) {
+          conv.data.descricao = null;
+          await this.showWizardSummary(chatId);
+          return;
+        }
+      }
+      if (text.toLowerCase() === '/cancelar') {
+        this.cancelWizard(chatId);
+        await this.bot.sendMessage(chatId, '❌ Wizard cancelado.');
+        return;
+      }
+      await this.handleWizardMessage(msg);
+      return;
+    }
+
     // Só processa se é menção ao bot
     if (!this.isMention(msg)) return;
 
-    const chatId = msg.chat.id;
     const authorName = msg.from?.first_name || msg.from?.username || 'usuário';
     const authorUsername = msg.from?.username || null;
     const cleanBody = this.cleanMentionText(text);
@@ -324,7 +604,36 @@ class TelegramLunaAgent {
     saveBuffer(buffer);
     log('info', `[RADAR] Menção #${mentionId} registrada | intent=${nluResult?.intent || 'null'} | sugestao=${suggestedAction.type}`);
 
-    // 3. RESPOSTA NO TELEGRAM
+    // 3. SE FOR TAREFA.CRIAR → INICIA WIZARD INTERATIVO
+    if (suggestedAction.type === 'criar_tarefa') {
+      const extractedTitle = cleanBody
+        .replace(/^(criar|nova?|tarefa|task)\s+/i, '')
+        .replace(/\s+/g, ' ')
+        .trim() || 'Tarefa sem título';
+
+      this.startWizard(chatId, {
+        titulo: extractedTitle,
+        responsavel: null,
+        prazo: null,
+        prioridade: null,
+        descricao: null,
+        author: authorName,
+        mentionId,
+        messageId: msg.message_id,
+      });
+
+      await this.bot.sendMessage(chatId, `📋 *Criar tarefa: "${extractedTitle}"*\n\nVou te fazer algumas perguntas rápidas...`, {
+        parse_mode: 'Markdown',
+      });
+
+      await this.askWizardStep(chatId, {
+        text: '👤 *Quem é o responsável?*',
+        keyboard: this.getWizardKeyboard('responsavel'),
+      });
+      return;
+    }
+
+    // 4. RESPOSTA PADRÃO PARA OUTRAS INTENTS
     await this.sendSuggestionReply(chatId, mentionEntry, msg.message_id);
   }
 
@@ -351,11 +660,12 @@ class TelegramLunaAgent {
     if (nlu.domain) text += `Domínio: \`${nlu.domain}\`\n`;
     text += `\n_To te aguardando no dashboard pra confirmar, ou clique em "Executar" aqui mesmo 👇_`;
 
+    const dashboardUrl = `${CONFIG.DASHBOARD_URL}/dashboard/tarefas`;
     const keyboard = {
       inline_keyboard: [
         [
           { text: '✅ Executar', callback_data: `exec:${mention.id}` },
-          { text: '📊 Dashboard', url: 'https://nexo-digital.app/dashboard/whatsapp' }
+          { text: '📊 Dashboard', url: dashboardUrl }
         ],
         [
           { text: '❌ Não era isso', callback_data: `wrong:${mention.id}` }
@@ -378,6 +688,13 @@ class TelegramLunaAgent {
     const data = query.data || '';
     const chatId = query.message.chat.id;
     const msgId = query.message.message_id;
+
+    // Primeiro: verifica se é callback do wizard
+    if (data.startsWith('wiz:')) {
+      await this.handleWizardCallback(query);
+      try { await this.bot.answerCallbackQuery(query.id); } catch {}
+      return;
+    }
 
     if (data.startsWith('exec:')) {
       const mentionId = data.split(':')[1];
