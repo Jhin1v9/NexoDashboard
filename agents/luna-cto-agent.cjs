@@ -1247,18 +1247,134 @@ class LunaAgent {
     return null;
   }
 
+  async classifyWithNLU(text) {
+    try {
+      let fetch;
+      try { fetch = (await import('node-fetch')).default; } catch (e) {
+        log.warn('[NLU] node-fetch nao disponivel');
+        return null;
+      }
+      const res = await fetch('http://localhost:3456/api/luna/understand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, lang: 'pt' })
+      });
+      if (!res.ok) {
+        log.warn(`[NLU] HTTP ${res.status}`);
+        return null;
+      }
+      const data = await res.json();
+      if (!data.success) return null;
+      return {
+        intent: data.intent,
+        domain: data.domain,
+        score: data.score,
+        action: data.action,
+        entities: data.entities,
+        answer: data.answer,
+        sentiment: data.sentiment
+      };
+    } catch (e) {
+      log.warn(`[NLU] Erro: ${e.message}`);
+      return null;
+    }
+  }
+
+  resolveSuggestedAction(nluResult) {
+    if (!nluResult) return { type: 'review', label: 'Revisar manualmente' };
+    const intent = nluResult.intent;
+    const domain = nluResult.domain;
+    const actionMap = {
+      'tarefa.criar': { type: 'criar_tarefa', label: 'Criar tarefa', icon: 'CheckSquare' },
+      'tarefa.concluir': { type: 'concluir_tarefa', label: 'Concluir tarefa', icon: 'CheckCircle' },
+      'financeiro.pagamento': { type: 'registrar_pagamento', label: 'Registrar pagamento', icon: 'DollarSign' },
+      'financeiro.despesa': { type: 'registrar_despesa', label: 'Registrar despesa', icon: 'Receipt' },
+      'financeiro.saldo': { type: 'consultar_caixa', label: 'Consultar caixa', icon: 'Wallet' },
+      'financeiro.projecao': { type: 'projetar_caixa', label: 'Projeção de caixa', icon: 'TrendingUp' },
+      'lead.criar': { type: 'criar_lead', label: 'Registrar lead', icon: 'UserPlus' },
+      'lead.status': { type: 'listar_leads', label: 'Ver leads', icon: 'Users' },
+      'email.rascunho': { type: 'criar_rascunho', label: 'Criar rascunho de email', icon: 'Mail' },
+      'email.enviar': { type: 'enviar_email', label: 'Enviar email', icon: 'Send' },
+      'consultar_status': { type: 'consultar_status', label: 'Consultar status', icon: 'Activity' },
+      'whatsapp.verificar_mencoes': { type: 'verificar_mencoes', label: 'Verificar menções', icon: 'AtSign' },
+      'whatsapp.verificar_links': { type: 'verificar_links', label: 'Verificar links', icon: 'Link' },
+      'ideia.salvar': { type: 'salvar_ideia', label: 'Salvar ideia', icon: 'Lightbulb' },
+      'link.salvar': { type: 'salvar_link', label: 'Salvar link', icon: 'Link2' },
+    };
+    if (actionMap[intent]) return actionMap[intent];
+    // Fallback por domínio
+    const domainMap = {
+      'tarefa': { type: 'criar_tarefa', label: 'Criar tarefa', icon: 'CheckSquare' },
+      'financeiro': { type: 'registrar_pagamento', label: 'Registrar financeiro', icon: 'DollarSign' },
+      'lead': { type: 'criar_lead', label: 'Registrar lead', icon: 'UserPlus' },
+      'email': { type: 'criar_rascunho', label: 'Criar rascunho', icon: 'Mail' },
+      'ideia': { type: 'salvar_ideia', label: 'Salvar ideia', icon: 'Lightbulb' },
+      'link': { type: 'salvar_link', label: 'Salvar link', icon: 'Link2' },
+    };
+    if (domain && domainMap[domain]) return domainMap[domain];
+    return { type: 'review', label: 'Revisar manualmente', icon: 'HelpCircle' };
+  }
+
   async handleMention(msg) {
     const body = msg.body || '';
     if (!body.trim()) { log.warn('Mencao vazia ignorada'); return; }
 
     log.info(`MENCAO de ${msg.pushname || msg.from}: ${body.slice(0, 80)}`);
 
+    // 1. CLASSIFICA COM NLU ANTES DE SALVAR
+    const nluResult = await this.classifyWithNLU(body);
+    const suggestedAction = this.resolveSuggestedAction(nluResult);
+
+    // Registra a menção no buffer para revisão posterior
+    const author = resolveAuthor(msg.author || msg.pushname || msg.from);
+    const authorName = author.name || msg.pushname || msg.from || 'chefe';
+    const cleanBody = this.cleanMentionText(body);
+    const mentionId = `mnt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    if (!this.cp.buffer.newMentions) this.cp.buffer.newMentions = [];
+    const mentionEntry = {
+      id: mentionId,
+      body,
+      cleanBody,
+      author: authorName,
+      authorRole: author.role || null,
+      chat: msg.from,
+      chatName: msg.pushname || msg.from,
+      time: normalizeWhatsAppTimestamp(msg.timestamp || Date.now()),
+      processed: false,
+      nlu: nluResult || null,
+      suggestedAction,
+      humanReviewed: false,
+      humanIntent: null,
+      humanAction: null,
+      feedbackAt: null,
+    };
+    this.cp.buffer.newMentions.push(mentionEntry);
+    this.cp.save();
+    log.info(`[RADAR] Menção #${mentionId} registrada | intent=${nluResult?.intent || 'null'} | sugestao=${suggestedAction.type}`);
+
+    // 2. RESPOSTA NO WHATSAPP COM A SUGESTÃO (modo radar educativo)
+    if (nluResult && nluResult.score > 0.7) {
+      const emojiMap = {
+        'criar_tarefa': '📋', 'concluir_tarefa': '✅',
+        'registrar_pagamento': '💰', 'registrar_despesa': '💸',
+        'consultar_caixa': '💵', 'projetar_caixa': '📈',
+        'criar_lead': '🤝', 'listar_leads': '👥',
+        'criar_rascunho': '✉️', 'enviar_email': '📤',
+        'consultar_status': '📊', 'verificar_mencoes': '@️',
+        'verificar_links': '🔗', 'salvar_ideia': '💡',
+        'salvar_link': '🔗', 'review': '👀'
+      };
+      const emoji = emojiMap[suggestedAction.type] || '🤖';
+      const reply = `${emoji} Detectei: *${suggestedAction.label}*\n\n` +
+        `Confiança: ${Math.round(nluResult.score * 100)}%\n` +
+        `Intent: \`${nluResult.intent}\`\n\n` +
+        `To te aguardando no dashboard pra confirmar, ou responde aqui se quiser que eu execute agora 👍`;
+      try { await msg.reply(reply); } catch (e) { /* silent */ }
+    }
+
     try {
       if (await this.handlePendingAnswer(msg)) return;
-
-      const author = resolveAuthor(msg.author || msg.pushname || msg.from);
-      const authorName = author.name || msg.pushname || msg.from || 'chefe';
-      const cleanBody = this.cleanMentionText(body);
 
       // ============================================================
       // MODO CONCIERGE v19.0 — Fluxo de intenção

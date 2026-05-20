@@ -4,7 +4,8 @@ import {
   MessageCircle, CheckSquare, Lightbulb, AlertTriangle, 
   TrendingUp, Users, Clock, Zap, BarChart3, ChevronDown, ChevronUp,
   Target, ArrowUpRight, CheckCircle2, Circle, AlertCircle,
-  RefreshCw, ExternalLink, Link2, FileText, AtSign, Bot
+  RefreshCw, ExternalLink, Link2, FileText, AtSign, Bot,
+  CheckCircle, DollarSign, Mail, UserPlus, ThumbsUp, ThumbsDown, Brain, HelpCircle
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -353,6 +354,184 @@ function ChatMessageBubble({ msg, index }) {
   )
 }
 
+// ─── MENTION CARD com NLP Suggestion ───
+function MentionCard({ mention, onRefresh }) {
+  const [submitting, setSubmitting] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [correctedIntent, setCorrectedIntent] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(false)
+
+  const nlu = mention.nlu || {}
+  const suggestion = mention.suggestedAction || { type: 'review', label: 'Revisar manualmente' }
+  const confidence = nlu.score || 0
+
+  const actionIcons = {
+    'criar_tarefa': CheckCircle,
+    'concluir_tarefa': CheckCircle2,
+    'registrar_pagamento': DollarSign,
+    'registrar_despesa': DollarSign,
+    'consultar_caixa': DollarSign,
+    'projetar_caixa': TrendingUp,
+    'criar_lead': UserPlus,
+    'listar_leads': Users,
+    'criar_rascunho': Mail,
+    'enviar_email': Mail,
+    'consultar_status': Activity,
+    'verificar_mencoes': AtSign,
+    'verificar_links': Link2,
+    'salvar_ideia': Lightbulb,
+    'salvar_link': Link2,
+    'review': HelpCircle
+  }
+
+  const SuggestionIcon = actionIcons[suggestion.type] || Brain
+
+  const handleExecute = async () => {
+    setSubmitting(true)
+    try {
+      await axios.post(`/api/luna/pending/${mention.id}/execute`, { actionType: suggestion.type })
+      onRefresh()
+    } catch (e) {
+      alert('Erro ao executar: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleFeedback = async () => {
+    if (!correctedIntent.trim()) return
+    setSubmitting(true)
+    try {
+      await axios.post(`/api/luna/pending/${mention.id}/feedback`, {
+        correctedIntent: correctedIntent.trim(),
+        comment: 'Correção humana via dashboard'
+      })
+      setFeedbackSent(true)
+      setTimeout(() => onRefresh(), 800)
+    } catch (e) {
+      alert('Erro ao enviar feedback: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const timeStr = mention.time
+    ? new Date(mention.time).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    : ''
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card p-4 space-y-3"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm text-nexo-text whitespace-pre-wrap">{mention.body}</p>
+          <p className="text-xs text-nexo-muted mt-1">
+            {mention.author} • {mention.chatName || mention.chat} • {timeStr}
+          </p>
+        </div>
+        {mention.humanReviewed && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-nexo-success/20 text-nexo-success border border-nexo-success/30">
+            Revisado
+          </span>
+        )}
+      </div>
+
+      {/* NLP Suggestion */}
+      <div className={`rounded-lg p-3 border ${confidence > 0.8 ? 'bg-nexo-success/5 border-nexo-success/20' : confidence > 0.5 ? 'bg-nexo-warning/5 border-nexo-warning/20' : 'bg-nexo-info/5 border-nexo-info/20'}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <Brain size={14} className={confidence > 0.8 ? 'text-nexo-success' : confidence > 0.5 ? 'text-nexo-warning' : 'text-nexo-info'} />
+          <span className="text-xs font-medium text-nexo-text">Sugestão NLP</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-nexo-border text-nexo-muted">
+            {Math.round(confidence * 100)}%
+          </span>
+          {nlu.intent && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-nexo-border text-nexo-muted font-mono">
+              {nlu.intent}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <SuggestionIcon size={16} className="text-nexo-primary" />
+          <span className="text-sm font-medium text-nexo-text">{suggestion.label}</span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      {!mention.processed && !feedbackSent && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExecute}
+            disabled={submitting || suggestion.type === 'review'}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-nexo-primary text-white text-xs rounded-lg hover:bg-nexo-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <CheckCircle size={13} />
+            {submitting ? '...' : 'Executar'}
+          </button>
+          <button
+            onClick={() => setShowFeedback(!showFeedback)}
+            disabled={submitting}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-nexo-card text-nexo-text text-xs rounded-lg border border-nexo-border hover:bg-nexo-border disabled:opacity-50 transition-colors"
+          >
+            <ThumbsDown size={13} />
+            Não era isso
+          </button>
+        </div>
+      )}
+
+      {mention.processed && (
+        <div className="flex items-center gap-1.5 text-xs text-nexo-success">
+          <CheckCircle2 size={13} />
+          Ação executada em {new Date(mention.executedAt).toLocaleString('pt-BR')}
+        </div>
+      )}
+
+      {feedbackSent && (
+        <div className="flex items-center gap-1.5 text-xs text-nexo-success">
+          <CheckCircle2 size={13} />
+          Feedback enviado! Luna vai aprender com isso 🧠
+        </div>
+      )}
+
+      {/* Feedback Form */}
+      {showFeedback && !feedbackSent && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="space-y-2 pt-2 border-t border-nexo-border"
+        >
+          <p className="text-xs text-nexo-muted">Qual era a intenção correta?</p>
+          <input
+            type="text"
+            placeholder="Ex: tarefa.criar, financeiro.pagamento..."
+            value={correctedIntent}
+            onChange={(e) => setCorrectedIntent(e.target.value)}
+            className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-xs text-nexo-text placeholder-nexo-muted focus:outline-none focus:border-nexo-primary"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleFeedback}
+              disabled={submitting || !correctedIntent.trim()}
+              className="px-3 py-1.5 bg-nexo-success text-white text-xs rounded-lg hover:bg-nexo-success/80 disabled:opacity-50 transition-colors"
+            >
+              {submitting ? 'Enviando...' : 'Enviar correção'}
+            </button>
+            <button
+              onClick={() => setShowFeedback(false)}
+              className="px-3 py-1.5 text-nexo-muted text-xs hover:text-nexo-text transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  )
+}
+
 function ChatView({ messages, selectedChat, setSelectedChat, historyMessages, fetchData }) {
   // Agrupar mensagens por chat
   const chatsMap = useMemo(() => {
@@ -540,6 +719,8 @@ export default function WhatsApp() {
   const navigate = useNavigate()
 
   const [projectList, setProjectList] = useState([])
+  const [pendingMentions, setPendingMentions] = useState([])
+  const [pendingLinks, setPendingLinks] = useState([])
 
   const data = useMemo(() => {
     if (!agentData) return null
@@ -551,11 +732,12 @@ export default function WhatsApp() {
       setLoading(true)
       
       // Buscar múltiplas fontes de dados em paralelo
-      const [agentRes, opsRes, tasksRes, historyRes] = await Promise.allSettled([
+      const [agentRes, opsRes, tasksRes, historyRes, pendingRes] = await Promise.allSettled([
         axios.get('/api/whatsapp-agent'),
         axios.get('/api/ops'),
         axios.get('/api/whatsapp'),
-        axios.get('/api/whatsapp/history?limit=50')
+        axios.get('/api/whatsapp/history?limit=50'),
+        axios.get('/api/luna/pending')
       ])
       
       if (agentRes.status === 'fulfilled') {
@@ -574,6 +756,12 @@ export default function WhatsApp() {
       if (historyRes.status === 'fulfilled') {
         const msgs = historyRes.value.data?.messages || []
         setHistoryMessages(msgs)
+      }
+
+      if (pendingRes.status === 'fulfilled') {
+        const p = pendingRes.value.data || {}
+        setPendingMentions(p.mentions || [])
+        setPendingLinks(p.links || [])
       }
       
       if (agentRes.status === 'rejected') {
@@ -663,7 +851,7 @@ export default function WhatsApp() {
   const tabs = [
     { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
     { id: 'tasks', label: `Tarefas (${tasks.length})`, icon: CheckSquare },
-    { id: 'mentions', label: `Menções (${mentionMessages.length})`, icon: AtSign },
+    { id: 'mentions', label: `Menções (${pendingMentions.length})`, icon: AtSign },
     { id: 'messages', label: `Mensagens (${messages.length})`, icon: MessageCircle },
     { id: 'ignored', label: `Ignoradas (${ignoredMessages.length})`, icon: AlertCircle },
     { id: 'links', label: `Links (${links.length})`, icon: Link2 },
@@ -852,10 +1040,14 @@ export default function WhatsApp() {
 
         {activeTab === 'mentions' && (
           <motion.div key="mentions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-            {mentionMessages.length > 0 ? (
+            {pendingMentions.length > 0 ? (
               <div className="space-y-3">
-                {mentionMessages.map((msg, i) => (
-                  <MessageBubble key={msg.id || i} msg={msg} index={i} />
+                {pendingMentions.slice().reverse().map((mnt) => (
+                  <MentionCard
+                    key={mnt.id}
+                    mention={mnt}
+                    onRefresh={fetchData}
+                  />
                 ))}
               </div>
             ) : (

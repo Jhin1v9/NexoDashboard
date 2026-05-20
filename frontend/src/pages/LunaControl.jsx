@@ -202,6 +202,7 @@ export default function LunaControl() {
   const [activeTab, setActiveTab] = useState(contextModule ? 'chat' : 'terminal')
   const [commands, setCommands] = useState([])
   const [status, setStatus] = useState(null)
+  const [telegramStatus, setTelegramStatus] = useState({ running: false, botUsername: null })
   const [executing, setExecuting] = useState(null)
   const [history, setHistory] = useState([])
   const [mood, setMood] = useState({ happiness: 66, energy: 80, trust: 58, excitement: 33 })
@@ -378,8 +379,16 @@ export default function LunaControl() {
 
   const fetchStatus = async () => {
     try {
-      const res = await axios.get('/api/luna/status')
-      if (res.data) setStatus(res.data)
+      const [lunaRes, tgRes] = await Promise.allSettled([
+        axios.get('/api/luna/status'),
+        axios.get('/api/telegram/status')
+      ])
+      if (lunaRes.status === 'fulfilled' && lunaRes.value.data) {
+        setStatus(lunaRes.value.data)
+      }
+      if (tgRes.status === 'fulfilled' && tgRes.value.data) {
+        setTelegramStatus(tgRes.value.data)
+      }
     } catch (e) {
       console.error('[LunaControl] Erro ao buscar status:', e.message)
       setStatus(prev => ({ ...prev, _error: e.message }))
@@ -646,6 +655,7 @@ export default function LunaControl() {
             <StatusRow label="Agente Luna" active={isRunning} />
             <StatusRow label="Chrome CDP" active={status?.chromeConnected} />
             <StatusRow label="WhatsApp" active={status?.whatsappConnected} />
+            <StatusRow label={`Telegram @${telegramStatus.botUsername || 'bot'}`} active={telegramStatus.running} />
             <div className="flex justify-between">
               <span className="text-nexo-muted">Ultimo Scan</span>
               <span className="text-nexo-text">{status?.lastScan ? new Date(status.lastScan).toLocaleTimeString('pt-BR') : 'Nunca'}</span>
@@ -1007,6 +1017,29 @@ export default function LunaControl() {
                     <RotateCcw className="w-6 h-6 text-nexo-primary" />
                     <span className="font-semibold text-sm">Reiniciar Luna</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Controle Telegram Bot */}
+              <div className="mt-8">
+                <h3 className="text-sm font-medium text-nexo-muted uppercase mb-4">Telegram Bot</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <button onClick={() => axios.post('/api/telegram/start').then(fetchStatus)}
+                    disabled={telegramStatus.running}
+                    className="flex flex-col items-center gap-2 p-5 bg-nexo-bg border border-nexo-border rounded-xl hover:bg-nexo-success/10 hover:border-nexo-success transition-all disabled:opacity-50">
+                    <Play className="w-6 h-6 text-nexo-success" />
+                    <span className="font-semibold text-sm">Ligar Bot</span>
+                  </button>
+                  <button onClick={() => axios.post('/api/telegram/stop').then(fetchStatus)}
+                    disabled={!telegramStatus.running}
+                    className="flex flex-col items-center gap-2 p-5 bg-nexo-bg border border-nexo-border rounded-xl hover:bg-nexo-danger/10 hover:border-nexo-danger transition-all disabled:opacity-50">
+                    <Square className="w-6 h-6 text-nexo-danger" />
+                    <span className="font-semibold text-sm">Desligar Bot</span>
+                  </button>
+                  <div className="flex flex-col items-center justify-center gap-1 p-5 bg-nexo-bg border border-nexo-border rounded-xl">
+                    <Bot className={`w-6 h-6 ${telegramStatus.running ? 'text-nexo-success' : 'text-nexo-muted'}`} />
+                    <span className="font-semibold text-sm">{telegramStatus.running ? `@${telegramStatus.botUsername}` : 'Offline'}</span>
+                  </div>
                 </div>
               </div>
 

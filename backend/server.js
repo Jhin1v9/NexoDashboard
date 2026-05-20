@@ -41,6 +41,8 @@ const DATA_DIR = path.join(__dirname, 'data');
 // ── Luna MODO CONCIERGE v19.0 ──
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
+const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
+
 const lunaIntentParser = new IntentParser({
   genAI,
   geminiModel: 'gemini-2.5-flash-lite',
@@ -4173,6 +4175,37 @@ app.post('/api/luna/stop', (req, res) => {
   });
 });
 
+// ============================================================================
+// === TELEGRAM BOT CONTROL ==================================================
+// ============================================================================
+
+app.get('/api/telegram/status', (req, res) => {
+  const status = getTelegramStatus();
+  res.json({ success: true, ...status });
+});
+
+app.post('/api/telegram/start', async (req, res) => {
+  try {
+    const started = await startTelegramAgent();
+    if (started) {
+      res.json({ success: true, message: 'Bot do Telegram iniciado', status: getTelegramStatus() });
+    } else {
+      res.status(500).json({ success: false, error: 'Falha ao iniciar bot (verifique TELEGRAM_BOT_TOKEN no .env)' });
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/telegram/stop', (req, res) => {
+  try {
+    stopTelegramAgent();
+    res.json({ success: true, message: 'Bot do Telegram parado' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/luna/scan', (req, res) => {
   try {
     const p = spawn('node', ['agents/luna-scheduler.mjs', '--force-scan'], {
@@ -4226,6 +4259,117 @@ app.post('/api/luna/scan', (req, res) => {
     p.unref();
     res.json({ success: true, message: 'Verificacao de links iniciada', pid: p.pid });
   } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/luna/pending — Retorna menções e links pendentes para revisão humana
+app.get('/api/luna/pending', (req, res) => {
+  try {
+    const bufferFile = path.join(DATA_DIR, 'luna-buffer.json');
+    const buffer = readJSON(bufferFile) || {};
+    const result = {
+      mentions: buffer.newMentions || [],
+      links: buffer.newLinks || [],
+      ignored: buffer.ignoredMessages || [],
+      timestamp: new Date().toISOString()
+    };
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/pending/:id/feedback — Corrige classificação e ensina o NLU
+app.post('/api/luna/pending/:id/feedback', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { correctedIntent, correctedAction, comment } = req.body;
+
+    if (!correctedIntent) {
+      return res.status(400).json({ success: false, error: 'correctedIntent é obrigatório' });
+    }
+
+    const bufferFile = path.join(DATA_DIR, 'luna-buffer.json');
+    const buffer = readJSON(bufferFile) || {};
+    const mentions = buffer.newMentions || [];
+    const idx = mentions.findIndex(m => m.id === id);
+
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'Menção não encontrada' });
+    }
+
+    const mention = mentions[idx];
+
+    // Atualiza o registro com a correção humana
+    mention.humanReviewed = true;
+    mention.humanIntent = correctedIntent;
+    mention.humanAction = correctedAction || null;
+    mention.feedbackComment = comment || null;
+    mention.feedbackAt = new Date().toISOString();
+    mention.feedbackBy = req.user?.id || req.user?.name || 'unknown';
+
+    // Ensina o NLU com o exemplo corrigido
+    try {
+      await lunaNLU.addTrainingExample('pt', mention.cleanBody || mention.body, correctedIntent);
+    } catch (e) {
+      console.warn('[LunaNLU] Falha ao aprender com feedback:', e.message);
+    }
+
+    // Salva o buffer atualizado
+    writeJSON(bufferFile, buffer);
+
+    res.json({
+      success: true,
+      message: 'Feedback registrado e NLU atualizado',
+      mention: {
+        id: mention.id,
+        humanIntent: mention.humanIntent,
+        suggestedAction: mention.suggestedAction,
+        learned: true
+      }
+    });
+  } catch (e) {
+    console.error('[LunaPending] Erro no feedback:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/pending/:id/execute — Executa ação sugerida para uma menção
+app.post('/api/luna/pending/:id/execute', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { actionType, params = {} } = req.body;
+
+    const bufferFile = path.join(DATA_DIR, 'luna-buffer.json');
+    const buffer = readJSON(bufferFile) || {};
+    const mentions = buffer.newMentions || [];
+    const idx = mentions.findIndex(m => m.id === id);
+
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'Menção não encontrada' });
+    }
+
+    const mention = mentions[idx];
+    const type = actionType || mention.suggestedAction?.type;
+
+    if (!type || type === 'review') {
+      return res.status(400).json({ success: false, error: 'Ação não definida ou é review manual' });
+    }
+
+    // Executa via ActionExecutor (import dinâmico)
+    const { ActionExecutor } = require('../agents/core/ActionExecutor');
+    const executor = new ActionExecutor({ apiBase: `http://localhost:${PORT}/api` });
+    const result = await executor.execute([{ type, params: { ...params, body: mention.body, author: mention.author } }], { authorName: mention.author });
+
+    mention.processed = true;
+    mention.executedAt = new Date().toISOString();
+    mention.executedAction = type;
+    writeJSON(bufferFile, buffer);
+
+    res.json({ success: true, message: 'Ação executada', result });
+  } catch (e) {
+    console.error('[LunaPending] Erro ao executar:', e);
     res.status(500).json({ success: false, error: e.message });
   }
 });
