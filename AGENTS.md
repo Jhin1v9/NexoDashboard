@@ -367,6 +367,118 @@ Get-Content "backend/data/cash-box.json" | ConvertFrom-Json | Select-Object -Exp
 
 ---
 
+---
+
+## 🤖 LUNA BRAIN v2.0 — EVOLUÇÃO 2026-05-20
+
+### O que foi entregue nesta sessão
+
+#### 1. Bot do Telegram (@lunanexobot)
+- **Arquivo:** `agents/telegram-luna-agent.cjs`
+- **Token:** `7778220021:AAHI08gP1nlsizzh1f4ak00-eaSOdU1OwsY` (no `.env`)
+- **Funcionalidade:** Recebe menções, classifica com NLP híbrido, responde com sugestão + botões inline (Executar / Dashboard / Não era isso)
+- **Endpoints:** `POST /api/telegram/start`, `/stop`, `GET /api/telegram/status`
+
+#### 2. Semantic Embedding Engine (Fase 1 v2.0)
+- **Arquivo:** `backend/services/luna-semantic-nlu.js`
+- **Modelo:** `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dims)
+- **Índice:** `backend/data/luna-semantic-index.json` (2686 vetores)
+- **Script de build:** `backend/scripts/build-semantic-index.js`
+- **Endpoints:** `/api/luna/semantic-understand`, `/api/luna/hybrid-understand`
+
+#### 3. NLP Híbrido (Ensemble)
+O sistema agora usa **dois cérebros**:
+- **Semantic Embedding** — similaridade vetorial de frases
+- **NLP.js Bayesiano** — classificação por frequência de palavras
+- **Ensemble** — detecta overconfidence do NLP.js em `financeiro.pagamento` e prefere semantic quando suspeito
+
+#### 4. Sistema de Menções com Feedback Loop
+- **Buffer:** `newMentions[]` em `luna-buffer.json` unifica WhatsApp + Telegram
+- **Dashboard:** Aba "Menções" mostra sugestão NLP com botões Executar/Não era isso
+- **Feedback:** `POST /api/luna/pending/:id/feedback` → corrige intent → ensina NLU
+- **Execute:** `POST /api/luna/pending/:id/execute` → executa ação via ActionExecutor
+
+---
+
+## ⚠️ REGRA CRÍTICA — NUNCA APAGAR
+
+### `handleExecute()` no `agents/telegram-luna-agent.cjs`
+
+Quando editar o wizard do Telegram, **NUNCA** substitua o trecho do `handleExecute` que chama a API do backend. Ele é responsável por sincronizar a tarefa criada com o PostgreSQL.
+
+```javascript
+// ✅ CORRETO — chama API do backend (sync PG↔JSON):
+    try {
+      const apiToken = process.env.INTERNAL_API_TOKEN;
+      const res = await fetch(`${CONFIG.API_BASE}/luna/pending/${mentionId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiToken}`
+        },
+        body: JSON.stringify({ actionType })
+      });
+      // ...
+
+// ❌ ERRADO — ActionExecutor direto (só salva no JSON local, não aparece no dashboard):
+    try {
+      const executor = getActionExecutor();
+      const result = await executor.execute(
+        [{ type: actionType, params: { body: mention.body, author: mention.author } }],
+        { authorName: mention.author }
+      );
+```
+
+**Por quê?** O `ActionExecutor` escreve direto em `tasks.json` via `fs.writeFileSync`. Só o `writeJSON()` do backend dispara `syncFileToPG()`.
+
+---
+
+## 🔧 CONFIGURAÇÃO OBRIGATÓRIA NO `.env`
+
+Adicionar no `backend/.env`:
+
+```bash
+# Token do bot do Telegram (fornecido por @BotFather)
+TELEGRAM_BOT_TOKEN=7778220021:AAHI08gP1nlsizzh1f4ak00-eaSOdU1OwsY
+
+# Token interno para o bot chamar a API do backend
+# Gerar com: node -e "const jwt=require('jsonwebtoken');console.log(jwt.sign({id:'service',name:'Service Bot',role:'admin'},'SEU_JWT_SECRET',{expiresIn:'1y'}))"
+INTERNAL_API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNlcnZpY2UiLCJuYW1lIjoiU2VydmljZSBCb3QiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzkyNzgyNTgsImV4cCI6MTgxMDgzNTg1OH0.-mlBvPKJ98431BnygF5s5muaS1IOGm3ULYfT7wowLr0
+```
+
+---
+
+## 📊 RESULTADOS DOS TESTES
+
+| Frase de Teste | NLP.js (antigo) | Semantic (novo) | Melhoria |
+|---|---|---|---|
+| `"novo lead"` | `None` (100%) | `lead.criar` (100%) | ✅ Corrigiu |
+| `"cria um rascunho"` | `tarefa.criar` (83%) | `email.criar_rascunho` (100%) | ✅ Corrigiu |
+| `"fazer rascunho de email"` | `None` (100%) | `email.criar_rascunho` (91%) | ✅ Corrigiu |
+| `"tirar do lixo"` | `financeiro.pagamento` (100%) | `email.mover_lixeira` (97%) | ✅ Corrigiu |
+| `"cria uma tarefa"` | `tarefa.criar` (83%) | `tarefa.criar` (100%) | ✅ Melhorou |
+
+---
+
+## 🚀 PRÓXIMOS PASSOS (Roadmap v2.0)
+
+### Fase 2: Context Memory Graph (~3-4 dias)
+- Memória de últimas 10 interações por chat
+- Entidades ativas do ERP (projetos, clientes)
+- Re-ranking baseado em contexto conversacional
+
+### Fase 3: LLM Local Chain-of-Thought (~1 semana)
+- Ollama + Llama 3.1 8B rodando local
+- Raciocínio passo-a-passo para frases complexas
+- Chamado apenas quando ensemble confidence < 0.70
+
+### Fase 4: Active Learning Avançado (~1 semana)
+- Gera 20 variações sintéticas por correção
+- Atualiza índice FAISS em 2 segundos
+- Fine-tuning LoRA do LLM com feedback
+
+---
+
 *Atualizado após evolução completa v4.0 em 2026-05-09*
-*Status: Backend ✅ | Agente ✅ | Frontend ✅ | Chat Persistente ✅*
-*Fases concluídas: 1.1, 1.2, 1.3, 1.4, 2, 3.1, 3.2, 3.3, 3.4, 4, 5 (Chat Threads)*
+*Status: Backend ✅ | Agente ✅ | Frontend ✅ | Chat Persistente ✅ | Telegram Bot ✅ | Semantic NLU ✅*
+*Fases concluídas: 1.1, 1.2, 1.3, 1.4, 2, 3.1, 3.2, 3.3, 3.4, 4, 5 (Chat Threads), 6 (Telegram Bot), 7 (Semantic Embedding)*

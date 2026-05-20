@@ -782,17 +782,34 @@ class TelegramLunaAgent {
     }
 
     try {
-      const executor = getActionExecutor();
-      const result = await executor.execute(
-        [{ type: actionType, params: { body: mention.body, author: mention.author } }],
-        { authorName: mention.author }
-      );
+      // Chamar API do backend (que faz sync PG↔JSON automaticamente)
+      const apiToken = process.env.INTERNAL_API_TOKEN;
+      const res = await fetch(`${CONFIG.API_BASE}/luna/pending/${mentionId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiToken}`
+        },
+        body: JSON.stringify({ actionType })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const result = await res.json();
+
       mention.processed = true;
       mention.executedAt = new Date().toISOString();
       mention.executedAction = actionType;
       saveBuffer(buffer);
 
-      await this.bot.editMessageText(`✅ *Ação executada!*\n\n${escapeMarkdown(mention.suggestedAction.label)}\n\n_Vai aparecer no dashboard em instantes._`, {
+      await this.bot.editMessageText(`✅ *Ação executada!*
+
+${escapeMarkdown(mention.suggestedAction.label)}
+
+_Vai aparecer no dashboard em instantes._`, {
         chat_id: chatId, message_id: msgId, parse_mode: 'MarkdownV2',
       });
     } catch (e) {
