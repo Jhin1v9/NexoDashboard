@@ -1,27 +1,24 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-20T13:50:00.000Z",
+  "lastUpdated": "2026-05-20T12:44:24.631Z",
   "entries": [
     {
-      "id": "changelog-telegram-bot-v3",
+      "id": "changelog-telegram-bot-standalone-v3",
       "version": "3.5.0",
-      "title": "Telegram Bot @lunanexobot v3.0 — Framework Wizard Interativo",
-      "description": "Bot do Telegram totalmente reescrito com framework wizard declarativo. 6 wizards interativos: Criar Tarefa (responsavel/prazo/prioridade/descricao), Registrar Pagamento (valor/de/descricao), Registrar Despesa (valor/para/descricao), Registrar Lead (nome/telefone/email/contexto), Enviar Email/Rascunho (para/assunto/texto), Salvar Ideia (titulo/conteudo/prioridade). Extração inteligente de parametros do texto inicial (valor monetario, email, telefone, nome, assunto). Bot inicia automaticamente no startup do backend se TELEGRAM_BOT_TOKEN configurado. Dashboard links direcionam para o modulo correto (/tarefas, /financeiro, /leads, /email, /ideias). Privacy mode desativado no BotFather para leitura de mensagens em grupos.",
-      "category": "feature",
+      "title": "Bot Telegram @lunanexobot — Modo Standalone 24/7 + Correções MarkdownV2",
+      "description": "Bot do Telegram agora roda independente do server.js via PM2 (start-telegram-bot.js), garantindo uptime 24/7 mesmo com reinícios do backend. Corrigido erro fatal ETELEGRAM 400 Bad Request: Character \".\" is reserved — adicionada função safeSendMarkdownV2() com fallback automático para texto simples. Corrigidos escapes MarkdownV2 nas labels dos wizard schemas. Adicionados handlers polling_error e error para resiliência. server.js respeita AUTO_START_TELEGRAM_BOT=false para evitar duplicidade.",
+      "category": "fix",
       "emoji": "🤖",
       "author": "Luna",
       "tier": 1,
-      "date": "2026-05-20T13:45:00.000Z",
+      "date": "2026-05-20T12:44:24.631Z",
       "tags": [
         "telegram",
         "bot",
-        "wizard",
-        "interativo",
-        "tarefas",
-        "financeiro",
-        "leads",
-        "email",
-        "ideias"
+        "standalone",
+        "24-7",
+        "markdownv2",
+        "bugfix"
       ],
       "readBy": []
     },
