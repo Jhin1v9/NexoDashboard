@@ -39,17 +39,8 @@ export default function LunaFloatingButton() {
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
 
   // ── Drag state ──
-  const [fabPos, setFabPos] = useState(() => {
-    try {
-      const raw = localStorage.getItem('luna_fab_pos')
-      const pos = raw ? JSON.parse(raw) : { x: 0, y: 0 }
-      // Sanity check: se a posição salva fora da tela, reseta
-      const w = window.innerWidth || 1920
-      const h = window.innerHeight || 1080
-      if (Math.abs(pos.x) > w || Math.abs(pos.y) > h) return { x: 0, y: 0 }
-      return pos
-    } catch { return { x: 0, y: 0 } }
-  })
+  // Sempre começa na posição padrão (F5 reseta pro canto inferior direito)
+  const [fabPos, setFabPos] = useState({ x: 0, y: 0 })
   const dragRef = useRef({ active: false, startX: 0, startY: 0, origX: 0, origY: 0, didDrag: false })
   const fabRef = useRef(null)
 
@@ -590,7 +581,6 @@ export default function LunaFloatingButton() {
 
           const snapped = { x: nx, y: ny }
           setFabPos(snapped)
-          try { localStorage.setItem('luna_fab_pos', JSON.stringify(snapped)) } catch {}
           e.currentTarget.releasePointerCapture(e.pointerId)
         }}
       >
