@@ -3,7 +3,7 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-19T20:15:00+02:00",
+  "lastUpdated": "2026-05-20T13:45:00+02:00",
   "activeSessionId": "kimi-10a71fc7",
   "sessions": [
     {
@@ -50,7 +50,7 @@
       "id": "kimi-10a71fc7",
       "startedAt": "2026-05-19T15:00:00+02:00",
       "status": "active",
-      "focus": "Workspace File Viewer v2 — Editor com syntax highlighting (highlight.js), preview Markdown/HTML, indicador não salvo, atalhos Ctrl+S/ESC, contexto Luna enriquecido com arquivo. Commits até 3e4256e.",
+      "focus": "Workspace File Viewer v2 + Telegram Bot v3.0. Editor com syntax highlighting, preview Markdown/HTML, atalhos Ctrl+S/ESC. Bot @lunanexobot com framework wizard declarativo (6 acoes interativas), extracao inteligente de params, inicio automatico no startup. Commits ate 8613bdd.",
       "snapshotFile": "sessions/2026-05-19-kimi-10a71fc7.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
@@ -91,7 +91,7 @@
       "signature": "KIMI-10A71FC7",
       "color": "🟡",
       "role": "coding-agent",
-      "notes": "Sessão atual. NLU unificado (floating + /luna), NLU Expansion 36→137 intents em 15 domínios, ActionExecutor (ajuda/navigate/task_done), botão flutuante estilizado produção, changelog recuperado (19 entradas), repo unificado."
+      "notes": "Sessao atual. NLU unificado, NLU Expansion 36->137 intents, ActionExecutor, botao flutuante estilizado, changelog recuperado. Telegram Bot v3.0: framework wizard declarativo, 6 wizards (tarefa/pagamento/despesa/lead/email/ideia), extracao inteligente, dashboard links por acao, inicio automatico no startup."
     }
   },
   "rules": {

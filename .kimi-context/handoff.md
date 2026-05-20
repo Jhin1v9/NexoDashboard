@@ -21,6 +21,11 @@
 - [x] **Changelog v3.4.0:** Entrada documentando o File Viewer
 - [x] **Build passando:** Vite build 0 erros, bundle 2.0MB
 - [x] **Push para origin/main:** Commits `4eaaf6a` + `3e4256e` + `7b338b3` + `acc8db7` enviados
+- [x] **Telegram Bot @lunanexobot v3.0:** Framework wizard declarativo + 6 wizards interativos (tarefas, pagamentos, despesas, leads, email, ideias)
+- [x] **Bot inicia automaticamente no startup:** `backend/server.js` chama `startTelegramAgent()` se `TELEGRAM_BOT_TOKEN` existir
+- [x] **Extração inteligente de params:** Valor monetário, email, telefone, nome, assunto extraídos do texto do usuário
+- [x] **Dashboard links por ação:** `/tarefas`, `/financeiro`, `/leads`, `/email`, `/ideias` — cada ação direciona pro módulo correto
+- [x] **Privacy mode desativado:** BotFather → Group Privacy OFF. Requer remover+readicionar bot em grupos existentes
 
 ### ⏳ Próximos passos (priorizados por realidade do código)
 

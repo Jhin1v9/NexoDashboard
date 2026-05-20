@@ -37,7 +37,7 @@ last_updated: 2026-05-19T20:15:00+02:00
 
 **NEXO Dashboard Pro** — ERP interno da NEXO Digital (empresa de 3 founders: Abner, Nonoke, Elias). Stack Node.js + React. Todos os dados em JSON files (sem banco de dados). Deploy na Render.com free tier.
 
-**Propósito:** Centralizar clientes, projetos, tarefas, WhatsApp (Luna agent), financeiro, leads, pipeline de vendas, **IDEIAS** (brainstorm com IA Gemini), e agora **EMAIL HUB** (integração Gmail + IA).
+**Propósito:** Centralizar clientes, projetos, tarefas, WhatsApp (Luna agent), **Telegram Bot** (@lunanexobot), financeiro, leads, pipeline de vendas, **IDEIAS** (brainstorm com IA Gemini), e **EMAIL HUB** (integração Gmail + IA).
 
 **Repo GitHub:** `github.com/Jhin1v9/NexoDashboard` (único — `NexoDashboard/` local antigo foi desvinculado do remote)
 
@@ -85,10 +85,19 @@ last_updated: 2026-05-19T20:15:00+02:00
 - [x] **Harvesters:** RouteHarvester, TaskHarvester, EmailHarvester, FinanceHarvester
 - [x] **useLunaDOM:** Captura de cliques, foco e scroll no DOM
 
+#### Telegram Bot v3.0 — Framework Wizard ✅
+- [x] **Bot @lunanexobot:** Inicia automaticamente no startup do backend (se `TELEGRAM_BOT_TOKEN` configurado)
+- [x] **Framework wizard declarativo:** Adicionar wizard em nova ação = 5-10 linhas de schema
+- [x] **6 wizards interativos:** Tarefas, Pagamentos, Despesas, Leads, Email/Rascunho, Ideias
+- [x] **Extração inteligente:** Valor, email, telefone, nome, assunto extraídos do texto inicial automaticamente
+- [x] **Botões inline:** Responsável (Abner/Nonoke/Elias/Eu), Prazo (Hoje/Amanhã/Semana/Sem), Prioridade (P0/P1/P2)
+- [x] **Dashboard links corretos:** Cada ação direciona pro módulo correto (`/tarefas`, `/financeiro`, `/leads`, `/email`, `/ideias`)
+- [x] **Privacy mode:** Desativado no BotFather — bot lê todas as mensagens em grupos
+
 #### Deploy/Repo ✅
 - [x] **NexoDashboard local antigo:** Remote removido (não empurra mais pro GitHub)
 - [x] **NEXO_DASHBOARD_PRO:** Único projeto com acesso ao remote
-- [x] **Todos os commits enviados:** `acc8db7` é o HEAD atual
+- [x] **Todos os commits enviados:** `8613bdd` é o HEAD atual
 
 ---
 
@@ -100,6 +109,7 @@ last_updated: 2026-05-19T20:15:00+02:00
 - `agents/core/ActionExecutor.js` — 113+ ações. Executa tarefas, pagamentos, emails, etc.
 - `agents/core/NLUActionMapper.js` — Mapeia intents NLU → ações do ActionExecutor
 - `agents/core/IntentParser.js` — Regex fallback quando NLU não reconhece
+- `agents/telegram-luna-agent.cjs` — Bot do Telegram (@lunanexobot). Framework wizard declarativo com 6 ações interativas. Inicia automaticamente no startup do backend.
 
 ### Frontend (React 18, Vite, Tailwind)
 - `frontend/src/pages/Workspace.jsx` — Página `/workspace` (clientes, pastas, arquivos, viewer)
