@@ -373,6 +373,20 @@ async function migrateLunaBuffer() {
 // ============================================================
 // 19. SETTINGS
 // ============================================================
+async function migrateWorkspaceClients() {
+  const data = readJSON('workspace-index.json');
+  const clients = data?.clientes || [];
+  const rows = clients.map(c => [
+    c.id, c.nome, c.caminho, c.status, c.cor, c.responsavel,
+    c.tipo || 'cliente', c.dataInicio,
+    c.orcamentoTotal ?? 0, c.moeda || 'EUR',
+    JSON.stringify(c.tags || []), c.anotacoes || '',
+    JSON.stringify(c.metadata || {}), c.criadoEm, c.atualizadoEm
+  ]);
+  await batchInsert('workspace_clients', ['id','name','path','status','color','responsavel','tipo','data_inicio','orcamento_total','moeda','tags','anotacoes','metadata','criado_em','atualizado_em'], rows);
+  console.log(`  ✓ workspace_clients (${clients.length})`);
+}
+
 async function migrateSettings() {
   const configs = [
     { key: 'payment_config', file: 'payment-config.json' },
@@ -434,6 +448,7 @@ async function main() {
     await migrateWhatsAppHistory();
     await migrateLunaThreads();
     await migrateLunaBuffer();
+    await migrateWorkspaceClients();
     await migrateSettings();
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
