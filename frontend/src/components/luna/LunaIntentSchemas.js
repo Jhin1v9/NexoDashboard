@@ -95,14 +95,27 @@ export const INTENT_SCHEMAS = {
         source: 'luna-nlu',
       }),
     },
-    extractEntities: (entities) => {
+    extractEntities: (entities, text) => {
       const prio = extractEntity(entities, 'prioridade')
       let priority = 'medium'
       if (prio.includes('urgent') || prio.includes('alt')) priority = 'high'
       if (prio.includes('baix')) priority = 'low'
-      return {
-        priority,
+      // Tipo
+      let type = 'one_time'
+      const lower = (text || '').toLowerCase()
+      if (/\b(diaria|diária|daily)\b/.test(lower)) type = 'daily'
+      else if (/\b(semanal|weekly)\b/.test(lower)) type = 'weekly'
+      else if (/\b(mensal|monthly)\b/.test(lower)) type = 'monthly'
+      // Data
+      let dueDate = ''
+      const isoMatch = (text || '').match(/\b(\d{4}-\d{2}-\d{2})\b/)
+      if (isoMatch) dueDate = isoMatch[1]
+      else if (/\b(amanha|amanhã|tomorrow)\b/.test(lower)) {
+        const d = new Date(); d.setDate(d.getDate() + 1); dueDate = d.toISOString().split('T')[0]
+      } else if (/\b(hoje|today)\b/.test(lower)) {
+        dueDate = new Date().toISOString().split('T')[0]
       }
+      return { priority, type, dueDate }
     },
   },
 
@@ -202,6 +215,11 @@ export const INTENT_SCHEMAS = {
         text: values.body,
       }),
     },
+    extractEntities: (entities) => ({
+      to: extractEntity(entities, 'email') || extractEntity(entities, 'para'),
+      subject: extractEntity(entities, 'assunto'),
+      body: extractEntity(entities, 'mensagem'),
+    }),
   },
 
   'email.listar_nao_lidos': {
@@ -261,6 +279,11 @@ export const INTENT_SCHEMAS = {
         recordedBy: 'luna',
       }),
     },
+    extractEntities: (entities) => ({
+      description: extractEntity(entities, 'descricao') || extractEntity(entities, 'cliente'),
+      amount: extractEntity(entities, 'valor'),
+      client: extractEntity(entities, 'cliente'),
+    }),
   },
 
   'financeiro.listar_pagamentos': {
@@ -345,6 +368,10 @@ export const INTENT_SCHEMAS = {
         }
       },
     },
+    extractEntities: (entities) => ({
+      name: extractEntity(entities, 'descricao') || extractEntity(entities, 'nome'),
+      amount: extractEntity(entities, 'valor'),
+    }),
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -381,6 +408,9 @@ export const INTENT_SCHEMAS = {
         text: values.text,
       }),
     },
+    extractEntities: (entities) => ({
+      text: extractEntity(entities, 'mensagem'),
+    }),
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -426,6 +456,16 @@ export const INTENT_SCHEMAS = {
         description: values.description || '',
         status: 'draft',
       }),
+    },
+    extractEntities: (entities, text) => {
+      const val = extractEntity(entities, 'valor') || extractEntity(entities, 'value')
+      const client = extractEntity(entities, 'cliente')
+      const project = extractEntity(entities, 'projeto')
+      return {
+        clientName: client || '',
+        projectName: project || '',
+        value: val || '',
+      }
     },
   },
 

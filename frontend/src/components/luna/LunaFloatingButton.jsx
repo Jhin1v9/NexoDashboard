@@ -42,10 +42,16 @@ export default function LunaFloatingButton() {
   const [fabPos, setFabPos] = useState(() => {
     try {
       const raw = localStorage.getItem('luna_fab_pos')
-      return raw ? JSON.parse(raw) : { x: 0, y: 0 }
+      const pos = raw ? JSON.parse(raw) : { x: 0, y: 0 }
+      // Sanity check: se a posição salva fora da tela, reseta
+      const w = window.innerWidth || 1920
+      const h = window.innerHeight || 1080
+      if (Math.abs(pos.x) > w || Math.abs(pos.y) > h) return { x: 0, y: 0 }
+      return pos
     } catch { return { x: 0, y: 0 } }
   })
   const dragRef = useRef({ active: false, startX: 0, startY: 0, origX: 0, origY: 0, didDrag: false })
+  const fabRef = useRef(null)
 
   const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
@@ -519,9 +525,11 @@ export default function LunaFloatingButton() {
 
       {/* Botão flutuante — arrastável */}
       <div
+        ref={fabRef}
         className="fixed bottom-6 right-6 z-[100] touch-none select-none"
-        style={{ transform: `translate3d(${fabPos.x}px, ${fabPos.y}px, 0)` }}
+        style={{ transform: `translate3d(${fabPos.x}px, ${fabPos.y}px, 0)`, touchAction: 'none' }}
         onPointerDown={(e) => {
+          e.preventDefault()
           const d = dragRef.current
           d.active = true
           d.didDrag = false
@@ -543,20 +551,43 @@ export default function LunaFloatingButton() {
           const d = dragRef.current
           if (!d.active) return
           d.active = false
-          // Snap para borda mais próxima
-          const btnW = 120
-          const btnH = 56
+
+          // Snap para borda mais próxima usando dimensões REAIS do botão
+          const rect = fabRef.current?.getBoundingClientRect()
+          const btnW = rect?.width || 120
+          const btnH = rect?.height || 56
           const pad = 24
-          const currentRight = pad - fabPos.x
-          const currentBottom = pad - fabPos.y
-          const currentLeft = window.innerWidth - currentRight - btnW
-          const currentTop = window.innerHeight - currentBottom - btnH
+          const vw = window.innerWidth
+          const vh = window.innerHeight
+
+          // Posição absoluta atual na tela (considerando o translate)
+          const absoluteX = vw - pad - btnW + fabPos.x   // porque base é right-6
+          const absoluteY = vh - pad - btnH + fabPos.y   // porque base é bottom-6
+
+          const distLeft   = absoluteX
+          const distRight  = vw - absoluteX - btnW
+          const distTop    = absoluteY
+          const distBottom = vh - absoluteY - btnH
+
           let nx = fabPos.x
           let ny = fabPos.y
-          if (currentLeft < currentRight) nx = window.innerWidth - btnW - pad
-          else nx = 0
-          if (currentTop < currentBottom) ny = window.innerHeight - btnH - pad
-          else ny = 0
+
+          if (distLeft < distRight) {
+            nx = 0  // fica no right-6 original
+          } else {
+            nx = -vw + btnW + pad * 2  // encosta na esquerda
+          }
+
+          if (distTop < distBottom) {
+            ny = 0  // fica no bottom-6 original
+          } else {
+            ny = -vh + btnH + pad * 2  // encosta no topo
+          }
+
+          // Garante que não saia da tela
+          nx = Math.max(-vw + btnW + pad, Math.min(pad, nx))
+          ny = Math.max(-vh + btnH + pad, Math.min(pad, ny))
+
           const snapped = { x: nx, y: ny }
           setFabPos(snapped)
           try { localStorage.setItem('luna_fab_pos', JSON.stringify(snapped)) } catch {}

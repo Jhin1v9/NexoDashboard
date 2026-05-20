@@ -102,6 +102,8 @@ class ActionExecutor {
         return await this.showHelp(action.params, authorName);
       case 'navegar':
         return await this.navigate(action.params, authorName);
+      case 'social':
+        return { type: 'social', message: 'Oi! 👋 Estou por aqui, pronta pra ajudar. Diga o que precisa!', source: 'executor' };
       case 'excluir_tarefa':
         return await this.deleteTask(action.params, authorName);
       case 'excluir_pagamento':
@@ -310,6 +312,23 @@ class ActionExecutor {
     const priority = priorityMap[params.prioridade] || params.priority || 'medium';
     const assignedTo = params.responsavel || params.assignedTo || null;
     const addedBy = authorName?.toLowerCase() || 'sistema';
+    // Tipo de tarefa: extrai do texto ou usa padrão
+    const typeMap = { 'diaria': 'daily', 'diária': 'daily', 'daily': 'daily',
+                      'semanal': 'weekly', 'semanalmente': 'weekly', 'weekly': 'weekly',
+                      'mensal': 'monthly', 'mensalmente': 'monthly', 'monthly': 'monthly' };
+    let taskType = 'one_time';
+    if (params.taskType) {
+      taskType = params.taskType;
+    } else if (params.type && typeMap[params.type.toLowerCase?.() || params.type]) {
+      taskType = typeMap[params.type.toLowerCase?.() || params.type];
+    } else {
+      const typeText = (description || title || '').toLowerCase();
+      for (const [pt, en] of Object.entries(typeMap)) {
+        if (typeText.includes(pt)) { taskType = en; break; }
+      }
+    }
+    // Data de prazo
+    let dueDate = params.dueDate || params.prazo || null;
 
     const task = {
       id: Date.now().toString(),
@@ -317,8 +336,8 @@ class ActionExecutor {
       description,
       priority,
       status: 'pending',
-      taskType: 'one_time',
-      dueDate: null,
+      taskType,
+      dueDate,
       assignedTo,
       addedBy,
       source: 'luna',

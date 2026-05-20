@@ -1284,6 +1284,30 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/tasks/complete-by-title — Conclui tarefa buscando pelo título
+app.post('/api/tasks/complete-by-title', (req, res) => {
+  let tasks = readJSON(TASKS_FILE) || [];
+  const title = req.body.title || req.body.titulo || '';
+  if (!title.trim()) {
+    return res.status(400).json({ success: false, error: 'Título da tarefa é obrigatório' });
+  }
+  const search = title.toLowerCase().trim();
+  const match = tasks.find(t => {
+    const taskTitle = (t.title || t.titulo || t.body || '').toLowerCase();
+    return taskTitle.includes(search) || search.includes(taskTitle.slice(0, 30));
+  });
+  if (!match) {
+    return res.status(404).json({ success: false, error: `Tarefa "${title}" não encontrada` });
+  }
+  const now = new Date().toISOString();
+  match.status = 'completed';
+  match.completedAt = now;
+  match.updatedAt = now;
+  writeJSON(TASKS_FILE, tasks);
+  broadcast({ type: 'tasks', data: tasks });
+  res.json({ success: true, task: match });
+});
+
 app.post('/api/tasks/:id/comments', async (req, res) => {
   let tasks = readJSON(TASKS_FILE) || [];
   const task = tasks.find(t => t.id === req.params.id);
@@ -4746,6 +4770,38 @@ app.get('/api/luna/insights', requireAuth, async (req, res) => {
   } catch (e) {
     console.error('[LunaInsights] Erro:', e);
     res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/luna/action — Proxy universal para executar actions via ActionExecutor
+app.post('/api/luna/action', requireAuth, async (req, res) => {
+  try {
+    const { intent, params = {}, confirmed } = req.body;
+    if (!intent) {
+      return res.status(400).json({ success: false, error: 'intent é obrigatório' });
+    }
+
+    const { INTENT_TO_ACTION } = require('../agents/core/NLUActionMapper');
+    const mapping = INTENT_TO_ACTION[intent];
+    if (!mapping) {
+      return res.status(400).json({ success: false, error: `Intent "${intent}" não mapeado para nenhuma ação` });
+    }
+
+    // Constrói a action para o Executor
+    const action = {
+      type: mapping.type,
+      params: { ...params },
+      needsConfirmation: mapping.needsConfirmation || false,
+      source: 'luna-action-proxy',
+      nluIntent: intent,
+    };
+
+    const result = await lunaActionExecutor.execute([action], { authorName: req.user?.name || req.body.authorName || 'sistema' });
+    const reply = buildConciergeReply(result, req.user?.name || 'sistema');
+    res.json({ success: true, reply, executed: true, result: result.summary });
+  } catch (err) {
+    console.error('[LunaAction] Erro:', err.message);
+    res.status(500).json({ success: false, error: err.message || 'Erro ao executar ação' });
   }
 });
 

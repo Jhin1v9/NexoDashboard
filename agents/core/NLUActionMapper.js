@@ -135,16 +135,25 @@ const ENTITY_EXTRACTORS = {
 
   // Tarefas
   'tarefa.criar': (entities, text) => {
-    const titulo = entities.find(e => e.type === 'tarefa')?.value ||
-                   entities.find(e => e.type === 'acao')?.value ||
-                   extractAfterKeyword(text, ['tarefa', 'criar', 'fazer', 'preciso']);
+    // Extrai título: prefere depois de 'tarefa', depois 'criar/cria', depois outros
+    let titulo = entities.find(e => e.type === 'tarefa')?.value ||
+                 entities.find(e => e.type === 'acao')?.value ||
+                 extractAfterKeyword(text, ['tarefa']) ||
+                 extractAfterKeyword(text, ['criar', 'cria', 'fazer', 'preciso']);
+    // Limpa artefatos comuns no início do título
+    if (titulo) {
+      titulo = titulo.replace(/^(uma|um|de|para|pra|pro|que|de uma|de um)\s+/i, '').trim();
+    }
     const responsavel = entities.find(e => e.type === 'pessoa')?.value || extractPerson(text);
     const prioridade = extractPriority(text);
+    const { taskType, dueDate } = extractTaskTypeAndDate(text);
     return {
       titulo,
       responsavel,
       prioridade,
       descricao: text,
+      taskType,
+      dueDate,
     };
   },
   'tarefa.concluir': (entities, text) => ({
@@ -193,6 +202,27 @@ const ENTITY_EXTRACTORS = {
   'whatsapp.enviar_mensagem': (entities, text) => ({
     numero: entities.find(e => e.type === 'telefone')?.value || extractPhone(text),
     mensagem: entities.find(e => e.type === 'mensagem')?.value || text,
+  }),
+
+  // Orçamentos
+  'orcamento.criar': (entities, text) => ({
+    clientName: entities.find(e => e.type === 'cliente')?.value || extractAfterKeyword(text, ['para', 'pro', 'cliente']),
+    projectName: entities.find(e => e.type === 'projeto')?.value || extractAfterKeyword(text, ['projeto', 'job']),
+    value: entities.find(e => e.type === 'valor')?.value || extractValue(text),
+    description: entities.find(e => e.type === 'descricao')?.value || text,
+  }),
+
+  // Clientes
+  'cliente.criar': (entities, text) => ({
+    nome: entities.find(e => e.type === 'pessoa')?.value || entities.find(e => e.type === 'cliente')?.value || extractAfterKeyword(text, ['cliente', 'chamado', 'nome']),
+    email: entities.find(e => e.type === 'email')?.value || extractEmail(text),
+    telefone: entities.find(e => e.type === 'telefone')?.value || extractPhone(text),
+  }),
+
+  // Projetos
+  'projeto.criar': (entities, text) => ({
+    nome: entities.find(e => e.type === 'projeto')?.value || extractAfterKeyword(text, ['projeto', 'criar']),
+    cliente: entities.find(e => e.type === 'cliente')?.value || extractAfterKeyword(text, ['para', 'pro', 'cliente']),
   }),
 };
 
@@ -248,6 +278,71 @@ function extractAfterKeyword(text, keywords) {
     }
   }
   return text.slice(0, 100);
+}
+
+function extractTaskTypeAndDate(text) {
+  const lower = text.toLowerCase();
+  let taskType = null;
+  let dueDate = null;
+
+  // Tipo de tarefa
+  if (/\b(diaria|diária|daily)\b/.test(lower)) taskType = 'daily';
+  else if (/\b(semanal|semanalmente|weekly)\b/.test(lower)) taskType = 'weekly';
+  else if (/\b(mensal|mensalmente|monthly)\b/.test(lower)) taskType = 'monthly';
+
+  // Datas ISO (YYYY-MM-DD)
+  const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoMatch) {
+    dueDate = isoMatch[1];
+    return { taskType, dueDate };
+  }
+
+  // Datas BR (DD/MM/YYYY ou DD/MM)
+  const brMatch = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/);
+  if (brMatch) {
+    const year = brMatch[3] || new Date().getFullYear();
+    dueDate = `${year}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+    return { taskType, dueDate };
+  }
+
+  // "amanhã"
+  if (/\b(amanha|amanhã|tomorrow)\b/.test(lower)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    dueDate = d.toISOString().split('T')[0];
+  }
+  // "hoje"
+  else if (/\b(hoje|today)\b/.test(lower)) {
+    dueDate = new Date().toISOString().split('T')[0];
+  }
+  // "depois de amanhã"
+  else if (/\b(depois de amanha|depois de amanhã|day after tomorrow)\b/.test(lower)) {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    dueDate = d.toISOString().split('T')[0];
+  }
+  // Dias da semana (próxima ocorrência)
+  else {
+    const dias = {
+      'domingo': 0, 'segunda': 1, 'segunda-feira': 1,
+      'terca': 2, 'terça': 2, 'terca-feira': 2, 'terça-feira': 2,
+      'quarta': 3, 'quarta-feira': 3,
+      'quinta': 4, 'quinta-feira': 4,
+      'sexta': 5, 'sexta-feira': 5,
+      'sabado': 6, 'sábado': 6,
+    };
+    for (const [dia, target] of Object.entries(dias)) {
+      if (lower.includes(dia)) {
+        const d = new Date();
+        const diff = (target + 7 - d.getDay()) % 7;
+        d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
+        dueDate = d.toISOString().split('T')[0];
+        break;
+      }
+    }
+  }
+
+  return { taskType, dueDate };
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
