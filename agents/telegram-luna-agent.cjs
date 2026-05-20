@@ -139,8 +139,11 @@ function getDueDate(label) {
 function escapeMarkdown(text) {
   return String(text || '').replace(/[_*\[\]()~`>#+=|{}.!-]/g, '\\$&');
 }
+function unescapeMarkdown(text) {
+  return String(text || '').replace(/\\([_*\[\]()~`>#+=|{}.!-])/g, '$1');
+}
 
-/** Envia mensagem com MarkdownV2, e se der erro de parse, envia sem formatação */
+/** Envia mensagem com MarkdownV2, e se der erro de parse, envia como texto legível */
 async function safeSendMarkdownV2(bot, method, chatId, text, extra = {}) {
   try {
     if (method === 'sendMessage') {
@@ -154,11 +157,12 @@ async function safeSendMarkdownV2(bot, method, chatId, text, extra = {}) {
       log('warn', `MarkdownV2 falhou, enviando sem formatação: ${e.message}`);
       const safeExtra = { ...extra };
       delete safeExtra.parse_mode;
+      const plain = unescapeMarkdown(text);
       if (method === 'sendMessage') {
-        return await bot.sendMessage(chatId, text, safeExtra);
+        return await bot.sendMessage(chatId, plain, safeExtra);
       }
       if (method === 'editMessageText') {
-        return await bot.editMessageText(text, safeExtra);
+        return await bot.editMessageText(plain, safeExtra);
       }
     }
     throw e;
@@ -542,7 +546,7 @@ class TelegramLunaAgent {
     const schema = WIZARD_SCHEMAS[conv.schemaKey];
     const summary = schema.formatSummary(conv.data);
 
-    const text = `${schema.emoji} *Resumo — ${escapeMarkdown(schema.label)}:*\n\n${escapeMarkdown(summary)}\n\n_Tudo certo\?_`;
+    const text = `${schema.emoji} *Resumo — ${escapeMarkdown(schema.label)}:*\n\n${summary}\n\n_Tudo certo\?_`;
     const keyboard = {
       inline_keyboard: [[
         { text: '✅ Confirmar e criar', callback_data: 'wz:confirmar:sim' },
@@ -580,7 +584,7 @@ class TelegramLunaAgent {
         saveBuffer(buffer);
       }
 
-      const text = `${schema.emoji} *${escapeMarkdown(schema.label)} — criado com sucesso!*\n\n${escapeMarkdown(schema.formatSummary(conv.data))}\n\n_Vai aparecer no dashboard em instantes\._`;
+      const text = `${schema.emoji} *${escapeMarkdown(schema.label)} — criado com sucesso!*\n\n${schema.formatSummary(conv.data)}\n\n_Vai aparecer no dashboard em instantes\._`;
       await safeSendMarkdownV2(this.bot, 'sendMessage', chatId, text);
     } catch (e) {
       log('error', `Erro ao executar ${conv.schemaKey}: ${e.message}`);
