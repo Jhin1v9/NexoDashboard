@@ -3,7 +3,7 @@
   "version": "16.0.0",
   "description": "NEXO Dashboard PRO — ERP interno da NEXO Digital",
   "scripts": {
-    "build": "cd backend && npm install && cd .. && cd frontend && npm install --legacy-peer-deps && npm run build && rm -rf ../backend/public && cp -r dist ../backend/public",
+    "build": "npm install && cd backend && npm install && cd .. && cd frontend && npm install --legacy-peer-deps && npm run build && rm -rf ../backend/public && cp -r dist ../backend/public",
     "start": "cd backend && NODE_PATH=../node_modules node server.js",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
     "brain:sync": "node scripts/brain-sync.js",
