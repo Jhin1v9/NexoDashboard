@@ -39,6 +39,9 @@ const CLIENTES_DIR = path.join(NEXO_BASE, 'CLIENTES');
 const DATA_DIR = path.join(__dirname, 'data');
 
 // ── Luna MODO CONCIERGE v19.0 ──
+// Permite que arquivos em ../agents resolvam módulos do backend/node_modules
+module.paths.unshift(path.join(__dirname, 'node_modules'));
+
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
 const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
@@ -96,6 +99,13 @@ function requireAuth(req, res, next) {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch {
+    // Fallback: aceita INTERNAL_API_TOKEN como token de serviço
+    const serviceToken = process.env.INTERNAL_API_TOKEN;
+    if (serviceToken && token === serviceToken) {
+      req.user = { id: 'service', name: 'Service Bot', role: 'admin' };
+      next();
+      return;
+    }
     return res.status(401).json({ success: false, error: 'Token inválido ou expirado' });
   }
 }
@@ -5255,7 +5265,7 @@ function buildActionCenterItems(dataDir) {
           entityId: d.id,
           actions: [
             { label: 'Aprovar', intent: 'email.enviar', primary: true },
-            { label: 'Revisar', href: `/comunicacao/emails?draft=${d.id}` },
+            { label: 'Revisar', href: `/email?draft=${d.id}` },
           ],
           dismissable: true,
           createdAt: d.createdAt || now.toISOString(),

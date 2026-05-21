@@ -82,7 +82,10 @@ let actionExecutor = null;
 function getActionExecutor() {
   if (!actionExecutor) {
     const { ActionExecutor } = require('./core/ActionExecutor');
-    actionExecutor = new ActionExecutor({ apiBase: CONFIG.API_BASE });
+    actionExecutor = new ActionExecutor({
+      apiBase: CONFIG.API_BASE,
+      apiKey: process.env.INTERNAL_API_TOKEN
+    });
   }
   return actionExecutor;
 }
@@ -690,7 +693,7 @@ class TelegramLunaAgent {
 
     log('info', `Menção de ${authorName} (${chatId}): ${text.slice(0, 80)}`);
 
-    const nluResult = await classifyWithNLU(text);
+    const nluResult = await classifyWithNLU(cleanBody);
     const suggestedAction = resolveSuggestedAction(nluResult);
 
     // Registra no buffer

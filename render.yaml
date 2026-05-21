@@ -3,8 +3,8 @@ services:
     name: nexo-dashboard-pro
     runtime: node
     plan: free
-    buildCommand: npm run build
-    startCommand: npm start
+    buildCommand: npm install && cd backend && npm install && cd .. && npm run build
+    startCommand: cd backend && NODE_PATH=../node_modules:node_modules node server.js
     envVars:
       - key: NODE_ENV
         value: production

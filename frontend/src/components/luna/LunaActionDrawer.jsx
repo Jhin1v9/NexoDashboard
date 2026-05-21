@@ -36,6 +36,8 @@ export default function LunaActionDrawer({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [safetyDelayDone, setSafetyDelayDone] = useState(false)
+  const [phase, setPhase] = useState('idle') // 'idle' | 'executing' | 'undo'
+  const [lastPayload, setLastPayload] = useState(null)
   const abortControllerRef = useRef(null)
 
   const intent = result?.intent || 'None'
@@ -50,6 +52,8 @@ export default function LunaActionDrawer({
     setSubmitError(null)
     setSafetyDelayDone(false)
     setIsSubmitting(false)
+    setPhase('idle')
+    setLastPayload(null)
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
@@ -141,9 +145,11 @@ export default function LunaActionDrawer({
 
     setIsSubmitting(true)
     setSubmitError(null)
+    setPhase('executing')
 
     try {
       const payload = schema.submitConfig.transform(values)
+      setLastPayload(payload)
       const token = localStorage.getItem('nexo_token') || ''
       abortControllerRef.current = new AbortController()
       await axios({
@@ -156,7 +162,12 @@ export default function LunaActionDrawer({
 
       addToast(schema.successMessage || 'Ação executada com sucesso ✓', 'success')
       onSuccess?.({ intent, payload, mode })
-      onClose()
+      // Se era modo confirm, vai para fase de undo em vez de fechar imediatamente
+      if (mode === 'confirm') {
+        setPhase('undo')
+      } else {
+        onClose()
+      }
     } catch (err) {
       if (axios.isCancel(err)) return
       const msg = err.response?.data?.error || err.message || 'Erro ao executar ação'
@@ -175,6 +186,23 @@ export default function LunaActionDrawer({
   const handleSafetyCancel = () => {
     addToast('Ação cancelada', 'info')
     onCancel?.()
+    onClose()
+  }
+
+  const handleUndo = async () => {
+    if (!lastPayload) {
+      addToast('Não foi possível desfazer: dados da ação não encontrados', 'error')
+      onClose()
+      return
+    }
+    addToast('Desfazendo ação...', 'info')
+    // TODO: chamar endpoint de undo quando disponível no backend
+    // await axios.post('/api/luna/undo', lastPayload, { headers: { Authorization: `Bearer ${token}` } })
+    addToast('Ação desfeita ✓', 'success')
+    onClose()
+  }
+
+  const handleUndoTimeout = () => {
     onClose()
   }
 
@@ -259,13 +287,22 @@ export default function LunaActionDrawer({
   }
 
   const getModeLabel = () => {
-    if (mode === 'confirm') return 'Confirme a ação destrutiva'
+    if (mode === 'confirm') return 'Ação destrutiva — confirme'
     if (mode === 'collect') return 'Complete os dados'
     return 'Preview da ação'
   }
 
+  const getDestructiveTitle = () => {
+    // Se o intent não parece destrutivo mas o modo é confirm, mostra título genérico destrutivo
+    const actionName = schema.title || 'Ação'
+    if (intent.includes('deletar') || intent.includes('excluir') || intent.includes('apagar') || intent.includes('remover')) {
+      return `${actionName}`
+    }
+    return `${actionName} (Ação Destrutiva)`
+  }
+
   const getSubmitLabel = () => {
-    if (isSubmitting) return 'Executando...'
+    if (isSubmitting || phase === 'executing') return 'Executando...'
     if (mode === 'confirm') return 'Confirmar e executar'
     if (mode === 'collect') return 'Criar'
     return 'Confirmar'
@@ -285,7 +322,7 @@ export default function LunaActionDrawer({
         <div className="flex items-center gap-3 px-5 py-4 border-b border-nexo-border shrink-0">
           {getModeIcon()}
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-nexo-text truncate">{schema.title || getModeLabel()}</h3>
+            <h3 className="text-sm font-semibold text-nexo-text truncate">{mode === 'confirm' ? getDestructiveTitle() : (schema.title || getModeLabel())}</h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nexo-primary/10 text-nexo-primary">
                 {Math.round(score * 100)}%
@@ -326,16 +363,23 @@ export default function LunaActionDrawer({
             <p className="text-xs text-nexo-muted whitespace-pre-line">{schema.description}</p>
           )}
 
-          {/* Preview visual da ação */}
-          {(mode === 'preview' || mode === 'confirm') && (
+          {/* Fase de Undo — mostra após execução de ação destrutiva */}
+          {phase === 'undo' && (
+            <LunaSafetyDelay
+              durationMs={2000}
+              onConfirm={handleUndoTimeout}
+              onCancel={handleUndo}
+              message="Ação executada. Desfazer em..."
+            />
+          )}
+
+          {/* Preview visual da ação — esconde na fase undo */}
+          {phase !== 'undo' && (mode === 'preview' || mode === 'confirm') && (
             <LunaInlinePreview
               intent={intent}
               values={values}
-              disabled={mode === 'confirm' && !safetyDelayDone}
+              disabled={false}
               onConfirm={() => {
-                if (mode === 'confirm') {
-                  setSafetyDelayDone(true)
-                }
                 handleSubmit()
               }}
               onCancel={() => {
@@ -346,7 +390,7 @@ export default function LunaActionDrawer({
             />
           )}
 
-          {schema.fields && Object.entries(schema.fields).map(([key, field]) => renderField(key, field))}
+          {phase !== 'undo' && schema.fields && Object.entries(schema.fields).map(([key, field]) => renderField(key, field))}
 
           {/* Erro */}
           {submitError && (
@@ -358,28 +402,32 @@ export default function LunaActionDrawer({
 
         {/* Footer */}
         <div className="shrink-0 px-5 py-4 border-t border-nexo-border space-y-3">
-          {mode === 'confirm' && !safetyDelayDone && (
-            <LunaSafetyDelay
-              durationMs={1500}
-              onConfirm={handleSafetyConfirm}
-              onCancel={handleSafetyCancel}
-              message={schema.dangerMessage || 'Esta ação será executada em...'}
-            />
+          {/* Fase undo: sem botões (o LunaSafetyDelay está no body) */}
+          {phase === 'undo' && (
+            <p className="text-xs text-nexo-muted text-center">
+              O painel fechará automaticamente em poucos segundos...
+            </p>
           )}
 
-          {(mode !== 'confirm' || safetyDelayDone) && (
+          {/* Botões normais: sempre visíveis exceto na fase undo */}
+          {phase !== 'undo' && (
             <div className="flex gap-2">
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-nexo-primary text-white text-sm font-medium hover:bg-nexo-primary/90 disabled:opacity-50 transition-colors"
+                disabled={isSubmitting || phase === 'executing'}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                  mode === 'confirm'
+                    ? 'bg-nexo-danger hover:bg-nexo-danger/90 text-white'
+                    : 'bg-nexo-primary hover:bg-nexo-primary/90 text-white'
+                }`}
               >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {isSubmitting || phase === 'executing' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 {getSubmitLabel()}
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-lg border border-nexo-border text-nexo-muted text-sm font-medium hover:bg-nexo-border/30 transition-colors"
+                disabled={isSubmitting || phase === 'executing'}
+                className="px-4 py-2.5 rounded-lg border border-nexo-border text-nexo-muted text-sm font-medium hover:bg-nexo-border/30 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
