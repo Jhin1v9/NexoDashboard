@@ -7,6 +7,8 @@
 // por similaridade de cosseno com o corpus inteiro.
 // ============================================================
 
+module.paths.unshift('../../node_modules');
+
 const { pipeline } = require('@xenova/transformers');
 const fs = require('fs');
 const path = require('path');
