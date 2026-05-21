@@ -4,7 +4,7 @@
 // ============================================================
 
 // Resolve root deps when this file is loaded from backend/server.js
-module.paths.unshift('../node_modules');
+module.paths.unshift(require('path').resolve(__dirname, '../node_modules'));
 
 require('dotenv').config({ path: require('path').join(__dirname, '../backend/.env') });
 const fs = require('fs');

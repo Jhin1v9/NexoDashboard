@@ -39,8 +39,9 @@ const CLIENTES_DIR = path.join(NEXO_BASE, 'CLIENTES');
 const DATA_DIR = path.join(__dirname, 'data');
 
 // ── Luna MODO CONCIERGE v19.0 ──
-// Permite que arquivos em ../agents resolvam módulos do backend/node_modules
+// Permite que arquivos em ../agents resolvam módulos do backend/node_modules e da raiz
 module.paths.unshift(path.join(__dirname, 'node_modules'));
+module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
