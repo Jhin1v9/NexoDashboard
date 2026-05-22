@@ -674,5 +674,35 @@
     "comments": [],
     "createdAt": "2026-05-19T14:26:04.496Z",
     "updatedAt": "2026-05-19T14:26:04.496Z"
+  },
+  {
+    "id": "1779459188615",
+    "title": "sistema faturas",
+    "description": "compartilhar site do billing.nexo-digital.app com nosso clientes que ja estao contratando nossos servicios",
+    "status": "pending",
+    "priority": "low",
+    "taskType": "one_time",
+    "dueDate": null,
+    "addedBy": "elias",
+    "assignedTo": "elias",
+    "source": "luna",
+    "comments": [],
+    "createdAt": "2026-05-22T14:13:08.614Z",
+    "updatedAt": "2026-05-22T14:13:08.614Z"
+  },
+  {
+    "id": "1779459188459",
+    "title": "sistema faturas",
+    "description": "compartilhar site do billing.nexo-digital.app com nosso clientes que ja estao contratando nossos servicios",
+    "priority": "low",
+    "status": "pending",
+    "taskType": "one_time",
+    "dueDate": null,
+    "assignedTo": "elias",
+    "addedBy": "elias",
+    "source": "luna",
+    "comments": [],
+    "createdAt": "2026-05-22T14:13:08.459Z",
+    "updatedAt": "2026-05-22T14:13:08.459Z"
   }
 ]

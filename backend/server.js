@@ -1110,7 +1110,7 @@ const VC_USERS_FILE = path.join(DATA_DIR, 'vercel_users.json');
 const WAPP_FILE = path.join(DATA_DIR, 'whatsapp-tasks.json');
 
 // Init defaults
-if (!fs.existsSync(TASKS_FILE)) writeJSON(TASKS_FILE, []);
+// (tasks are now persisted in PostgreSQL via datastore-pg.js)
 
 // Ensure default users exist in PostgreSQL
 const DEFAULT_PASSWORD_HASH = '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla'; // hash de '7741'
@@ -1186,12 +1186,12 @@ function scanClients() {
   return clients;
 }
 
-function getPredictions(clients) {
+async function getPredictions(clients) {
   const predictions = [];
   const stale = clients.filter(c => c.health < 50);
   if (stale.length > 0) predictions.push({ type: 'warning', msg: `${stale.length} cliente(s) com health < 50%` });
 
-  const tasks = readJSON(TASKS_FILE) || [];
+  const tasks = await dataStore.getTasks();
   const pending = tasks.filter(t => !t.completed);
   if (pending.length > 10) predictions.push({ type: 'danger', msg: `Sprint overload: ${pending.length} tarefas pendentes` });
 
@@ -1227,9 +1227,9 @@ wss.on('connection', (ws) => {
 // State
 app.get('/api/state', async (req, res) => {
   const clients = scanClients();
-  const tasks = readJSON(TASKS_FILE) || [];
+  const tasks = await dataStore.getTasks();
   const users = await dataStore.getUsers();
-  res.json({ clients, tasks, users, predictions: getPredictions(clients), timestamp: new Date().toISOString() });
+  res.json({ clients, tasks, users, predictions: await getPredictions(clients), timestamp: new Date().toISOString() });
 });
 
 // Tasks v16.3 — Evoluído com status workflow, dueDate, prioridade, tipo, comentários
@@ -1239,8 +1239,8 @@ const isOverdue = (dueDate) => {
   return new Date(dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
 };
 
-app.get('/api/tasks', (req, res) => {
-  let tasks = readJSON(TASKS_FILE) || [];
+app.get('/api/tasks', async (req, res) => {
+  let tasks = await dataStore.getTasks();
   const { status, assignedTo, priority, taskType, overdue } = req.query;
 
   if (status) tasks = tasks.filter(t => t.status === status);
@@ -1252,8 +1252,7 @@ app.get('/api/tasks', (req, res) => {
   res.json(tasks);
 });
 
-app.post('/api/tasks', (req, res) => {
-  const tasks = readJSON(TASKS_FILE) || [];
+app.post('/api/tasks', async (req, res) => {
   const now = new Date().toISOString();
   const task = {
     id: Date.now().toString(),
@@ -1270,40 +1269,33 @@ app.post('/api/tasks', (req, res) => {
     createdAt: now,
     updatedAt: now
   };
-  tasks.push(task);
-  writeJSON(TASKS_FILE, tasks);
-  broadcast({ type: 'tasks', data: tasks });
+  await dataStore.saveTask(task);
   res.json(task);
 });
 
-app.put('/api/tasks/:id', (req, res) => {
-  let tasks = readJSON(TASKS_FILE) || [];
+app.put('/api/tasks/:id', async (req, res) => {
+  const tasks = await dataStore.getTasks();
   const now = new Date().toISOString();
-  tasks = tasks.map(t => {
-    if (t.id !== req.params.id) return t;
-    const updates = { ...req.body, updatedAt: now };
-    // Auto-set timestamps baseado no status
-    if (updates.status === 'in_progress' && !t.startedAt) updates.startedAt = now;
-    if (updates.status === 'completed' && !t.completedAt) updates.completedAt = now;
-    if (updates.status && updates.status !== 'completed') updates.completedAt = null;
-    return { ...t, ...updates };
-  });
-  writeJSON(TASKS_FILE, tasks);
-  broadcast({ type: 'tasks', data: tasks });
-  res.json(tasks.find(t => t.id === req.params.id));
+  const existing = tasks.find(t => t.id === req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Tarefa não encontrada' });
+  const updates = { ...req.body, updatedAt: now };
+  // Auto-set timestamps baseado no status
+  if (updates.status === 'in_progress' && !existing.startedAt) updates.startedAt = now;
+  if (updates.status === 'completed' && !existing.completedAt) updates.completedAt = now;
+  if (updates.status && updates.status !== 'completed') updates.completedAt = null;
+  const updated = { ...existing, ...updates };
+  await dataStore.saveTask(updated);
+  res.json(updated);
 });
 
-app.delete('/api/tasks/:id', (req, res) => {
-  let tasks = readJSON(TASKS_FILE) || [];
-  tasks = tasks.filter(t => t.id !== req.params.id);
-  writeJSON(TASKS_FILE, tasks);
-  broadcast({ type: 'tasks', data: tasks });
+app.delete('/api/tasks/:id', async (req, res) => {
+  await dataStore.deleteTask(req.params.id);
   res.json({ ok: true });
 });
 
 // POST /api/tasks/complete-by-title — Conclui tarefa buscando pelo título
-app.post('/api/tasks/complete-by-title', (req, res) => {
-  let tasks = readJSON(TASKS_FILE) || [];
+app.post('/api/tasks/complete-by-title', async (req, res) => {
+  const tasks = await dataStore.getTasks();
   const title = req.body.title || req.body.titulo || '';
   if (!title.trim()) {
     return res.status(400).json({ success: false, error: 'Título da tarefa é obrigatório' });
@@ -1320,13 +1312,12 @@ app.post('/api/tasks/complete-by-title', (req, res) => {
   match.status = 'completed';
   match.completedAt = now;
   match.updatedAt = now;
-  writeJSON(TASKS_FILE, tasks);
-  broadcast({ type: 'tasks', data: tasks });
+  await dataStore.saveTask(match);
   res.json({ success: true, task: match });
 });
 
 app.post('/api/tasks/:id/comments', async (req, res) => {
-  let tasks = readJSON(TASKS_FILE) || [];
+  const tasks = await dataStore.getTasks();
   const task = tasks.find(t => t.id === req.params.id);
   if (!task) return res.status(404).json({ error: 'Tarefa não encontrada' });
 
@@ -1340,8 +1331,7 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
   task.comments = task.comments || [];
   task.comments.push(comment);
   task.updatedAt = new Date().toISOString();
-  writeJSON(TASKS_FILE, tasks);
-  broadcast({ type: 'tasks', data: tasks });
+  await dataStore.saveTask(task);
 
   // Notifica no Discord usuários mencionados
   if (comment.mentions.length > 0) {
@@ -1410,8 +1400,8 @@ app.get('/api/vercel-projects', async (req, res) => {
 });
 
 // Predictions
-app.get('/api/predictions', (req, res) => {
-  res.json(getPredictions(scanClients()));
+app.get('/api/predictions', async (req, res) => {
+  res.json(await getPredictions(scanClients()));
 });
 
 function normalizeWhatsappBuffer(buffer = {}) {
