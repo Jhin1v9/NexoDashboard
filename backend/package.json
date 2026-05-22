@@ -28,6 +28,15 @@
     "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^8.0.7",
     "pg": "^8.21.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.1",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   }
 }

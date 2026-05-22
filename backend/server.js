@@ -22,7 +22,6 @@ const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
-const { restoreAllFromPG, syncFileToPG } = require('./pg-sync');
 const dataStore = require('./datastore-pg');
 
 // Discord Mention Notifier
@@ -927,7 +926,7 @@ const readJSON = (file, defaultValue = null) => {
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
   if (process.env.DATABASE_URL) {
-    syncFileToPG(file, data).catch(e => console.error('[pg-sync]', e.message));
+    // (pg-sync removed — direct PG writes only)
   }
 };
 
@@ -4562,11 +4561,11 @@ function buildDashboardContext(contextModule = null, contextId = null, contextFi
     const pendingPayments = payments.filter(p => p.status !== 'paid' && p.status !== 'received');
     const totalPending = pendingPayments.reduce((s, p) => s + (p.totalAmount || p.amount || 0), 0);
     const monthlyExpenses = expenses.filter(e => {
-      const d = e.date || e.createdAt || '';
+      const d = e.startDate || e.renewDate || e.date || e.createdAt || '';
       return d.startsWith(today.slice(0, 7));
     });
     const totalExpensesMonth = monthlyExpenses.reduce((s, e) => {
-      const val = typeof e.amount === 'object' ? (e.amount?.value || 0) : (e.amount || e.valor || 0);
+      const val = (e.amount && typeof e.amount === 'object') ? (e.amount?.value || 0) : (e.amount || e.valor || 0);
       return s + (parseFloat(val) || 0);
     }, 0);
 
