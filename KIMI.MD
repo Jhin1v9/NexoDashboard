@@ -51,7 +51,7 @@ last_updated: 2026-05-23T01:00:00+02:00
 
 ### 🎯 Sprint Ativo: Fase 0.1 — Reverse Schema Engineering + Migração PG
 
-**Status:** 🟡 Em andamento — 6 de 19 entidades migradas (31.6%)
+**Status:** 🟡 Em andamento — 7 de 19 entidades migradas (36.8%)
 
 #### Arquitetura de Persistência (REESCRITA)
 - `backend/datastore-pg.js` — Datastore 100% PostgreSQL. 33 funções, zero fallback JSON.
@@ -69,11 +69,12 @@ last_updated: 2026-05-23T01:00:00+02:00
 | 4 | `expenses` | CRUD + pay | 5 ✅ |
 | 5 | `cash_box` | Singleton + entries + reconcile + payments | 4 ✅ |
 | 6 | `quotes` | CRUD | 5 ✅ |
+| 7 | `leads` | CRUD + convert | 5 ✅ |
 
-**Testes totais:** 26/26 passando (`npx jest --verbose`)
+**Testes totais:** 31/31 passando (`npx jest --verbose`)
 
 #### Entidades Pendentes (ainda em JSON)
-`company_tasks`, `leads`, `members`, `transactions`, `links`, `notifications`, `security_logs`, `changelog`, `ideas`, `whatsapp_history`, `luna_threads`, `luna_buffer`, `workspace_clients`
+`company_tasks`, `members`, `transactions`, `links`, `notifications`, `security_logs`, `changelog`, `ideas`, `whatsapp_history`, `luna_threads`, `luna_buffer`, `workspace_clients`
 
 **Regra:** UMA entidade por vez. Testada. Aprovada pelo Abner. Só aí próxima.
 
@@ -127,7 +128,7 @@ last_updated: 2026-05-23T01:00:00+02:00
 
 | Fase | Progresso Real | Gap Principal |
 |------|---------------|---------------|
-| 0.1 — Reverse Schema Engineering | 🟡 32% | 6/19 entidades migradas. Quotes concluído. |
+| 0.1 — Reverse Schema Engineering | 🟡 37% | 7/19 entidades migradas. Leads concluído. |
 | 1 — Fundação de Consciência | ✅ 100% | — |
 | 2 — Eliminar o Modal | ✅ ~90% | Modo C e D implementados |
 | 3 — Execução Inteligente | ✅ ~90% | Preview visual implementado |
@@ -152,7 +153,7 @@ last_updated: 2026-05-23T01:00:00+02:00
 ## 6. Comandos Úteis
 
 ```bash
-# Testes (26 testes, todas as entidades migradas)
+# Testes (31 testes, todas as entidades migradas)
 cd backend && npx jest --verbose
 
 # Build frontend

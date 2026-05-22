@@ -1473,6 +1473,7 @@ const REPORTS_DIR = path.join(DATA_DIR, 'reports');
 const WHATSAPP_HISTORY_FILE = path.join(DATA_DIR, 'whatsapp-history.json');
 const BUFFER_FILE = path.join(DATA_DIR, 'luna-buffer.json');
 const CHECKPOINT_FILE = path.join(DATA_DIR, 'luna-checkpoint.json');
+const HISTORY_FILE = WHATSAPP_HISTORY_FILE;
 const CLIENTS_REGISTRY_FILE = path.join(DATA_DIR, 'schema', 'clients-registry.json');
 
 // Ensure reports dir exists
@@ -3871,12 +3872,6 @@ function getEmojiForCategory(category) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // LEADS API — Receber formulários do site chatopsmaster.com
 // ═══════════════════════════════════════════════════════════════════════════════
-
-const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
-
-
-
-
 
 // ============================================================================
 // === LUNA COMMAND CENTER v14.1 — Rotas de Controle do Agente ==============
@@ -6504,7 +6499,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const expenses = readJSON(EXPENSES_FILE) || [];
     const cashBox = await dataStore.getCashBox();
     const quotes = await dataStore.getQuotes();
-    const leads = readJSON(LEADS_FILE) || { leads: [] };
+    const leads = await dataStore.getLeads();
     const members = readJSON(MEMBERS_FILE) || [];
     const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };
     const transactions = readJSON(TRANSACTIONS_FILE) || [];
@@ -7324,19 +7319,10 @@ app.post('/api/emails/sync', async (req, res) => {
 const LEAD_STATUSES = ['novo', 'contatado', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'];
 
 // GET /api/leads — Lista todos os leads
-app.get('/api/leads', (req, res) => {
+app.get('/api/leads', async (req, res) => {
   try {
     const { status, assignedTo, source, search } = req.query;
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
-    let leads = Object.entries(registry.clients || {}).map(([id, data]) => ({
-      id,
-      ...data
-    }));
-
-    // Só retornar leads (não clientes já convertidos, a menos que explicitamente pedido)
-    if (!req.query.includeClients) {
-      leads = leads.filter(l => l.type === 'lead' || LEAD_STATUSES.includes(l.pipelineStatus));
-    }
+    let leads = await dataStore.getLeads();
 
     if (status) leads = leads.filter(l => l.pipelineStatus === status);
     if (assignedTo) leads = leads.filter(l => l.assignedTo === assignedTo);
@@ -7357,29 +7343,30 @@ app.get('/api/leads', (req, res) => {
 });
 
 // GET /api/leads/:id — Detalhe de um lead
-app.get('/api/leads/:id', (req, res) => {
+app.get('/api/leads/:id', async (req, res) => {
   try {
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
-    const lead = registry.clients?.[req.params.id];
+    const leads = await dataStore.getLeads();
+    const lead = leads.find(l => l.id === req.params.id);
     if (!lead) return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
-    res.json({ success: true, lead: { id: req.params.id, ...lead } });
+    res.json({ success: true, lead });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // POST /api/leads — Criar lead
-app.post('/api/leads', (req, res) => {
+app.post('/api/leads', async (req, res) => {
   try {
     const { displayName, name, email, phone, source, estimatedValue, notes, assignedTo, tags } = req.body;
     const leadName = displayName || name;
     if (!leadName) {
       return res.status(400).json({ success: false, error: 'displayName obrigatorio' });
     }
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {}, schema: { version: '16.1.0' } };
     const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    registry.clients[id] = {
+    const lead = {
+      id,
       displayName: leadName,
+      name: leadName,
       email: email || '',
       phone: phone || '',
       source: source || 'manual',
@@ -7392,33 +7379,34 @@ app.post('/api/leads', (req, res) => {
       assignedTo: assignedTo || null,
       tags: tags || [],
       createdAt: new Date().toISOString(),
-      lastContact: null
+      lastContact: null,
+      convertedAt: null
     };
-    writeJSON(CLIENTS_REGISTRY_FILE, registry);
-    broadcast({ type: 'leads:create', data: { id, ...registry.clients[id] } });
-    res.json({ success: true, lead: { id, ...registry.clients[id] } });
+    await dataStore.saveLead(lead);
+    res.json({ success: true, lead });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // PUT /api/leads/:id — Atualizar lead
-app.put('/api/leads/:id', (req, res) => {
+app.put('/api/leads/:id', async (req, res) => {
   try {
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
-    if (!registry.clients?.[req.params.id]) {
+    const leads = await dataStore.getLeads();
+    const existing = leads.find(l => l.id === req.params.id);
+    if (!existing) {
       return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     }
     const allowed = ['displayName', 'email', 'phone', 'source', 'pipelineStatus', 'estimatedValue', 'currency', 'notes', 'assignedTo', 'tags', 'lastContact'];
+    const updated = { ...existing };
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        registry.clients[req.params.id][key] = req.body[key];
+        updated[key] = req.body[key];
       }
     }
-    registry.clients[req.params.id].updatedAt = new Date().toISOString();
-    writeJSON(CLIENTS_REGISTRY_FILE, registry);
-    broadcast({ type: 'leads:update', data: { id: req.params.id, ...registry.clients[req.params.id] } });
-    res.json({ success: true, lead: { id: req.params.id, ...registry.clients[req.params.id] } });
+    updated.updatedAt = new Date().toISOString();
+    await dataStore.saveLead(updated);
+    res.json({ success: true, lead: updated });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -7427,22 +7415,25 @@ app.put('/api/leads/:id', (req, res) => {
 // POST /api/leads/:id/convert — Converter lead em cliente + criar workspace
 app.post('/api/leads/:id/convert', async (req, res) => {
   try {
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
+    const leads = await dataStore.getLeads();
     const leadId = req.params.id;
-    if (!registry.clients?.[leadId]) {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     }
 
-    registry.clients[leadId].type = 'cliente-externo';
-    registry.clients[leadId].status = 'ativo';
-    registry.clients[leadId].pipelineStatus = 'ganho';
-    registry.clients[leadId].convertedAt = new Date().toISOString();
-    writeJSON(CLIENTS_REGISTRY_FILE, registry);
+    const updated = {
+      ...lead,
+      type: 'cliente-externo',
+      status: 'ativo',
+      pipelineStatus: 'ganho',
+      convertedAt: new Date().toISOString()
+    };
+    await dataStore.saveLead(updated);
 
     // Cria workspace se ainda não existir
     let workspace = null;
     if (!workspaceManager.clientExists(leadId)) {
-      const lead = registry.clients[leadId];
       const displayName = lead.name || lead.displayName || lead.company || leadId;
       workspace = workspaceManager.createClient(leadId, {
         nome: displayName,
@@ -7468,8 +7459,7 @@ Pasta padrão do workspace NEXO.
       workspace = workspaceManager.getClient(leadId);
     }
 
-    broadcast({ type: 'leads:convert', data: { id: leadId, ...registry.clients[leadId] } });
-    res.json({ success: true, lead: { id: leadId, ...registry.clients[leadId] }, workspace });
+    res.json({ success: true, lead: updated, workspace });
   } catch (e) {
     console.error('[Convert Lead] Erro:', e);
     res.status(500).json({ success: false, error: e.message });
@@ -7477,15 +7467,9 @@ Pasta padrão do workspace NEXO.
 });
 
 // DELETE /api/leads/:id — Remover lead
-app.delete('/api/leads/:id', (req, res) => {
+app.delete('/api/leads/:id', async (req, res) => {
   try {
-    const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
-    if (!registry.clients?.[req.params.id]) {
-      return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
-    }
-    delete registry.clients[req.params.id];
-    writeJSON(CLIENTS_REGISTRY_FILE, registry);
-    broadcast({ type: 'leads:delete', data: { id: req.params.id } });
+    await dataStore.deleteLead(req.params.id);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
