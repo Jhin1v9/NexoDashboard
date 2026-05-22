@@ -2264,7 +2264,7 @@ app.post('/api/payments/:id/split/:personId/receive', async (req, res) => {
 // GET all expenses
 app.get('/api/expenses', async (req, res) => {
   try {
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     res.json(expenses);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2274,7 +2274,7 @@ app.get('/api/expenses', async (req, res) => {
 // POST new expense
 app.post('/api/expenses', async (req, res) => {
   try {
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const splitAmong = req.body.splitAmong || [];
     const amountVal = req.body.amount ? (req.body.amount.value || 0) : 0;
     const costPerPerson = splitAmong.length > 0 ? parseFloat((amountVal / splitAmong.length).toFixed(2)) : amountVal;
@@ -2308,8 +2308,7 @@ app.post('/api/expenses', async (req, res) => {
       createdAt: nowISO(),
       updatedAt: nowISO()
     };
-    expenses.push(expense);
-    writeJSON(EXPENSES_FILE, expenses);
+    await dataStore.saveExpense(expense);
 
     // Update cash box if auto-deduct
     if (expense.autoDeductFromCashBox && amountVal > 0) {
@@ -2333,7 +2332,6 @@ app.post('/api/expenses', async (req, res) => {
       broadcast({ type: 'cashbox', data: cashBox });
     }
 
-    broadcast({ type: 'expenses', data: expenses });
     res.json(expense);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2343,10 +2341,9 @@ app.post('/api/expenses', async (req, res) => {
 // PUT update expense
 app.put('/api/expenses/:id', async (req, res) => {
   try {
-    let expenses = readJSON(EXPENSES_FILE) || [];
-    const idx = expenses.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Expense not found' });
-    const oldExpense = expenses[idx];
+    const expenses = await dataStore.getExpenses();
+    const oldExpense = expenses.find(e => e.id === req.params.id);
+    if (!oldExpense) return res.status(404).json({ error: 'Expense not found' });
     const updated = { ...oldExpense, ...req.body, updatedAt: nowISO() };
 
     // Recalc costPerPerson if amount or splitAmong changed
@@ -2363,9 +2360,7 @@ app.put('/api/expenses/:id', async (req, res) => {
       recalcExpenseFullyPaid(updated);
     }
 
-    expenses[idx] = updated;
-    writeJSON(EXPENSES_FILE, expenses);
-    broadcast({ type: 'expenses', data: expenses });
+    await dataStore.saveExpense(updated);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2375,12 +2370,10 @@ app.put('/api/expenses/:id', async (req, res) => {
 // DELETE expense
 app.delete('/api/expenses/:id', async (req, res) => {
   try {
-    let expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const expense = expenses.find(e => e.id === req.params.id);
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
-    expenses = expenses.filter(e => e.id !== req.params.id);
-    writeJSON(EXPENSES_FILE, expenses);
-    broadcast({ type: 'expenses', data: expenses });
+    await dataStore.deleteExpense(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2390,10 +2383,9 @@ app.delete('/api/expenses/:id', async (req, res) => {
 // POST pay expense share
 app.post('/api/expenses/:id/pay', async (req, res) => {
   try {
-    let expenses = readJSON(EXPENSES_FILE) || [];
-    const idx = expenses.findIndex(e => e.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Expense not found' });
-    const expense = expenses[idx];
+    const expenses = await dataStore.getExpenses();
+    const expense = expenses.find(e => e.id === req.params.id);
+    if (!expense) return res.status(404).json({ error: 'Expense not found' });
     const { personId, method } = req.body;
     if (!personId) return res.status(400).json({ error: 'personId required' });
     expense.paidBy = expense.paidBy || {};
@@ -2405,8 +2397,7 @@ app.post('/api/expenses/:id/pay', async (req, res) => {
     };
     recalcExpenseFullyPaid(expense);
     expense.updatedAt = nowISO();
-    writeJSON(EXPENSES_FILE, expenses);
-    broadcast({ type: 'expenses', data: expenses });
+    await dataStore.saveExpense(expense);
     res.json(expense);
   } catch (err) {
     res.status(500).json({ error: err.message });

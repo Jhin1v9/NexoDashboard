@@ -229,6 +229,11 @@ async function saveExpense(expense) {
   return expense;
 }
 
+async function deleteExpense(expenseId) {
+  await db.run('DELETE FROM expenses WHERE id=$1', [expenseId]);
+  notifyChange('expenses', await getExpenses());
+  return true;
+}
 // ============================================================
 // CASH BOX
 // ============================================================
@@ -806,7 +811,7 @@ module.exports = {
   getTasks, saveTask, deleteTask,
   getCompanyTasks, saveCompanyTask,
   getPayments, savePayment, deletePayment,
-  getExpenses, saveExpense,
+  getExpenses, saveExpense, deleteExpense,
   getCashBox, saveCashBox,
   getQuotes, saveQuote,
   getMembers, saveMember,
