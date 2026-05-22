@@ -1,0 +1,509 @@
+#@PROJECT:NEXO_DASHBOARD_PRO
+#@VERSION:16.0.0
+#@DATE:2026-05-22T22:57:32+02:00
+#@PERSONA:SUPREME_ANALYST+SENIOR_DEBUGGER+ARCHITECT
+#@NOTATION:KIMI-STRUCTURED-v1
+#@SCOPE:FULL_SYSTEM_AUDIT
+#@NEXT_ACTION:ANALYZE_ONLY_NO_FIX
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:METADATA
+═══════════════════════════════════════════════════════════════════════════════
+>>PROJECT_META{
+  name: NEXO_DASHBOARD_PRO,
+  version: 16.0.0,
+  stack: [React+Vite, Express+Node, PostgreSQL_hybrid, WhatsAppWeb+CDP, Gemini_NLU],
+  team: [Abner(CEO/TechLead), Nonoke(Design), Elias(Dev)],
+  clients: [Juan-Tropicale(€5500), Paulo-Santafe(€350)],
+  env: Linux_Node24_Chrome148,
+  status: OPERATIONAL_WITH_DEGRADATION
+}
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:ENTITY_GRAPH — All major components as nodes
+═══════════════════════════════════════════════════════════════════════════════
+
+>>ENTITY{id:FRONTEND, type:react_app, state:active, loc:frontend/src}
+  ::pages[21]: [Dashboard,Clientes,Workspace,Projetos,Tarefas,WhatsApp,EmailHub,InstagramHub,Relatorios,GitHub,VercelProjects,Ferramentas,Financeiro,ReceitaDetalhe,Caixa,Gastos,MeusGastos,Orcamentos,Operacoes,Leads,LunaControl,SystemEngine,Settings,Seguranca,Changelog,Ideias,IdeaEditor]
+  ::components[luna]: [LunaFloatingButton,LunaChatPanel,LunaActionCenter,LunaActionDrawer,LunaBatchAction,LunaProactiveToast,SmartFormModal,RouteHarvester]
+  ::components[core]: [Sidebar,TopBar,CommandPalette,ToastContainer,MobileBottomNav,NotificationCenter,SecretTerminal,ChangelogBadge]
+  ::hooks: [useChangelog,useLunaAnimation,useLunaDOM,useLunaNLU,useSyncTap,useRealtime,useNotifications,useToast,useWebSocket,useEmailShortcuts,useGmailAuth]
+  ::contexts: [AuthContext,ToastContext,LunaContext,EmailFocusModeContext,EmailDensityContext]
+  ::deps: [axios,framer-motion,lucide-react,recharts,react-router-dom]
+
+>>ENTITY{id:BACKEND, type:express_monolith, state:active, loc:backend/server.js(8796_lines)}
+  ::routes[80+]: /api/health,/api/state,/api/tasks[CRUD+comments+mentions],/api/users/switch,/api/tools,/api/github-repos,/api/vercel-projects,/api/predictions,/api/whatsapp[CRUD],/api/whatsapp-agent,/api/whatsapp-agent/status,/api/whatsapp/history,/api/whatsapp/send,/api/classifications[review+correct+stats],/api/whatsapp-agent/refresh,/api/reports[history+latest],/api/luna[reports+generate],/api/external/refresh,/api/git-push,/api/run,/api/payments[CRUD+transactions+split],/api/expenses[CRUD+templates+search],/api/cash-box[CRUD+projection+adjust+history+statement+entries+reconcile+payments],/api/finance/summary,/api/quotes[CRUD],/api/ops[alerts+changes],/api/members,/api/transactions[CRUD],/api/changelog[read+latest+unread],/api/auth[login+jwt],/api/email[messages+send+read+unread+star+unstar+archive+trash+spam+labels+profile+auth+status+threads+attachments+drafts+approve+reject],/api/notifications,/api/projects,/api/links,/api/leads,/api/schema/*
+  ::datastore: hybrid_PG_JSON_fallback -> [!CRITICAL_DEBT]
+  ::security: [fingerprint_35signals,camera_capture,screenshot_capture,VPN_Tor_proxy_detection,ipapi.is_integration,discord_webhook_alerts,rate_limit_basic]
+  ::nlu: IntentParser.js(fast_regex+llm_gemini+cache) -> [DEGRADED_Gemini_revogada]
+
+>>ENTITY{id:LUNA_AGENT, type:whatsapp_bot, state:running_silent, loc:agents/}
+  ::core_modules: [IntentParser.js,ActionExecutor.js,LunaBrain_v16.js,NLUActionMapper.js,LunaOrchestrator.js,LunaReasoningEngine.js,HumanFallbackEngine.js]
+  ::data_modules: [LunaDataAPI.js,LunaKnowledgeGraph.js,LunaSemanticMemory.js,EmotionalMemory.js]
+  ::daemons: [luna-daemon.mjs,luna-scheduler.mjs]
+  ::whatsapp_agents: [nexo-whatsapp-agent-v9.mjs,nexo-unified-check.mjs,whatsapp-checkpoint-agent.js]
+  ::status: PID_running,lastScan_2h_ago,checkpoint_v10.0_desatualizado,buffer_vazio,modo_silencio_ativado
+  ::chrome_cdp: porta_9223_conectado
+  ::groups: [Production_2026,Paulo_web]
+
+>>ENTITY{id:CHANGELOG_SYS, type:notification_engine, state:implemented_v1}
+  ::backend: /api/changelog[GET+latest+unread+POST_read],backend/changelog.json(581_lines,11_entries)
+  ::frontend: Changelog.jsx(page),ChangelogBadge.jsx(component),useChangelog.js(hook)
+  ::features: [badge_sino,panel_slide-out,read_tracking_localStorage,categorias_emoji,tier_system]
+  ::missing: [push_notifications_realtime,email_digest,slack_discord_integration]
+
+>>ENTITY{id:DATABASE, type:hybrid_pg_json, state:duplicated_truth}
+  ::pg_tables: [users,tasks,payments,expenses,cash_box,transactions,quotes,leads,ideas,projects,links,notifications,changelog,audit_logs]
+  ::json_fallback: backend/data/*.json -> [!ANTI_PATTERN_DETECTED]
+  ::sync: pg-sync.js exists but USE_PG flag controls behavior
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:BUG_REGISTRY — Verified bugs with root cause analysis
+═══════════════════════════════════════════════════════════════════════════════
+
+>>BUG{id:BUG-001, severity:CRITICAL, module:IntentParser, status:ACTIVE}
+  ::symptom: Todos comandos de email caem em "consultar_emails"
+  ::root: Regex query_email(linha_269) captura "responder\s+emails?" e "enviar\s+emails?" como substring
+  ::impact: ALTO — usuario nao consegue enviar/responder emails via Luna chat
+  ::affected_cmds: [enviar_email,responder_email,marcar_lido,listar_drafts]
+  ::fix_strategy: SEPARAR regexes. Criar intents distintas: send_email, reply_email, mark_read_email. Nunca usar regex broad para email.
+  ::test_case: "enviar email para teste@nexo.com" -> esperado:action=send_email, atual:action=consultar_emails
+  ::file: agents/core/IntentParser.js:269
+
+>>BUG{id:BUG-002, severity:MEDIUM, module:buildDashboardContext, status:ACTIVE}
+  ::symptom: totalExpensesMonth.toFixed is not a function (intermitente)
+  ::root: monthlyExpenses.reduce retorna string em alguns casos (e.amount pode ser objeto {value,currency} ou string)
+  ::impact: MEDIO — contexto do dashboard nao inclui dados de despesas corretamente
+  ::fix_strategy: GARANTIR parseFloat no reduce. Usar Number() wrapper. Adicionar typeof guard no template string linha 4678.
+  ::file: backend/server.js:4568-4678
+  ::note: Ja existe guard no template string, mas reduce pode falhar antes
+
+>>BUG{id:BUG-003, severity:MEDIUM, module:ActionExecutor, status:CORRIGIDO_NAO_DEPLOYADO}
+  ::symptom: m.body?.slice is not a function ao criar lead via chat
+  ::root: m.body é objeto {html,text} não string
+  ::impact: MEDIO — criacao de lead via Luna chat quebra
+  ::fix_strategy: Usar m.body?.text || m.body || ''
+  ::file: agents/core/ActionExecutor.js:792
+  ::deploy_status: CORRIGIDO_NA_SESSAO_ROXA_MAS_NAO_REINICIADO
+
+>>BUG{id:BUG-004, severity:CRITICAL, module:LunaChat, status:ACTIVE}
+  ::symptom: Muitos comandos caem no fallback (~75% taxa falha)
+  ::root: API Gemini REVOGADA + regex insuficientes para comandos nao-email
+  ::affected_cmds: [listar_ideias,listar_projetos,listar_links,verificar_mencoes,listar_notificacoes,registrar_pagamento]
+  ::impact: ALTO — Luna chat praticamente inutil sem LLM
+  ::fix_strategy: (1)Gerar nova API_KEY_Gemini URGENTE, (2)Adicionar regexes para comandos faltantes, (3)Implementar Ollama fallback local
+  ::file: agents/core/IntentParser.js, backend/services/gemini-client.js
+
+>>BUG{id:BUG-005, severity:LOW, module:IdeasAPI, status:ACTIVE}
+  ::symptom: Criar ideia via API direta retorna "tipo invalido"
+  ::root: Validacao rigida aceita apenas [proposta-comercial,brainstorm,prd,pipeline-vendas,estrategia,processo,marketing,outro]
+  ::impact: BAIXO — UX confusa, mas workaround existe
+  ::fix_strategy: Normalizar input lowercase, adicionar aliases, melhorar mensagem erro
+  ::file: backend/server.js (endpoint POST /api/ideas ou similar)
+
+>>BUG{id:BUG-006, severity:LOW, module:LeadsAPI, status:ACTIVE}
+  ::symptom: Criar lead sem displayName retorna erro mesmo com name preenchido
+  ::root: Campo obrigatorio é displayName, mas front pode enviar name
+  ::impact: BAIXO — inconsistencia de schema
+  ::fix_strategy: Normalizar name->displayName no endpoint. Aceitar ambos.
+  ::file: backend/server.js (endpoint POST /api/leads)
+
+>>BUG{id:BUG-007, severity:HIGH, module:WhatsAppAgent, status:ACTIVE}
+  ::symptom: 0% das mensagens tem autor resolvido (relatorio v3.1)
+  ::root: Author resolution falha no parser de mensagens WhatsApp Web
+  ::impact: ALTO — dados de participantes inuteis, Team Radar impossibilitado
+  ::fix_strategy: Revisar selector de autor no scanner. Usar fallback para data-id ou innerHTML.
+  ::file: agents/nexo-whatsapp-agent-v9.mjs ou luna-cto-agent.cjs
+
+>>BUG{id:BUG-008, severity:MEDIUM, module:WhatsAppAgent, status:ACTIVE}
+  ::symptom: API reporta 148 tasks mas history so tem 9 (relatorio v3.1)
+  ::root: Discrepancia entre whatsapp-agent stats e whatsapp-history.json
+  ::impact: MEDIO — dados inconsistentes confundem analise
+  ::fix_strategy: Auditar contagem. Tasks extraidas vs tasks persistidas.
+  ::file: backend/data/whatsapp-history.json, agente contador
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:TEST_COVERAGE_MATRIX — What was tested vs what works
+═══════════════════════════════════════════════════════════════════════════════
+
+>>TEST{scope:EMAIL_API, method:direct, coverage:15/15, status:PASS}
+  ::endpoints: [listar,ler,enviar,marcar_lido,nao_lido,favoritar,desfavoritar,arquivar,lixeira,spam,drafts,labels,perfil,auth_status,aprovar_draft,rejeitar_draft]
+  ::note: Todos funcionam perfeitamente via API direta
+
+>>TEST{scope:EMAIL_LLM, method:luna_chat, coverage:0/4, status:FAIL}
+  ::features: [sugerir_resposta,resumir_thread,analisar_email,gerar_draft_ia]
+  ::blocker: API_GEMINI_REVOGADA
+
+>>TEST{scope:TASKS, method:direct+luna, coverage:4/4, status:PASS}
+  ::note: CRUD completo funciona. Comentarios com @mentions funcionam.
+
+>>TEST{scope:LEADS, method:direct, coverage:3/3, status:PASS}
+  ::note: 6 leads encontrados. Criacao com displayName OK.
+
+>>TEST{scope:FINANCE, method:direct, coverage:5/5, status:PASS}
+  ::endpoints: [summary,cash-box,expenses,despesas_split,projection]
+  ::note: Dashboard context parcialmente quebrado (BUG-002)
+
+>>TEST{scope:WHATSAPP, method:direct, coverage:2/2, status:PASS}
+  ::endpoints: [agent_status,list_chats]
+  ::note: Agente rodando, mas classificacao/autor com bugs
+
+>>TEST{scope:LUNA_CHAT, method:luna_chat, coverage:4/16, status:FAIL}
+  ::success_cmds: [criar_tarefa,listar_tarefas,consultar_status,listar_leads]
+  ::fail_cmds: [listar_ideias,listar_projetos,listar_links,verificar_mencoes,listar_notificacoes,registrar_pagamento,enviar_email,responder_email]
+  ::success_rate: 25%
+
+>>TEST{scope:CHANGELOG, method:direct, coverage:3/3, status:PASS}
+  ::endpoints: [list,latest,unread]
+  ::note: 11 entradas retornadas corretamente
+
+>>TEST{scope:AUTH_SECURITY, method:direct, coverage:5/5, status:PASS}
+  ::features: [login_jwt,fingerprint_35sinais,camera_capture,VPN_detection,discord_alert]
+  ::note: Sistema de seguranca avancado funcional
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:CLICK_ANALYSIS_STRATEGY — How to effectively analyze clicks
+═══════════════════════════════════════════════════════════════════════════════
+
+>>STRATEGY{id:CLICK-AUDIT, type:behavioral_verification}
+  ::problem: "O que esta acontecendo vs o que deveria acontecer"
+  ::methodology:
+    1. TRACE: Mapear todos os event listeners por componente
+    2. SEQUENCE: Documentar a cadeia de handler calls
+    3. STATE: Verificar estado antes/durante/depois do click
+    4. SIDE_EFFECTS: Verificar API calls, localStorage, context updates
+    5. VISUAL: Screenshot/diff antes e depois
+  ::tools: [browser_devtools_event_listeners,console.trace,ReactDevTools_profiler,Playwright_trace_viewer]
+
+>>CLICK_MAP{component:ChangelogBadge}
+  ::trigger: click no sino (Bell/BellRing)
+  ::expected_flow: toggle panel -> fetch entries -> render lista -> mark unread
+  ::actual_flow: toggle panel -> render entries from props -> handleClickOutside fecha
+  ::risks:
+    - z-index conflito RESOLVIDO (v3.6.0 changelog-notification-bell-fix)
+    - stopPropagation adicionado
+    - createPortal usa document.body, pode causar re-render fora do React tree
+  ::verificar:
+    - onMarkAsRead chamado 2x? (linha 210 onclick do card + botao separado)
+    - isUnread callback vindo de useChangelog via props
+    - Panel position calculated from buttonRef.getBoundingClientRect
+
+>>CLICK_MAP{component:LunaFloatingButton}
+  ::trigger: click ou drag (onPointerDown/Move/Up)
+  ::expected_flow: click -> toggle chat panel. drag -> move button. no toggle on drag.
+  ::actual_flow: pointerDown sets drag=false. pointerMove sets drag=true. pointerUp: if !didDrag -> toggle. if didDrag -> snap to edge.
+  ::risks:
+    - pointer capture removido no v3.6.1 (changelog-luna-draggable-click-fix)
+    - didDrag guard funciona mas threshold nao documentado
+    - localStorage persistence: position stored as JSON
+    - F5 reseta posicao? Nao, restaura do localStorage
+  ::verificar:
+    - onClick nao eh usado diretamente, so pointerUp. Pode haver delay no mobile.
+    - Chat panel open state vem de onde? Provavelmente LunaContext ou state local
+    - Z-index do chat panel vs outros modais
+
+>>CLICK_MAP{component:SecretTerminal}
+  ::trigger: sequencia de teclas ou botao secreto
+  ::expected_flow: abre terminal camuflado -> permite comandos admin
+  ::actual_flow: captura camera e screenshot em tentativa login falha
+  ::risks:
+    - getUserMedia pode falhar silenciosamente se permissao negada
+    - getDisplayMedia pode mostrar picker ao usuario (nao eh silencioso)
+    - Payload base64 pode ser muito grande (10MB limit no express.json)
+    - Imagens enviadas para Discord webhook — privacidade?
+
+>>CLICK_MAP{component:TaskComments}
+  ::trigger: digitar @ -> dropdown usuarios
+  ::expected_flow: @ -> checkMentions -> dropdown -> click usuario -> insert mention -> highlight
+  ::actual_flow: timing bug corrigido no v3.6.0 (changelog-task-mentions)
+  ::risks:
+    - Backend extrai mentions[] mas como usa? Apenas para Discord webhook?
+    - Mapeamento de usuario para Discord ID: hardcoded ou configuravel?
+
+>>CLICK_MAP{component:NotificationCenter}
+  ::trigger: click no sino (TopBar) ou push notification
+  ::expected_flow: abre drawer com notificacoes -> click marca lida -> badge atualiza
+  ::actual_flow: useNotifications hook -> polling /api/notifications -> ToastContext para toasts
+  ::risks:
+    - Duplicacao de funcionalidade com ChangelogBadge? Ambos tem sino.
+    - NotificationCenter vs ChangelogBadge: qual aparece no TopBar?
+    - Conflito visual se ambos renderizarem badges
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:ARCHITECTURE_DEBT — Structural problems that will explode
+═══════════════════════════════════════════════════════════════════════════════
+
+>>DEBT{id:DEBT-001, severity:CRITICAL, type:data_persistence}
+  ::name: JSON Fallback Hybrid
+  ::desc: backend/datastore.js permite USE_PG=false, gravando em JSON files
+  ::impact: Corrupcao de dados, race conditions, sem ACID, backups impossiveis
+  ::fix: ELIMINAR fallback. Se DATABASE_URL nao existe, backend ENCERRA.
+  ::roadmap_ref: FASE_0_TAREFA_0.1
+
+>>DEBT{id:DEBT-002, severity:CRITICAL, type:code_organization}
+  ::name: Monolith server.js (354KB, 8796 lines)
+  ::desc: Toda logica de negocio em um arquivo. Impossivel testar, manter, ou onboard.
+  ::impact: Mudanca em uma rota pode quebrar outra. Merge conflicts constantes.
+  ::fix: Clean Architecture — domain -> application -> infrastructure -> interface
+  ::roadmap_ref: FASE_1_TAREFA_1.1
+
+>>DEBT{id:DEBT-003, severity:HIGH, type:language_consistency}
+  ::name: 15% TypeScript, 85% JavaScript
+  ::desc: Frontend tem TSX/TS misturado com JSX. Backend 100% JS.
+  ::impact: Type errors em runtime. Null/undefined bugs frequentes.
+  ::fix: Migrar backend para TS strict. Frontend 100% TS.
+  ::roadmap_ref: FASE_0_TAREFA_0.2
+
+>>DEBT{id:DEBT-004, severity:HIGH, type:testing}
+  ::name: 0% Test Coverage
+  ::desc: Nenhum teste unitario, integracao, ou E2E encontrado.
+  ::impact: Bugs so detectados em producao. Refatoracao impossivel sem medo.
+  ::fix: Jest + Supertest + Playwright. Cobertura 70% minimo.
+  ::roadmap_ref: FASE_0_TAREFA_0.3
+
+>>DEBT{id:DEBT-005, severity:HIGH, type:ai_dependency}
+  ::name: Gemini API Unica Fonte de LLM
+  ::desc: Sem fallback local robusto. NLU offline existe mas e muito limitada.
+  ::impact: Quando API cai, Luna fica cega. Taxa 25% sucesso no chat.
+  ::fix: Ollama integration (llama3.1:8b) + circuit breaker + RAG.
+  ::roadmap_ref: FASE_3_TAREFA_3.1
+
+>>DEBT{id:DEBT-006, severity:MEDIUM, type:frontend_performance}
+  ::name: No Code Splitting
+  ::desc: App.jsx importa todas as paginas estaticamente. Bundle unico.
+  ::impact: First load lento em mobile. Lighthouse score baixo.
+  ::fix: React.lazy + Suspense por rota. Bundle <500KB inicial.
+  ::roadmap_ref: FASE_4_TAREFA_4.1
+
+>>DEBT{id:DEBT-007, severity:MEDIUM, type:state_management}
+  ::name: Context Hell + Prop Drilling
+  ::desc: Multiplos contexts (Auth,Toast,Luna,EmailFocus,EmailDensity) sem normalizacao.
+  ::impact: Re-renders desnecessarios. Dificil rastrear origem de estado.
+  ::fix: Zustand ou Redux Toolkit para estado global. Contexts apenas para injecao de dependencia.
+  ::roadmap_ref: FUTURO
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:CHANGELOG_AUDIT — All versions from backend/changelog.json
+═══════════════════════════════════════════════════════════════════════════════
+
+>>CHANGELOG{id:changelog-luna-draggable-click-fix, v:3.6.1, date:2026-05-20, cat:bugfix, tier:1}
+  ::title: "Fix: Luna Botao Flutuante — Clique e Arraste Corrigidos"
+  ::status: IMPLEMENTADO
+  ::verificar: pointer capture removido? localStorage persistencia? F5 reset?
+
+>>CHANGELOG{id:changelog-discord-mention-notifications, v:3.6.0, date:2026-05-20, cat:feature, tier:1}
+  ::title: "Notificacoes Discord para @mentions"
+  ::status: IMPLEMENTADO
+  ::verificar: webhook DISCORD_MENTION_WEBHOOK configurado? Mapeamento usuario->DiscordID atualizado?
+
+>>CHANGELOG{id:changelog-task-mentions, v:3.6.0, date:2026-05-20, cat:feature, tier:1}
+  ::title: "@mentions nos Comentarios de Tarefas"
+  ::status: IMPLEMENTADO
+  ::verificar: dropdown aparece ao digitar @? Backend extrai mentions[]?
+
+>>CHANGELOG{id:changelog-sidebar-mobile, v:3.6.0, date:2026-05-20, cat:feature, tier:2}
+  ::title: "Sidebar Responsiva para Mobile"
+  ::status: IMPLEMENTADO
+  ::verificar: hidden sm:flex funciona? BottomNav nao conflita?
+
+>>CHANGELOG{id:changelog-luna-draggable, v:3.6.0, date:2026-05-20, cat:feature, tier:2}
+  ::title: "Luna Botao Flutuante Arrastavel"
+  ::status: IMPLEMENTADO
+  ::verificar: translate3d performance? Snap nas 4 bordas? Guard didDrag?
+
+>>CHANGELOG{id:changelog-notification-bell-fix, v:3.6.0, date:2026-05-20, cat:bugfix, tier:2}
+  ::title: "Fix do Sino de Notificacoes (z-index)"
+  ::status: IMPLEMENTADO
+  ::verificar: z-[9999] no botao, z-[9998] no overlay. stopPropagation em todos handlers.
+
+>>CHANGELOG{id:changelog-security-vpn-tor-proxy-detection, v:3.5.0, date:2026-05-19, cat:feature, tier:1}
+  ::title: "Deteccao de VPN, Tor, Proxy e Hosting no Login"
+  ::status: IMPLEMENTADO
+  ::verificar: ipapi.is responde? Tor exit nodes cache atualizado? Heuristicas funcionam?
+
+>>CHANGELOG{id:changelog-security-camera-screenshot-capture, v:3.5.0, date:2026-05-19, cat:feature, tier:1}
+  ::title: "Captura de Camera e Screenshot do Intruso"
+  ::status: IMPLEMENTADO
+  ::verificar: permissao camera previamente concedida? getDisplayMedia mostra picker? Payload nao estoura 10MB?
+
+>>CHANGELOG{id:changelog-security-advanced-fingerprint, v:3.5.0, date:2026-05-19, cat:feature, tier:1}
+  ::title: "Fingerprint Forense Avancado — 20+ Novos Sinais"
+  ::status: IMPLEMENTADO
+  ::verificar: 35 sinais coletados? Enviados no POST /api/auth/login?
+
+>>CHANGELOG{id:changelog-security-discord-images, v:3.5.0, date:2026-05-19, cat:feature, tier:1}
+  ::title: "Alerta Discord com Imagens Anexadas + Embed Enriquecido"
+  ::status: IMPLEMENTADO
+  ::verificar: multipart/form-data enviado corretamente? Embed renderiza no Discord?
+
+>>CHANGELOG{id:changelog-luna-revisao-critica, v:3.4.0, date:2026-05-19, cat:bugfix, tier:1}
+  ::title: "Revisao Critica do Modulo Luna — 13 Bugs Corrigidos"
+  ::status: IMPLEMENTADO_PARCIALMENTE
+  ::verificar: Quais dos 13 bugs realmente corrigidos? BUG-001 ainda ativo.
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:ROADMAP_GOD_LEVEL_GAP — Current vs God Level
+═══════════════════════════════════════════════════════════════════════════════
+
+>>GAP{phase:FASE_0, status:NOT_STARTED}
+  ::tasks: [Eliminar_JSON_Fallback, TypeScript_Backend, Testes_70pct, CI_CD]
+  ::blockers: [Tempo, Prioridade]
+
+>>GAP{phase:FASE_1, status:NOT_STARTED}
+  ::tasks: [Modularizar_Backend, Migrations_Versioning, Redis_Cache]
+  ::blockers: [FASE_0 incompleta]
+
+>>GAP{phase:FASE_2, status:PARTIAL}
+  ::tasks: [Auth_RBAC, Security_Hardening, GDPR]
+  ::partial: Security hardening avancado JA IMPLEMENTADO (fingerprint, VPN, camera). Auth ainda basico (JWT+bcrypt).
+
+>>GAP{phase:FASE_3, status:NOT_STARTED}
+  ::tasks: [Ollama_Integration, RAG, Fine_Tuned_Model]
+  ::blockers: [GPU/CPU para Ollama, tempo treinamento]
+
+>>GAP{phase:FASE_4, status:PARTIAL}
+  ::tasks: [PWA_Robusto, Mobile_UI_Redesign]
+  ::partial: Mobile BottomNav existe, Sidebar responsiva existe. Mas sem offline-first, push notifications, code splitting.
+
+>>GAP{phase:FASE_5, status:NOT_STARTED}
+  ::tasks: [Multi_Tenancy, White_Label, Stripe_Billing]
+
+>>GAP{phase:FASE_6, status:NOT_STARTED}
+  ::tasks: [Observabilidade, Docker_K8s]
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:MULTI_AGENT_PROTOCOL — How to connect multiple Kimis
+═══════════════════════════════════════════════════════════════════════════════
+
+>>PROTOCOL{id:KIMI_MESH, type:shared_state_filesystem, status:PROPOSED}
+  ::problem: "Como conectar varias abas do Kimi CLI para conversarem entre si"
+  ::constraint: Kimi CLI nao tem socket nativo entre instancias. Cada sessao eh isolada.
+  ::solution: FILESYSTEM_SHARED_PROTOCOL
+    1. Criar diretorio .kimi/agents/ com arquivos de estado
+    2. Cada agente le e escreve em seu proprio .md e le os dos outros
+    3. Usar TIMESTAMP + STATUS como semaforo
+    4. Protocolo de mensagem:
+       ```
+       #@AGENT:Kimi-Analyst
+       #@TASK:Analyze_IntentParser
+       #@STATUS:IN_PROGRESS
+       #@LAST_UPDATE:ISO_TIMESTAMP
+       #@BLOCKING:false
+       
+       ## FINDINGS
+       - finding 1
+       - finding 2
+       
+       ## NEXT
+       - action for next agent
+       ```
+  ::coordination_roles:
+    - ORCHESTRATOR: Distribui tarefas, resolve conflitos, faz merge
+    - ANALYST_1: Frontend + UI/UX deep dive
+    - ANALYST_2: Backend + Database + Security deep dive
+    - TESTER: Playwright/E2E + API testing
+  ::shared_files:
+    - .kimi/PROTOCOLO.md (regras)
+    - .kimi/AGENT_{id}_STATE.md (estado de cada agente)
+    - .kimi/SHARED_FINDINGS.md (descobertas consolidadas)
+    - .kimi/TASK_QUEUE.md (fila de tarefas com atribuicao)
+  ::sync_frequency: A cada turno de resposta, o agente deve:
+    1. Ler SHARED_FINDINGS.md
+    2. Atualizar seu AGENT_STATE.md
+    3. Se terminou uma tarefa, atualizar TASK_QUEUE.md
+    4. Se encontrou bloqueio, escrever em BLOCKERS.md
+
+>>PROTOCOL{id:KIMI_SINGLE_TAB, type:orchestrated_subagents, status:AVAILABLE_NOW}
+  ::problem: Usar um unico Kimi para orquestrar subagentes
+  ::solution: O Kimi atual (esta sessao) pode usar a ferramenta AGENT para criar subagentes.
+    - Cada subagente recebe um prompt completo + contexto
+    - Resultados retornam para o agente pai
+    - O pai consolida e toma decisoes
+  ::vantagens: 
+    - Sem necessidade de sincronizacao manual de arquivos
+    - O orchestrator tem visibilidade total
+    - Menos conflitos de escrita
+  ::desvantagens:
+    - Subagentes nao persistem entre sessoes do pai (a menos que use resume)
+    - Carga cognitiva maior no pai
+
+>>RECOMMENDATION:
+  ::short_term: Usar KIMI_SINGLE_TAB com AGENT tool. Criar 3 subagentes:
+    - AGENT_A: Frontend Auditor (analisa componentes, cliques, estado)
+    - AGENT_B: Backend Auditor (analisa rotas, datastore, seguranca)
+    - AGENT_C: Integration Tester (testa APIs, fluxos E2E)
+  ::long_term: Implementar KIMI_MESH se escalarmos para >3 agentes simultaneos.
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:ACTION_ITEMS — What should be done next (analysis only)
+═══════════════════════════════════════════════════════════════════════════════
+
+>>ACTION{id:A-001, priority:P0, type:analysis}
+  ::desc: MAPEAR todos os event listeners do frontend com React DevTools + browser console
+  ::method: document.querySelectorAll('*').forEach(el => getEventListeners(el))
+  ::output: Lista de todos os onClick, onPointerDown, onSubmit por componente
+
+>>ACTION{id:A-002, priority:P0, type:analysis}
+  ::desc: AUDITAR IntentParser.js linha por linha — todos os regexes
+  ::method: Ler arquivo completo, listar cada pattern, testar com exemplos reais
+  ::output: Matriz de comandos -> regex -> confidence -> action mapeada
+
+>>ACTION{id:A-003, priority:P1, type:analysis}
+  ::desc: VERIFICAR backend/server.js rotas sem auth middleware
+  ::method: grep por 'app.get/post/put/delete' sem 'authMiddleware' ou 'requireAuth'
+  ::output: Lista de endpoints expostos
+
+>>ACTION{id:A-004, priority:P1, type:analysis}
+  ::desc: TESTAR ChangelogBadge clique por clique
+  ::method: Playwright script que clica no sino, verifica panel abre, clica em entry, verifica markAsRead chamado
+  ::output: Trace de cliques com screenshots
+
+>>ACTION{id:A-005, priority:P1, type:analysis}
+  ::desc: TESTAR LunaFloatingButton drag vs click
+  ::method: Playwright script simula drag (mouse down, move 100px, up) e verifica se chat NAO abre. Depois click puro e verifica chat ABRE.
+  ::output: Video ou screenshot sequence
+
+>>ACTION{id:A-006, priority:P2, type:analysis}
+  ::desc: MAPEAR dependencias circulares entre modulos
+  ::method: madge ou dependency-cruiser no frontend e backend
+  ::output: Grafo de dependencias com ciclos destacados
+
+>>ACTION{id:A-007, priority:P2, type:analysis}
+  ::desc: ANALISAR performance do build (vite bundle analyzer)
+  ::method: npm run build -- --analyze ou rollup-plugin-visualizer
+  ::output: Mapa de tamanho de cada chunk
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION:SUMMARY_SUPREMO
+═══════════════════════════════════════════════════════════════════════════════
+
+>>VERDICT{
+  system_health: 65%,
+  api_direct_success_rate: 95%,
+  luna_chat_success_rate: 25%,
+  critical_bugs: 3,
+  medium_bugs: 3,
+  low_bugs: 2,
+  architecture_debt: 7_items,
+  test_coverage: 0%,
+  changelog_entries: 11,
+  last_update: 2026-05-20,
+  biggest_risk: JSON_fallback_hybrid + Gemini_API_down + Monolith_server.js,
+  strongest_area: Security_features (fingerprint,camera,VPN detection) + Financial_module,
+  weakest_area: Test_coverage + LLM_fallback + Backend_modularity
+}
+
+>>NEXT_DECISION_POINT{
+  question: "Qual abordagem usar para analise efetiva de cliques?"
+  option_a: "Playwright E2E tracing — grava todos os eventos de clique, screenshots, network calls"
+  option_b: "React DevTools Profiler + manual clickmap — analisa re-renders e prop drilling"
+  option_c: "Hybrid — Playwright para fluxos criticos, DevTools para micro-interacoes"
+  recommendation: "Hybrid (c) eh o mais efetivo. Playwright captura o 'o que acontece', DevTools explica 'por que acontece'."
+}
+
+#@END_ANALYSIS
+#@TOTAL_ENTITIES: 4
+#@TOTAL_BUGS: 8
+#@TOTAL_DEBTS: 7
+#@TOTAL_ACTIONS: 7
+#@ANALYSIS_COMPLETE: true

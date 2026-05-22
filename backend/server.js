@@ -3402,44 +3402,36 @@ app.use('/api/ideas', ideasRouter(requireAuth));
 
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──
-const QUOTES_FILE = path.join(DATA_DIR, 'quotes.json');
 
-app.get('/api/quotes', (req, res) => {
-  const quotes = readJSON(QUOTES_FILE) || [];
+app.get('/api/quotes', async (req, res) => {
+  const quotes = await dataStore.getQuotes();
   res.json(quotes);
 });
 
-app.get('/api/quotes/:id', (req, res) => {
-  const quotes = readJSON(QUOTES_FILE) || [];
+app.get('/api/quotes/:id', async (req, res) => {
+  const quotes = await dataStore.getQuotes();
   const quote = quotes.find(q => q.quoteId === req.params.id);
   if (!quote) return res.status(404).json({ error: 'Orçamento não encontrado' });
   res.json(quote);
 });
 
-app.post('/api/quotes', (req, res) => {
-  const quotes = readJSON(QUOTES_FILE) || [];
+app.post('/api/quotes', async (req, res) => {
   const newQuote = { ...req.body, quoteId: `quote-${Date.now()}`, createdAt: new Date().toISOString() };
-  quotes.push(newQuote);
-  writeJSON(QUOTES_FILE, quotes);
-  broadcast({ type: 'quotes', data: quotes });
+  await dataStore.saveQuote(newQuote);
   res.json(newQuote);
 });
 
-app.put('/api/quotes/:id', (req, res) => {
-  const quotes = readJSON(QUOTES_FILE) || [];
+app.put('/api/quotes/:id', async (req, res) => {
+  const quotes = await dataStore.getQuotes();
   const idx = quotes.findIndex(q => q.quoteId === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Orçamento não encontrado' });
-  quotes[idx] = { ...quotes[idx], ...req.body, updatedAt: new Date().toISOString() };
-  writeJSON(QUOTES_FILE, quotes);
-  broadcast({ type: 'quotes', data: quotes });
-  res.json(quotes[idx]);
+  const updated = { ...quotes[idx], ...req.body, updatedAt: new Date().toISOString() };
+  await dataStore.saveQuote(updated);
+  res.json(updated);
 });
 
-app.delete('/api/quotes/:id', (req, res) => {
-  const quotes = readJSON(QUOTES_FILE) || [];
-  const filtered = quotes.filter(q => q.quoteId !== req.params.id);
-  writeJSON(QUOTES_FILE, filtered);
-  broadcast({ type: 'quotes', data: filtered });
+app.delete('/api/quotes/:id', async (req, res) => {
+  await dataStore.deleteQuote(req.params.id);
   res.json({ success: true });
 });
 
@@ -6511,7 +6503,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const payments = readJSON(PAYMENTS_FILE) || [];
     const expenses = readJSON(EXPENSES_FILE) || [];
     const cashBox = await dataStore.getCashBox();
-    const quotes = readJSON(QUOTES_FILE) || [];
+    const quotes = await dataStore.getQuotes();
     const leads = readJSON(LEADS_FILE) || { leads: [] };
     const members = readJSON(MEMBERS_FILE) || [];
     const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };

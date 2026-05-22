@@ -345,6 +345,12 @@ async function saveQuote(quote) {
   return quote;
 }
 
+async function deleteQuote(quoteId) {
+  await db.run('DELETE FROM quotes WHERE quote_id=$1', [quoteId]);
+  notifyChange('quotes', await getQuotes());
+  return true;
+}
+
 // ============================================================
 // MEMBERS
 // ============================================================
@@ -813,7 +819,7 @@ module.exports = {
   getPayments, savePayment, deletePayment,
   getExpenses, saveExpense, deleteExpense,
   getCashBox, saveCashBox,
-  getQuotes, saveQuote,
+  getQuotes, saveQuote, deleteQuote,
   getMembers, saveMember,
   getSettings, setSettings,
   getIdeas, saveIdea,
