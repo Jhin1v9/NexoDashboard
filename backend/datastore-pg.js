@@ -171,6 +171,12 @@ async function savePayment(payment) {
   return payment;
 }
 
+async function deletePayment(paymentId) {
+  await db.run('DELETE FROM payments WHERE payment_id=$1', [paymentId]);
+  notifyChange('payments', await getPayments());
+  return true;
+}
+
 // ============================================================
 // EXPENSES
 // ============================================================
@@ -799,7 +805,7 @@ module.exports = {
   getUsers, saveUser,
   getTasks, saveTask, deleteTask,
   getCompanyTasks, saveCompanyTask,
-  getPayments, savePayment,
+  getPayments, savePayment, deletePayment,
   getExpenses, saveExpense,
   getCashBox, saveCashBox,
   getQuotes, saveQuote,

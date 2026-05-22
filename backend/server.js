@@ -46,9 +46,12 @@ module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
 const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
+const { OllamaClient } = require('./services/ollama-client.js');
 
+const lunaOllama = new OllamaClient({ timeout: 60000 });
 const lunaIntentParser = new IntentParser({
   genAI,
+  ollama: lunaOllama,
   geminiModel: 'gemini-2.5-flash-lite',
   timeout: 15000
 });
@@ -2095,7 +2098,7 @@ function getEquivalentMonthly(expense) {
 // GET all payments
 app.get('/api/payments', async (req, res) => {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payments = await dataStore.getPayments();
     res.json(payments);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2105,7 +2108,7 @@ app.get('/api/payments', async (req, res) => {
 // GET payment by id
 app.get('/api/payments/:id', async (req, res) => {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payments = await dataStore.getPayments();
     const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
     res.json(payment);
@@ -2117,7 +2120,6 @@ app.get('/api/payments/:id', async (req, res) => {
 // POST new payment
 app.post('/api/payments', async (req, res) => {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
     const payment = {
       paymentId: req.body.paymentId || generateId('pay'),
       id: req.body.id || req.body.paymentId || generateId('pay'),
@@ -2140,9 +2142,7 @@ app.post('/api/payments', async (req, res) => {
       createdAt: nowISO(),
       updatedAt: nowISO()
     };
-    payments.push(payment);
-    writeJSON(PAYMENTS_FILE, payments);
-    broadcast({ type: 'payments', data: payments });
+    await dataStore.savePayment(payment);
     res.json(payment);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2152,13 +2152,12 @@ app.post('/api/payments', async (req, res) => {
 // PUT update payment
 app.put('/api/payments/:id', async (req, res) => {
   try {
-    let payments = readJSON(PAYMENTS_FILE) || [];
-    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
-    payments[idx] = { ...payments[idx], ...req.body, updatedAt: nowISO() };
-    writeJSON(PAYMENTS_FILE, payments);
-    broadcast({ type: 'payments', data: payments });
-    res.json(payments[idx]);
+    const payments = await dataStore.getPayments();
+    const existing = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Payment not found' });
+    const updated = { ...existing, ...req.body, updatedAt: nowISO() };
+    await dataStore.savePayment(updated);
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2167,10 +2166,9 @@ app.put('/api/payments/:id', async (req, res) => {
 // POST transaction to payment (recalcula status automaticamente)
 app.post('/api/payments/:id/transactions', async (req, res) => {
   try {
-    let payments = readJSON(PAYMENTS_FILE) || [];
-    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
-    const payment = payments[idx];
+    const payments = await dataStore.getPayments();
+    const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
     const tx = {
       id: req.body.id || generateId('tx'),
@@ -2222,8 +2220,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
       broadcast({ type: 'cashbox', data: cashBox });
     }
 
-    writeJSON(PAYMENTS_FILE, payments);
-    broadcast({ type: 'payments', data: payments });
+    await dataStore.savePayment(payment);
     res.json(payment);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2233,7 +2230,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
 // GET payment split
 app.get('/api/payments/:id/split', async (req, res) => {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payments = await dataStore.getPayments();
     const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
     if (!payment) return res.status(404).json({ error: 'Payment not found' });
     res.json(payment.revenueSplit || []);
@@ -2245,17 +2242,15 @@ app.get('/api/payments/:id/split', async (req, res) => {
 // POST mark split person as received
 app.post('/api/payments/:id/split/:personId/receive', async (req, res) => {
   try {
-    let payments = readJSON(PAYMENTS_FILE) || [];
-    const idx = payments.findIndex(p => p.paymentId === req.params.id || p.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'Payment not found' });
-    const payment = payments[idx];
+    const payments = await dataStore.getPayments();
+    const payment = payments.find(p => p.paymentId === req.params.id || p.id === req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
     payment.revenueSplit = payment.revenueSplit || [];
     const sIdx = payment.revenueSplit.findIndex(s => s.personId === req.params.personId);
     if (sIdx === -1) return res.status(404).json({ error: 'Person not found in split' });
     payment.revenueSplit[sIdx].received = true;
     payment.updatedAt = nowISO();
-    writeJSON(PAYMENTS_FILE, payments);
-    broadcast({ type: 'payments', data: payments });
+    await dataStore.savePayment(payment);
     res.json(payment.revenueSplit[sIdx]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -5701,7 +5696,7 @@ app.post('/api/luna/chat', async (req, res) => {
       });
     }
 
-    // ── 6. FALLBACK: conversa via LLM (Gemini API) ──
+    // ── 6. FALLBACK: conversa via LLM (Ollama local → Gemini cloud) ──
     const dataContext = buildDashboardContext(contextModule, contextId, contextFile);
     const conversationHistory = context.slice(-10).map(c => ({
       role: c.role === 'user' ? 'user' : 'model',
@@ -5750,23 +5745,60 @@ ${dataContext}`;
     let usedModel = 'gemini-2.5-flash-lite';
     let isFallback = false;
 
-    try {
-      const geminiResult = await genAI.models.generateContent({
-        model: usedModel,
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-          maxOutputTokens: 1024
+    // Try Ollama first for social/knowledge questions (offline, no API key needed)
+    const isSocialQuestion = parsed.intent === 'social' &&
+      !/\b(oi|olá|ola|opa|e aí|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)\b/i.test(msg);
+
+    if (isSocialQuestion && lunaOllama) {
+      try {
+        const ollamaMessages = [
+          { role: 'system', content: 'Você é a Luna, assistente brasileira direta e prestativa. Responda em português de forma natural e concisa. Máximo 100 palavras.' },
+          { role: 'user', content: msg }
+        ];
+        reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 256 });
+        reply = reply.trim();
+        usedModel = 'ollama-gemma2:2b';
+      } catch (ollamaErr) {
+        console.warn('[CONCIERGE] Ollama social chat failed:', ollamaErr.message);
+        // Fall through to Gemini or static fallback
+      }
+    }
+
+    // If Ollama didn't produce a reply, try Gemini
+    if (!reply) {
+      try {
+        const geminiResult = await genAI.models.generateContent({
+          model: usedModel,
+          contents,
+          config: {
+            systemInstruction: systemPrompt,
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        });
+        reply = (geminiResult.text || '...').trim();
+      } catch (geminiErr) {
+        // LLM indisponível — try Ollama as last resort, then static fallback
+        console.warn('[CONCIERGE] Gemini indisponível, tentando Ollama...', geminiErr.message);
+        if (lunaOllama) {
+          try {
+            const ollamaMessages = [
+              { role: 'system', content: systemPrompt.slice(0, 800) },
+              ...contents.map(c => ({ role: c.role, content: c.parts[0].text }))
+            ];
+            reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 512 });
+            reply = reply.trim();
+            usedModel = 'ollama-gemma2:2b';
+          } catch (ollamaErr2) {
+            console.warn('[CONCIERGE] Ollama também indisponível:', ollamaErr2.message);
+          }
         }
-      });
-      reply = (geminiResult.text || '...').trim();
-    } catch (geminiErr) {
-      // LLM indisponível — usar fallback inteligente
-      console.warn('[CONCIERGE] Gemini indisponível, usando fallback:', geminiErr.message);
-      usedModel = 'fallback';
-      isFallback = true;
-      reply = buildChatFallbackReply(msg.trim());
+        if (!reply) {
+          usedModel = 'fallback';
+          isFallback = true;
+          reply = buildChatFallbackReply(msg.trim());
+        }
+      }
     }
 
     res.json({ success: true, reply, model: usedModel, intent: 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
@@ -8756,8 +8788,7 @@ async function startServer() {
         execSync('node scripts/migrate-json-to-sql.js', { cwd: __dirname, stdio: 'inherit' });
         console.log('✅ Initial migration complete.');
       } else {
-        console.log('🔄 Restoring data from PostgreSQL to JSON files...');
-        await restoreAllFromPG();
+        console.log('🔄 PostgreSQL is the source of truth. Skipping JSON restore.');
       }
     } catch (err) {
       console.error('❌ Database setup failed:', err.message);
