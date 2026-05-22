@@ -23,6 +23,7 @@ const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
 const { restoreAllFromPG, syncFileToPG } = require('./pg-sync');
+const dataStore = require('./datastore-pg');
 
 // Discord Mention Notifier
 const { sendMentionNotification, setWebhookUrl } = require('./services/discord-notifier');
@@ -56,11 +57,10 @@ const lunaActionExecutor = new ActionExecutor({
   apiBase: `http://localhost:${process.env.PORT || 3456}/api`,
   dataDir: DATA_DIR
 });
-// Helper para identificar o CEO logado pelo users.json
-function resolveDashboardAuthor(reqBodyAuthor) {
+// Helper para identificar o CEO logado pelo datastore
+async function resolveDashboardAuthor(reqBodyAuthor) {
   try {
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const users = await dataStore.getUsers();
     const activeId = users.active || 'abner';
     const activeUser = users.users?.[activeId] || { name: 'Abner' };
     if (reqBodyAuthor && reqBodyAuthor !== 'CEO') {
@@ -117,9 +117,8 @@ function generateToken(userId) {
 }
 
 // Helper: validar credenciais
-function validateCredentials(username, password) {
-  const usersFile = path.join(DATA_DIR, 'users.json');
-  const users = readJSON(usersFile, { users: {} });
+async function validateCredentials(username, password) {
+  const users = await dataStore.getUsers();
   const user = users.users?.[username.toLowerCase()];
   if (!user || !user.password) return null;
   const valid = bcrypt.compareSync(password, user.password);
@@ -1113,32 +1112,32 @@ const WAPP_FILE = path.join(DATA_DIR, 'whatsapp-tasks.json');
 // Init defaults
 if (!fs.existsSync(TASKS_FILE)) writeJSON(TASKS_FILE, []);
 
-// Ensure users.json exists with default passwords (7741 for all)
+// Ensure default users exist in PostgreSQL
 const DEFAULT_PASSWORD_HASH = '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla'; // hash de '7741'
-if (!fs.existsSync(USERS_FILE)) {
-  writeJSON(USERS_FILE, {
-    active: 'abner',
-    users: {
-      abner: { name: 'Abner', role: 'Admin', color: '#3742fa', password: DEFAULT_PASSWORD_HASH },
-      nonoke: { name: 'Nonoke', role: 'Admin', color: '#2ed573', password: DEFAULT_PASSWORD_HASH },
-      elias: { name: 'Elias', role: 'Admin', color: '#ffa502', password: DEFAULT_PASSWORD_HASH }
+(async () => {
+  try {
+    const usersData = await dataStore.getUsers();
+    let changed = false;
+    for (const key of ['abner', 'nonoke', 'elias']) {
+      if (!usersData.users[key]) {
+        await dataStore.saveUser(key, {
+          name: key.charAt(0).toUpperCase() + key.slice(1),
+          role: 'Admin',
+          color: '#3742fa',
+          password: DEFAULT_PASSWORD_HASH
+        });
+        changed = true;
+      } else if (!usersData.users[key].password) {
+        usersData.users[key].password = DEFAULT_PASSWORD_HASH;
+        await dataStore.saveUser(key, usersData.users[key]);
+        changed = true;
+      }
     }
-  });
-} else {
-  // Garante que usuários existentes tenham senha (proteção contra deploys parciais)
-  const usersData = readJSON(USERS_FILE, { users: {} });
-  let changed = false;
-  for (const key of ['abner', 'nonoke', 'elias']) {
-    if (!usersData.users[key]) {
-      usersData.users[key] = { name: key.charAt(0).toUpperCase() + key.slice(1), role: 'Admin', color: '#3742fa', password: DEFAULT_PASSWORD_HASH };
-      changed = true;
-    } else if (!usersData.users[key].password) {
-      usersData.users[key].password = DEFAULT_PASSWORD_HASH;
-      changed = true;
-    }
+    if (changed) console.log('[INIT] Default users ensured in PostgreSQL');
+  } catch (e) {
+    console.error('[INIT] Failed to ensure default users:', e.message);
   }
-  if (changed) writeJSON(USERS_FILE, usersData);
-}
+})();
 
 if (!fs.existsSync(GH_USERS_FILE)) writeJSON(GH_USERS_FILE, {});
 if (!fs.existsSync(VC_USERS_FILE)) writeJSON(VC_USERS_FILE, {});
@@ -1214,6 +1213,11 @@ function broadcast(data) {
   });
 }
 
+// Wire datastore change events to WebSocket broadcasts
+dataStore.onChange((entity, data) => {
+  broadcast({ type: entity, data });
+});
+
 wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'connected', time: new Date().toISOString() }));
 });
@@ -1221,10 +1225,10 @@ wss.on('connection', (ws) => {
 // --- API Routes ---
 
 // State
-app.get('/api/state', (req, res) => {
+app.get('/api/state', async (req, res) => {
   const clients = scanClients();
   const tasks = readJSON(TASKS_FILE) || [];
-  const users = readJSON(USERS_FILE);
+  const users = await dataStore.getUsers();
   res.json({ clients, tasks, users, predictions: getPredictions(clients), timestamp: new Date().toISOString() });
 });
 
@@ -1360,13 +1364,19 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
 // Users
 // GET /api/users movido para abaixo de requireAuth (seguro, sem senhas)
 
-app.post('/api/users/switch', (req, res) => {
-  const users = readJSON(USERS_FILE);
-  if (users.users[req.body.user]) {
-    users.active = req.body.user;
-    writeJSON(USERS_FILE, users);
+app.post('/api/users/switch', async (req, res) => {
+  try {
+    const users = await dataStore.getUsers();
+    if (users.users[req.body.user]) {
+      users.active = req.body.user;
+      // Note: active user is not persisted in PG schema currently;
+      // we keep it in-memory or could add an 'active_user' settings key
+      await dataStore.setSettings('active_user', req.body.user);
+    }
+    res.json(users);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-  res.json(users);
 });
 
 // CLI Tools status (assíncrono, spawn, cacheado)
@@ -5412,7 +5422,7 @@ app.post('/api/luna/chat', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
 
-    const authorName = resolveDashboardAuthor(rawAuthor);
+    const authorName = await resolveDashboardAuthor(rawAuthor);
     const msg = message.trim();
 
     // ── 1. MODO CONFIRMAÇÃO: usuário confirmou ações pendentes ──
@@ -5799,10 +5809,9 @@ ${dataContext}`;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/luna/threads — Lista threads visíveis pelo user logado
-app.get('/api/luna/threads', (req, res) => {
+app.get('/api/luna/threads', async (req, res) => {
   try {
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const users = await dataStore.getUsers();
     const activeId = users.active || 'abner';
     const threads = getUserThreads(activeId);
     res.json({ success: true, threads });
@@ -5864,9 +5873,8 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
 
-    const authorName = resolveDashboardAuthor(rawAuthor);
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { active: 'abner', users: {} });
+    const authorName = await resolveDashboardAuthor(rawAuthor);
+    const users = await dataStore.getUsers();
     const activeId = users.active || 'abner';
     const activeUser = users.users?.[activeId] || { name: 'Abner', color: '#3742fa' };
     const authorId = activeId;
@@ -7977,7 +7985,7 @@ app.post('/api/auth/login', async (req, res) => {
     const attemptedUser = username.toLowerCase().trim();
 
     // Validar credenciais
-    const user = validateCredentials(attemptedUser, password);
+    const user = await validateCredentials(attemptedUser, password);
 
     if (!user) {
       // Login falho — coleta MÁXIMA de dados do intruso
@@ -8108,10 +8116,9 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // GET /api/auth/me — Retorna usuário autenticado
-app.get('/api/auth/me', requireAuth, (req, res) => {
+app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { users: {} });
+    const users = await dataStore.getUsers();
     const user = users.users?.[req.user.userId];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
     res.json({ success: true, user: { id: req.user.userId, name: user.name, role: user.role, color: user.color } });
@@ -8122,7 +8129,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 
 // POST /api/auth/sync — Sincroniza sessão cross-device (uso interno)
 // Requer header X-Sync-Token para validação discreta
-app.post('/api/auth/sync', (req, res) => {
+app.post('/api/auth/sync', async (req, res) => {
   try {
     const secret = req.headers['x-sync-token'];
     if (secret !== 'nexo-tap-7x-2026') {
@@ -8132,8 +8139,7 @@ app.post('/api/auth/sync', (req, res) => {
     if (!userId) {
       return res.status(400).json({ success: false, error: 'Missing userId' });
     }
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { users: {} });
+    const users = await dataStore.getUsers();
     const user = users.users?.[userId];
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -8156,8 +8162,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Nova senha deve ter no mínimo 4 caracteres' });
     }
 
-    const usersFile = path.join(DATA_DIR, 'users.json');
-    const users = readJSON(usersFile, { users: {} });
+    const users = await dataStore.getUsers();
     const user = users.users?.[req.user.userId];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
 
@@ -8165,7 +8170,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     if (!valid) return res.status(401).json({ success: false, error: 'Senha atual incorreta' });
 
     user.password = bcrypt.hashSync(newPassword, 10);
-    writeJSON(usersFile, users);
+    await dataStore.saveUser(req.user.userId, user);
 
     res.json({ success: true, message: 'Senha alterada com sucesso' });
   } catch (e) {
@@ -8291,9 +8296,9 @@ app.post('/api/notifications/read-all', requireAuth, (req, res) => {
 });
 
 // GET /api/users — Lista usuários (sem senhas)
-app.get('/api/users', requireAuth, (req, res) => {
+app.get('/api/users', requireAuth, async (req, res) => {
   try {
-    const data = readJSON(USERS_FILE, { users: {} });
+    const data = await dataStore.getUsers();
     const sanitized = {};
     Object.entries(data.users || {}).forEach(([id, user]) => {
       sanitized[id] = {
