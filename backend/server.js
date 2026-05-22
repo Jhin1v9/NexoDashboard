@@ -2070,13 +2070,13 @@ function recalcExpenseFullyPaid(expense) {
   expense.fullyPaid = split.every(pid => expense.paidBy && expense.paidBy[pid] && expense.paidBy[pid].paid);
 }
 
-function addCashBoxEntry(entry) {
-  const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+async function addCashBoxEntry(entry) {
+  const cashBox = await dataStore.getCashBox();
   cashBox.history = cashBox.history || [];
   cashBox.balance = cashBox.balance || { value: 0, currency: 'EUR' };
   cashBox.history.push(entry);
   cashBox.lastUpdated = nowISO();
-  writeJSON(CASH_BOX_FILE, cashBox);
+  await dataStore.saveCashBox(cashBox);
   return cashBox;
 }
 
@@ -2200,7 +2200,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
       // Use companySharePercent from payment config, default to 25%
       const companySharePercent = payment.companySharePercent || 25;
       const companyShare = txBase * (companySharePercent / 100);
-      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+      const cashBox = await dataStore.getCashBox();
       const oldBalance = cashBox.balance.value;
       const newBalance = oldBalance + companyShare;
       cashBox.balance.value = parseFloat(newBalance.toFixed(2));
@@ -2216,7 +2216,7 @@ app.post('/api/payments/:id/transactions', async (req, res) => {
         recordedBy: tx.recordedBy || 'system',
         recordedAt: nowISO()
       });
-      writeJSON(CASH_BOX_FILE, cashBox);
+      await dataStore.saveCashBox(cashBox);
       broadcast({ type: 'cashbox', data: cashBox });
     }
 
@@ -2312,7 +2312,7 @@ app.post('/api/expenses', async (req, res) => {
 
     // Update cash box if auto-deduct
     if (expense.autoDeductFromCashBox && amountVal > 0) {
-      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+      const cashBox = await dataStore.getCashBox();
       const oldBalance = cashBox.balance.value;
       const newBalance = oldBalance - amountVal;
       cashBox.balance.value = parseFloat(newBalance.toFixed(2));
@@ -2328,7 +2328,7 @@ app.post('/api/expenses', async (req, res) => {
         recordedBy: 'system',
         recordedAt: nowISO()
       });
-      writeJSON(CASH_BOX_FILE, cashBox);
+      await dataStore.saveCashBox(cashBox);
       broadcast({ type: 'cashbox', data: cashBox });
     }
 
@@ -2466,7 +2466,7 @@ app.get('/api/expenses/search', async (req, res) => {
 // GET cash box
 app.get('/api/cash-box', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+    const cashBox = await dataStore.getCashBox();
     res.json(cashBox);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2476,7 +2476,7 @@ app.get('/api/cash-box', async (req, res) => {
 // PUT editable cash box fields
 app.put('/api/cash-box', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [], settings: {} };
+    const cashBox = await dataStore.getCashBox();
     const next = { ...cashBox };
     const currency = req.body.currency || cashBox.balance?.currency || 'EUR';
 
@@ -2495,8 +2495,7 @@ app.put('/api/cash-box', async (req, res) => {
     }
 
     next.lastUpdated = nowISO();
-    writeJSON(CASH_BOX_FILE, next);
-    broadcast({ type: 'cashbox', data: next });
+    await dataStore.saveCashBox(next);
     res.json(next);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2506,7 +2505,7 @@ app.put('/api/cash-box', async (req, res) => {
 // GET cash box projection (6 meses)
 app.get('/api/cash-box/projection', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, incomingPayments: [], outgoingExpenses: [] };
+    const cashBox = await dataStore.getCashBox();
     const payments = readJSON(PAYMENTS_FILE) || [];
     const expenses = readJSON(EXPENSES_FILE) || [];
     const months = parseInt(req.query.months || '6', 10);
@@ -2570,7 +2569,7 @@ app.get('/api/cash-box/projection', async (req, res) => {
 // POST manual cash box adjustment
 app.post('/api/cash-box/adjust', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const cashBox = await dataStore.getCashBox();
     const adjustment = req.body.amount || 0;
     const oldBalance = cashBox.balance.value;
     const newBalance = oldBalance + adjustment;
@@ -2587,8 +2586,7 @@ app.post('/api/cash-box/adjust', async (req, res) => {
       recordedBy: req.body.recordedBy || 'system',
       recordedAt: nowISO()
     });
-    writeJSON(CASH_BOX_FILE, cashBox);
-    broadcast({ type: 'cashbox', data: cashBox });
+    await dataStore.saveCashBox(cashBox);
     res.json(cashBox);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2598,7 +2596,7 @@ app.post('/api/cash-box/adjust', async (req, res) => {
 // GET cash box history
 app.get('/api/cash-box/history', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     res.json(cashBox.history || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2608,7 +2606,7 @@ app.get('/api/cash-box/history', async (req, res) => {
 // GET cash box statement (extrato completo tipo banco)
 app.get('/api/cash-box/statement', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [], balance: { value: 0, currency: 'EUR' } };
+    const cashBox = await dataStore.getCashBox();
     const payments = readJSON(PAYMENTS_FILE) || [];
     const expenses = readJSON(EXPENSES_FILE) || [];
     
@@ -2737,7 +2735,7 @@ app.post('/api/cash-box/entries', async (req, res) => {
       return res.status(400).json({ success: false, error: 'amount must be a positive number' });
     }
 
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const cashBox = await dataStore.getCashBox();
     const oldBalance = parseFloat((cashBox.balance?.value || 0).toFixed(2));
     const delta = (type === 'income' || type === 'payment_received') ? amountVal : -amountVal;
     const newBalance = parseFloat((oldBalance + delta).toFixed(2));
@@ -2766,8 +2764,7 @@ app.post('/api/cash-box/entries', async (req, res) => {
     cashBox.auditLog.push({ action: 'entry_create', entryId: entry.id, timestamp: nowISO() });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
-    broadcast({ type: 'cashbox', data: cashBox });
+    await dataStore.saveCashBox(cashBox);
     res.json({ success: true, entry, newBalance });
   } catch (err) {
     console.error('[CASH-BOX] Error creating entry:', err.message);
@@ -2778,7 +2775,7 @@ app.post('/api/cash-box/entries', async (req, res) => {
 // GET /api/cash-box/entries/:id
 app.get('/api/cash-box/entries/:id', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     const entry = cashBox.history?.find(h => h.id === req.params.id);
     if (!entry) return res.status(404).json({ success: false, error: 'Entry not found' });
     res.json({ success: true, entry });
@@ -2790,7 +2787,7 @@ app.get('/api/cash-box/entries/:id', async (req, res) => {
 // PUT /api/cash-box/entries/:id — Editar entrada
 app.put('/api/cash-box/entries/:id', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     const idx = cashBox.history?.findIndex(h => h.id === req.params.id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Entry not found' });
 
@@ -2818,8 +2815,7 @@ app.put('/api/cash-box/entries/:id', async (req, res) => {
     cashBox.auditLog.push({ action: 'entry_update', entryId: updated.id, timestamp: nowISO() });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
-    broadcast({ type: 'cashbox', data: cashBox });
+    await dataStore.saveCashBox(cashBox);
     res.json({ success: true, entry: updated, newBalance: cashBox.balance.value });
   } catch (err) {
     console.error('[CASH-BOX] Error updating entry:', err.message);
@@ -2830,7 +2826,7 @@ app.put('/api/cash-box/entries/:id', async (req, res) => {
 // DELETE /api/cash-box/entries/:id — Soft delete
 app.delete('/api/cash-box/entries/:id', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     const idx = cashBox.history?.findIndex(h => h.id === req.params.id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Entry not found' });
 
@@ -2857,8 +2853,7 @@ app.delete('/api/cash-box/entries/:id', async (req, res) => {
     cashBox.auditLog.push({ action: 'entry_soft_delete', entryId: req.params.id, timestamp: nowISO() });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
-    broadcast({ type: 'cashbox', data: cashBox });
+    await dataStore.saveCashBox(cashBox);
     res.json({ success: true, removedId: req.params.id, newBalance: cashBox.balance.value });
   } catch (err) {
     console.error('[CASH-BOX] Error deleting entry:', err.message);
@@ -2869,7 +2864,7 @@ app.delete('/api/cash-box/entries/:id', async (req, res) => {
 // POST /api/cash-box/reconcile — Recalcular saldo a partir do histórico
 app.post('/api/cash-box/reconcile', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [], balance: { value: 0, currency: 'EUR' } };
+    const cashBox = await dataStore.getCashBox();
     const sorted = [...(cashBox.history || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
     let runningBalance = 0;
     sorted.forEach(h => {
@@ -2887,8 +2882,7 @@ app.post('/api/cash-box/reconcile', async (req, res) => {
     cashBox.auditLog.push({ action: 'reconcile', oldBalance, newBalance: cashBox.balance.value, timestamp: nowISO() });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
-    broadcast({ type: 'cashbox', data: cashBox });
+    await dataStore.saveCashBox(cashBox);
     res.json({ success: true, oldBalance, newBalance: cashBox.balance.value, entryCount: sorted.filter(h => h.isActive !== false).length });
   } catch (err) {
     console.error('[CASH-BOX] Reconcile error:', err.message);
@@ -2941,7 +2935,7 @@ app.post('/api/cash-box/payments', async (req, res) => {
       return res.status(400).json({ success: false, error: 'amount must be a positive number' });
     }
 
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+    const cashBox = await dataStore.getCashBox();
     const oldBalance = parseFloat((cashBox.balance?.value || 0).toFixed(2));
     const newBalance = parseFloat((oldBalance + amountVal).toFixed(2));
 
@@ -3016,7 +3010,7 @@ app.post('/api/cash-box/payments', async (req, res) => {
     });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
+    await dataStore.saveCashBox(cashBox);
     broadcast({ type: 'cashbox', data: cashBox });
     res.json({ success: true, entry, newBalance: cashBox.balance.value, applied: !!applyImmediately });
   } catch (err) {
@@ -3028,7 +3022,7 @@ app.post('/api/cash-box/payments', async (req, res) => {
 // POST /api/cash-box/payments/:id/apply-distribution — Aplicar split
 app.post('/api/cash-box/payments/:id/apply-distribution', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     const entry = cashBox.history?.find(h => h.id === req.params.id && h.type === 'payment_received');
     if (!entry) return res.status(404).json({ success: false, error: 'Payment entry not found' });
     if (entry.distribution?.appliedAt) {
@@ -3080,7 +3074,7 @@ app.post('/api/cash-box/payments/:id/apply-distribution', async (req, res) => {
     cashBox.auditLog.push({ action: 'distribution_applied', entryId: entry.id, timestamp: nowISO() });
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-    writeJSON(CASH_BOX_FILE, cashBox);
+    await dataStore.saveCashBox(cashBox);
     broadcast({ type: 'cashbox', data: cashBox });
     res.json({ success: true, entry, newBalance: cashBox.balance.value });
   } catch (err) {
@@ -3092,7 +3086,7 @@ app.post('/api/cash-box/payments/:id/apply-distribution', async (req, res) => {
 // GET /api/cash-box/payments/:id — Obter pagamento com distribuição
 app.get('/api/cash-box/payments/:id', async (req, res) => {
   try {
-    const cashBox = readJSON(CASH_BOX_FILE) || { history: [] };
+    const cashBox = await dataStore.getCashBox();
     const entry = cashBox.history?.find(h => h.id === req.params.id && h.type === 'payment_received');
     if (!entry) return res.status(404).json({ success: false, error: 'Payment not found' });
     res.json({ success: true, entry });
@@ -3139,7 +3133,7 @@ app.post('/api/expenses/quick', async (req, res) => {
     
     // Deduct from cash box if enabled
     if (expense.autoDeductFromCashBox && parseFloat(amount) > 0) {
-      const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+      const cashBox = await dataStore.getCashBox();
       const amountVal = parseFloat(amount);
       cashBox.balance.value = parseFloat((cashBox.balance.value - amountVal).toFixed(2));
       cashBox.lastUpdated = nowISO();
@@ -3155,7 +3149,7 @@ app.post('/api/expenses/quick', async (req, res) => {
         recordedAt: nowISO(),
         note: note || ''
       });
-      writeJSON(CASH_BOX_FILE, cashBox);
+      await dataStore.saveCashBox(cashBox);
       broadcast({ type: 'cashbox', data: cashBox });
     }
     
@@ -3174,7 +3168,7 @@ app.get('/api/finance/summary', async (req, res) => {
   try {
     const payments = readJSON(PAYMENTS_FILE) || [];
     const expenses = readJSON(EXPENSES_FILE) || [];
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, monthlyIncome: { value: 0 }, monthlyExpenses: { value: 0 } };
+    const cashBox = await dataStore.getCashBox();
     const alerts = readJSON(ALERTS_FILE) || [];
 
     let totalExpected = 0;
@@ -3230,10 +3224,10 @@ app.get('/api/finance/summary', async (req, res) => {
 // === CRON JOBS ===============================================================
 // ============================================================================
 
-function checkAndGenerateAlerts() {
+async function checkAndGenerateAlerts() {
   try {
     const payments = readJSON(PAYMENTS_FILE) || [];
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0 }, monthlyExpenses: { value: 0 }, settings: { lowBalanceMultiplier: 2 } };
+    const cashBox = await dataStore.getCashBox();
     const expenses = readJSON(EXPENSES_FILE) || [];
     const alerts = [];
     const now = new Date();
@@ -3317,10 +3311,10 @@ function checkAndGenerateAlerts() {
   }
 }
 
-function deductRecurringExpenses() {
+async function deductRecurringExpenses() {
   try {
     const expenses = readJSON(EXPENSES_FILE) || [];
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [], monthlyExpenses: { value: 0, currency: 'EUR' }, outgoingExpenses: [] };
+    const cashBox = await dataStore.getCashBox();
     let totalDeducted = 0;
     const now = new Date();
     const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -3372,7 +3366,7 @@ function deductRecurringExpenses() {
       }));
 
     cashBox.lastUpdated = nowISO();
-    writeJSON(CASH_BOX_FILE, cashBox);
+    await dataStore.saveCashBox(cashBox);
     broadcast({ type: 'cashbox', data: cashBox });
     console.log(`[CRON] Recurring expenses deducted at ${nowISO()}: total=€${totalDeducted.toFixed(2)}`);
   } catch (err) {
@@ -3381,18 +3375,18 @@ function deductRecurringExpenses() {
 }
 
 // Schedule: every 6 hours
-const alertCron = cron.schedule('0 */6 * * *', () => {
-  checkAndGenerateAlerts();
+const alertCron = cron.schedule('0 */6 * * *', async () => {
+  await checkAndGenerateAlerts();
 });
 
 // Schedule: 1st day of each month at 00:00
-const expenseCron = cron.schedule('0 0 1 * *', () => {
-  deductRecurringExpenses();
+const expenseCron = cron.schedule('0 0 1 * *', async () => {
+  await deductRecurringExpenses();
 });
 
 // Run alert check once on startup
-setTimeout(() => {
-  checkAndGenerateAlerts();
+setTimeout(async () => {
+  await checkAndGenerateAlerts();
 }, 3000);
 
 console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
@@ -3536,7 +3530,7 @@ app.get('/api/transactions/:id', (req, res) => {
 });
 
 // POST /api/transactions — Cria nova transação
-app.post('/api/transactions', (req, res) => {
+app.post('/api/transactions', async (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const { type, amount, description, category, date, source, notes } = req.body;
   
@@ -3565,13 +3559,13 @@ app.post('/api/transactions', (req, res) => {
   updateCashBoxFromTransactions(transactions);
   
   broadcast({ type: 'transactions', data: transactions });
-  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  broadcast({ type: 'cash-box', data: await dataStore.getCashBox() });
   
   res.status(201).json(newTx);
 });
 
 // PUT /api/transactions/:id — Edita transação
-app.put('/api/transactions/:id', (req, res) => {
+app.put('/api/transactions/:id', async (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const idx = transactions.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Transação não encontrada' });
@@ -3586,13 +3580,13 @@ app.put('/api/transactions/:id', (req, res) => {
   updateCashBoxFromTransactions(transactions);
   
   broadcast({ type: 'transactions', data: transactions });
-  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  broadcast({ type: 'cash-box', data: await dataStore.getCashBox() });
   
   res.json(transactions[idx]);
 });
 
 // DELETE /api/transactions/:id — Remove transação
-app.delete('/api/transactions/:id', (req, res) => {
+app.delete('/api/transactions/:id', async (req, res) => {
   const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const filtered = transactions.filter(t => t.id !== req.params.id);
   
@@ -3604,7 +3598,7 @@ app.delete('/api/transactions/:id', (req, res) => {
   updateCashBoxFromTransactions(filtered);
   
   broadcast({ type: 'transactions', data: filtered });
-  broadcast({ type: 'cash-box', data: readJSON(CASH_BOX_FILE) });
+  broadcast({ type: 'cash-box', data: await dataStore.getCashBox() });
   
   res.json({ success: true, message: 'Transação removida' });
 });
@@ -3614,12 +3608,12 @@ app.delete('/api/transactions/:id', (req, res) => {
 // Removida em 2026-05-08 para evitar sobrescrita da versão completa.
 
 // Função auxiliar: recalcula caixa baseado em transações
-function updateCashBoxFromTransactions(transactions) {
+async function updateCashBoxFromTransactions(transactions) {
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const balance = parseFloat((totalIncome - totalExpense).toFixed(2));
 
-  const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' }, history: [] };
+  const cashBox = await dataStore.getCashBox();
 
   // ATENÇÃO: NUNCA recriar history[] — ele contém entradas manuais, deduções automáticas,
   // ajustes, e registros de payments/expenses. Apenas atualiza o saldo.
@@ -3638,7 +3632,7 @@ function updateCashBoxFromTransactions(transactions) {
   // Manter apenas últimos 50 audit entries
   if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
-  writeJSON(CASH_BOX_FILE, cashBox);
+  await dataStore.saveCashBox(cashBox);
   broadcast({ type: 'cashbox', data: cashBox });
 }
 
@@ -6510,13 +6504,13 @@ app.get('/api/config/dashboard', (req, res) => {
 });
 
 // GET /api/nexo-state - Combined API com TODOS os schemas + dados antigos
-app.get('/api/nexo-state', (req, res) => {
+app.get('/api/nexo-state', async (req, res) => {
   try {
     // Dados antigos (compatibilidade)
     const tasks = readJSON(TASKS_FILE) || [];
     const payments = readJSON(PAYMENTS_FILE) || [];
     const expenses = readJSON(EXPENSES_FILE) || [];
-    const cashBox = readJSON(CASH_BOX_FILE) || { balance: { value: 0, currency: 'EUR' } };
+    const cashBox = await dataStore.getCashBox();
     const quotes = readJSON(QUOTES_FILE) || [];
     const leads = readJSON(LEADS_FILE) || { leads: [] };
     const members = readJSON(MEMBERS_FILE) || [];
