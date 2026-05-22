@@ -2,55 +2,53 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-19
+> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-23
 
 ---
 
-## 🎯 Foco Atual (Workspace File Viewer v2 ✅ CONCLUÍDO)
+## 🎯 Foco Atual (Fase 0.1 — Migração PostgreSQL 🟡 EM ANDAMENTO)
 
-### ✅ Concluído nesta sessão (kimi-10a71fc7 🟡)
-- [x] **Workspace File Viewer v2:** Editor/viewer de arquivos no workspace com syntax highlighting
-- [x] **highlight.js:** 15 linguagens registradas (JS, TS, JSON, CSS, Python, PHP, SQL, YAML, Bash, Dockerfile, GraphQL, etc.)
-- [x] **Modo Preview/Código:** Toggle para Markdown, HTML e arquivos de código
-- [x] **Indicador de alterações não salvas:** ● laranja no header + subtítulo
-- [x] **Atalhos de teclado:** `Ctrl+S` salvar, `ESC` fechar viewer
-- [x] **Scrollbars customizadas:** `.custom-scrollbar` com thumb `#2a2a3e` e hover `#3a3a4e`
-- [x] **Endpoints backend:** `GET/PUT /api/workspace/clients/:id/content` (leitura/escrita textual)
-- [x] **Contexto Luna enriquecido:** `buildDashboardContext()` injeta conteúdo do arquivo no prompt (até 4000 chars)
-- [x] **Integração LunaControl.jsx:** Lê `file` dos query params e envia `contextFile` em mensagens de chat/thread
-- [x] **Changelog v3.4.0:** Entrada documentando o File Viewer
-- [x] **Build passando:** Vite build 0 erros, bundle 2.0MB
-- [x] **Push para origin/main:** Commits `4eaaf6a` + `3e4256e` + `7b338b3` + `acc8db7` enviados
-- [x] **Telegram Bot @lunanexobot v3.0:** Framework wizard declarativo + 6 wizards interativos (tarefas, pagamentos, despesas, leads, email, ideias)
-- [x] **Bot inicia automaticamente no startup:** `backend/server.js` chama `startTelegramAgent()` se `TELEGRAM_BOT_TOKEN` existir
-- [x] **Extração inteligente de params:** Valor monetário, email, telefone, nome, assunto extraídos do texto do usuário
-- [x] **Dashboard links por ação:** `/tarefas`, `/financeiro`, `/leads`, `/email`, `/ideias` — cada ação direciona pro módulo correto
-- [x] **Privacy mode desativado:** BotFather → Group Privacy OFF. Requer remover+readicionar bot em grupos existentes
+### ✅ Concluído nesta sessão
+- [x] **Reverse Schema Engineering:** `backend/docs/SCHEMA_AUDIT.md` (46KB) documenta todos os mismatches
+- [x] **Migration 005:** `backend/migrations/005-real-schema.sql` — schema REAL do server.js (zero adapters)
+- [x] **datastore-pg.js reescrito:** 33 funções, nomes 1:1 com JSON, `onChange` → WebSocket broadcast
+- [x] **migrate-005.js:** 1.228 rows migrados do JSON para PG
+- [x] **pg-sync.js REMOVIDO:** Arquivado em `backend/archive/pg-sync.js.bak` — estava corrompendo dados
+- [x] **Entidade `users` migrada:** 3 usuários no PG
+- [x] **Entidade `tasks` migrada:** 84 tasks no PG
+- [x] **Entidade `payments` migrada:** 5 rotas migradas, testes passando
+- [x] **Entidade `expenses` migrada:** 5 rotas migradas, auto-deduct atualizado
+- [x] **Entidade `cash_box` migrada:** ~15 rotas migradas, auto-deduct em payments/expenses atualizado
+- [x] **Testes:** 21/21 passando (`users: 3, tasks: 4, payments: 5, expenses: 5, cash-box: 4`)
+- [x] **Dependências:** Zod, Jest, Supertest, TypeScript, ts-node, @types/* instalados
+- [x] **tsconfig.json:** Strict mode ativado
+- [x] **ollama-client.js:** Restaurado para `backend/services/` (required by server.js)
 
-### ⏳ Próximos passos (priorizados por realidade do código)
+### ⏳ Próximos passos (uma entidade por vez)
 
-Baseado na análise em `.kimi-context/plans-vs-reality.md`:
+**🔴 PRÓXIMA ENTIDADE (escolher uma):**
+- [ ] `quotes` — 4 quotes no PG, schema já real
+- [ ] `leads` — 0 leads (vazio), schema já real
+- [ ] `notifications` — 12 notificações no PG
+- [ ] `company_tasks` — 76 tasks no PG
+- [ ] `links` — 46 links no PG
 
-**🔴 CRÍTICO (blocante):**
-- [ ] **Substituir `GEMINI_API_KEY`** no `backend/.env` (revogada pelo Google) — sem isso, IA generativa (drafts, resumos, ideias) não funciona
+**🟡 PENDENTES DEPOIS:**
+- [ ] `members` — 0 members (vazio)
+- [ ] `transactions` — 0 transactions (vazio)
+- [ ] `security_logs` — 14 events no PG
+- [ ] `changelog` — 31 entries no PG
+- [ ] `ideas` — 7 ideas no PG
+- [ ] `whatsapp_history` — 1.171 messages no PG
+- [ ] `luna_threads` — 4 threads no PG
+- [ ] `luna_buffer` — 1 row no PG
+- [ ] `workspace_clients` — 2 clients no PG
 
-**🟡 IMPORTANTE (UX) — ✅ CONCLUÍDO:**
-- [x] **Workspace File Viewer v2:** Syntax highlighting, preview Markdown/HTML, indicador não salvo, atalhos
-- [x] **Contexto Luna enriquecido:** Arquivo do workspace injetado no prompt da IA
-- [x] **Modo C — Transformação de Interface:** `LunaBatchAction` com checkboxes multi-seleção por página
-- [x] **Preview visual:** `LunaInlinePreview` integrado no LunaActionDrawer (modos preview/confirm)
-- [x] **Modo D — Assistente Passivo Proativo:** Badge animado no botão flutuante com `/api/luna/proactive`
-
-**🟢 MÉDIO (polimento) — ✅ CONCLUÍDO:**
-- [x] **Cross-Module Insights:** Endpoint `/api/luna/insights` com resumo cruzado + recomendações
-- [ ] **Deploy para Render:** Verificar build remoto e modelo NLU carregando
-- [ ] **Melhorar extração de params:** `extractEmail()` e `extractAfterKeyword()` para frases naturais
-
-**✅ JÁ IMPLEMENTADO (não repetir):**
-- [x] Fase 1 — Fundação de Consciência (7/7)
-- [x] Fase 3 — Execução Inteligente (4/5, falta preview visual)
-- [x] Fase 4 — Consciência por Módulo (3/3)
-- [x] Fase 5 — NLP.js + Contexto (4/4)
+**🟢 INFRAESTRUTURA:**
+- [ ] TypeScript: converter `datastore-pg.js` para `.ts`
+- [ ] Zod schemas para validação de entidades
+- [ ] Testes de integração para rotas HTTP (supertest)
+- [ ] Cobertura de testes > 70%
 
 ---
 
@@ -62,25 +60,26 @@ Baseado na análise em `.kimi-context/plans-vs-reality.md`:
 | `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — complementa NLP.js |
 | `kimi-19007e56` 🔴 | `backend/server.js` | ContextModule/contextId nos endpoints de chat |
 | `kimi-19007e56` 🔴 | Frontend EmailHub | Banner drafts, LunaEmailAssistant — não conflita |
+| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 5 entidades |
 
 ---
 
 ## 🔗 Arquivos chave desta sessão
 
 ```
-frontend/src/lib/lunaDecisionEngine.js              # Motor de decisão (score → modo de execução)
-frontend/src/hooks/useLunaAnimation.js              # Web Animations API hook
-frontend/src/components/luna/LunaActionDrawer.jsx   # Drawer 380px sem blur
-frontend/src/components/luna/LunaSafetyDelay.jsx    # Safety delay 1.5s com undo
-frontend/src/components/luna/LunaActionFlow.jsx     # Orquestrador de apresentação
-frontend/src/components/luna/LunaFloatingButton.jsx # Integração com Decision Engine
-frontend/src/components/luna/SmartFormModal.jsx     # Fallback modal (Active Learning)
-frontend/src/components/luna/LunaIntentSchemas.js   # Schemas para 137 intents
-frontend/src/components/luna/LunaModuleSuggestions.js # Sugestões contextuais por módulo
-frontend/src/context/LunaContext.jsx                # Provider global de contexto
-frontend/src/lib/lunaEventBus.js                    # Event emitter desacoplado
-backend/services/luna-nlu.js                        # Motor NLP.js — 137 intents, PT/ES/CA
-backend/data/luna-model.nlp                         # Modelo treinado persistido
+backend/datastore-pg.js                             # Datastore 100% PostgreSQL (33 funções)
+backend/db.js                                       # Pool node-postgres
+backend/migrations/005-real-schema.sql              # Schema real do server.js
+backend/migrate-005.js                              # Script de migração JSON → PG
+backend/docs/SCHEMA_AUDIT.md                        # Audit completo (46KB)
+backend/docs/RELATORIO_FASE_0_1.md                  # Relatório da Fase 0.1
+backend/__tests__/users.test.js                     # 3 testes
+backend/__tests__/tasks.test.js                     # 4 testes
+backend/__tests__/payments.test.js                  # 5 testes
+backend/__tests__/expenses.test.js                  # 5 testes
+backend/__tests__/cash-box.test.js                  # 4 testes
+backend/jest.config.js                              # Config Jest
+backend/tsconfig.json                               # TypeScript strict mode
 ```
 
 ---
@@ -88,21 +87,34 @@ backend/data/luna-model.nlp                         # Modelo treinado persistido
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `920c182` — `feat(nlu): Expansão massiva de intents 36→137 + schemas + sugestões`  
+**Commit atual:** `e36c519` — `feat(cash-box): migrate cash_box to PostgreSQL + update auto-deduct`  
 **Build:** ✅ Vite build passando (0 erros)  
-**Testes manuais:** ⚠️ Vite HMR cache instável — usar build de produção para testes finais  
+**Testes:** ✅ 21/21 passando  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
-**Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB) e `backend/model.nlp` (2.7MB)  
+**Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB)  
+**PostgreSQL:** ✅ Neon DB, 22 tabelas, 5 entidades ativas em PG  
 
-**Validação NLU (score 1.000 em todos):**
-- "rascunhos pendentes" → `email.listar_rascunhos`
-- "tarefas P0" → `tarefa.p0`
-- "extrato financeiro" → `financeiro.extrato`
-- "minhas tarefas" → `tarefa.minhas`
-- "aprovar rascunho" → `email.aprovar_rascunho`
-- "rejeitar draft" → `email.rejeitar_rascunho`
-- "gastos do mês" → `financeiro.gastos_do_mes`
-- "balanço financeiro" → `financeiro.ver_balanco`
+**Validação PG (counts reais):**
+| Tabela | Rows |
+|--------|------|
+| users | 3 |
+| tasks | 84 |
+| payments | 0 |
+| expenses | 9 |
+| cash_box | 1 |
+| quotes | 4 |
+| leads | 0 |
+| members | 0 |
+| transactions | 0 |
+| notifications | 12 |
+| links | 46 |
+| security_logs | 14 |
+| changelog | 31 |
+| ideas | 7 |
+| whatsapp_history | 1.171 |
+| luna_threads | 4 |
+| luna_buffer | 1 |
+| workspace_clients | 2 |
 
 ---
 
