@@ -8951,6 +8951,32 @@ async function startServer() {
 
 startServer();
 
+// ── Graceful Shutdown ──
+// Evita Telegram 409 Conflict ao reiniciar (matando o bot antes de encerrar o processo)
+async function gracefulShutdown(signal) {
+  console.log(`\n[Shutdown] Recebido ${signal}. Encerrando serviços...`);
+  try {
+    stopTelegramAgent();
+    console.log('[Shutdown] Bot do Telegram parado.');
+  } catch (e) {
+    console.error('[Shutdown] Erro ao parar Telegram:', e.message);
+  }
+  try {
+    const { pool } = require('./db');
+    if (pool) {
+      await pool.end();
+      console.log('[Shutdown] Pool PostgreSQL encerrado.');
+    }
+  } catch (e) {
+    console.error('[Shutdown] Erro ao fechar PG pool:', e.message);
+  }
+  console.log('[Shutdown] Tchau! 👋');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 // ── Background Refresh: tools a cada 10 min ──
 setInterval(() => {
   external.refreshExternal('tools').catch(() => {});

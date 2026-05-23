@@ -17,16 +17,52 @@ pool.on('error', (err) => {
 });
 
 /**
+ * Retry wrapper for Neon PostgreSQL instability (ETIMEDOUT / ENETUNREACH)
+ */
+async function _withRetry(fn, operationName = 'db') {
+  const maxRetries = 3;
+  const baseDelay = 500; // ms
+  let lastErr;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isConnectionError =
+        err.code === 'ETIMEDOUT' ||
+        err.code === 'ENETUNREACH' ||
+        err.code === 'ECONNREFUSED' ||
+        err.code === 'ECONNRESET' ||
+        err.message?.includes('timeout') ||
+        err.message?.includes(' Neon ');
+
+      if (!isConnectionError || attempt >= maxRetries) {
+        throw err;
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt);
+      console.warn(`[DB] ${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${err.message}. Retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+
+  throw lastErr;
+}
+
+/**
  * Execute a query and return all rows.
  */
 async function query(sql, params = []) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(sql, params);
-    return result.rows;
-  } finally {
-    client.release();
-  }
+  return _withRetry(async () => {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }, 'query');
 }
 
 /**
@@ -41,13 +77,15 @@ async function get(sql, params = []) {
  * Execute an INSERT/UPDATE/DELETE and return the first row (if RETURNING).
  */
 async function run(sql, params = []) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(sql, params);
-    return result.rows[0] || null;
-  } finally {
-    client.release();
-  }
+  return _withRetry(async () => {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return result.rows[0] || null;
+    } finally {
+      client.release();
+    }
+  }, 'run');
 }
 
 /**

@@ -79,7 +79,22 @@ class OllamaClient {
         const txt = await res.text().catch(() => '');
         throw new Error(`Ollama HTTP ${res.status}: ${txt.slice(0, 200)}`);
       }
-      return await res.json();
+      const text = await res.text();
+      // Ollama sometimes returns NDJSON (multiple JSON objects) even with stream:false
+      // Parse only the first valid JSON object
+      try {
+        return JSON.parse(text);
+      } catch (parseErr) {
+        const firstLine = text.trim().split('\n')[0];
+        if (firstLine) {
+          try {
+            return JSON.parse(firstLine);
+          } catch {
+            // fallback: try to extract JSON from the first line
+          }
+        }
+        throw new Error(`Ollama JSON parse error: ${parseErr.message}`);
+      }
     } catch (err) {
       clearTimeout(timer);
       if (err.name === 'AbortError') throw new Error('OLLAMA_TIMEOUT');
