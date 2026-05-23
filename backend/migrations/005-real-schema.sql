@@ -212,26 +212,58 @@ CREATE TABLE workspace_clients (
   atualizado_em TIMESTAMPTZ DEFAULT NOW()
 );
 -- Restore dos dados antigos (mapeando nomes antigos para novos)
-INSERT INTO workspace_clients (id, nome, caminho, status, cor, responsavel, tipo, data_inicio, orcamento_total, moeda, tags, anotacoes, versao, ultima_atualizacao, criado_em, atualizado_em)
-SELECT 
-  id,
-  COALESCE(name, id) as nome,
-  COALESCE(path, id) as caminho,
-  COALESCE(status, 'ativo') as status,
-  COALESCE(color, '#3b82f6') as cor,
-  COALESCE(responsavel, 'todos') as responsavel,
-  COALESCE(tipo, 'cliente') as tipo,
-  data_inicio,
-  COALESCE(orcamento_total, 0) as orcamento_total,
-  COALESCE(moeda, 'EUR') as moeda,
-  COALESCE(tags, '[]'::jsonb) as tags,
-  COALESCE(anotacoes, '') as anotacoes,
-  '1.0' as versao,
-  NOW() as ultima_atualizacao,
-  COALESCE(criado_em, NOW()) as criado_em,
-  COALESCE(atualizado_em, NOW()) as atualizado_em
-FROM workspace_clients_backup;
-DROP TABLE workspace_clients_backup;
+DO $$
+DECLARE
+  has_name_col BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'workspace_clients_backup' AND column_name = 'name'
+  ) INTO has_name_col;
+
+  IF has_name_col THEN
+    INSERT INTO workspace_clients (id, nome, caminho, status, cor, responsavel, tipo, data_inicio, orcamento_total, moeda, tags, anotacoes, versao, ultima_atualizacao, criado_em, atualizado_em)
+    SELECT 
+      id,
+      COALESCE(name, id) as nome,
+      COALESCE(path, id) as caminho,
+      COALESCE(status, 'ativo') as status,
+      COALESCE(color, '#3b82f6') as cor,
+      COALESCE(responsavel, 'todos') as responsavel,
+      COALESCE(tipo, 'cliente') as tipo,
+      data_inicio,
+      COALESCE(orcamento_total, 0) as orcamento_total,
+      COALESCE(moeda, 'EUR') as moeda,
+      COALESCE(tags, '[]'::jsonb) as tags,
+      COALESCE(anotacoes, '') as anotacoes,
+      '1.0' as versao,
+      NOW() as ultima_atualizacao,
+      COALESCE(criado_em, NOW()) as criado_em,
+      COALESCE(atualizado_em, NOW()) as atualizado_em
+    FROM workspace_clients_backup;
+  ELSE
+    INSERT INTO workspace_clients (id, nome, caminho, status, cor, responsavel, tipo, data_inicio, orcamento_total, moeda, tags, anotacoes, versao, ultima_atualizacao, criado_em, atualizado_em)
+    SELECT 
+      id,
+      id as nome,
+      COALESCE(path, id) as caminho,
+      COALESCE(status, 'ativo') as status,
+      COALESCE(color, '#3b82f6') as cor,
+      COALESCE(responsavel, 'todos') as responsavel,
+      COALESCE(tipo, 'cliente') as tipo,
+      data_inicio,
+      COALESCE(orcamento_total, 0) as orcamento_total,
+      COALESCE(moeda, 'EUR') as moeda,
+      COALESCE(tags, '[]'::jsonb) as tags,
+      COALESCE(anotacoes, '') as anotacoes,
+      '1.0' as versao,
+      NOW() as ultima_atualizacao,
+      COALESCE(criado_em, NOW()) as criado_em,
+      COALESCE(atualizado_em, NOW()) as atualizado_em
+    FROM workspace_clients_backup;
+  END IF;
+END $$;
+DROP TABLE IF EXISTS workspace_clients_backup;
 
 -- WHATSAPP_HISTORY (vazia) — schema real do server.js
 DROP TABLE IF EXISTS whatsapp_history;

@@ -4751,6 +4751,58 @@ app.get('/api/luna/proactive', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/luna/dashboard-state — Estado completo do dashboard em tempo real
+app.get('/api/luna/dashboard-state', requireAuth, async (req, res) => {
+  try {
+    const [tasks, companyTasks, payments, expenses, cashBox, leads, notifications, quotes] = await Promise.all([
+      dataStore.getTasks().catch(() => ({ tasks: [] })),
+      dataStore.getCompanyTasks().catch(() => ({ tasks: [] })),
+      dataStore.getPayments().catch(() => ({ payments: [] })),
+      dataStore.getExpenses().catch(() => ({ expenses: [] })),
+      dataStore.getCashBox().catch(() => ({ currentBalance: 0, transactions: [] })),
+      dataStore.getLeads().catch(() => ({ leads: [] })),
+      dataStore.getNotifications().catch(() => ({ notifications: [] })),
+      dataStore.getQuotes().catch(() => ({ quotes: [] })),
+    ]);
+
+    const allTasks = [...(tasks.tasks || []), ...(companyTasks.tasks || [])];
+    const pendingTasks = allTasks.filter(t => t.status !== 'concluido' && t.status !== 'done');
+    const unreadNotifications = (notifications.notifications || []).filter(n => !n.read);
+
+    // Calculate cash box balance
+    const balance = cashBox.currentBalance || 0;
+
+    // Recent leads (last 7 days)
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const recentLeads = (leads.leads || []).filter(l => l.createdAt && l.createdAt > oneWeekAgo);
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      summary: {
+        pendingTasks: pendingTasks.length,
+        totalTasks: allTasks.length,
+        unreadNotifications: unreadNotifications.length,
+        totalNotifications: notifications.notifications?.length || 0,
+        cashBalance: balance,
+        recentLeads: recentLeads.length,
+        totalLeads: leads.leads?.length || 0,
+        pendingPayments: payments.payments?.filter(p => p.status !== 'pago').length || 0,
+        pendingExpenses: expenses.expenses?.filter(e => e.status === 'ativo').length || 0,
+        totalQuotes: quotes.quotes?.length || 0,
+      },
+      details: {
+        tasks: pendingTasks.slice(0, 5).map(t => ({ id: t.id, title: t.title, status: t.status, dueDate: t.dueDate })),
+        notifications: unreadNotifications.slice(0, 5).map(n => ({ id: n.id, title: n.title, severity: n.severity })),
+        leads: recentLeads.slice(0, 5).map(l => ({ id: l.id, name: l.name, status: l.status })),
+      }
+    });
+  } catch (e) {
+    console.error('[DashboardState] Erro:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // GET /api/luna/insights — Cross-Module Insights (resumo cruzado)
 app.get('/api/luna/insights', requireAuth, async (req, res) => {
   try {
@@ -5252,7 +5304,7 @@ app.post('/api/luna/action-center/dismiss', requireAuth, async (req, res) => {
 // ============================================================
 app.post('/api/luna/chat', async (req, res) => {
   try {
-    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile } = req.body;
+    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -5311,6 +5363,7 @@ app.post('/api/luna/chat', async (req, res) => {
         authorName,
         contextModule,
         contextId,
+        dashboardContext,
         bufferSummary: {
           tasks: (buffer.newTasks || []).length,
           ideas: (buffer.newIdeas || []).length,
@@ -5825,7 +5878,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
     const thread = await getThread(threadId);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
 
-    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile } = req.body;
+    const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -5860,7 +5913,8 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       editedFields,
       contextModule,
       contextId,
-      contextFile
+      contextFile,
+      dashboardContext
     };
 
     const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {

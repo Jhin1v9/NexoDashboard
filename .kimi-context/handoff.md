@@ -345,3 +345,86 @@ Ver seção "Bugs Observados" acima.
 - **Testes:** ✅ 90/90 passando
 - **Bugs críticos:** 0 remanescentes
 - **Próxima fase:** Fase 0.2 — correção de bugs de frontend/WebSocket
+
+
+---
+
+## 🌙 Sessão Atual — Luna HUD v2.0 + Bugfix Total
+
+> **Instância:** `kimi-atual` 🟢 — 2026-05-23
+> **Foco:** Resolver todos os bugs + Visual HUD Futurista + Context Awareness + Inline Actions
+> **Changelog entries:** 5 novas entradas adicionadas via `dataStore.saveChangelog()`
+
+### ✅ FASE 0: Todos os Bugs Corrigidos
+
+| # | Bug | Arquivo | Solução |
+|---|---|---|---|
+| 1 | WebSocket dev falha | `LunaChatPanel.jsx`, `NotificationCenter.jsx` | `window.location.port === '3457' ? 'localhost:3456'` |
+| 2 | Landing page não redireciona | `LandingPage.jsx` | `useNavigate` + `useEffect` verifica token no mount |
+| 3 | NotificationCenter dropdown | `NotificationCenter.jsx` | Glassmorphism, re-fetch após ações, z-index correto |
+| 4 | Contador desatualizado | `NotificationCenter.jsx` | `setTimeout(fetchNotifications, 500)` após cada ação |
+| 5 | `lunaOllama.preload` erro | `ollama-client.js` | Método `preload()` adicionado — dummy generate para warmup |
+| 6 | Código morto no FAB | `LunaFloatingButton.jsx` | Reescrito de forma enxuta, ~400 linhas removidas |
+| 7 | Migração 005 falha | `005-real-schema.sql` | PL/pgSQL condicional para verificar coluna `name` |
+
+### ✅ FASE 1: Visual HUD Futurista
+
+**`LunaChatPanel.jsx` — Redesign completo:**
+- Scan lines CSS effect
+- Corner accents (estilo JARVIS/HUD)
+- Glow borders cyan/purple
+- Fonte monoespaçada (`font-mono`) para mensagens da Luna
+- Typing animation com cursor piscante
+- Avatar breathing effect (`scale` + `opacity` pulsação)
+- Paleta HUD: Cyan `#00f0ff`, Purple `#9b59b6`, Green `#2ed573`
+- Input area com estilo futurista
+
+**`LunaFloatingButton.jsx` — Orb Holográfico:**
+- Formato circular com gradiente animado
+- Glow pulsante quando há notificações proativas
+- Anel externo no hover
+- Efeito de campo de força radiante
+- Badge proativo com estilo neon
+
+### ✅ FASE 2: Dashboard Context Awareness
+
+- **Novo endpoint:** `GET /api/luna/dashboard-state` — snapshot em tempo real do dashboard
+- **`useLunaContext`** integrado no `LunaChatPanel` — coleta rota, módulo, foco, dados visíveis
+- **`dashboardContext`** enviado em TODAS as mensagens do chat
+- **IntentParser.buildPrompt enriquecido** — prompt da Ollama inclui contexto do dashboard
+- **Resultado:** Luna sabe EXATAMENTE onde o usuário está e responde contextualmente
+
+### ✅ FASE 3: Inline Actions (Luna Controla o Dashboard)
+
+- **Novo componente:** `LunaActionBridge.jsx` — executa ações no DOM
+- **Ações suportadas:** `navigate`, `filter`, `highlight`, `scroll`, `toast`, `focus`
+- **Novos intents no IntentParser:** `navigate` e `filter` com regex
+- **Exemplos:** "vai para tarefas" → navega, "mostra pendentes" → filtra, "destaca X" → glow
+
+### 📁 Arquivos Criados
+- `frontend/src/components/luna/LunaActionBridge.jsx` — Ponte de ações inline
+- `frontend/src/components/luna/LunaHUDEffects.jsx` — Efeitos visuais (scan lines, glow, corner accents)
+
+### 📁 Arquivos Modificados
+- `frontend/src/components/luna/LunaChatPanel.jsx` — Redesign HUD + Context Awareness
+- `frontend/src/components/luna/LunaFloatingButton.jsx` — Orb holográfico + cleanup
+- `frontend/src/components/NotificationCenter.jsx` — Fix dropdown + counter + visual
+- `frontend/src/pages/LandingPage.jsx` — Redirect para logged users
+- `frontend/src/App.jsx` — Adicionado LunaActionBridge
+- `backend/server.js` — Endpoint `/api/luna/dashboard-state` + contexto no chat
+- `backend/services/ollama-client.js` — Método `preload()` adicionado
+- `backend/migrations/005-real-schema.sql` — Fix coluna `name` com PL/pgSQL
+- `agents/core/IntentParser.js` — Novos intents `navigate`/`filter` + prompt com dashboard context
+
+### 🧪 Testes
+- **Build Vite:** ✅ 0 erros (2787 modules)
+- **Backend start:** ✅ Porta 3456 respondendo
+- **API health:** ✅ `{"status":"ok"}`
+- **Ollama preload:** ✅ `[OllamaClient] Preloading intent model: gemma3:1b`
+
+### 🎯 Status desta sessão
+- **Bugs:** ✅ 7/7 corrigidos
+- **Visual HUD:** ✅ Completo
+- **Context Awareness:** ✅ Completo
+- **Inline Actions:** ✅ Completo
+- **Changelog:** ✅ 5 entradas adicionadas

@@ -374,6 +374,54 @@ class IntentParser {
           const m = text.match(/(?:cliente|nome)\s*[:\-]?\s*([A-Za-zÀ-ÿ\s]+?)(?:\s+(?:email|telefone|tel|@)|$)/i);
           return { nome: m?.[1]?.trim() || 'Cliente não identificado' };
         }
+      },
+      // ── NAVEGAÇÃO ──
+      navigate: {
+        regex: /\b(vai?\s+(?:para|pra|pro)|mostra?\s+(?:a\s+)?(?:p[áa]gina\s+de\s+)?|abre?\s+(?:a\s+)?(?:p[áa]gina\s+de\s+)?|navega?\s+(?:para|pra|pro)|ir\s+(?:para|pra|pro)|quero\s+ver\s+(?:a\s+)?|me\s+mostra?\s+(?:a\s+)?)(?:tarefas?|tasks?|financeiro|caixa|emails?|leads?|whatsapp|projetos?|or[çc]amentos?|clientes?|dashboard|configura[çc][õo]es?|settings|relat[óo]rios?|ideias?|links?)\b/i,
+        action: 'navegar',
+        extract: (text) => {
+          const destMap = {
+            tarefa: '/tarefas', tarefas: '/tarefas', task: '/tarefas', tasks: '/tarefas',
+            financeiro: '/financeiro', caixa: '/financeiro/caixa',
+            email: '/email', emails: '/email', inbox: '/email',
+            lead: '/leads', leads: '/leads',
+            whatsapp: '/whatsapp',
+            projeto: '/projetos', projetos: '/projetos', project: '/projetos',
+            orcamento: '/orcamentos', orcamentos: '/orcamentos', orçamento: '/orcamentos', orçamentos: '/orcamentos',
+            cliente: '/clientes', clientes: '/clientes', workspace: '/workspace',
+            dashboard: '/dashboard', inicio: '/dashboard',
+            configuracao: '/settings', configuracoes: '/settings', settings: '/settings',
+            relatorio: '/relatorios', relatorios: '/relatorios',
+            ideia: '/ideias', ideias: '/ideias',
+            link: '/ferramentas', links: '/ferramentas',
+          };
+          const lower = text.toLowerCase();
+          let destino = '/dashboard';
+          for (const [key, route] of Object.entries(destMap)) {
+            if (lower.includes(key)) { destino = route; break; }
+          }
+          return { destino, pagina: destino };
+        }
+      },
+      // ── FILTRO ──
+      filter: {
+        regex: /\b(filtra?\s+(?:por\s+)?|mostra?\s+(?:s[oó]\s+)?|s[oó]\s+(?:mostra?\s+)?)(?:pendentes?|conclu[ií]das?|P0|P1|P2|urgentes?|cr[ií]ticas?|minhas?|de\s+[A-Za-zÀ-ÿ]+)\b/i,
+        action: 'filtrar',
+        extract: (text) => {
+          const lower = text.toLowerCase();
+          let status = null;
+          let priority = null;
+          let assignee = null;
+          if (/pendente/.test(lower)) status = 'pendente';
+          if (/conclu[íi]da/.test(lower)) status = 'concluido';
+          if (/P0|urgente|cr[íi]tica/.test(lower)) priority = 'P0';
+          if (/P1/.test(lower)) priority = 'P1';
+          if (/P2/.test(lower)) priority = 'P2';
+          const respMatch = text.match(/(?:de|do|da|para|pro|pra)\s+([A-Za-zÀ-ÿ]+)/i);
+          if (respMatch) assignee = respMatch[1].toLowerCase();
+          if (/minhas?/.test(lower)) assignee = 'me';
+          return { status, priority, assignee };
+        }
       }
     };
   }
@@ -473,6 +521,26 @@ class IntentParser {
   buildPrompt(text, context) {
     const author = context.authorName || 'CEO';
     const bufferSummary = context.bufferSummary || {};
+    const dashboard = context.dashboardContext || {};
+    
+    // Build dashboard context section
+    let dashboardSection = '';
+    if (dashboard.currentModule) {
+      dashboardSection += `\n- Página atual: ${dashboard.currentModule}`;
+    }
+    if (dashboard.currentRoute) {
+      dashboardSection += `\n- Rota: ${dashboard.currentRoute}`;
+    }
+    if (dashboard.dashboardState) {
+      const s = dashboard.dashboardState;
+      dashboardSection += `\n- Tarefas pendentes: ${s.pendingTasks || 0}/${s.totalTasks || 0}`;
+      dashboardSection += `\n- Notificações não lidas: ${s.unreadNotifications || 0}`;
+      dashboardSection += `\n- Saldo caixa: €${s.cashBalance || 0}`;
+      dashboardSection += `\n- Leads recentes: ${s.recentLeads || 0}`;
+    }
+    if (dashboard.userFocus) {
+      dashboardSection += `\n- Foco do usuário: ${dashboard.userFocus.elementLabel || dashboard.userFocus.elementType || 'desconhecido'}`;
+    }
 
     return `Você é o módulo de interpretação de comandos da Luna, assistente da NEXO Digital.
 Sua única função é analisar o que o usuário quer e retornar um JSON válido.
@@ -481,7 +549,7 @@ CONTEXTO ATUAL:
 - Autor: ${author}
 - Tarefas pendentes: ${bufferSummary.tasks || 0}
 - Leads novos: ${bufferSummary.leads || 0}
-- Sinais financeiros: ${bufferSummary.finance || 0}
+- Sinais financeiros: ${bufferSummary.finance || 0}${dashboardSection}
 
 TEXTO DO USUÁRIO:
 """${text}"""

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
 import CountUp from 'react-countup'
 import {
@@ -1140,9 +1141,18 @@ function Footer() {
    MAIN LANDING PAGE
    ============================================================ */
 export default function LandingPage() {
+  const navigate = useNavigate()
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [syncOpen, setSyncOpen] = useState(false)
   const tapRef = useRef(null)
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('nexo_token')
+    if (token) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [navigate])
 
   useSyncTap({ targetRef: tapRef, threshold: 7, timeout: 1500, onTrigger: () => setSyncOpen(true) })
 

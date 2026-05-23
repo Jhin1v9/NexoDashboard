@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageCircle, Send, Bot, User, Users, CheckCircle,
-  ChevronDown, Eraser, Loader, X, Sparkles
+  ChevronDown, Eraser, Loader, X, Sparkles, Activity
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
+import { useLunaContext } from '../../hooks/useLunaContext'
 import EditablePreviewCard from './EditablePreviewCard'
 
 const LUNA_AVATAR = '/luna-avatar.png'
@@ -15,8 +16,90 @@ function getUserColor(name) {
   return map[name?.toLowerCase()] || '#3742fa'
 }
 
+/* ── HUD Visual Effects ── */
+function ScanLines() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-none opacity-[0.03]">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,240,255,0.1) 2px, rgba(0,240,255,0.1) 4px)',
+          backgroundSize: '100% 4px',
+        }}
+      />
+    </div>
+  )
+}
+
+function CornerAccents() {
+  return (
+    <>
+      {/* Top-left */}
+      <div className="absolute top-0 left-0 w-6 h-6 border-l-2 border-t-2 border-cyan-500/40 rounded-tl-sm" />
+      {/* Top-right */}
+      <div className="absolute top-0 right-0 w-6 h-6 border-r-2 border-t-2 border-cyan-500/40 rounded-tr-sm" />
+      {/* Bottom-left */}
+      <div className="absolute bottom-0 left-0 w-6 h-6 border-l-2 border-b-2 border-cyan-500/40 rounded-bl-sm" />
+      {/* Bottom-right */}
+      <div className="absolute bottom-0 right-0 w-6 h-6 border-r-2 border-b-2 border-cyan-500/40 rounded-br-sm" />
+    </>
+  )
+}
+
+function HUDGlowBorder({ children }) {
+  return (
+    <div className="relative">
+      <div className="absolute -inset-[1px] bg-gradient-to-b from-cyan-500/20 via-transparent to-purple-500/20 rounded-none blur-[1px]" />
+      <div className="relative">{children}</div>
+    </div>
+  )
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 px-1">
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-cyan-400/70"
+          animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ── Typing Animation Hook ── */
+function useTypingEffect(text, speed = 15) {
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const indexRef = useRef(0)
+
+  useEffect(() => {
+    if (!text) { setDisplayed(''); setDone(true); return }
+    indexRef.current = 0
+    setDisplayed('')
+    setDone(false)
+    const interval = setInterval(() => {
+      indexRef.current++
+      if (indexRef.current >= text.length) {
+        setDisplayed(text)
+        setDone(true)
+        clearInterval(interval)
+      } else {
+        setDisplayed(text.slice(0, indexRef.current))
+      }
+    }, speed)
+    return () => clearInterval(interval)
+  }, [text, speed])
+
+  return { displayed, done }
+}
+
 export default function LunaChatPanel({ isOpen, onClose }) {
   const { user: authUser } = useAuth()
+  const { currentRoute, currentModule, visibleData, userFocus } = useLunaContext()
   const [activeUser, setActiveUser] = useState(authUser?.name || 'Abner')
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -26,6 +109,21 @@ export default function LunaChatPanel({ isOpen, onClose }) {
   const [isLoadingThread, setIsLoadingThread] = useState(false)
   const [showThreadDropdown, setShowThreadDropdown] = useState(false)
   const [pendingConfirmation, setPendingConfirmation] = useState(null)
+  const [typingMsgId, setTypingMsgId] = useState(null)
+  const [dashboardState, setDashboardState] = useState(null)
+
+  // Fetch dashboard state periodically
+  useEffect(() => {
+    const fetchState = async () => {
+      try {
+        const res = await axios.get('/api/luna/dashboard-state')
+        if (res.data.success) setDashboardState(res.data.summary)
+      } catch (e) {}
+    }
+    fetchState()
+    const interval = setInterval(fetchState, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const chatEndRef = useRef(null)
   const dropdownRef = useRef(null)
@@ -48,7 +146,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [threadMessages, activeThreadId])
+  }, [threadMessages, activeThreadId, typingMsgId])
 
   // Load threads on mount
   useEffect(() => {
@@ -66,8 +164,10 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     let reconnectTimer
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      ws = new WebSocket(`${protocol}//${window.location.host}/ws`)
-      ws.onopen = () => console.log('[LunaChatPanel] WS connected')
+      const host = window.location.port === '3457' ? 'localhost:3456' : window.location.host
+      const wsUrl = `${protocol}//${host}/ws`
+      ws = new WebSocket(wsUrl)
+      ws.onopen = () => console.log('[LunaChatPanel] WS connected:', wsUrl)
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
@@ -82,6 +182,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         } catch (e) { /* ignore non-JSON */ }
       }
       ws.onclose = () => { reconnectTimer = setTimeout(connect, 3000) }
+      ws.onerror = (err) => { console.error('[LunaChatPanel] WS error:', err) }
     }
     connect()
     return () => {
@@ -204,10 +305,24 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         return
       }
 
-      // Regular chat message
+      // Build dashboard context
+      const dashboardContext = {
+        currentRoute,
+        currentModule,
+        userFocus,
+        dashboardState,
+        visibleDataSnapshot: Object.keys(visibleData).reduce((acc, key) => {
+          const data = visibleData[key]
+          acc[key] = Array.isArray(data) ? { count: data.length } : typeof data === 'object' ? { keys: Object.keys(data) } : data
+          return acc
+        }, {})
+      }
+
+      // Regular chat message with context
       const res = await axios.post(`/api/luna/threads/${activeThreadId}/messages`, {
         text,
-        authorName: activeUser
+        authorName: activeUser,
+        dashboardContext
       })
       const data = res.data
 
@@ -233,6 +348,12 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         }))
         if (data.pendingActions) {
           setPendingConfirmation({ actions: data.pendingActions, messageId: data.messages[0]?.id })
+        }
+        // Trigger typing animation for Luna's last message
+        const lastMsg = data.messages[data.messages.length - 1]
+        if (lastMsg?.role === 'assistant') {
+          setTypingMsgId(lastMsg.id)
+          setTimeout(() => setTypingMsgId(null), 1500)
         }
       } else {
         const errorMsg = {
@@ -338,17 +459,29 @@ export default function LunaChatPanel({ isOpen, onClose }) {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.8 }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[90vw] bg-nexo-bg border-l border-nexo-border shadow-2xl z-[9981] flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[90vw] z-[9981] flex flex-col"
+            style={{
+              background: 'linear-gradient(180deg, rgba(8,8,12,0.98) 0%, rgba(15,15,22,0.96) 100%)',
+              borderLeft: '1px solid rgba(0,240,255,0.15)',
+              boxShadow: '-8px 0 40px rgba(0,240,255,0.05), -2px 0 20px rgba(155,89,182,0.05)'
+            }}
           >
+            <ScanLines />
+            <CornerAccents />
+
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border bg-nexo-card/50">
+            <div className="relative flex items-center justify-between px-4 py-3 border-b border-cyan-500/10"
+              style={{ background: 'linear-gradient(90deg, rgba(0,240,255,0.03) 0%, transparent 50%)' }}
+            >
               <div className="flex items-center gap-3">
                 {/* Luna Avatar */}
                 <div className="relative">
-                  <img
+                  <motion.img
                     src={LUNA_AVATAR}
                     alt="Luna"
-                    className="w-10 h-10 rounded-full object-cover border-2 border-nexo-primary/30"
+                    className="w-10 h-10 rounded-full object-cover border border-cyan-500/30"
+                    animate={{ scale: [1, 1.02, 1], opacity: [0.9, 1, 0.9] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                     onError={(e) => {
                       e.target.style.display = 'none'
                       e.target.nextSibling.style.display = 'flex'
@@ -357,14 +490,14 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 items-center justify-center hidden absolute inset-0">
                     <Bot className="w-5 h-5 text-white" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-nexo-success rounded-full border-2 border-nexo-bg" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#08080c] animate-pulse" />
                 </div>
 
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-nexo-text">Luna</span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-nexo-success/10 text-nexo-success border border-nexo-success/20">
-                      <Sparkles className="w-2.5 h-2.5" /> Online
+                    <span className="font-semibold text-sm text-white font-mono tracking-wide">LUNA</span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                      <Activity className="w-2.5 h-2.5" /> ONLINE
                     </span>
                   </div>
 
@@ -372,7 +505,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       onClick={() => setShowThreadDropdown(!showThreadDropdown)}
-                      className="flex items-center gap-1 text-xs text-nexo-muted hover:text-nexo-primary transition-colors"
+                      className="flex items-center gap-1 text-xs text-nexo-muted hover:text-cyan-400 transition-colors font-mono"
                     >
                       {getThreadDisplayTitle()}
                       <ChevronDown size={12} className={`transition-transform ${showThreadDropdown ? 'rotate-180' : ''}`} />
@@ -386,14 +519,19 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -4, scale: 0.95 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute top-full left-0 mt-1 w-56 bg-nexo-card border border-nexo-border rounded-lg shadow-xl z-[9990] py-1"
+                          className="absolute top-full left-0 mt-1 w-56 z-[9990] py-1 rounded-lg overflow-hidden"
+                          style={{
+                            background: 'rgba(15,15,22,0.98)',
+                            border: '1px solid rgba(0,240,255,0.15)',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+                          }}
                         >
                           {threads.map(t => (
                             <button
                               key={t.id}
                               onClick={() => { setActiveThreadId(t.id); setShowThreadDropdown(false) }}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-nexo-bg transition-colors ${
-                                t.id === activeThreadId ? 'bg-nexo-bg/50 text-nexo-primary' : 'text-nexo-text'
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors font-mono ${
+                                t.id === activeThreadId ? 'bg-cyan-500/10 text-cyan-400' : 'text-nexo-text hover:bg-white/5'
                               }`}
                             >
                               {t.type === 'group' ? (
@@ -402,7 +540,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                                 <User className="w-4 h-4 text-nexo-muted flex-shrink-0" />
                               )}
                               <span className="flex-1 truncate">{t.title}</span>
-                              {t.id === activeThreadId && <CheckCircle className="w-3 h-3 text-nexo-success flex-shrink-0" />}
+                              {t.id === activeThreadId && <CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0" />}
                             </button>
                           ))}
                         </motion.div>
@@ -415,14 +553,14 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               <div className="flex items-center gap-1">
                 <button
                   onClick={clearThreadMessages}
-                  className="p-2 text-nexo-muted hover:text-nexo-text hover:bg-nexo-card rounded-lg transition-colors"
+                  className="p-2 text-nexo-muted hover:text-cyan-400 hover:bg-cyan-500/5 rounded-lg transition-colors"
                   title="Limpar conversa"
                 >
                   <Eraser className="w-4 h-4" />
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-2 text-nexo-muted hover:text-nexo-text hover:bg-nexo-card rounded-lg transition-colors"
+                  className="p-2 text-nexo-muted hover:text-cyan-400 hover:bg-cyan-500/5 rounded-lg transition-colors"
                   title="Fechar (Esc)"
                 >
                   <X className="w-4 h-4" />
@@ -431,18 +569,18 @@ export default function LunaChatPanel({ isOpen, onClose }) {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
               {currentMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-nexo-muted">
                   <div className="relative mb-4">
                     <img
                       src={LUNA_AVATAR}
                       alt="Luna"
-                      className="w-16 h-16 rounded-full object-cover border-2 border-nexo-primary/20 opacity-50"
+                      className="w-16 h-16 rounded-full object-cover border border-cyan-500/20 opacity-50"
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                   </div>
-                  <p className="text-sm font-medium">Nenhuma mensagem ainda</p>
+                  <p className="text-sm font-medium font-mono">Nenhuma mensagem ainda</p>
                   <p className="text-xs mt-1 max-w-[250px] text-center">
                     {isGroup
                       ? 'Chat em grupo com a Luna. Todos os CEOs veem as mensagens.'
@@ -455,6 +593,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                 const isUser = msg.role === 'user'
                 const showAuthor = isGroup && isUser && msg.authorName
                 const authorColor = msg.authorColor || getUserColor(msg.author)
+                const isTyping = msg.id === typingMsgId && !isUser
                 return (
                   <div key={msg.id || i} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
                     {/* Avatar */}
@@ -479,19 +618,29 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                     </div>
 
                     {/* Message Bubble */}
-                    <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                    <div className={`max-w-[75%] px-4 py-2.5 text-sm leading-relaxed ${
                       isUser
-                        ? 'bg-nexo-primary text-white rounded-tr-sm'
-                        : 'bg-nexo-card text-nexo-text border border-nexo-border/50 rounded-tl-sm'
-                    }`}>
+                        ? 'bg-nexo-primary text-white rounded-2xl rounded-tr-sm'
+                        : 'rounded-2xl rounded-tl-sm font-mono tracking-tight'
+                    }`}
+                    style={isUser ? {} : {
+                      background: 'linear-gradient(135deg, rgba(0,240,255,0.08) 0%, rgba(155,89,182,0.05) 100%)',
+                      border: '1px solid rgba(0,240,255,0.1)',
+                      color: '#e0e0e0'
+                    }}
+                    >
                       {showAuthor && (
-                        <p className="text-[10px] font-semibold mb-0.5" style={{ color: authorColor }}>
+                        <p className="text-[10px] font-semibold mb-0.5 font-mono" style={{ color: authorColor }}>
                           {msg.authorName}
                         </p>
                       )}
-                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                      {isTyping ? (
+                        <TypingText text={msg.text} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                      )}
 
-                      {/* Editable Preview Card (tarefas, pagamentos, despesas, leads, deleções) */}
+                      {/* Editable Preview Card */}
                       {msg.needsConfirmation && msg.editableFields && (
                         <EditablePreviewCard
                           fields={msg.editableFields}
@@ -511,7 +660,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                         />
                       )}
 
-                      {/* Confirmation buttons para ações sem editableFields */}
+                      {/* Confirmation buttons */}
                       {msg.needsConfirmation && !msg.editableFields && (
                         <div className="flex gap-2 mt-3">
                           <button
@@ -519,13 +668,13 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                               setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
                               confirmPendingActions(true)
                             }}
-                            className="px-3 py-1.5 bg-nexo-success text-white text-xs rounded-lg hover:bg-nexo-success/80 transition-colors font-medium"
+                            className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors font-medium border border-emerald-500/20"
                           >
                             ✅ Confirmar
                           </button>
                           <button
                             onClick={() => confirmPendingActions(false)}
-                            className="px-3 py-1.5 bg-nexo-border text-nexo-text text-xs rounded-lg hover:bg-nexo-card transition-colors font-medium"
+                            className="px-3 py-1.5 bg-white/5 text-nexo-text text-xs rounded-lg hover:bg-white/10 transition-colors font-medium border border-white/10"
                           >
                             ❌ Cancelar
                           </button>
@@ -534,17 +683,17 @@ export default function LunaChatPanel({ isOpen, onClose }) {
 
                       {/* Executed confirmation */}
                       {!msg.needsConfirmation && msg.executed && (
-                        <div className="mt-2 px-3 py-1.5 bg-nexo-success/10 border border-nexo-success/20 rounded-lg text-xs text-nexo-success flex items-center gap-1.5">
+                        <div className="mt-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 flex items-center gap-1.5 font-mono">
                           <CheckCircle className="w-3.5 h-3.5" />
                           Ação executada com sucesso!
                         </div>
                       )}
 
                       {/* Timestamp */}
-                      <span className={`text-[10px] mt-1.5 block ${isUser ? 'text-white/60' : 'text-nexo-muted'}`}>
+                      <span className={`text-[10px] mt-1.5 block font-mono ${isUser ? 'text-white/60' : 'text-nexo-muted'}`}>
                         {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
                         {msg.fallback && <span className="ml-2 text-yellow-400">⚡ modo rápido</span>}
-                        {msg.executed && <span className="ml-2 text-green-400">✅ executado</span>}
+                        {msg.executed && <span className="ml-2 text-emerald-400">✅ executado</span>}
                         {msg.quotaExhausted && (
                           <span className="ml-2 text-orange-400">⏸️ quota esgotada</span>
                         )}
@@ -557,7 +706,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               {/* Loading indicator */}
               {chatLoading && (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-nexo-primary/20">
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-cyan-500/20">
                     <img
                       src={LUNA_AVATAR}
                       alt="Luna"
@@ -565,9 +714,14 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                   </div>
-                  <div className="bg-nexo-card border border-nexo-border/50 px-4 py-2.5 rounded-2xl rounded-tl-sm flex items-center gap-2">
-                    <Loader className="w-4 h-4 text-nexo-primary animate-spin" />
-                    <span className="text-xs text-nexo-muted">Luna está pensando...</span>
+                  <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm flex items-center gap-2"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0,240,255,0.05) 0%, rgba(155,89,182,0.03) 100%)',
+                      border: '1px solid rgba(0,240,255,0.08)'
+                    }}
+                  >
+                    <Loader className="w-4 h-4 text-cyan-400 animate-spin" />
+                    <span className="text-xs text-nexo-muted font-mono">Luna está pensando...</span>
                   </div>
                 </div>
               )}
@@ -575,7 +729,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               {/* Thread loading */}
               {isLoadingThread && !chatLoading && (
                 <div className="flex justify-center py-4">
-                  <Loader className="w-5 h-5 text-nexo-primary animate-spin" />
+                  <Loader className="w-5 h-5 text-cyan-400 animate-spin" />
                 </div>
               )}
 
@@ -583,9 +737,16 @@ export default function LunaChatPanel({ isOpen, onClose }) {
             </div>
 
             {/* Input Area */}
-            <div className="p-3 border-t border-nexo-border bg-nexo-card/30">
-              <div className="flex items-center gap-2 bg-nexo-bg rounded-xl px-4 py-2.5 border border-nexo-border focus-within:border-nexo-primary/50 transition-colors">
-                <MessageCircle className="w-4 h-4 text-nexo-muted flex-shrink-0" />
+            <div className="relative p-3 border-t border-cyan-500/10"
+              style={{ background: 'linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(15,15,22,0.9) 100%)' }}
+            >
+              <div className="flex items-center gap-2 rounded-xl px-4 py-2.5 border transition-colors"
+                style={{
+                  background: 'rgba(0,0,0,0.3)',
+                  borderColor: 'rgba(0,240,255,0.1)'
+                }}
+              >
+                <MessageCircle className="w-4 h-4 text-cyan-500/50 flex-shrink-0" />
                 <input
                   ref={inputRef}
                   type="text"
@@ -593,19 +754,23 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
                   placeholder={`Mensagem em ${getThreadDisplayTitle()}...`}
-                  className="flex-1 bg-transparent text-sm text-nexo-text placeholder-nexo-muted outline-none"
+                  className="flex-1 bg-transparent text-sm text-white placeholder-nexo-muted outline-none font-mono"
                   disabled={chatLoading}
                 />
                 <button
                   onClick={sendChatMessage}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="p-2 bg-nexo-primary rounded-lg text-white hover:bg-nexo-primary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,240,255,0.2) 0%, rgba(155,89,182,0.2) 100%)',
+                    border: '1px solid rgba(0,240,255,0.2)'
+                  }}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 text-cyan-400" />
                 </button>
               </div>
-              <p className="text-[10px] text-nexo-muted/60 mt-1.5 text-center">
-                Pressione <kbd className="px-1 py-0.5 bg-nexo-card rounded text-[10px] border border-nexo-border">Enter</kbd> para enviar · <kbd className="px-1 py-0.5 bg-nexo-card rounded text-[10px] border border-nexo-border">Esc</kbd> para fechar
+              <p className="text-[10px] text-nexo-muted/60 mt-1.5 text-center font-mono">
+                Pressione <kbd className="px-1 py-0.5 rounded text-[10px] border border-cyan-500/20 text-cyan-400/70">Enter</kbd> para enviar · <kbd className="px-1 py-0.5 rounded text-[10px] border border-cyan-500/20 text-cyan-400/70">Esc</kbd> para fechar
               </p>
             </div>
           </motion.div>
@@ -613,4 +778,28 @@ export default function LunaChatPanel({ isOpen, onClose }) {
       )}
     </AnimatePresence>
   )
+}
+
+/* ── Typing Text Component ── */
+function TypingText({ text, speed = 12 }) {
+  const [displayed, setDisplayed] = useState('')
+  const indexRef = useRef(0)
+
+  useEffect(() => {
+    if (!text) { setDisplayed(''); return }
+    indexRef.current = 0
+    setDisplayed('')
+    const interval = setInterval(() => {
+      indexRef.current++
+      if (indexRef.current >= text.length) {
+        setDisplayed(text)
+        clearInterval(interval)
+      } else {
+        setDisplayed(text.slice(0, indexRef.current))
+      }
+    }, speed)
+    return () => clearInterval(interval)
+  }, [text, speed])
+
+  return <span>{displayed}<span className="animate-pulse text-cyan-400">▋</span></span>
 }

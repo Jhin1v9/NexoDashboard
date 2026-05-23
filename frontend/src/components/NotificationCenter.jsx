@@ -35,7 +35,11 @@ function NotificationCenter() {
   // Escutar WebSocket para notificações em tempo real
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`)
+    // Dev workaround: Vite runs on :3457 but WS server is on :3456
+    const host = window.location.port === '3457' ? 'localhost:3456' : window.location.host
+    const wsUrl = `${protocol}//${host}/ws`
+    const ws = new WebSocket(wsUrl)
+    ws.onopen = () => console.log('[NotificationCenter] WS connected:', wsUrl)
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
@@ -44,6 +48,7 @@ function NotificationCenter() {
         }
       } catch {}
     }
+    ws.onerror = (err) => { console.error('[NotificationCenter] WS error:', err) }
     return () => ws.close()
   }, [])
 
@@ -64,6 +69,8 @@ function NotificationCenter() {
       await axios.post(`/api/notifications/${id}/read`)
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
       setUnreadCount(prev => Math.max(0, prev - 1))
+      // Re-fetch to ensure sync with server
+      setTimeout(fetchNotifications, 500)
     } catch (e) {}
   }
 
@@ -79,6 +86,8 @@ function NotificationCenter() {
     try {
       await axios.delete(`/api/notifications/${id}`)
       setNotifications(prev => prev.filter(n => n.id !== id))
+      // Re-fetch count to ensure sync
+      setTimeout(fetchNotifications, 500)
     } catch (e) {}
   }
 
@@ -99,11 +108,17 @@ function NotificationCenter() {
 
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className="fixed w-80 bg-nexo-card border border-nexo-border rounded-xl shadow-2xl z-[9999] overflow-hidden"
+            className="fixed w-80 rounded-xl shadow-2xl z-[9999] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
-            style={{ top: pos.top, right: pos.right }}
+            style={{
+              top: pos.top,
+              right: pos.right,
+              background: 'linear-gradient(180deg, rgba(15,15,22,0.98) 0%, rgba(8,8,12,0.98) 100%)',
+              border: '1px solid rgba(0,240,255,0.15)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,240,255,0.05)'
+            }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
               <h3 className="font-semibold text-sm">Notificações</h3>

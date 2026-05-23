@@ -279,6 +279,24 @@ Intent JSON:`;
       host: this.host
     };
   }
+
+  /**
+   * Preload model into memory to avoid cold starts
+   */
+  async preload() {
+    try {
+      console.log('[OllamaClient] Preloading intent model:', this.intentModel);
+      // Send a dummy generate request to load model into RAM
+      await this._call('/api/generate', {
+        prompt: 'hello',
+        options: { temperature: 0, num_predict: 1 }
+      }, { model: this.intentModel, timeout: 60000 });
+      console.log('[OllamaClient] Preload complete');
+    } catch (err) {
+      console.warn('[OllamaClient] Preload failed:', err.message);
+      throw err;
+    }
+  }
 }
 
 module.exports = { OllamaClient, MODELS };
