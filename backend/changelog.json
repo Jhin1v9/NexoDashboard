@@ -11,7 +11,7 @@
       "emoji": "🧪",
       "author": "NEXO Team",
       "tier": 2,
-      "date": "2026-05-23T17:00:00.000Z",
+      "date": "2026-05-23T19:45:00.000Z",
       "tags": [
         "e2e",
         "playwright",
@@ -20,8 +20,8 @@
         "qa"
       ],
       "readBy": [],
-      "status": "🟡 EM PROGRESSO",
-      "statusDetail": "Auth 3/3 passando. Notifications 1/2 (falta seed de notificações). Leads 0/2 (seletores do formulário multi-step precisam de ajuste)."
+      "status": "✅ 100% PRONTO",
+      "statusDetail": "Auth 3/3 passando. Notifications 2/2 passando. Leads 2/2 passando. Total: 7/7 verde."
     },
     {
       "id": "changelog-email-smtp-fallback",
