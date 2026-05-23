@@ -10,6 +10,10 @@ const DATA_DIR = path.join(__dirname, 'data');
 const WORKSPACE_DIR = path.join(__dirname, 'workspace');
 const INDEX_FILE = path.join(DATA_DIR, 'workspace-index.json');
 
+// PostgreSQL datastore para índice de clientes
+let dataStore;
+try { dataStore = require('./datastore-pg'); } catch { dataStore = null; }
+
 const DEFAULT_FOLDERS = [
   '01_orcamentos',
   '02_contratos',
@@ -66,22 +70,37 @@ function writeJSON(filePath, data) {
 
 // ── INDEX ──
 
-function getIndex() {
+async function getIndex() {
+  if (dataStore) {
+    return await dataStore.getWorkspaceClients();
+  }
   return readJSON(INDEX_FILE, { versao: '1.0', ultimaAtualizacao: nowISO(), clientes: [] });
 }
 
-function saveIndex(index) {
+async function saveIndex(index) {
   index.ultimaAtualizacao = nowISO();
+  if (dataStore) {
+    for (const c of (index.clientes || [])) {
+      await dataStore.saveWorkspaceClient({
+        id: c.id, nome: c.nome, caminho: c.caminho || c.id,
+        status: c.status, cor: c.cor, responsavel: c.responsavel,
+        tipo: c.tipo || 'cliente', dataInicio: c.dataInicio || nowISO().split('T')[0],
+        orcamentoTotal: c.orcamentoTotal || 0, moeda: c.moeda || 'EUR',
+        tags: c.tags || [], anotacoes: c.anotacoes || '',
+        criadoEm: c.criadoEm || nowISO(), atualizadoEm: c.atualizadoEm || nowISO()
+      });
+    }
+  }
   writeJSON(INDEX_FILE, index);
 }
 
 // ── CLIENT ──
 
-function createClient(rawId, metadata = {}) {
+async function createClient(rawId, metadata = {}) {
   const id = sanitizeClientId(rawId);
   if (!id) throw new Error('Invalid client id');
 
-  const index = getIndex();
+  const index = await getIndex();
   if (index.clientes.find(c => c.id === id)) {
     throw new Error('Client already exists');
   }
@@ -121,11 +140,11 @@ function createClient(rawId, metadata = {}) {
     responsavel: clienteJson.responsavel
   });
 
-  saveIndex(index);
+  await saveIndex(index);
   return clienteJson;
 }
 
-function getClient(id) {
+async function getClient(id) {
   const sid = sanitizeClientId(id);
   if (!sid) return null;
   const file = path.join(WORKSPACE_DIR, sid, 'cliente.json');
@@ -139,7 +158,7 @@ function clientExists(id) {
   return fs.existsSync(path.join(WORKSPACE_DIR, sid, 'cliente.json'));
 }
 
-function updateClient(id, updates) {
+async function updateClient(id, updates) {
   const sid = sanitizeClientId(id);
   if (!sid) throw new Error('Invalid client id');
 
@@ -160,20 +179,20 @@ function updateClient(id, updates) {
   writeJSON(file, client);
 
   // Atualiza índice
-  const index = getIndex();
+  const index = await getIndex();
   const idx = index.clientes.findIndex(c => c.id === sid);
   if (idx >= 0) {
     index.clientes[idx].nome = client.nome;
     index.clientes[idx].status = client.status;
     index.clientes[idx].cor = client.cor;
     index.clientes[idx].responsavel = client.responsavel;
-    saveIndex(index);
+    await saveIndex(index);
   }
 
   return client;
 }
 
-function deleteClient(id) {
+async function deleteClient(id) {
   const sid = sanitizeClientId(id);
   if (!sid) throw new Error('Invalid client id');
 
@@ -182,9 +201,12 @@ function deleteClient(id) {
 
   fs.rmSync(clientDir, { recursive: true, force: true });
 
-  const index = getIndex();
+  const index = await getIndex();
   index.clientes = index.clientes.filter(c => c.id !== sid);
-  saveIndex(index);
+  await saveIndex(index);
+  if (dataStore) {
+    await dataStore.deleteWorkspaceClient(sid);
+  }
   return { deleted: sid };
 }
 

@@ -7379,7 +7379,7 @@ app.post('/api/leads/:id/convert', async (req, res) => {
     let workspace = null;
     if (!workspaceManager.clientExists(leadId)) {
       const displayName = lead.name || lead.displayName || lead.company || leadId;
-      workspace = workspaceManager.createClient(leadId, {
+      workspace = await workspaceManager.createClient(leadId, {
         nome: displayName,
         status: 'ativo',
         responsavel: lead.assignedTo || 'todos',
@@ -7400,7 +7400,7 @@ Pasta padrão do workspace NEXO.
 `;
       fs.writeFileSync(readmePath, readmeContent, 'utf8');
     } else {
-      workspace = workspaceManager.getClient(leadId);
+      workspace = await workspaceManager.getClient(leadId);
     }
 
     res.json({ success: true, lead: updated, workspace });
@@ -8352,7 +8352,7 @@ const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB
 
 app.get('/api/workspace/clients', requireAuth, (req, res) => {
   try {
-    const index = workspaceManager.getIndex();
+    const index = await workspaceManager.getIndex();
     const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
     const merged = new Map();
 
@@ -8393,7 +8393,7 @@ app.post('/api/workspace/clients', requireAuth, (req, res) => {
   try {
     const { id, nome, status, dataInicio, responsavel, orcamentoTotal, moeda, cor, tags, anotacoes } = req.body;
     if (!id) return res.status(400).json({ success: false, error: 'id obrigatorio' });
-    const client = workspaceManager.createClient(id, {
+    const client = await workspaceManager.createClient(id, {
       nome, status, dataInicio, responsavel, orcamentoTotal, moeda, cor, tags, anotacoes
     });
     res.json({ success: true, client });
@@ -8404,7 +8404,7 @@ app.post('/api/workspace/clients', requireAuth, (req, res) => {
 
 app.get('/api/workspace/clients/:id', requireAuth, (req, res) => {
   try {
-    const client = workspaceManager.getClient(req.params.id);
+    const client = await workspaceManager.getClient(req.params.id);
     if (!client) return res.status(404).json({ success: false, error: 'Cliente nao encontrado' });
     res.json({ success: true, client });
   } catch (e) {
@@ -8414,7 +8414,7 @@ app.get('/api/workspace/clients/:id', requireAuth, (req, res) => {
 
 app.put('/api/workspace/clients/:id', requireAuth, (req, res) => {
   try {
-    const client = workspaceManager.updateClient(req.params.id, req.body);
+    const client = await workspaceManager.updateClient(req.params.id, req.body);
     res.json({ success: true, client });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
@@ -8423,7 +8423,7 @@ app.put('/api/workspace/clients/:id', requireAuth, (req, res) => {
 
 app.delete('/api/workspace/clients/:id', requireAuth, (req, res) => {
   try {
-    const result = workspaceManager.deleteClient(req.params.id);
+    const result = await workspaceManager.deleteClient(req.params.id);
     res.json({ success: true, ...result });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
