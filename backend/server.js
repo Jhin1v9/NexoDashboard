@@ -2417,7 +2417,7 @@ app.get('/api/expenses/search', async (req, res) => {
   try {
     const q = (req.query.q || '').toLowerCase();
     const templates = readJSON(EXPENSE_TEMPLATES_FILE) || [];
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const results = [];
     templates.forEach(t => {
       if (t.name && t.name.toLowerCase().includes(q)) results.push({ type: 'template', ...t });
@@ -2478,8 +2478,8 @@ app.put('/api/cash-box', async (req, res) => {
 app.get('/api/cash-box/projection', async (req, res) => {
   try {
     const cashBox = await dataStore.getCashBox();
-    const payments = readJSON(PAYMENTS_FILE) || [];
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const payments = await dataStore.getPayments();
+    const expenses = await dataStore.getExpenses();
     const months = parseInt(req.query.months || '6', 10);
     const projection = [];
     let runningBalance = cashBox.balance ? (cashBox.balance.value || 0) : 0;
@@ -2579,8 +2579,8 @@ app.get('/api/cash-box/history', async (req, res) => {
 app.get('/api/cash-box/statement', async (req, res) => {
   try {
     const cashBox = await dataStore.getCashBox();
-    const payments = readJSON(PAYMENTS_FILE) || [];
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const payments = await dataStore.getPayments();
+    const expenses = await dataStore.getExpenses();
     
     const { from, to, type, category } = req.query;
     
@@ -3075,7 +3075,7 @@ app.post('/api/expenses/quick', async (req, res) => {
       return res.status(400).json({ error: 'name and amount required' });
     }
     
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const expense = {
       id: generateId('exp'),
       name: name || 'Despesa',
@@ -3138,8 +3138,8 @@ app.post('/api/expenses/quick', async (req, res) => {
 
 app.get('/api/finance/summary', async (req, res) => {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const payments = await dataStore.getPayments();
+    const expenses = await dataStore.getExpenses();
     const cashBox = await dataStore.getCashBox();
     const alerts = readJSON(ALERTS_FILE) || [];
 
@@ -3198,9 +3198,9 @@ app.get('/api/finance/summary', async (req, res) => {
 
 async function checkAndGenerateAlerts() {
   try {
-    const payments = readJSON(PAYMENTS_FILE) || [];
+    const payments = await dataStore.getPayments();
     const cashBox = await dataStore.getCashBox();
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const alerts = [];
     const now = new Date();
 
@@ -3285,7 +3285,7 @@ async function checkAndGenerateAlerts() {
 
 async function deductRecurringExpenses() {
   try {
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const expenses = await dataStore.getExpenses();
     const cashBox = await dataStore.getCashBox();
     let totalDeducted = 0;
     const now = new Date();
@@ -4268,10 +4268,10 @@ app.get('/api/projects', (req, res) => {
 });
 
 // GET /api/luna/analytics — Dashboard de produtividade v17.0
-app.get('/api/luna/analytics', (req, res) => {
+app.get('/api/luna/analytics', async (req, res) => {
   try {
-    const buffer = readJSON(BUFFER_FILE, { newTasks: [], newTasksDone: [], newLeads: [], newLinks: [], newFinance: [], newMessages: [] });
-    const history = readJSON(HISTORY_FILE, { messages: [] });
+    const buffer = await dataStore.getLunaBuffer();
+    const history = await dataStore.getWhatsappHistory();
     const checkpoint = readJSON(CHECKPOINT_FILE, { processedCount: 0, lastScan: null });
 
     const tasks = buffer.newTasks || [];
@@ -6438,9 +6438,9 @@ app.get('/api/config/dashboard', (req, res) => {
 app.get('/api/nexo-state', async (req, res) => {
   try {
     // Dados antigos (compatibilidade)
-    const tasks = readJSON(TASKS_FILE) || [];
-    const payments = readJSON(PAYMENTS_FILE) || [];
-    const expenses = readJSON(EXPENSES_FILE) || [];
+    const tasks = await dataStore.getTasks();
+    const payments = await dataStore.getPayments();
+    const expenses = await dataStore.getExpenses();
     const cashBox = await dataStore.getCashBox();
     const quotes = await dataStore.getQuotes();
     const leads = await dataStore.getLeads();
