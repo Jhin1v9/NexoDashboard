@@ -23,10 +23,20 @@ export default function LunaFloatingButton() {
   const [ghostParticles, setGhostParticles] = useState([])
 
   // ── Drag state ──
+  const clampPos = (p) => {
+    // Garante que o FAB nunca saia da viewport (com margem de 80px)
+    const maxX = Math.max(0, window.innerWidth - 120)
+    const maxY = Math.max(0, window.innerHeight - 120)
+    return {
+      x: Math.min(Math.max(p.x, -maxX), maxX),
+      y: Math.min(Math.max(p.y, -maxY), maxY),
+    }
+  }
   const [pos, setPos] = useState(() => {
     try {
       const raw = localStorage.getItem('luna_fab_pos')
-      return raw ? JSON.parse(raw) : { x: 0, y: 0 }
+      const parsed = raw ? JSON.parse(raw) : { x: 0, y: 0 }
+      return clampPos(parsed)
     } catch { return { x: 0, y: 0 } }
   })
   const drag = useRef({ active: false, dragged: false, mx: 0, my: 0, bx: 0, by: 0 })
@@ -157,6 +167,13 @@ export default function LunaFloatingButton() {
       lunaEventBus.off('luna:openChat', handleOpenChat)
       lunaEventBus.off('luna:actionDismissed', handleDismissed)
     }
+  }, [])
+
+  // Recalcula limites ao redimensionar a janela (evita FAB fora da tela)
+  useEffect(() => {
+    const handleResize = () => setPos(prev => clampPos(prev))
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   // Fecha com ESC
@@ -310,7 +327,7 @@ export default function LunaFloatingButton() {
             if (Math.abs(dx) > 5 || Math.abs(dy) > 5) d.dragged = true
             if (d.dragged) {
               e.preventDefault()
-              setPos({ x: d.bx + dx, y: d.by + dy })
+              setPos(clampPos({ x: d.bx + dx, y: d.by + dy }))
             }
           }}
           onMouseUp={() => {
