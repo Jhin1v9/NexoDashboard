@@ -2,7 +2,9 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-10a71fc7` 🟡 — última atualização: 2026-05-23
+> **Sessão ativa:** `kimi-568adf4a` 🟡 — última atualização: 2026-05-23 02:42
+> 
+> **Último commit:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
 
 ---
 
@@ -32,7 +34,7 @@
 ### ⏳ Próximos passos (uma entidade por vez)
 
 **🔴 PRÓXIMA ENTIDADE (escolher uma):**
-- [ ] `links` — 46 links no PG
+- [ ] `security_logs` — 14 events no PG
 
 **🟡 PENDENTES DEPOIS:**
 - [ ] `members` — 0 members (vazio)
@@ -93,12 +95,12 @@ backend/tsconfig.json                               # TypeScript strict mode
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `e36c519` — `feat(cash-box): migrate cash_box to PostgreSQL + update auto-deduct`  
+**Commit atual:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`  
 **Build:** ✅ Vite build passando (0 erros)  
 **Testes:** ✅ 46/46 passando  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
 **Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB)  
-**PostgreSQL:** ✅ Neon DB, 22 tabelas, 5 entidades ativas em PG  
+**PostgreSQL:** ✅ Neon DB, 22 tabelas, 10 entidades ativas em PG  
 
 **Validação PG (counts reais):**
 | Tabela | Rows |
@@ -133,8 +135,10 @@ backend/tsconfig.json                               # TypeScript strict mode
 | 3 | **Contador de notificações fica desatualizado sem WS** | Frontend (`useNotifications.js`) | Badge mostra "9+" mesmo após API retornar `unreadCount: 0`. Só atualiza com F5. | Teste notifications |
 | 4 | **Landing page não redireciona usuário logado para `/dashboard`** | Frontend (`LandingPage.jsx` ou roteamento) | Com token válido no localStorage, acessar `/` mostra landing em vez de redirecionar para dashboard. | Teste leads/notifications |
 | 5 | **Vite proxy não encaminha WebSockets** | `frontend/vite.config.js` | `ws://localhost:3457/ws` cai — precisa adicionar `ws: true` no proxy config. | Teste notifications |
+| 6 | **lunaOllama.preload is not a function** | `backend/server.js:8858` | Server crasha no startup se ollama-client.js não exporta `preload()`. Fix aplicado: guard `typeof === 'function'`. | Teste links |
 
 > **Regra:** Fase 0.1 = migração PG. NÃO corrigir bugs agora. Documentar e resolver na Fase 0.2 ou 1.x.
+> **Exceção:** Bug 6 foi fixado porque impedia o backend de iniciar.
 
 ---
 
@@ -153,5 +157,24 @@ backend/workspace/tpv-sorveteria/
 ├── cliente.json
 └── README.md
 ```
+
+---
+
+## 📡 Comunicação entre sessões Kimi
+
+> **Se você é outra instância Kimi lendo este arquivo:**
+> 
+> 1. **Estado atual:** 10/19 entidades migradas (52.6%). Links acabou de ser concluído.
+> 2. **Próxima entidade:** `security_logs` (14 events no PG)
+> 3. **Padrão consolidado:**
+>    - Adicionar `delete<Entity>()` ao `datastore-pg.js` se não existir
+>    - Migrar rotas no `server.js` de `readJSON/writeJSON` → `dataStore.get*/save*/delete*`
+>    - Criar `backend/__tests__/<entity>.test.js` com 4-5 testes
+>    - Rodar `npx jest --runInBand --testTimeout=30000`
+>    - Testar no frontend (ou via curl se não houver página dedicada)
+>    - Commit com mensagem descritiva, aguardar OK do usuário para push
+> 4. **Arquitetura:** Zero adapters, schema 1:1 com JSON, IDs são strings JS
+> 5. **Bugs:** Ver seção "Bugs Observados" acima — NÃO corrigir na Fase 0.1
+> 6. **Contato:** Se precisar de contexto adicional, pergunte ao usuário — ele vai copiar/colar sua pergunta para mim
 
 **⚠️ Atenção:** `backend/workspace/` foi adicionado ao `.gitignore` — NÃO commitar dados de runtime.
