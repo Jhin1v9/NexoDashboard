@@ -1,6 +1,11 @@
 /**
  * E2E Spec: Captura de Leads (Demo Request)
- * Testa o fluxo completo: landing → formulário → dashboard
+ * Testa o fluxo completo: landing → formulário multi-step → dashboard
+ *
+ * Seletores baseados no DOM real do RegisterPage.jsx:
+ * - Inputs: placeholder-based (sem name/id)
+ * - Company size: botões toggle (não <select>)
+ * - Confirmação: "Obrigado, {nome}!"
  */
 
 const { test, expect } = require('@playwright/test');
@@ -13,7 +18,7 @@ test.describe('Lead Capture (Demo Request)', () => {
     email: `e2e-${Date.now()}@nexo.com`,
     phone: '+351 900 000 000',
     companyName: 'TestCorp E2E',
-    companySize: '11-50',
+    companySize: '11-50 funcionários',
     message: 'Mensagem de teste E2E',
   };
 
@@ -22,20 +27,23 @@ test.describe('Lead Capture (Demo Request)', () => {
     await landing.goto();
     await landing.clickRegistrar();
 
-    // Step 1: Dados pessoais
-    await page.locator('input[name="name"], input[placeholder*="nome"]').first().fill(lead.name);
-    await page.locator('input[name="email"], input[type="email"]').first().fill(lead.email);
-    await page.locator('input[name="phone"], input[type="tel"]').first().fill(lead.phone);
-    await page.locator('button', { hasText: /próximo|continuar|next/i }).first().click();
+    // ── Step 1: Dados pessoais ──
+    await page.getByPlaceholder('Seu nome').fill(lead.name);
+    await page.getByPlaceholder('voce@empresa.com').fill(lead.email);
+    await page.getByPlaceholder('+34 600 000 000').fill(lead.phone);
+    await page.getByRole('button', { name: /continuar/i }).click();
 
-    // Step 2: Empresa
-    await page.locator('input[name="companyName"], input[placeholder*="empresa"]').first().fill(lead.companyName);
-    await page.locator('select[name="companySize"]').first().selectOption(lead.companySize);
-    await page.locator('textarea[name="message"], textarea[placeholder*="mensagem"]').first().fill(lead.message);
-    await page.locator('button', { hasText: /enviar|solicitar|submit/i }).first().click();
+    // ── Step 2: Empresa ──
+    await page.getByPlaceholder('Sua empresa').fill(lead.companyName);
+    await page.getByText(lead.companySize).click();
+    await page.getByPlaceholder(/Conte-nos sobre/).fill(lead.message);
+
+    // Submete
+    await page.getByRole('button', { name: /solicitar demo/i }).click();
 
     // Confirmação
-    await expect(page.locator('text=/obrigado|sucesso|confirm/i')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Obrigado/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Recebemos sua solicitação/)).toBeVisible();
   });
 
   test('lead aparece no dashboard após envio', async ({ page }) => {
@@ -45,10 +53,10 @@ test.describe('Lead Capture (Demo Request)', () => {
     await login.login('abner', '7741');
 
     // 2. Navega para Leads
-    await page.click('text=Leads');
+    await page.getByText(/Leads/i).first().click();
     await page.waitForURL(/\/leads|dashboard/, { timeout: 10000 });
 
     // 3. Verifica que o lead do teste anterior aparece
-    await expect(page.locator(`text=${lead.name}`).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(lead.name).first()).toBeVisible({ timeout: 5000 });
   });
 });
