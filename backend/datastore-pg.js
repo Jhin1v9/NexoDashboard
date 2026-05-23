@@ -388,6 +388,11 @@ async function saveMember(member) {
   return member;
 }
 
+async function deleteMember(id) {
+  await db.run('DELETE FROM members WHERE id = $1', [id]);
+  notifyChange('members', await getMembers());
+}
+
 // ============================================================
 // SETTINGS / GENERIC JSONB
 // ============================================================
@@ -887,7 +892,7 @@ module.exports = {
   getExpenses, saveExpense, deleteExpense,
   getCashBox, saveCashBox,
   getQuotes, saveQuote, deleteQuote,
-  getMembers, saveMember,
+  getMembers, saveMember, deleteMember,
   getSettings, setSettings,
   getIdeas, saveIdea,
   getLeads, saveLead, deleteLead,

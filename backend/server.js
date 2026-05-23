@@ -3448,22 +3448,22 @@ app.post('/api/ops/changes', (req, res) => {
   res.json(change);
 });
 
-// ── Members ──
-const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
+// ── Members ── migrado para PostgreSQL
 
-app.get('/api/members', (req, res) => {
-  const members = readJSON(MEMBERS_FILE) || [];
+app.get('/api/members', async (req, res) => {
+  const members = await dataStore.getMembers();
   res.json(members);
 });
 
-app.put('/api/members/:id', (req, res) => {
-  const members = readJSON(MEMBERS_FILE) || [];
+app.put('/api/members/:id', async (req, res) => {
+  const members = await dataStore.getMembers();
   const idx = members.findIndex(m => m.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Membro não encontrado' });
-  members[idx] = { ...members[idx], ...req.body, updatedAt: new Date().toISOString() };
-  writeJSON(MEMBERS_FILE, members);
-  broadcast({ type: 'members', data: members });
-  res.json(members[idx]);
+  const updated = { ...members[idx], ...req.body, updatedAt: new Date().toISOString() };
+  await dataStore.saveMember(updated);
+  const all = await dataStore.getMembers();
+  broadcast({ type: 'members', data: all });
+  res.json(updated);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -6448,7 +6448,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const cashBox = await dataStore.getCashBox();
     const quotes = await dataStore.getQuotes();
     const leads = await dataStore.getLeads();
-    const members = readJSON(MEMBERS_FILE) || [];
+    const members = await dataStore.getMembers();
     const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };
     const transactions = readJSON(TRANSACTIONS_FILE) || [];
     const whatsappTasks = readJSON(WAPP_FILE) || [];
