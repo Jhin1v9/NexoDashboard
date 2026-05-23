@@ -907,6 +907,9 @@ const PUBLIC_API_ROUTES = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/sync',
+  '/api/leads',               // Lead capture / Demo request (público)
+  '/api/email/auth/url',      // Inicia OAuth do Gmail (precisa estar logado, mas o frontend envia token)
+  '/api/email/auth/status',   // Status da conexão Gmail
   '/api/email/auth/callback', // OAuth callback do Gmail (chamado pelo Google, sem token)
 ];
 
@@ -3385,6 +3388,12 @@ console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
 // ═══════════════════════════════════════════════════════════════════════════════
 const ideasRouter = require('./routes/ideas');
 app.use('/api/ideas', ideasRouter(requireAuth));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Leads Routes (Demo Request — público, sem auth)
+// ═══════════════════════════════════════════════════════════════════════════════
+const leadsRouter = require('./routes/leads');
+app.use('/api/leads', leadsRouter);
 
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──
@@ -5919,7 +5928,10 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
 
     const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers.authorization || ''
+      },
       body: JSON.stringify(chatPayload)
     });
 

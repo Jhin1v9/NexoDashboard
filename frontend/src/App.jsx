@@ -15,6 +15,7 @@ import LunaActionBridge from './components/luna/LunaActionBridge'
 import { RouteHarvester } from './components/luna/harvesters'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
 import Workspace from './pages/Workspace'
@@ -113,6 +114,9 @@ function App() {
 
           {/* Login tradicional */}
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Registro / Demo Request */}
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Terminal secreto (easter egg / modo legacy) */}
           <Route path="/terminal" element={<LandingPage terminalMode={true} />} />

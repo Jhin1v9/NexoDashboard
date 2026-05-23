@@ -22,9 +22,13 @@ export function useGmailAuth() {
       const res = await axios.get('/api/email/auth/url')
       if (res.data.success && res.data.authUrl) {
         window.location.href = res.data.authUrl
+      } else {
+        alert('Erro ao conectar com Google: ' + (res.data.error || 'URL de autenticação não disponível'))
       }
     } catch (e) {
+      const msg = e.response?.data?.error || e.message || 'Erro desconhecido'
       console.error('Erro ao iniciar OAuth:', e)
+      alert('Erro ao conectar com Google: ' + msg)
     }
   }, [])
 

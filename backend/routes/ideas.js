@@ -1633,7 +1633,10 @@ module.exports = function(requireAuth) {
       const PORT = process.env.PORT || 3456;
       const lunaResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.authorization || ''
+        },
         body: JSON.stringify({
           message,
           authorName: getUserName(req.user?.id || req.user?.userId),

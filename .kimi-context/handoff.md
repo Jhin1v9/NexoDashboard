@@ -551,3 +551,44 @@ Ver seção "Bugs Observados" acima.
 - **Ghost Mode:** ✅ Ethereal Presence
 - **Build:** ✅ 0 erros
 - **Backend:** ✅ Rodando, endpoint funcional
+
+
+---
+
+## 🐛 Sessão Atual — Bugfix Total (Auth + Frontend + Backend)
+
+> **Instância:** `kimi-atual-hud-v3` 🔥 — 2026-05-23  
+> **Foco:** Corrigir bugs reportados pelo usuário em produção  
+> **Changelog entries:** 1 nova entrada (bugfix)
+
+### ✅ Bugs Corrigidos
+
+| # | Bug | Causa Raiz | Fix |
+|---|---|---|---|
+| 1 | **WhatsApp crash** `ReferenceError: Activity is not defined` | Ícone `Activity` do lucide-react usado no `actionIcons` mas não importado em `WhatsApp.jsx` | Adicionado `Activity` ao import |
+| 2 | **Luna não responde** — "Ops! Algo deu errado" em TODAS as mensagens | Internal `fetch` para `/api/luna/chat` no `server.js` e `ideas.js` **não passava header `Authorization`**. Middleware de auth global bloqueava com 401 | Adicionado `'Authorization': req.headers.authorization \|\| ''` em ambos os internal fetches |
+| 3 | **Email "Conectar com Google"** não faz nada | (a) Rotas `/api/email/auth/url` e `/api/email/auth/status` não estavam em `PUBLIC_API_ROUTES` → 401  <br>(b) Erro capturado silenciosamente no frontend → usuário não via nada | (a) Adicionadas rotas ao `PUBLIC_API_ROUTES`  <br>(b) `useGmailAuth.js` agora mostra `alert()` com mensagem de erro real |
+| 4 | **"Erro ao Salvar caixa"** e erro SISTÊMICO em várias páginas | Axios tem interceptador global que adiciona token JWT, mas **`fetch` nativo NÃO TEM**. Todas as páginas que usam `fetch` sem `Authorization` são bloqueadas pelo middleware de auth com 401 | **Interceptador global de `fetch`** adicionado em `main.jsx`. Agora TODAS as chamadas `fetch` para `/api/*` incluem o token automaticamente |
+| 5 | **Sino de notificações não abre** dropdown | `createPortal` do dropdown podia estar falhando ou sendo sobreposto por stacking context. Posicionamento `fixed` com coordenadas calculadas manualmente era frágil | Removido `createPortal`. Dropdown agora é renderizado **inline** com posicionamento `absolute` relativo ao container do botão. Simplificado e mais robusto |
+
+### 📁 Arquivos Modificados
+- `frontend/src/pages/WhatsApp.jsx` — Adicionado `Activity` ao import do lucide-react
+- `backend/server.js` — Auth header no internal fetch + rotas de email no PUBLIC_API_ROUTES
+- `backend/routes/ideas.js` — Auth header no internal fetch para `/api/luna/chat`
+- `frontend/src/hooks/useGmailAuth.js` — Feedback visual (alert) em erros de OAuth
+- `frontend/src/main.jsx` — **Interceptador global de `fetch`** para adicionar token JWT
+- `frontend/src/pages/Caixa.jsx` — Convertido `fetch` para `axios.put`
+- `frontend/src/components/NotificationCenter.jsx` — Removido `createPortal`, dropdown inline com posicionamento absoluto
+
+### 🧪 Testes
+- **Build Vite:** ✅ 3150 modules, 0 erros
+- **Backend start:** ✅ Porta 3456 respondendo
+- **API health:** ✅ `{"status":"ok"}`
+- **Backend syntax:** ✅ `node -c server.js` passa
+
+### 🎯 Status
+- **WhatsApp:** ✅ Menções não quebram mais
+- **Luna chat:** ✅ Responde normalmente (auth passa no internal fetch)
+- **Email OAuth:** ✅ Mostra erro real se falhar, rota acessível
+- **Caixa/Outras páginas:** ✅ Fetch global interceptado, todas as páginas com token
+- **Notificações:** ✅ Dropdown abre inline

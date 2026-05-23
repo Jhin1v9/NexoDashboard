@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
 import CountUp from 'react-countup'
 import {
@@ -97,12 +97,22 @@ function Navbar() {
 
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3">
-            <button
-              onClick={() => scrollTo('cta')}
-              className="bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 text-white font-semibold px-5 py-2 rounded-full shadow-lg shadow-violet-500/25 transition-all hover:scale-105 hover:shadow-xl hover:shadow-violet-500/30 text-sm"
+            <Link
+              to="/login"
+              className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors rounded-lg hover:bg-white/[0.04] border border-white/[0.06]"
             >
-              Get Started
-            </button>
+              Entrar
+            </Link>
+            <Link
+              to="/register"
+              className="text-white font-semibold px-5 py-2 rounded-full shadow-lg transition-all hover:scale-105 hover:shadow-xl text-sm"
+              style={{
+                background: 'linear-gradient(135deg, #00f0ff 0%, #6c5ce7 100%)',
+                boxShadow: '0 4px 20px rgba(0, 240, 255, 0.2)'
+              }}
+            >
+              Registrar
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -129,12 +139,19 @@ function Navbar() {
                   {link.label}
                 </button>
               ))}
-              <button
-                onClick={() => scrollTo('cta')}
-                className="mt-2 bg-gradient-to-r from-violet-600 to-violet-500 text-white font-semibold rounded-full px-5 py-3 text-sm"
+              <Link
+                to="/register"
+                className="mt-2 text-white font-semibold rounded-full px-5 py-3 text-sm text-center block"
+                style={{ background: 'linear-gradient(135deg, #00f0ff 0%, #6c5ce7 100%)' }}
               >
-                Get Started
-              </button>
+                Registrar
+              </Link>
+              <Link
+                to="/login"
+                className="text-zinc-400 hover:text-white font-medium px-5 py-3 text-sm text-center block transition-colors"
+              >
+                Entrar
+              </Link>
             </div>
           </div>
         )}

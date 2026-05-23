@@ -5,6 +5,7 @@ import {
   CheckCircle, Clock, ArrowUpRight, ArrowDownRight,
   Plus, Trash2, Edit2, RefreshCw, X, ChevronDown, ChevronUp, Banknote
 } from 'lucide-react'
+import axios from 'axios'
 import PaymentModal from '../components/PaymentModal.jsx'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import useRealtime from '../hooks/useRealtime'
@@ -154,12 +155,8 @@ export default function Caixa() {
         monthlyExpenses: editValues.monthlyExpenses === '' ? monthlyExpenses : Number(editValues.monthlyExpenses),
         currency
       }
-      const res = await fetch('/api/cash-box', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      if (!res.ok) throw new Error('Erro ao salvar caixa')
+      const res = await axios.put('/api/cash-box', payload)
+      if (!res.data) throw new Error('Erro ao salvar caixa')
       setEditValues({ balance: '', monthlyIncome: '', monthlyExpenses: '' })
       await refetchCashBox()
     } catch (e) {

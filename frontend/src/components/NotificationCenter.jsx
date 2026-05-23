@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { Bell, X, Check, AlertTriangle, Shield, Info } from 'lucide-react'
 import axios from 'axios'
 
@@ -13,7 +12,6 @@ function NotificationCenter() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [pos, setPos] = useState({ top: 56, right: 16 })
   const [wsConnected, setWsConnected] = useState(false)
   const buttonRef = useRef(null)
   const dropdownRef = useRef(null)
@@ -60,14 +58,7 @@ function NotificationCenter() {
   }, [fetchNotifications])
 
   useEffect(() => {
-    if (open && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect()
-      setPos({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right
-      })
-      // Auto-mark all as read when opening
-      markAllAsRead()
+    if (open) {
       // Focus first focusable element in dropdown
       setTimeout(() => {
         dropdownRef.current?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus()
@@ -135,7 +126,7 @@ function NotificationCenter() {
         )}
       </button>
 
-      {open && createPortal(
+      {open && (
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} role="presentation" aria-hidden="true" />
           <div
@@ -143,11 +134,11 @@ function NotificationCenter() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="nc-title"
-            className="fixed w-80 rounded-xl shadow-2xl z-[9999] overflow-hidden"
+            className="absolute w-80 rounded-xl shadow-2xl z-[9999] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             style={{
-              top: pos.top,
-              right: pos.right,
+              top: 'calc(100% + 8px)',
+              right: 0,
               background: 'linear-gradient(180deg, rgba(15,15,22,0.98) 0%, rgba(8,8,12,0.98) 100%)',
               border: '1px solid rgba(0,240,255,0.15)',
               boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,240,255,0.05)'
@@ -203,8 +194,7 @@ function NotificationCenter() {
               )}
             </div>
           </div>
-        </>,
-        document.body
+        </>
       )}
     </div>
   )

@@ -5,7 +5,8 @@ import {
   TrendingUp, Users, Clock, Zap, BarChart3, ChevronDown, ChevronUp,
   Target, ArrowUpRight, CheckCircle2, Circle, AlertCircle,
   RefreshCw, ExternalLink, Link2, FileText, AtSign, Bot,
-  CheckCircle, DollarSign, Mail, UserPlus, ThumbsUp, ThumbsDown, Brain, HelpCircle
+  CheckCircle, DollarSign, Mail, UserPlus, ThumbsUp, ThumbsDown, Brain, HelpCircle,
+  Activity
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'

@@ -291,9 +291,34 @@ async function sendSimpleMessage(content, options = {}) {
   }
 }
 
+/**
+ * Envia uma mensagem genérica (embeds) para o webhook Discord configurado
+ * @param {Object} payload - { content?, embeds?, username?, avatar_url? }
+ */
+async function sendWebhookMessage(payload) {
+  if (!DISCORD_MENTION_WEBHOOK) {
+    return { sent: false, reason: 'webhook_not_set' };
+  }
+  try {
+    const res = await fetch(DISCORD_MENTION_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return { sent: true, status: res.status };
+    }
+    const text = await res.text();
+    return { sent: false, reason: 'discord_error', status: res.status, error: text };
+  } catch (err) {
+    return { sent: false, reason: 'network_error', error: err.message };
+  }
+}
+
 module.exports = {
   sendMentionNotification,
   sendSimpleMessage,
+  sendWebhookMessage,
   resolveMentions,
   templates,
   setWebhookUrl
