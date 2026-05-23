@@ -136,6 +136,7 @@ export default function Tarefas() {
   }
 
   const deleteTask = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta tarefa?')) return
     await axios.delete(`/api/tasks/${id}`)
     refetch()
   }
@@ -450,6 +451,7 @@ export default function Tarefas() {
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteTask(task.id) }}
                   className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-nexo-danger/20 rounded transition-all mt-0.5"
+                  title="Excluir tarefa"
                 >
                   <Trash2 size={14} className="text-nexo-danger" />
                 </button>
@@ -674,6 +676,7 @@ export default function Tarefas() {
                 <button
                   onClick={() => { deleteTask(modalTask.id); closeModal() }}
                   className="px-3 py-2 text-xs text-nexo-danger hover:bg-nexo-danger/10 rounded-lg transition-colors"
+                  title="Excluir tarefa"
                 >
                   <Trash2 size={14} className="inline mr-1" />
                   Deletar

@@ -1,28 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 
 export default function useRealtime(endpoint, interval = 30000) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const latestRequestRef = useRef(0)
 
-  const fetch = async () => {
+  const fetch = useCallback(async () => {
+    const requestId = ++latestRequestRef.current
     try {
       const res = await axios.get(endpoint)
-      setData(res.data)
-      setError(null)
+      // Ignora respostas de requisições antigas (race condition protection)
+      if (latestRequestRef.current === requestId) {
+        setData(res.data)
+        setError(null)
+      }
     } catch (e) {
-      setError(e)
+      if (latestRequestRef.current === requestId) {
+        setError(e)
+      }
     } finally {
-      setLoading(false)
+      if (latestRequestRef.current === requestId) {
+        setLoading(false)
+      }
     }
-  }
+  }, [endpoint])
 
   useEffect(() => {
     fetch()
     const id = setInterval(fetch, interval)
     return () => clearInterval(id)
-  }, [endpoint, interval])
+  }, [fetch, interval])
 
   return { data, loading, error, refetch: fetch }
 }

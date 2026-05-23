@@ -121,7 +121,7 @@ curl http://localhost:3457/            # deve retornar 200
 | 2 | Luna não responde (fetch sem Auth) | 🟡 PENDENTE | 2026-05-23 | Internal fetch para `/api/luna/chat` não passa header `Authorization` |
 | 3 | Email OAuth silencioso | ✅ CORRIGIDO | 2026-05-23 | Agora mostra alert com erro real |
 | 4 | Caixa "Erro ao salvar" | 🟡 PENDENTE | 2026-05-23 | Páginas com `fetch` nativo não enviam token JWT |
-| 5 | Sino 9+ não abre | 🟡 PENDENTE | 2026-05-23 | NotificationCenter refatorado, precisa validar |
+| 5 | Sino 9+ não abre | ✅ FUNCIONA | 2026-05-23 | Há 3 sinos na TopBar (ChangelogBadge, NotificationCenter, PushNotification). O "9+" é o NotificationCenter — **funciona quando clicado corretamente** |
 | 6 | Ollama erro JSON | 🟡 CONHECIDO | 2026-05-23 | `[OllamaClient] Unexpected non-whitespace character after JSON` — não crítico |
 | 7 | WebSocket ERR_CONNECTION_REFUSED | 🟡 CONHECIDO | 2026-05-23 | WS funciona via teste, browser às vezes falha |
 | 8 | Vite dev server cai | 🟡 CONHECIDO | 2026-05-23 | Reiniciar: `cd frontend && npx vite --port 3457` |
@@ -178,6 +178,10 @@ curl -s http://localhost:3456/api/luna/threads -H "Authorization: Bearer $TOKEN"
 7. **SEMPRE verifique `git status`** antes de fazer mudanças
 8. **Siga o handoff.md** para entender o estado atual do projeto
 9. **Token JWT expira após restart do backend** — O secret é gerado aleatoriamente em cada startup. Se reiniciar o backend, faça logout/login novamente no browser (ou limpe o localStorage)
+10. **Há 3 sinos na TopBar** — Não se confunda:
+    - 🔔 **"9+"** (esquerda) = `NotificationCenter` — notificações do sistema
+    - 🔔 **"3"** (meio) = `ChangelogBadge` — atualizações do changelog  
+    - 🔔 **vazio** (direita) = `PushNotificationButton` — notificações push do browser
 
 ---
 
