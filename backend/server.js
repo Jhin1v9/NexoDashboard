@@ -1417,19 +1417,16 @@ function normalizeWhatsappBuffer(buffer = {}) {
   };
 }
 
-function readLunaBuffer() {
-  const canonical = path.join(DATA_DIR, 'luna-buffer.json');
-  const legacy = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
-  const fallback = { newMessages: [], newTasks: [], newIdeas: [], newDecisions: [], newLinks: [], newLeads: [], newFinance: [], ignoredMessages: [] };
-  const data = readJSON(canonical) || readJSON(legacy) || fallback;
+async function readLunaBuffer() {
+  const data = await dataStore.getLunaBuffer();
   return normalizeWhatsappBuffer(data);
 }
 
 // WhatsApp tasks (legado)
 // FIX: /api/whatsapp agora retorna dados REAIS do backend/data/luna-buffer.json
-app.get('/api/whatsapp', (req, res) => {
+app.get('/api/whatsapp', async (req, res) => {
     try {
-        res.json(readLunaBuffer());
+        res.json(await readLunaBuffer());
     } catch (e) {
         // Fallback para legado se erro
         res.json(readJSON(WAPP_FILE) || []);
@@ -1460,10 +1457,10 @@ if (!fs.existsSync(WHATSAPP_HISTORY_FILE)) writeJSON(WHATSAPP_HISTORY_FILE, []);
 // Serve report files statically
 app.use('/reports', express.static(REPORTS_DIR));
 
-app.get('/api/whatsapp-agent', (req, res) => {
+app.get('/api/whatsapp-agent', async (req, res) => {
   try {
     const data = readJSON(AGENT_DATA_FILE);
-    const buffer = readLunaBuffer();
+    const buffer = await readLunaBuffer();
     const history = await readWhatsappHistory();
     const payload = data && !Array.isArray(data) ? data : {};
     
@@ -1510,7 +1507,7 @@ app.get('/api/whatsapp-agent', (req, res) => {
 
 app.get('/api/whatsapp-agent/status', async (req, res) => {
   const data = readJSON(AGENT_DATA_FILE);
-  const buffer = readLunaBuffer();
+  const buffer = await readLunaBuffer();
   const history = await readWhatsappHistory();
   const hasBufferActivity = (buffer.newTasks?.length || 0) + (buffer.newLinks?.length || 0) + (buffer.newLeads?.length || 0) > 0;
   res.json({
@@ -4361,7 +4358,7 @@ app.get('/api/luna/analytics', (req, res) => {
 // ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
 async function buildDashboardContext(contextModule = null, contextId = null, contextFile = null) {
   try {
-    const buffer = readLunaBuffer();
+    const buffer = await readLunaBuffer();
     const tasksFile = path.join(DATA_DIR, 'tasks.json');
     const cashFile = path.join(DATA_DIR, 'cash-box.json');
     const paymentsFile = path.join(DATA_DIR, 'payments.json');
@@ -4526,8 +4523,8 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
   }
 }
 
-function buildChatFallbackReply(userMessage) {
-  const buffer = readLunaBuffer();
+async function buildChatFallbackReply(userMessage) {
+  const buffer = await readLunaBuffer();
   const tasks = (buffer.newTasks || []).filter(t => !t.done);
   const p0 = tasks.filter(t => t.priority === 'P0');
   const p1 = tasks.filter(t => t.priority === 'P1');
@@ -5293,7 +5290,7 @@ app.post('/api/luna/chat', async (req, res) => {
 
     // 2B. SE NLU NÃO RECONHECEU → usa regex fast-path ou LLM
     if (!parsed) {
-      const buffer = readLunaBuffer();
+      const buffer = await readLunaBuffer();
       const parseContext = {
         authorName,
         contextModule,
@@ -5634,7 +5631,7 @@ ${dataContext}`;
         if (!reply) {
           usedModel = 'fallback';
           isFallback = true;
-          reply = buildChatFallbackReply(msg.trim());
+          reply = await buildChatFallbackReply(msg.trim());
         }
       }
     }
@@ -5657,7 +5654,7 @@ ${dataContext}`;
       return res.json({ success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() });
     }
 
-    const fallbackReply = buildChatFallbackReply(msgText.trim());
+    const fallbackReply = await buildChatFallbackReply(msgText.trim());
     return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
   }
 });
@@ -5688,7 +5685,7 @@ app.post('/api/luna/chat/stream', async (req, res) => {
     }
 
     if (!parsed) {
-      const buffer = readLunaBuffer();
+      const buffer = await readLunaBuffer();
       parsed = await lunaIntentParser.parse(msg, {
         authorName,
         bufferSummary: {
