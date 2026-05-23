@@ -1687,7 +1687,7 @@ function resolveAuthor(msg) {
   }
 }
 
-app.get('/api/whatsapp/history', (req, res) => {
+app.get('/api/whatsapp/history', async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 50));
     const chat = (req.query.chat || '').toString().trim().toLowerCase();
@@ -1757,7 +1757,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
   }
 });
 
-app.get('/api/classifications/review', (req, res) => {
+app.get('/api/classifications/review', async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
     const messages = (await readWhatsappHistory())
@@ -1779,7 +1779,7 @@ app.get('/api/classifications/review', (req, res) => {
   }
 });
 
-app.post('/api/classifications/:id/correct', (req, res) => {
+app.post('/api/classifications/:id/correct', async (req, res) => {
   try {
     const { correctCategory, notes } = req.body || {};
     if (!correctCategory || typeof correctCategory !== 'string') {
@@ -1825,7 +1825,7 @@ app.post('/api/classifications/:id/correct', (req, res) => {
   }
 });
 
-app.get('/api/classifications/stats', (req, res) => {
+app.get('/api/classifications/stats', async (req, res) => {
   try {
     const history = (await readWhatsappHistory()).filter(m => m.classification);
     const byCategory = {};
@@ -3738,7 +3738,7 @@ app.get('/luna-control', (req, res) => {
 });
 
 // 1. Status do Luna
-app.get('/api/luna/status', (req, res) => {
+app.get('/api/luna/status', async (req, res) => {
     try {
         const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
         const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
@@ -5900,7 +5900,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
 });
 
 // DELETE /api/luna/threads/:id/messages — Limpa mensagens da thread (mantém a thread)
-app.delete('/api/luna/threads/:id/messages', (req, res) => {
+app.delete('/api/luna/threads/:id/messages', async (req, res) => {
   try {
     const threadId = req.params.id;
     const thread = await getThread(threadId);
@@ -8346,7 +8346,7 @@ app.delete('/api/bugdetector/reports/:filename', requireAuth, (req, res) => {
 
 const upload = multer({ limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB
 
-app.get('/api/workspace/clients', requireAuth, (req, res) => {
+app.get('/api/workspace/clients', requireAuth, async (req, res) => {
   try {
     const index = await workspaceManager.getIndex();
     const registry = readJSON(CLIENTS_REGISTRY_FILE) || { clients: {} };
@@ -8385,7 +8385,7 @@ app.get('/api/workspace/clients', requireAuth, (req, res) => {
   }
 });
 
-app.post('/api/workspace/clients', requireAuth, (req, res) => {
+app.post('/api/workspace/clients', requireAuth, async (req, res) => {
   try {
     const { id, nome, status, dataInicio, responsavel, orcamentoTotal, moeda, cor, tags, anotacoes } = req.body;
     if (!id) return res.status(400).json({ success: false, error: 'id obrigatorio' });
@@ -8398,7 +8398,7 @@ app.post('/api/workspace/clients', requireAuth, (req, res) => {
   }
 });
 
-app.get('/api/workspace/clients/:id', requireAuth, (req, res) => {
+app.get('/api/workspace/clients/:id', requireAuth, async (req, res) => {
   try {
     const client = await workspaceManager.getClient(req.params.id);
     if (!client) return res.status(404).json({ success: false, error: 'Cliente nao encontrado' });
@@ -8408,7 +8408,7 @@ app.get('/api/workspace/clients/:id', requireAuth, (req, res) => {
   }
 });
 
-app.put('/api/workspace/clients/:id', requireAuth, (req, res) => {
+app.put('/api/workspace/clients/:id', requireAuth, async (req, res) => {
   try {
     const client = await workspaceManager.updateClient(req.params.id, req.body);
     res.json({ success: true, client });
@@ -8417,7 +8417,7 @@ app.put('/api/workspace/clients/:id', requireAuth, (req, res) => {
   }
 });
 
-app.delete('/api/workspace/clients/:id', requireAuth, (req, res) => {
+app.delete('/api/workspace/clients/:id', requireAuth, async (req, res) => {
   try {
     const result = await workspaceManager.deleteClient(req.params.id);
     res.json({ success: true, ...result });

@@ -426,7 +426,7 @@ function parseToolCalls(response) {
   return toolCalls;
 }
 
-function executeToolCall(toolCall, currentIdeaId, reqUser) {
+async function executeToolCall(toolCall, currentIdeaId, reqUser) {
   const { tool, params } = toolCall;
   const ideasData = await loadIdeasData();
   const now = new Date().toISOString();
