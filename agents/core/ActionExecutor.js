@@ -296,6 +296,39 @@ class ActionExecutor {
         return await this.deleteBugReport(action.params);
       case 'controlar_servico':
         return await this.controlService(action.params);
+      // ─── Administração de Sistema ───
+      case 'monitorar_sistema':
+        return await this.monitorSystem(action.params);
+      case 'listar_processos':
+        return await this.listSystemProcesses(action.params);
+      case 'matar_processo':
+        return await this.killSystemProcess(action.params);
+      case 'listar_pm2':
+        return await this.listPM2(action.params);
+      case 'controlar_pm2':
+        return await this.controlPM2(action.params);
+      case 'status_systemd':
+        return await this.statusSystemd(action.params);
+      case 'controlar_systemd':
+        return await this.controlSystemd(action.params);
+      case 'executar_shell':
+        return await this.executeShell(action.params);
+      case 'listar_arquivos':
+        return await this.listFiles(action.params);
+      case 'ler_arquivo':
+        return await this.readFileAction(action.params);
+      case 'tail_arquivo':
+        return await this.tailFileAction(action.params);
+      case 'buscar_arquivos':
+        return await this.findFilesAction(action.params);
+      case 'listar_cron':
+        return await this.listCron(action.params);
+      case 'adicionar_cron':
+        return await this.addCron(action.params);
+      case 'remover_cron':
+        return await this.removeCron(action.params);
+      case 'logs_sistema':
+        return await this.systemLogs(action.params);
       default:
         throw new Error(`Ação não suportada: ${action.type}`);
     }
@@ -2771,6 +2804,173 @@ class ActionExecutor {
       return { type: 'service_control', action, service, result: apiResult, source: 'api' };
     }
     return { type: 'service_control', action, service, result: 'offline', source: 'fallback' };
+  }
+
+  // ============================================================
+  // AÇÕES: Administração de Sistema
+  // ============================================================
+  async monitorSystem(params) {
+    const apiResult = await this.apiGet('/system/health');
+    if (apiResult && !apiResult.error) {
+      return { type: 'system_health', ...apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível obter métricas do sistema');
+  }
+
+  async listSystemProcesses(params) {
+    const sortBy = params.ordenar || 'cpu';
+    const limit = parseInt(params.limite) || 20;
+    const apiResult = await this.apiGet(`/system/processes?sortBy=${sortBy}&limit=${limit}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'process_list', processes: apiResult.processes, count: apiResult.count, source: 'api' };
+    }
+    throw new Error('Não foi possível listar processos');
+  }
+
+  async killSystemProcess(params) {
+    const pid = parseInt(params.pid || params.processo);
+    const signal = params.sinal || 'SIGTERM';
+    if (!pid) throw new Error('PID do processo é necessário');
+    const apiResult = await this.apiPost('/system/processes/kill', { pid, signal });
+    if (apiResult && apiResult.success) {
+      return { type: 'process_kill', pid, signal, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao matar processo');
+  }
+
+  async listPM2(params) {
+    const apiResult = await this.apiGet('/system/pm2');
+    if (apiResult && !apiResult.error) {
+      return { type: 'pm2_list', processes: apiResult.processes, source: 'api' };
+    }
+    throw new Error('Não foi possível listar processos PM2');
+  }
+
+  async controlPM2(params) {
+    const action = params.acao || params.action;
+    const target = params.alvo || params.nome || params.target;
+    if (!action || !target) throw new Error('Ação e alvo são necessários (ex: start nexo-dashboard)');
+    const apiResult = await this.apiPost('/system/pm2', { action, target });
+    if (apiResult && apiResult.success) {
+      return { type: 'pm2_control', action, target, output: apiResult.output, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao controlar PM2');
+  }
+
+  async statusSystemd(params) {
+    const service = params.servico || params.service;
+    if (!service) throw new Error('Nome do serviço é necessário');
+    const apiResult = await this.apiGet(`/system/systemd/${service}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'systemd_status', service, ...apiResult, source: 'api' };
+    }
+    throw new Error('Não foi possível verificar status do serviço');
+  }
+
+  async controlSystemd(params) {
+    const action = params.acao || params.action;
+    const service = params.servico || params.service;
+    if (!action || !service) throw new Error('Ação e serviço são necessários');
+    const apiResult = await this.apiPost(`/system/systemd/${service}`, { action });
+    if (apiResult && apiResult.success) {
+      return { type: 'systemd_control', action, service, output: apiResult.output, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao controlar serviço');
+  }
+
+  async executeShell(params) {
+    const command = params.comando || params.command;
+    const cwd = params.diretorio || params.cwd;
+    if (!command) throw new Error('Comando é necessário');
+    const apiResult = await this.apiPost('/system/shell', { command, cwd });
+    if (apiResult && apiResult.success) {
+      return { type: 'shell_exec', command, stdout: apiResult.stdout, stderr: apiResult.stderr, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao executar comando');
+  }
+
+  async listFiles(params) {
+    const dirPath = params.caminho || params.path || params.diretorio;
+    const apiResult = await this.apiGet(`/system/files?path=${encodeURIComponent(dirPath || '')}`);
+    if (apiResult && apiResult.success) {
+      return { type: 'file_list', path: apiResult.path, items: apiResult.items, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao listar diretório');
+  }
+
+  async readFileAction(params) {
+    const filePath = params.caminho || params.path || params.arquivo;
+    const lines = parseInt(params.linhas) || 100;
+    const offset = parseInt(params.offset) || 0;
+    if (!filePath) throw new Error('Caminho do arquivo é necessário');
+    const apiResult = await this.apiGet(`/system/files/read?path=${encodeURIComponent(filePath)}&lines=${lines}&offset=${offset}`);
+    if (apiResult && apiResult.success) {
+      return { type: 'file_read', path: apiResult.path, content: apiResult.content, totalLines: apiResult.totalLines, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao ler arquivo');
+  }
+
+  async tailFileAction(params) {
+    const filePath = params.caminho || params.path || params.arquivo;
+    const lines = parseInt(params.linhas) || 50;
+    if (!filePath) throw new Error('Caminho do arquivo é necessário');
+    const apiResult = await this.apiGet(`/system/files/tail?path=${encodeURIComponent(filePath)}&lines=${lines}`);
+    if (apiResult && apiResult.success) {
+      return { type: 'file_tail', path: apiResult.path, content: apiResult.content, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao fazer tail do arquivo');
+  }
+
+  async findFilesAction(params) {
+    const dir = params.diretorio || params.dir || params.caminho;
+    const pattern = params.patterns || params.pattern || params.nome;
+    const maxDepth = parseInt(params.profundidade) || 3;
+    if (!dir || !pattern) throw new Error('Diretório e padrão de busca são necessários');
+    const apiResult = await this.apiGet(`/system/files/find?dir=${encodeURIComponent(dir)}&pattern=${encodeURIComponent(pattern)}&maxDepth=${maxDepth}`);
+    if (apiResult && apiResult.success) {
+      return { type: 'file_find', dir, pattern, files: apiResult.files, count: apiResult.count, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha na busca');
+  }
+
+  async listCron(params) {
+    const apiResult = await this.apiGet('/system/cron');
+    if (apiResult && !apiResult.error) {
+      return { type: 'cron_list', jobs: apiResult.jobs, count: apiResult.count, source: 'api' };
+    }
+    throw new Error('Não foi possível listar cron jobs');
+  }
+
+  async addCron(params) {
+    const schedule = params.agenda || params.schedule || params.cron;
+    const command = params.comando || params.command;
+    if (!schedule || !command) throw new Error('Agenda (cron) e comando são necessários');
+    const apiResult = await this.apiPost('/system/cron', { schedule, command });
+    if (apiResult && apiResult.success) {
+      return { type: 'cron_add', schedule, command, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao adicionar cron job');
+  }
+
+  async removeCron(params) {
+    const id = parseInt(params.id);
+    if (isNaN(id)) throw new Error('ID do job é necessário');
+    const apiResult = await this.apiDelete(`/system/cron/${id}`);
+    if (apiResult && apiResult.success) {
+      return { type: 'cron_remove', id, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao remover cron job');
+  }
+
+  async systemLogs(params) {
+    const service = params.servico || params.service;
+    const lines = parseInt(params.linhas) || 50;
+    const endpoint = service ? `/system/logs?service=${service}&lines=${lines}` : `/system/logs?lines=${lines}`;
+    const apiResult = await this.apiGet(endpoint);
+    if (apiResult && apiResult.success) {
+      return { type: 'system_logs', service: apiResult.service, content: apiResult.content, source: 'api' };
+    }
+    throw new Error(apiResult?.error || 'Falha ao obter logs');
   }
 
   // ============================================================
