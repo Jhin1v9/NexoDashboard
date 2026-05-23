@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell, X, Check, AlertTriangle, Shield, Info } from 'lucide-react'
 import axios from 'axios'
@@ -14,9 +14,11 @@ function NotificationCenter() {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [pos, setPos] = useState({ top: 56, right: 16 })
+  const [wsConnected, setWsConnected] = useState(false)
   const buttonRef = useRef(null)
+  const dropdownRef = useRef(null)
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const res = await axios.get('/api/notifications')
       if (res.data.success) {
@@ -24,13 +26,14 @@ function NotificationCenter() {
         setUnreadCount(res.data.unreadCount || 0)
       }
     } catch (e) {}
-  }
+  }, [])
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
+    // Poll more frequently when WS is not connected
+    const interval = setInterval(fetchNotifications, wsConnected ? 30000 : 15000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchNotifications, wsConnected])
 
   // Escutar WebSocket para notificações em tempo real
   useEffect(() => {
@@ -39,7 +42,11 @@ function NotificationCenter() {
     const host = window.location.port === '3457' ? 'localhost:3456' : window.location.host
     const wsUrl = `${protocol}//${host}/ws`
     const ws = new WebSocket(wsUrl)
-    ws.onopen = () => console.log('[NotificationCenter] WS connected:', wsUrl)
+    ws.onopen = () => {
+      console.log('[NotificationCenter] WS connected:', wsUrl)
+      setWsConnected(true)
+    }
+    ws.onclose = () => setWsConnected(false)
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
@@ -50,7 +57,7 @@ function NotificationCenter() {
     }
     ws.onerror = (err) => { console.error('[NotificationCenter] WS error:', err) }
     return () => ws.close()
-  }, [])
+  }, [fetchNotifications])
 
   useEffect(() => {
     if (open && buttonRef.current) {
@@ -61,7 +68,24 @@ function NotificationCenter() {
       })
       // Auto-mark all as read when opening
       markAllAsRead()
+      // Focus first focusable element in dropdown
+      setTimeout(() => {
+        dropdownRef.current?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus()
+      }, 50)
     }
+  }, [open])
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    if (!open) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        buttonRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open])
 
   const markAsRead = async (id) => {
@@ -79,6 +103,8 @@ function NotificationCenter() {
       await axios.post('/api/notifications/read-all')
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
       setUnreadCount(0)
+      // Re-fetch to ensure sync with server
+      setTimeout(fetchNotifications, 500)
     } catch (e) {}
   }
 
@@ -97,8 +123,11 @@ function NotificationCenter() {
         ref={buttonRef}
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="relative p-2 text-nexo-muted hover:text-nexo-text transition-colors"
+        aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} não lidas)` : ''}`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
       >
-        <Bell className="w-5 h-5" />
+        <Bell className="w-5 h-5" aria-hidden="true" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -108,8 +137,12 @@ function NotificationCenter() {
 
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} role="presentation" aria-hidden="true" />
           <div
+            ref={dropdownRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nc-title"
             className="fixed w-80 rounded-xl shadow-2xl z-[9999] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -121,7 +154,7 @@ function NotificationCenter() {
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexo-border">
-              <h3 className="font-semibold text-sm">Notificações</h3>
+              <h3 id="nc-title" className="font-semibold text-sm">Notificações</h3>
               {unreadCount > 0 && (
                 <button onClick={markAllAsRead} className="text-xs text-nexo-primary hover:underline">
                   Marcar todas como lidas
