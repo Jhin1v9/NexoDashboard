@@ -379,5 +379,6 @@ module.exports = {
   getFileInfo,
   detectProjectType,
   sanitizeSubPath,
+  sanitizeClientId,
   WORKSPACE_DIR
 };

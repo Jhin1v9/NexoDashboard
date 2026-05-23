@@ -31,6 +31,20 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// ── Security Headers ──
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // HSTS only in production (HTTPS)
+  if (req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  }
+  next();
+});
+
 // Config
 const PORT = process.env.PORT || 3456;
 const BIND_IP = process.env.BIND_IP || '0.0.0.0';
@@ -4428,10 +4442,15 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
     }
 
     if (contextModule === 'workspace' && contextId) {
-      ctx += `📁 CONTEXTO ATUAL — WORKSPACE CLIENTE: ${contextId}\n`;
+      const safeContextId = workspaceManager.sanitizeClientId ? workspaceManager.sanitizeClientId(contextId) : contextId.replace(/[^a-z0-9_-]/gi, '');
+      if (!safeContextId) {
+        ctx += `📁 CONTEXTO ATUAL — WORKSPACE CLIENTE: ID inválido\n\n`;
+      } else {
+      ctx += `📁 CONTEXTO ATUAL — WORKSPACE CLIENTE: ${safeContextId}\n`;
       if (contextFile) {
         try {
-          const filePath = path.join(workspaceManager.WORKSPACE_DIR, contextId, contextFile.replace(/\.\./g, ''));
+          const safeContextFile = contextFile.replace(/\.\./g, '').replace(/^[\/\\]+/, '');
+          const filePath = path.join(workspaceManager.WORKSPACE_DIR, safeContextId, safeContextFile);
           if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
             const stats = fs.statSync(filePath);
             if (stats.size <= 5 * 1024 * 1024) {
@@ -4451,7 +4470,7 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
       } else {
         // Lista arquivos do workspace para contexto geral
         try {
-          const clientDir = path.join(workspaceManager.WORKSPACE_DIR, contextId);
+          const clientDir = path.join(workspaceManager.WORKSPACE_DIR, safeContextId);
           if (fs.existsSync(clientDir)) {
             const listDir = (dir, prefix = '') => {
               let out = '';
@@ -4475,6 +4494,7 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
         } catch (e) {
           ctx += `(Erro ao listar workspace: ${e.message})\n\n`;
         }
+      }
       }
     }
 
