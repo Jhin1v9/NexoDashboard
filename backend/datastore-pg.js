@@ -641,6 +641,11 @@ async function saveTransaction(t) {
   return t;
 }
 
+async function deleteTransaction(id) {
+  await db.run('DELETE FROM transactions WHERE id = $1', [id]);
+  notifyChange('transactions', await getTransactions());
+}
+
 // ============================================================
 // CHANGELOG (schema real — NOMES REAIS)
 // ============================================================
@@ -899,7 +904,7 @@ module.exports = {
   getSecurityLogs, saveSecurityLog, deleteSecurityLog,
   getNotifications, saveNotification, deleteNotification,
   getLinks, saveLink, deleteLink,
-  getTransactions, saveTransaction,
+  getTransactions, saveTransaction, deleteTransaction,
   getChangelog, saveChangelog, deleteChangelog,
   getWhatsappHistory, saveWhatsappMessage, saveWhatsappHistory, deleteWhatsappMessage,
   getLunaThreads, saveLunaThread, saveLunaThreads, deleteLunaThread,

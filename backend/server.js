@@ -3470,24 +3470,19 @@ app.put('/api/members/:id', async (req, res) => {
 // API FINANCEIRA COMPLETA — CRUD DE TRANSAÇÕES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
-
-// Inicializa arquivo de transações se não existir
-if (!fs.existsSync(TRANSACTIONS_FILE)) {
-  writeJSON(TRANSACTIONS_FILE, []);
-}
+// ── Transactions ── migrado para PostgreSQL
 
 // GET /api/transactions — Lista todas as transações
-app.get('/api/transactions', (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+app.get('/api/transactions', async (req, res) => {
+  const transactions = await dataStore.getTransactions();
   // Ordena por data (mais recente primeiro)
   transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
   res.json(transactions);
 });
 
 // GET /api/transactions/:id — Uma transação específica
-app.get('/api/transactions/:id', (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+app.get('/api/transactions/:id', async (req, res) => {
+  const transactions = await dataStore.getTransactions();
   const tx = transactions.find(t => t.id === req.params.id);
   if (!tx) return res.status(404).json({ error: 'Transação não encontrada' });
   res.json(tx);
@@ -3495,7 +3490,6 @@ app.get('/api/transactions/:id', (req, res) => {
 
 // POST /api/transactions — Cria nova transação
 app.post('/api/transactions', async (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
   const { type, amount, description, category, date, source, notes } = req.body;
   
   if (!type || !amount || !description) {
@@ -3516,8 +3510,8 @@ app.post('/api/transactions', async (req, res) => {
     createdBy: 'abner'
   };
   
-  transactions.push(newTx);
-  writeJSON(TRANSACTIONS_FILE, transactions);
+  await dataStore.saveTransaction(newTx);
+  const transactions = await dataStore.getTransactions();
   
   // Atualiza caixa automaticamente
   updateCashBoxFromTransactions(transactions);
@@ -3530,38 +3524,40 @@ app.post('/api/transactions', async (req, res) => {
 
 // PUT /api/transactions/:id — Edita transação
 app.put('/api/transactions/:id', async (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const transactions = await dataStore.getTransactions();
   const idx = transactions.findIndex(t => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Transação não encontrada' });
   
-  transactions[idx] = {
+  const updated = {
     ...transactions[idx],
     ...req.body,
     updatedAt: new Date().toISOString()
   };
   
-  writeJSON(TRANSACTIONS_FILE, transactions);
-  updateCashBoxFromTransactions(transactions);
+  await dataStore.saveTransaction(updated);
+  const all = await dataStore.getTransactions();
+  updateCashBoxFromTransactions(all);
   
-  broadcast({ type: 'transactions', data: transactions });
+  broadcast({ type: 'transactions', data: all });
   broadcast({ type: 'cash-box', data: await dataStore.getCashBox() });
   
-  res.json(transactions[idx]);
+  res.json(updated);
 });
 
 // DELETE /api/transactions/:id — Remove transação
 app.delete('/api/transactions/:id', async (req, res) => {
-  const transactions = readJSON(TRANSACTIONS_FILE) || [];
+  const transactions = await dataStore.getTransactions();
   const filtered = transactions.filter(t => t.id !== req.params.id);
   
   if (filtered.length === transactions.length) {
     return res.status(404).json({ error: 'Transação não encontrada' });
   }
   
-  writeJSON(TRANSACTIONS_FILE, filtered);
-  updateCashBoxFromTransactions(filtered);
+  await dataStore.deleteTransaction(req.params.id);
+  const all = await dataStore.getTransactions();
+  updateCashBoxFromTransactions(all);
   
-  broadcast({ type: 'transactions', data: filtered });
+  broadcast({ type: 'transactions', data: all });
   broadcast({ type: 'cash-box', data: await dataStore.getCashBox() });
   
   res.json({ success: true, message: 'Transação removida' });
@@ -6450,7 +6446,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const leads = await dataStore.getLeads();
     const members = await dataStore.getMembers();
     const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };
-    const transactions = readJSON(TRANSACTIONS_FILE) || [];
+    const transactions = await dataStore.getTransactions();
     const whatsappTasks = readJSON(WAPP_FILE) || [];
     const agentData = readJSON(AGENT_DATA_FILE) || {};
     const luna = readJSON(path.join(__dirname, '..', 'agents', 'luna-buffer.json')) || { messages: [], tasks: [], ideas: [] };
