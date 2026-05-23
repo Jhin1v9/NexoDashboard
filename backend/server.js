@@ -6962,6 +6962,7 @@ app.put('/api/links/:id', async (req, res) => {
 
 const EmailAgent = require('./services/email-agent');
 const emailAgent = new EmailAgent();
+const emailService = require('./services/email.service');
 const gmailOAuth = require('./services/gmail-oauth');
 const gmailAPI = require('./services/gmail-api');
 const emailAI = require('./services/email-ai');
@@ -7121,10 +7122,32 @@ app.post('/api/email/messages/send', async (req, res) => {
   try {
     const { to, subject, text, html, cc, bcc, attachments, threadId, inReplyTo } = req.body;
     if (!to || !subject) return res.status(400).json({ success: false, error: 'Destinatario e assunto obrigatorios' });
-    const result = await gmailAPI.sendEmail({ to, subject, text, html, cc, bcc, attachments, threadId, inReplyTo });
+
+    // 🎯 Tenta Gmail API primeiro (OAuth2)
+    let result;
+    try {
+      result = await gmailAPI.sendEmail({ to, subject, text, html, cc, bcc, attachments, threadId, inReplyTo });
+      broadcast({ type: 'email:sent', data: result });
+      return res.json({ success: true, ...result });
+    } catch (gmailErr) {
+      const isOAuthMissing = gmailErr.message?.includes('não configuradas') ||
+                             gmailErr.message?.includes('não autenticado') ||
+                             gmailErr.message?.includes('Credenciais OAuth2');
+      if (!isOAuthMissing) {
+        throw gmailErr; // Erro real da Gmail API, não falta de config
+      }
+      console.log('[Email] Gmail OAuth não disponível, tentando fallback SMTP...');
+    }
+
+    // 🔄 Fallback SMTP via Nodemailer
+    if (!emailService.isConfigured) {
+      throw new Error('Nenhum serviço de email configurado. Configure GMAIL_CLIENT_ID/SECRET (OAuth) ou SMTP_HOST/USER/PASS (SMTP) no .env');
+    }
+    result = await emailService.sendEmail({ to, subject, text, html, cc, bcc, attachments });
     broadcast({ type: 'email:sent', data: result });
     res.json({ success: true, ...result });
   } catch (e) {
+    console.error('[Email] Erro ao enviar email:', e.message);
     res.status(500).json({ success: false, error: e.message });
   }
 });

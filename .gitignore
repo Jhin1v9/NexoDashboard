@@ -85,3 +85,6 @@ backend/data/security-settings.json
 # E2E Test artifacts
 test-results/
 e2e/screenshots/
+
+# Playwright report
+e2e/playwright-report/

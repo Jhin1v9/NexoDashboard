@@ -149,7 +149,35 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Envia email genérico via SMTP (usado como fallback quando Gmail OAuth não está disponível)
+ */
+async function sendEmail({ to, subject, text, html, cc, bcc, attachments = [] }) {
+  if (!isConfigured || !transporter) {
+    throw new Error('SMTP não configurado. Configure SMTP_HOST, SMTP_USER e SMTP_PASS no .env');
+  }
+
+  const info = await transporter.sendMail({
+    from: `"NEXO Digital" <${SMTP_USER}>`,
+    to,
+    cc,
+    bcc,
+    subject,
+    text,
+    html,
+    attachments: attachments.map(a => ({
+      filename: a.filename || a.name,
+      path: a.path || a.content,
+      content: a.content
+    })).filter(a => a.filename || a.content)
+  });
+
+  console.log('[EmailService] Email enviado:', info.messageId);
+  return { success: true, messageId: info.messageId, to, subject };
+}
+
 module.exports = {
   sendLeadNotification,
+  sendEmail,
   isConfigured
 };
