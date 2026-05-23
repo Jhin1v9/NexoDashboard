@@ -457,8 +457,13 @@ async function addNotification({ type, title, message, severity = 'medium', meta
 }
 
 // Discord Webhook para alertas de segurança
-const DISCORD_SECURITY_WEBHOOK = 'https://discord.com/api/webhooks/1506384996305338518/NVJ5yYsBCd7JXFGsczUxTuVV0rpL2pt2dICREfNzKxuJ26TgY5--5diOpUdmEVXp3vza';
-setWebhookUrl(DISCORD_SECURITY_WEBHOOK);
+const DISCORD_SECURITY_WEBHOOK = process.env.DISCORD_SECURITY_WEBHOOK;
+if (DISCORD_SECURITY_WEBHOOK) {
+  setWebhookUrl(DISCORD_SECURITY_WEBHOOK);
+  console.log('[SECURITY] Discord webhook configurado');
+} else {
+  console.warn('[SECURITY] DISCORD_SECURITY_WEBHOOK não configurado. Alertas de segurança não serão enviados.');
+}
 
 // Helper: coletar TODOS os dados possíveis do request
 function collectIntruderData(req, fingerprint = {}, risk = {}) {

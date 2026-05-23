@@ -6,8 +6,9 @@ import {
   Loader, AlertTriangle, HardDrive, Clock
 } from 'lucide-react'
 import axios from 'axios'
-import StackStatusPanel from '../components/StackStatus'
-import AutoFixPanel from '../components/AutoFixPanel'
+// REMOVIDO: StackStatus e AutoFixPanel chamavam APIs inexistentes (/api/stack-status, /api/auto-fix/*)
+// import StackStatusPanel from '../components/StackStatus'
+// import AutoFixPanel from '../components/AutoFixPanel'
 
 const SERVICES = [
   { key: 'backend', label: 'Backend API', icon: Server, port: 3456, log: 'backend' },
@@ -169,11 +170,11 @@ export default function SystemEngine() {
           })}
         </div>
 
-        {/* Stack Status & Auto-Fix Panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Stack Status & Auto-Fix Panels — REMOVIDOS (APIs não existem no backend) */}
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <StackStatusPanel />
           <AutoFixPanel />
-        </div>
+        </div> */}
 
         {/* Aux Services */}
         <div className="glass-card rounded-xl p-4 border border-nexo-border">

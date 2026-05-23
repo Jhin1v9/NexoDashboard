@@ -18,8 +18,12 @@ export function AuthProvider({ children }) {
             localStorage.removeItem('nexo_token')
           }
         })
-        .catch(() => {
-          localStorage.removeItem('nexo_token')
+        .catch((err) => {
+          // Só remove token em 401 (não autorizado).
+          // Erros de rede (backend offline) não devem deslogar o usuário.
+          if (err.response?.status === 401) {
+            localStorage.removeItem('nexo_token')
+          }
         })
         .finally(() => setLoading(false))
     } else {
