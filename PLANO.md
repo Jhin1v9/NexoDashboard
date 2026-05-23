@@ -2,7 +2,7 @@
 
 > **LEIA ESTE ARQUIVO PRIMEIRO** antes de qualquer ação no projeto.  
 > Este documento mantém o estado atual, decisões aprovadas e próximos passos.  
-> **Atualizado:** 2026-05-23 10:45 UTC
+> **Atualizado:** 2026-05-23 10:55 UTC
 
 ---
 
@@ -51,7 +51,7 @@
 - [ ] **Página de login tradicional** — substituir o terminal secreto/Konami code
 - [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
 - [x] **Path traversal fix** — workspace file access (`../` bypass) ✅ commit `a2c5e00`
-- [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
+- [x] **Source maps** — desabilitar em produção ✅ commit `ed7fc62`
 - [x] **HTTP headers de segurança** — HSTS, X-Frame-Options, CSP, Permissions-Policy ✅ commit `a2c5e00`
 - [x] **Audit log persistente** — security log no PostgreSQL ✅ Fase 0.1
 - [ ] **Atualizar Discord Webhook** — token atual retorna 401 (Invalid Webhook Token)

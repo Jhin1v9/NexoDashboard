@@ -63,7 +63,7 @@
 ### ⏳ Próximos passos (próxima fase a definir)
 
 **🔴 PRÓXIMA FASE (backlog do PLANO.md):**
-- [ ] **Página de login tradicional** — substituir terminal secreto/Konami code
+- [x] **Página de login tradicional** — substituir terminal secreto/Konami code ✅ commit `ed7fc62`
 - [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
 - [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
 - [ ] **Atualizar Discord Webhook** — token atual retorna 401

@@ -55,9 +55,10 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 | 24 | **Security Headers** | ✅ IMPLEMENTADO | HSTS, CSP, X-Frame-Options, Permissions-Policy |
 | 25 | **Path Traversal Fix** | ✅ IMPLEMENTADO | `sanitizeClientId` + regex sanitização |
 | 26 | **Luna NLU v2** | ✅ IMPLEMENTADO | IntentParser 96% acerto, navigate/filter intents |
-| 27 | **Luna HUD v2** | ✅ IMPLEMENTADO | ChatPanel futurista, FAB orb holográfico, inline actions |
+| 27 | **Luna HUD v2/v3** | ✅ IMPLEMENTADO | ChatPanel futurista, FAB orb, inline actions, reactions, ghost mode, voice input |
 | 28 | **Dashboard Context** | ✅ IMPLEMENTADO | `GET /api/luna/dashboard-state`, context awareness |
 | 29 | **Playwright WhatsApp** | ✅ INSTALADO | `whatsapp-sender.js` com CDP automation |
+| 30 | **Login tradicional** | ✅ IMPLEMENTADO | Split-screen, dark mode, design Linear/Stripe/Vercel |
 
 #### Agente Luna (luna-cto-agent.cjs + SmartClassifier)
 | # | Feature | Status | Evidência |
