@@ -89,7 +89,7 @@ if (!JWT_SECRET) {
 }
 const JWT_EXPIRES_IN = '8h';
 const SECURITY_LOG_FILE = path.join(DATA_DIR, 'security-log.json');
-const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
+
 
 // Middleware: verifica JWT em rotas protegidas
 function requireAuth(req, res, next) {
@@ -387,7 +387,7 @@ async function logSecurityEvent(event) {
   broadcast({ type: 'security:alert', data: entry });
 
   // Notificação persistente
-  addNotification({
+  await addNotification({
     type: 'security_alert',
     title: event.type === 'failed_login' ? '🚨 Login falho detectado' : '⚠️ Alerta de segurança',
     message: event.message || `${event.type} — IP: ${event.ip}`,
@@ -399,23 +399,32 @@ async function logSecurityEvent(event) {
 }
 
 // Helper: adicionar notificação persistente
-function addNotification({ type, title, message, severity = 'medium', metadata = {} }) {
-  const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
-  notifs.lastId = (notifs.lastId || 0) + 1;
-  notifs.notifications.unshift({
-    id: `notif-${notifs.lastId}`,
+async function addNotification({ type, title, message, severity = 'medium', metadata = {} }) {
+  const result = await dataStore.getNotifications();
+  const notifications = result.notifications || [];
+  // Encontrar o maior ID numérico para sequência
+  let maxId = 0;
+  for (const n of notifications) {
+    const match = n.id?.match(/notif-(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxId) maxId = num;
+    }
+  }
+  const newId = `notif-${maxId + 1}`;
+  const newNotif = {
+    id: newId,
     type,
     title,
     message,
     severity,
     read: false,
     timestamp: new Date().toISOString(),
-    metadata
-  });
-  if (notifs.notifications.length > 100) notifs.notifications = notifs.notifications.slice(0, 100);
-  writeJSON(NOTIFICATIONS_FILE, notifs);
-  broadcast({ type: 'notifications:new', data: { unreadCount: notifs.notifications.filter(n => !n.read).length } });
-  return notifs.notifications[0];
+    metadata,
+    createdAt: new Date().toISOString()
+  };
+  await dataStore.saveNotification(newNotif);
+  return newNotif;
 }
 
 // Discord Webhook para alertas de segurança
@@ -5729,7 +5738,7 @@ ${dataContext}`;
         ];
         reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 256 });
         reply = reply.trim();
-        usedModel = 'ollama-gemma2:2b';
+        usedModel = 'ollama-gemma3:1b';
       } catch (ollamaErr) {
         console.warn('[CONCIERGE] Ollama social chat failed:', ollamaErr.message);
         // Fall through to Gemini or static fallback
@@ -5760,7 +5769,7 @@ ${dataContext}`;
             ];
             reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 512 });
             reply = reply.trim();
-            usedModel = 'ollama-gemma2:2b';
+            usedModel = 'ollama-gemma3:1b';
           } catch (ollamaErr2) {
             console.warn('[CONCIERGE] Ollama também indisponível:', ollamaErr2.message);
           }
@@ -5793,6 +5802,91 @@ ${dataContext}`;
 
     const fallbackReply = buildChatFallbackReply(msgText.trim());
     return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
+  }
+});
+
+// ── STREAMING SSE: /api/luna/chat/stream ──
+// Devolve a resposta do LLM token por token, com efeito visual no frontend
+app.post('/api/luna/chat/stream', async (req, res) => {
+  try {
+    const { message, authorName: rawAuthor, context = [] } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Mensagem vazia' });
+    }
+
+    const authorName = await resolveDashboardAuthor(rawAuthor);
+    const msg = message.trim();
+
+    // Parse intent (reuse same logic as /api/luna/chat)
+    let parsed = null;
+    try {
+      const nluResult = await lunaNLU.process(msg, 'pt');
+      if (nluResult && nluResult.score >= 0.5 && nluResult.intent !== 'None') {
+        const { mapNLUResults } = require('../agents/core/NLUActionMapper');
+        const nluParsed = mapNLUResults(nluResult, msg);
+        if (nluParsed && nluParsed.actions.length > 0) parsed = nluParsed;
+      }
+    } catch (nluErr) {
+      console.error('[LunaStream] NLU erro:', nluErr.message);
+    }
+
+    if (!parsed) {
+      const buffer = readLunaBuffer();
+      parsed = await lunaIntentParser.parse(msg, {
+        authorName,
+        bufferSummary: {
+          tasks: (buffer.newTasks || []).length,
+          ideas: (buffer.newIdeas || []).length,
+          links: (buffer.newLinks || []).length,
+          leads: (buffer.newLeads || []).length,
+          finance: (buffer.newFinance || []).length
+        }
+      });
+    }
+
+    // If it's a social question or unknown → stream from Ollama
+    const isGreeting = /\b(oi|olá|ola|opa|e aí|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)\b/i.test(msg);
+    const isSocial = parsed.intent === 'social' || (parsed.intent === 'unknown' && !isGreeting);
+
+    if (!isSocial || !lunaOllama) {
+      // Non-streaming fallback — just return JSON
+      return res.json({ success: false, error: 'Not a streaming request', intent: parsed.intent });
+    }
+
+    // Setup SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    const ollamaMessages = [
+      { role: 'system', content: 'Você é a Luna, assistente brasileira direta e prestativa. Responda em português de forma natural e concisa. Máximo 100 palavras.' },
+      { role: 'user', content: msg }
+    ];
+
+    // Send initial metadata event
+    res.write(`event: meta\ndata: ${JSON.stringify({ intent: 'chat', model: 'ollama-gemma3:1b' })}\n\n`);
+
+    let hasContent = false;
+    for await (const chunk of lunaOllama.chatStream(ollamaMessages, { temperature: 0.7, maxTokens: 256 })) {
+      if (chunk.error) {
+        res.write(`event: error\ndata: ${JSON.stringify({ error: chunk.error })}\n\n`);
+        break;
+      }
+      if (chunk.text) {
+        hasContent = true;
+        res.write(`data: ${JSON.stringify({ token: chunk.text })}\n\n`);
+      }
+      if (chunk.done) break;
+    }
+
+    res.write(`event: done\ndata: ${JSON.stringify({ complete: true })}\n\n`);
+    res.end();
+
+  } catch (e) {
+    console.error('[LunaStream] Erro:', e.message);
+    res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+    res.end();
   }
 });
 
@@ -7094,7 +7188,7 @@ app.post('/api/email/ai/action-items-to-tasks', requireAuth, async (req, res) =>
     }
 
     if (createdTasks.length > 0) {
-      addNotification({
+      await addNotification({
         type: 'luna_email_tasks',
         title: `${createdTasks.length} tarefa(s) criada(s) do email`,
         message: `Action items de "${subject || 'Email'}" foram convertidos em tarefas.`,
@@ -7173,7 +7267,7 @@ app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
     ], { authorName: 'Luna' });
 
     // Notificação
-    const notif = addNotification({
+    const notif = await addNotification({
       type: 'luna_email_draft',
       title: 'Luna sugeriu uma resposta',
       message: `Rascunho gerado para "${subject || 'Email'}". Revise antes de enviar.`,
@@ -8226,26 +8320,27 @@ app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/notifications — Lista notificações
-app.get('/api/notifications', requireAuth, (req, res) => {
+app.get('/api/notifications', requireAuth, async (req, res) => {
   try {
-    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
-    const unreadCount = notifs.notifications.filter(n => !n.read).length;
-    res.json({ success: true, notifications: notifs.notifications.slice(0, 50), unreadCount });
+    const result = await dataStore.getNotifications();
+    const notifications = result.notifications || [];
+    const unreadCount = notifications.filter(n => !n.read).length;
+    res.json({ success: true, notifications: notifications.slice(0, 50), unreadCount });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // POST /api/notifications/:id/read — Marca como lida
-app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
+app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
   try {
-    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
-    const notif = notifs.notifications.find(n => n.id === req.params.id);
+    const result = await dataStore.getNotifications();
+    const notif = result.notifications.find(n => n.id === req.params.id);
     if (notif) {
       notif.read = true;
-      writeJSON(NOTIFICATIONS_FILE, notifs);
+      await dataStore.saveNotification(notif);
     }
-    const unreadCount = notifs.notifications.filter(n => !n.read).length;
+    const unreadCount = result.notifications.filter(n => !n.read).length;
     res.json({ success: true, unreadCount });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8253,12 +8348,11 @@ app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
 });
 
 // DELETE /api/notifications/:id — Remove notificação
-app.delete('/api/notifications/:id', requireAuth, (req, res) => {
+app.delete('/api/notifications/:id', requireAuth, async (req, res) => {
   try {
-    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
-    notifs.notifications = notifs.notifications.filter(n => n.id !== req.params.id);
-    writeJSON(NOTIFICATIONS_FILE, notifs);
-    const unreadCount = notifs.notifications.filter(n => !n.read).length;
+    await dataStore.deleteNotification(req.params.id);
+    const result = await dataStore.getNotifications();
+    const unreadCount = result.notifications.filter(n => !n.read).length;
     res.json({ success: true, unreadCount });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8266,11 +8360,15 @@ app.delete('/api/notifications/:id', requireAuth, (req, res) => {
 });
 
 // POST /api/notifications/read-all — Marca todas como lidas
-app.post('/api/notifications/read-all', requireAuth, (req, res) => {
+app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
   try {
-    const notifs = readJSON(NOTIFICATIONS_FILE, { version: '1.0', notifications: [], lastId: 0 });
-    notifs.notifications.forEach(n => n.read = true);
-    writeJSON(NOTIFICATIONS_FILE, notifs);
+    const result = await dataStore.getNotifications();
+    for (const n of result.notifications) {
+      if (!n.read) {
+        n.read = true;
+        await dataStore.saveNotification(n);
+      }
+    }
     res.json({ success: true, unreadCount: 0 });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8757,6 +8855,11 @@ async function startServer() {
   }
   server.listen(PORT, BIND_IP, async () => {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+
+    // ── Preload Ollama model to avoid cold starts ──
+    if (lunaOllama) {
+      lunaOllama.preload().catch(() => {});
+    }
 
     // ── Iniciar Telegram Bot automaticamente (se token configurado e não desabilitado) ──
     try {

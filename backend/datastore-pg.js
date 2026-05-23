@@ -545,6 +545,12 @@ async function saveNotification(n) {
   return n;
 }
 
+async function deleteNotification(id) {
+  await db.run('DELETE FROM notifications WHERE id=$1', [id]);
+  notifyChange('notifications', await getNotifications());
+  return true;
+}
+
 // ============================================================
 // LINKS
 // ============================================================
@@ -825,7 +831,7 @@ module.exports = {
   getIdeas, saveIdea,
   getLeads, saveLead, deleteLead,
   getSecurityLogs, saveSecurityLog,
-  getNotifications, saveNotification,
+  getNotifications, saveNotification, deleteNotification,
   getLinks, saveLink,
   getTransactions, saveTransaction,
   getChangelog, saveChangelog,
