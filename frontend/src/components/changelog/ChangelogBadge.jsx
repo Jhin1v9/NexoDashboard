@@ -36,6 +36,12 @@ const CATEGORY_LABELS = {
   ai: 'Inteligência Artificial',
 };
 
+const STATUS_CONFIG = {
+  '✅ 100% PRONTO': { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', label: '100% Pronto' },
+  '🚧 FALTA INCREMENTAR': { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/30', label: 'Em Progresso' },
+  '❓ STATUS NÃO AVALIADO': { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30', label: 'Não Avaliado' },
+};
+
 function formatTimeAgo(dateString) {
   const date = new Date(dateString);
   const now = new Date();
@@ -221,10 +227,15 @@ export default function ChangelogBadge({
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <span className="text-xs font-medium text-nexo-text-secondary">
                               {CATEGORY_LABELS[entry.category] || entry.category}
                             </span>
+                            {entry.status && (
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${STATUS_CONFIG[entry.status]?.bg || 'bg-gray-500/20'} ${STATUS_CONFIG[entry.status]?.text || 'text-gray-400'} ${STATUS_CONFIG[entry.status]?.border || 'border-gray-500/30'}`}>
+                                {STATUS_CONFIG[entry.status]?.label || entry.status}
+                              </span>
+                            )}
                             <span className="text-[10px] text-nexo-text-secondary/60">
                               {formatTimeAgo(entry.date)}
                             </span>
@@ -235,6 +246,11 @@ export default function ChangelogBadge({
                           <p className="text-xs text-nexo-text-secondary/70 line-clamp-2 mt-0.5">
                             {entry.description}
                           </p>
+                          {entry.statusDetail && (
+                            <p className="text-[10px] text-nexo-text-secondary/50 line-clamp-1 mt-1 italic">
+                              {entry.statusDetail}
+                            </p>
+                          )}
                         </div>
                         
                         {/* Botão marcar como lido */}

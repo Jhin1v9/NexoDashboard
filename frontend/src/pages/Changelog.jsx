@@ -23,6 +23,12 @@ const TIER_CONFIG = {
   3: { label: 'Informativo', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
 };
 
+const STATUS_CONFIG = {
+  '✅ 100% PRONTO': { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', label: '✅ 100% Pronto' },
+  '🚧 FALTA INCREMENTAR': { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/30', label: '🚧 Em Progresso' },
+  '❓ STATUS NÃO AVALIADO': { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30', label: '❓ Não Avaliado' },
+};
+
 function formatDate(dateString) {
   const date = new Date(dateString);
   const now = new Date();
@@ -70,6 +76,11 @@ function ChangelogCard({ entry, isUnread, onMarkAsRead }) {
             <span className={`text-xs font-medium ${config.textColor}`}>
               {config.label}
             </span>
+            {entry.status && (
+              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border ${STATUS_CONFIG[entry.status]?.bg || 'bg-gray-500/20'} ${STATUS_CONFIG[entry.status]?.text || 'text-gray-400'} ${STATUS_CONFIG[entry.status]?.border || 'border-gray-500/30'}`}>
+                {STATUS_CONFIG[entry.status]?.label || entry.status}
+              </span>
+            )}
             <span className="text-xs text-nexo-text-secondary/50">
               v{entry.version}
             </span>
@@ -81,9 +92,18 @@ function ChangelogCard({ entry, isUnread, onMarkAsRead }) {
           </h3>
 
           {/* Descrição */}
-          <p className="text-sm text-nexo-text-secondary/80 leading-relaxed mb-3">
+          <p className="text-sm text-nexo-text-secondary/80 leading-relaxed mb-2">
             {entry.description}
           </p>
+
+          {/* Status Detail */}
+          {entry.statusDetail && (
+            <div className={`mb-3 p-3 rounded-lg border ${STATUS_CONFIG[entry.status]?.border || 'border-gray-500/30'} ${STATUS_CONFIG[entry.status]?.bg || 'bg-gray-500/10'}`}>
+              <p className={`text-xs leading-relaxed ${STATUS_CONFIG[entry.status]?.text || 'text-gray-400'}`}>
+                <span className="font-semibold">Status:</span> {entry.statusDetail}
+              </p>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between">

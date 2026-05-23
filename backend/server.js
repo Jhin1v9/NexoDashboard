@@ -908,6 +908,8 @@ const PUBLIC_API_ROUTES = [
   '/api/auth/logout',
   '/api/auth/sync',
   '/api/leads',               // Lead capture / Demo request (público)
+  '/api/changelog',           // Release notes públicos
+  '/api/changelog/latest',    // Último release note
   '/api/email/auth/url',      // Inicia OAuth do Gmail (precisa estar logado, mas o frontend envia token)
   '/api/email/auth/status',   // Status da conexão Gmail
   '/api/email/auth/callback', // OAuth callback do Gmail (chamado pelo Google, sem token)

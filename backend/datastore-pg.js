@@ -660,21 +660,25 @@ async function getChangelog() {
     id: r.id, version: r.version, title: r.title,
     description: r.description, category: r.category,
     emoji: r.emoji, author: r.author, tier: r.tier,
-    date: r.date, tags: r.tags || [], readBy: r.read_by || []
+    date: r.date, tags: r.tags || [], readBy: r.read_by || [],
+    status: r.status || '❓ STATUS NÃO AVALIADO',
+    statusDetail: r.status_detail || 'Esta funcionalidade ainda não foi revisada neste ciclo de testes.'
   }));
   return { version: '1.0', lastUpdated: new Date().toISOString(), entries };
 }
 
 async function saveChangelog(entry) {
   await db.run(
-    `INSERT INTO changelog (id, version, title, description, category, emoji, author, tier, date, tags, read_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `INSERT INTO changelog (id, version, title, description, category, emoji, author, tier, date, tags, read_by, status, status_detail)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      ON CONFLICT (id) DO UPDATE SET
        version=$2, title=$3, description=$4, category=$5, emoji=$6,
-       author=$7, tier=$8, date=$9, tags=$10, read_by=$11`,
+       author=$7, tier=$8, date=$9, tags=$10, read_by=$11, status=$12, status_detail=$13`,
     [entry.id, entry.version, entry.title, entry.description, entry.category,
      entry.emoji, entry.author, entry.tier, entry.date,
-     JSON.stringify(entry.tags || []), JSON.stringify(entry.readBy || [])]
+     JSON.stringify(entry.tags || []), JSON.stringify(entry.readBy || []),
+     entry.status || '❓ STATUS NÃO AVALIADO',
+     entry.statusDetail || 'Esta funcionalidade ainda não foi revisada neste ciclo de testes.']
   );
   notifyChange('changelog', await getChangelog());
   return entry;
