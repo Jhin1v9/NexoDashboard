@@ -255,8 +255,8 @@ function NotificationCenter() {
         )}
       </button>
 
-      {/* ── Dropdown ──────────────────────────────────────────────────────────── */}
-      {open && (
+      {/* ── Dropdown (Portal para ficar acima de tudo) ────────────────────────── */}
+      {open && createPortal(
         <>
           {/* Overlay */}
           <div
@@ -272,11 +272,11 @@ function NotificationCenter() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="nc-title"
-            className="absolute w-[400px] rounded-xl shadow-2xl z-[9999] overflow-hidden flex flex-col"
+            className="fixed w-[400px] rounded-xl shadow-2xl z-[9999] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
             style={{
-              top: 'calc(100% + 10px)',
-              right: 0,
+              top: pos.top,
+              right: pos.right,
               background: 'linear-gradient(180deg, rgba(12,12,18,0.99) 0%, rgba(6,6,10,0.99) 100%)',
               border: '1px solid rgba(0,240,255,0.12)',
               boxShadow: '0 12px 50px rgba(0,0,0,0.6), 0 0 30px rgba(0,240,255,0.04)',

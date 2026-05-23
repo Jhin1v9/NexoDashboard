@@ -437,6 +437,83 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     }
   }
 
+  /* ── Smart Form Handlers ── */
+  const handleSmartFormSubmit = async ({ actionType, params }) => {
+    setChatLoading(true)
+    try {
+      const res = await axios.post('/api/luna/execute-action', {
+        actionType,
+        params,
+        context: { authorName: activeUser }
+      })
+      const data = res.data
+      if (data.success) {
+        const successMsg = {
+          id: 'sf_ok_' + Date.now(),
+          role: 'assistant',
+          author: 'luna',
+          authorName: 'Luna',
+          authorColor: '#9b59b6',
+          text: data.reply || 'Pronto! Ação executada com sucesso ✅',
+          timestamp: new Date().toISOString()
+        }
+        setThreadMessages(prev => ({
+          ...prev,
+          [activeThreadId]: [...(prev[activeThreadId] || []), successMsg]
+        }))
+      } else {
+        const errorMsg = {
+          id: 'sf_err_' + Date.now(),
+          role: 'assistant',
+          author: 'luna',
+          authorName: 'Luna',
+          authorColor: '#9b59b6',
+          text: data.error || 'Não consegui completar a ação. Tenta de novo?',
+          timestamp: new Date().toISOString()
+        }
+        setThreadMessages(prev => ({
+          ...prev,
+          [activeThreadId]: [...(prev[activeThreadId] || []), errorMsg]
+        }))
+      }
+    } catch (e) {
+      console.error('[LunaChatPanel] Erro no SmartForm:', e.message)
+      const errorMsg = {
+        id: 'sf_exc_' + Date.now(),
+        role: 'assistant',
+        author: 'luna',
+        authorName: 'Luna',
+        authorColor: '#9b59b6',
+        text: 'Ops, deu um erro técnico aqui. Pode tentar de novo?',
+        timestamp: new Date().toISOString()
+      }
+      setThreadMessages(prev => ({
+        ...prev,
+        [activeThreadId]: [...(prev[activeThreadId] || []), errorMsg]
+      }))
+    } finally {
+      setChatLoading(false)
+      setSmartForm(null)
+    }
+  }
+
+  const handleSmartFormCancel = () => {
+    setSmartForm(null)
+    const cancelMsg = {
+      id: 'sf_cancel_' + Date.now(),
+      role: 'assistant',
+      author: 'luna',
+      authorName: 'Luna',
+      authorColor: '#9b59b6',
+      text: 'Beleza, cancelado 👍',
+      timestamp: new Date().toISOString()
+    }
+    setThreadMessages(prev => ({
+      ...prev,
+      [activeThreadId]: [...(prev[activeThreadId] || []), cancelMsg]
+    }))
+  }
+
   const confirmPendingActions = async (confirm, editedFields = null) => {
     if (!confirm) {
       setPendingConfirmation(null)
@@ -839,6 +916,15 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               </p>
             </div>
           </motion.div>
+
+          {/* Smart Form Modal */}
+          {smartForm && (
+            <SmartFormModal
+              smartForm={smartForm}
+              onSubmit={handleSmartFormSubmit}
+              onCancel={handleSmartFormCancel}
+            />
+          )}
         </>
       )}
     </AnimatePresence>
