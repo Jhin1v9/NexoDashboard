@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageCircle, Send, Bot, User, Users, CheckCircle,
-  ChevronDown, Eraser, Loader, X, Sparkles, Activity
+  ChevronDown, Eraser, Loader, X, Sparkles, Activity,
+  Volume2, VolumeX
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
@@ -11,6 +12,7 @@ import EditablePreviewCard from './EditablePreviewCard'
 import LunaMarkdown from './LunaMarkdown'
 import LunaMessageReactions from './LunaMessageReactions'
 import LunaVoiceInput from './LunaVoiceInput'
+import useLunaVoice from '../../hooks/useLunaVoice'
 import SmartFormModal from './SmartFormModal'
 
 const LUNA_AVATAR = '/luna-avatar.png'
@@ -117,6 +119,9 @@ export default function LunaChatPanel({ isOpen, onClose }) {
   const [dashboardState, setDashboardState] = useState(null)
   const [ghostMode, setGhostMode] = useState(false)
   const [smartForm, setSmartForm] = useState(null)
+
+  // Voice settings
+  const { ttsEnabled, isSpeaking, speak, stopSpeaking, toggleTts } = useLunaVoice()
 
   // Fetch dashboard state periodically
   useEffect(() => {
@@ -331,6 +336,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), cmdMsg]
         }))
+        speak(cmdText)
         setChatLoading(false)
         return
       }
@@ -379,11 +385,12 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         if (data.pendingActions) {
           setPendingConfirmation({ actions: data.pendingActions, messageId: data.messages[0]?.id })
         }
-        // Trigger typing animation for Luna's last message
+        // Trigger typing animation + TTS for Luna's last message
         const lastMsg = data.messages[data.messages.length - 1]
         if (lastMsg?.role === 'assistant') {
           setTypingMsgId(lastMsg.id)
           setTimeout(() => setTypingMsgId(null), 1500)
+          speak(lastMsg.text)
         }
       } else if (data.success && data.smartForm) {
         // 🎯 SMART FORM: abre modal para coletar dados faltantes
@@ -402,6 +409,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), lunaMsg]
         }))
+        speak(lunaMsg.text)
       } else {
         const errorMsg = {
           id: 'err_' + Date.now(),
@@ -416,6 +424,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), errorMsg]
         }))
+        speak(errorMsg.text)
       }
     } catch (e) {
       console.error('[LunaChatPanel] Erro ao enviar mensagem:', e.message)
@@ -432,6 +441,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         ...prev,
         [activeThreadId]: [...(prev[activeThreadId] || []), errorMsg]
       }))
+      speak(errorMsg.text)
     } finally {
       setChatLoading(false)
     }
@@ -466,6 +476,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), msg]
         }))
+        speak(msgText)
       } else {
         const errorMsg = {
           id: 'sf_err_' + Date.now(),
@@ -535,6 +546,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         ...prev,
         [activeThreadId]: [...(prev[activeThreadId] || []), cancelMsg]
       }))
+      speak(cancelMsg.text)
       return
     }
     if (!pendingConfirmation) return
@@ -556,6 +568,10 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), ...data.messages]
         }))
+        const lastMsg = data.messages[data.messages.length - 1]
+        if (lastMsg?.role === 'assistant') {
+          speak(lastMsg.text)
+        }
       }
       setPendingConfirmation(null)
     } catch (e) {
@@ -619,7 +635,19 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 items-center justify-center hidden absolute inset-0">
                     <Bot className="w-5 h-5 text-white" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#08080c] animate-pulse" />
+                  {/* Status indicator: ONLINE or SPEAKING */}
+                  <motion.span
+                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#08080c]"
+                    animate={{
+                      backgroundColor: isSpeaking ? '#f59e0b' : '#34d399',
+                      scale: isSpeaking ? [1, 1.3, 1] : [1, 1.05, 1],
+                    }}
+                    transition={{
+                      duration: isSpeaking ? 0.6 : 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut'
+                    }}
+                  />
                 </div>
 
                 <div className="flex flex-col">
@@ -680,6 +708,18 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               </div>
 
               <div className="flex items-center gap-1">
+                {/* TTS Toggle */}
+                <button
+                  onClick={toggleTts}
+                  className={`p-2 rounded-lg transition-colors ${
+                    ttsEnabled
+                      ? 'text-emerald-400 bg-emerald-500/10'
+                      : 'text-nexo-muted hover:text-cyan-400 hover:bg-cyan-500/5'
+                  }`}
+                  title={ttsEnabled ? 'Luna fala (ativado)' : 'Luna fala (desativado)'}
+                >
+                  {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
                 <button
                   onClick={clearThreadMessages}
                   className="p-2 text-nexo-muted hover:text-cyan-400 hover:bg-cyan-500/5 rounded-lg transition-colors"

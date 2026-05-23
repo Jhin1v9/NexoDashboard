@@ -37,7 +37,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   // HSTS only in production (HTTPS)
   if (req.headers['x-forwarded-proto'] === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
@@ -90,6 +90,21 @@ async function resolveDashboardAuthor(reqBodyAuthor) {
   }
 }
 
+// --- Helpers JSON ---
+const readJSON = (file, defaultValue = null) => {
+  try {
+    let raw = fs.readFileSync(file, 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
+    return JSON.parse(raw);
+  } catch { return defaultValue; }
+};
+const writeJSON = (file, data) => {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  if (process.env.DATABASE_URL) {
+    // (pg-sync removed — direct PG writes only)
+  }
+};
+
 // ── AUTH & SECURITY CONFIG ──
 let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -104,7 +119,7 @@ if (!JWT_SECRET) {
 const JWT_EXPIRES_IN = '8h';
 const SECURITY_SETTINGS_FILE = path.join(DATA_DIR, 'security-settings.json');
 if (!fs.existsSync(SECURITY_SETTINGS_FILE)) {
-  writeJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: { maxAttemptsBeforeAlert: 1 }, lastNotifiedAt: null });
+  fs.writeFileSync(SECURITY_SETTINGS_FILE, JSON.stringify({ version: '1.0', settings: { maxAttemptsBeforeAlert: 1 }, lastNotifiedAt: null }, null, 2));
 }
 
 
@@ -945,21 +960,6 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-
-// --- Helpers ---
-const readJSON = (file, defaultValue = null) => {
-  try {
-    let raw = fs.readFileSync(file, 'utf8');
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
-    return JSON.parse(raw);
-  } catch { return defaultValue; }
-};
-const writeJSON = (file, data) => {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-  if (process.env.DATABASE_URL) {
-    // (pg-sync removed — direct PG writes only)
-  }
-};
 
 // ── LUNA CHAT THREADS v1.0 — migrado para PostgreSQL ──
 
