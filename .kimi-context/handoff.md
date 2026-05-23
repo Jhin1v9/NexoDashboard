@@ -2,9 +2,9 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-atual-hud-v3` 🔥 — última atualização: 2026-05-23 08:58
+> **Sessão ativa:** `kimi-atual-hud-v3` 🔥 — última atualização: 2026-05-23 19:15
 > 
-> **Último commit:** trabalho não commitado (desenvolvimento local)
+> **Último commit:** `e1e7e4e` — feat: email fallback SMTP + E2E suite + changelog update
 
 ---
 
@@ -20,7 +20,7 @@
 | Fase 3 | ✅ | Inline Actions (navigate, filter, highlight, scroll, toast via LunaActionBridge) |
 | Fase 4 | ✅ | Markdown HUD (Luna Syntax Core — terminal HUD, syntax highlight, tabelas, bullets sci-fi) |
 | Fase 5 | ✅ | Constellation Reactions (orbes flutuantes, explosão de partículas, badges com contador) |
-| Fase 6 | ✅ | Neural Uplink Voice Input (waveform viva, Web Audio API, SpeechRecognition pt-BR) |
+| Fase 6 | ✅ | Neural Uplink Voice Input (STT + TTS, waveform viva, Web Audio API, SpeechRecognition pt-BR, speechSynthesis) |
 | Fase 7 | ✅ | Ethereal Presence Ghost Mode (tecla G, rastro de partículas, notificações holográficas) |
 
 **Build:** ✅ 3148 modules, 0 erros  
@@ -64,9 +64,12 @@
 
 **🔴 PRÓXIMA FASE (backlog do PLANO.md):**
 - [x] **Página de login tradicional** — substituir terminal secreto/Konami code ✅ commit `ed7fc62`
+- [x] **Modo Voz 100% funcional** — STT + TTS + toggle no chat ✅ commit atual
 - [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
 - [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
 - [ ] **Atualizar Discord Webhook** — token atual retorna 401
+- [ ] **E2E Leads spec** — ajustar seletores do formulário multi-step
+- [ ] **E2E Notifications spec** — criar seed de notificações via API
 
 **🟢 INFRAESTRUTURA TÉCNICA:**
 - [ ] TypeScript: converter `datastore-pg.js` para `.ts`
@@ -294,6 +297,46 @@ backend/workspace/tpv-sorveteria/
 
 **⚠️ Atenção:** `backend/workspace/` foi adicionado ao `.gitignore` — NÃO commitar dados de runtime.
 
+
+---
+
+## 🔊 Modo Voz (Neural Uplink v2) — 100% Funcional
+
+### O que foi implementado
+O modo voz da Luna evoluiu de "input apenas" para "conversação bidirecional":
+
+| Componente | Status | Detalhes |
+|---|---|---|
+| **STT (Speech-to-Text)** | ✅ Funcional | Web Speech API nativa, pt-BR, waveform visual com 32 barras |
+| **TTS (Text-to-Speech)** | ✅ Funcional | speechSynthesis nativa, voz pt-BR automática, toggle no header |
+| **Waveform visual** | ✅ Funcional | Web Audio API (AnalyserNode), pulsa em tempo real |
+| **Permissões** | ✅ Corrigido | `Permissions-Policy: microphone=(self)` no backend |
+| **Configurações** | ✅ Persistidas | localStorage: STT on/off, TTS on/off, rate, volume, pitch |
+| **Indicador visual** | ✅ Funcional | Dot no avatar da Luna pulsa laranja quando falando |
+| **Atalho** | ✅ Funcional | `Ctrl+Shift+V` para iniciar/parar STT |
+
+### Arquivos modificados
+- `backend/server.js` — `Permissions-Policy: microphone=(self)` (era `microphone=()`)
+- `frontend/src/hooks/useLunaVoice.js` — Hook novo: TTS + settings + persistência
+- `frontend/src/components/luna/LunaChatPanel.jsx` — Integração TTS, toggle Volume2/VolumeX, indicador de fala
+
+### Como usar
+1. Clique no ícone de microfone ao lado do input do chat (ou `Ctrl+Shift+V`)
+2. Fale — a waveform pulsa e o texto aparece em tempo real
+3. Aperte Enter ou clique no ícone novamente para enviar
+4. Para ouvir a Luna responder: clique no ícone 🔊 no header do chat (toggle TTS)
+5. A Luna lerá todas as respostas em voz alta quando TTS estiver ativo
+
+### Configurações (localStorage: `luna-voice-settings`)
+```json
+{
+  "sttEnabled": true,
+  "ttsEnabled": false,
+  "rate": 1.1,
+  "volume": 1.0,
+  "pitch": 1.0
+}
+```
 
 ---
 

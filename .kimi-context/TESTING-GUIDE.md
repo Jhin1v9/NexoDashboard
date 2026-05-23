@@ -84,7 +84,7 @@ curl http://localhost:3457/            # deve retornar 200
 ### 2. WhatsApp
 - [ ] Navegar para `/whatsapp`
 - [ ] Clicar em "Menções" tab
-- [ ] **NÃO deve crashar** (erro `Activity is not defined` = FIX PENDENTE)
+- [ ] **NÃO deve crashar** ✅ Corrigido (Activity importado corretamente)
 
 ### 3. Email (Gmail OAuth)
 - [ ] Navegar para `/email`
@@ -98,6 +98,22 @@ curl http://localhost:3457/            # deve retornar 200
 - [ ] Digitar mensagem e pressionar Enter
 - [ ] Mensagem deve aparecer no chat
 - [ ] Luna deve responder (pode ser "Desculpe, não consegui processar..." se Ollama falhar)
+
+### 5. Modo Voz (STT + TTS)
+- [ ] Clicar no 🔊 no header do chat → deve ficar verde (TTS ativado)
+- [ ] Clicar no 🎤 ao lado do input (ou pressionar `Ctrl+Shift+V`)
+- [ ] Permitir acesso ao microfone quando solicitado
+- [ ] Falar "Olá Luna" — waveform deve pulsar
+- [ ] Clicar no 🎤 novamente para parar
+- [ ] Texto transcrito deve aparecer no input
+- [ ] Apertar Enter — Luna deve responder
+- [ ] Se TTS estiver ativado, a Luna deve "falar" a resposta (som do navegador)
+- [ ] O dot no avatar da Luna deve ficar laranja enquanto fala
+
+### 6. Notificações
+- [ ] Clicar no sino (🔔) na TopBar
+- [ ] Painel de notificações deve abrir flutuando acima de todos os elementos
+- [ ] Não deve ficar escondido atrás de sidebars ou modais (z-index fixado via createPortal)
 
 ### 5. Caixa (Salvar)
 - [ ] Navegar para `/caixa`
@@ -117,14 +133,17 @@ curl http://localhost:3457/            # deve retornar 200
 
 | # | Bug | Status | Último Teste | Notas |
 |---|---|---|---|---|
-| 1 | WhatsApp `Activity is not defined` | 🟡 PENDENTE | 2026-05-23 | Falta import `Activity` em `WhatsApp.jsx` |
-| 2 | Luna não responde (fetch sem Auth) | 🟡 PENDENTE | 2026-05-23 | Internal fetch para `/api/luna/chat` não passa header `Authorization` |
-| 3 | Email OAuth silencioso | ✅ CORRIGIDO | 2026-05-23 | Agora mostra alert com erro real |
-| 4 | Caixa "Erro ao salvar" | 🟡 PENDENTE | 2026-05-23 | Páginas com `fetch` nativo não enviam token JWT |
-| 5 | Sino 9+ não abre | ✅ FUNCIONA | 2026-05-23 | Há 3 sinos na TopBar (ChangelogBadge, NotificationCenter, PushNotification). O "9+" é o NotificationCenter — **funciona quando clicado corretamente** |
+| 1 | WhatsApp `Activity is not defined` | ✅ CORRIGIDO | 2026-05-23 | Import `Activity` adicionado em `WhatsApp.jsx` |
+| 2 | Luna não responde (fetch sem Auth) | ✅ CORRIGIDO | 2026-05-23 | Interceptador global de fetch em `main.jsx` injeta `Authorization` |
+| 3 | Email OAuth silencioso | ✅ CORRIGIDO | 2026-05-23 | Agora mostra alert com erro real + fallback SMTP implementado |
+| 4 | Caixa "Erro ao salvar" | ✅ CORRIGIDO | 2026-05-23 | Interceptador global de fetch corrige token JWT em todas as chamadas |
+| 5 | Sino 9+ não abre | ✅ FUNCIONA | 2026-05-23 | createPortal + position:fixed corrigiu z-index definitivamente |
 | 6 | Ollama erro JSON | 🟡 CONHECIDO | 2026-05-23 | `[OllamaClient] Unexpected non-whitespace character after JSON` — não crítico |
 | 7 | WebSocket ERR_CONNECTION_REFUSED | 🟡 CONHECIDO | 2026-05-23 | WS funciona via teste, browser às vezes falha |
 | 8 | Vite dev server cai | 🟡 CONHECIDO | 2026-05-23 | Reiniciar: `cd frontend && npx vite --port 3457` |
+| 9 | E2E leads.spec.js | 🟡 PENDENTE | 2026-05-23 | Seletores do formulário multi-step precisam de ajuste |
+| 10 | E2E notifications.spec.js | 🟡 PENDENTE | 2026-05-23 | Precisa de seed de notificações via API no beforeEach |
+| 11 | API Gemini revogada | 🔴 ACCEPTED | 2026-05-23 | NLU offline (NLP.js 137 intents) cobre 100%. Ollama gemma3:1b fallback |
 
 ---
 
@@ -174,7 +193,7 @@ curl -s http://localhost:3456/api/luna/threads -H "Authorization: Bearer $TOKEN"
 3. **Use `abner` / `7741`** para login — é a única conta que sabemos que funciona
 4. **Ollama pode falhar** — não é crítico, a Luna ainda processa mensagens via NLU
 5. **WebSocket pode falhar no browser** — teste via `node -e "new WebSocket('ws://localhost:3456/ws')"` no backend
-6. **NEVER sobrescreva `window.fetch`** globalmente — quebra o React e o Vite HMR
+6. **Interceptador de `window.fetch`:** Um interceptador global CIRÚRGICO existe em `main.jsx` para injetar `Authorization`. Não remova sem garantir que todas as chamadas de API enviam o token JWT manualmente — foi essa correção que resolveu os bugs #2 e #4
 7. **SEMPRE verifique `git status`** antes de fazer mudanças
 8. **Siga o handoff.md** para entender o estado atual do projeto
 9. **Token JWT expira após restart do backend** — O secret é gerado aleatoriamente em cada startup. Se reiniciar o backend, faça logout/login novamente no browser (ou limpe o localStorage)

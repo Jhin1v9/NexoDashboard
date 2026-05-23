@@ -3,8 +3,8 @@
 # AGENTS.md — NEXO COMMAND CENTER v4.0
 # Documento de contexto para agentes de IA
 # Data: 2026-05-12
-# Última atualização: 2026-05-23 10:45
-# Último commit: e772e68 (main)
+# Última atualização: 2026-05-23 19:15
+# Último commit: e1e7e4e (main)
 # ═══════════════════════════════════════════════════════════════════
 
 ## 🏢 EMPRESA
@@ -55,10 +55,13 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 | 24 | **Security Headers** | ✅ IMPLEMENTADO | HSTS, CSP, X-Frame-Options, Permissions-Policy |
 | 25 | **Path Traversal Fix** | ✅ IMPLEMENTADO | `sanitizeClientId` + regex sanitização |
 | 26 | **Luna NLU v2** | ✅ IMPLEMENTADO | IntentParser 96% acerto, navigate/filter intents |
-| 27 | **Luna HUD v2/v3** | ✅ IMPLEMENTADO | ChatPanel futurista, FAB orb, inline actions, reactions, ghost mode, voice input |
+| 27 | **Luna HUD v2/v3** | ✅ IMPLEMENTADO | ChatPanel futurista, FAB orb, inline actions, reactions, ghost mode, voice input + TTS |
 | 28 | **Dashboard Context** | ✅ IMPLEMENTADO | `GET /api/luna/dashboard-state`, context awareness |
 | 29 | **Playwright WhatsApp** | ✅ INSTALADO | `whatsapp-sender.js` com CDP automation |
 | 30 | **Login tradicional** | ✅ IMPLEMENTADO | Split-screen, dark mode, design Linear/Stripe/Vercel |
+| 31 | **Modo Voz completo** | ✅ IMPLEMENTADO | STT (SpeechRecognition) + TTS (speechSynthesis), waveform visual, toggle no chat |
+| 32 | **E2E Playwright** | 🟡 EM PROGRESSO | Auth 3/3 passando, notifications 1/2, leads 0/2 |
+| 33 | **Email Fallback SMTP** | ✅ IMPLEMENTADO | Fallback de Gmail OAuth para Nodemailer quando OAuth indisponível |
 
 #### Agente Luna (luna-cto-agent.cjs + SmartClassifier)
 | # | Feature | Status | Evidência |
