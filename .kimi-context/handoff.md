@@ -23,7 +23,8 @@
 - [x] **Entidade `leads` migrada:** 6 rotas migradas, leads no PG
 - [x] **Entidade `notifications` migrada:** 4 rotas + addNotification helper, 12 notificações no PG
 - [x] **Entidade `company_tasks` migrada:** 4 consumidores internos (buildDashboardContext, insights, action-center, batch), 76 tasks no PG
-- [x] **Testes:** 41/41 passando (`users: 3, tasks: 4, payments: 5, expenses: 5, cash-box: 4, quotes: 5, leads: 5, notifications: 5, company-tasks: 5`)
+- [x] **Entidade `links` migrada:** 6 rotas (GET, GET/stats, POST/enrich, POST/sync, POST, DELETE, PUT), 46 links no PG
+- [x] **Testes:** 46/46 passando (`users: 3, tasks: 4, payments: 5, expenses: 5, cash-box: 4, quotes: 5, leads: 5, notifications: 5, company-tasks: 5, links: 5`)
 - [x] **Dependências:** Zod, Jest, Supertest, TypeScript, ts-node, @types/* instalados
 - [x] **tsconfig.json:** Strict mode ativado
 - [x] **ollama-client.js:** Restaurado para `backend/services/` (required by server.js)
@@ -60,7 +61,7 @@
 | `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — complementa NLP.js |
 | `kimi-19007e56` 🔴 | `backend/server.js` | ContextModule/contextId nos endpoints de chat |
 | `kimi-19007e56` 🔴 | Frontend EmailHub | Banner drafts, LunaEmailAssistant — não conflita |
-| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 9 entidades |
+| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 10 entidades |
 
 ---
 
@@ -82,6 +83,7 @@ backend/__tests__/quotes.test.js                    # 5 testes
 backend/__tests__/leads.test.js                     # 5 testes
 backend/__tests__/notifications.test.js               # 5 testes
 backend/__tests__/company-tasks.test.js               # 5 testes
+backend/__tests__/links.test.js                       # 5 testes
 backend/jest.config.js                              # Config Jest
 backend/tsconfig.json                               # TypeScript strict mode
 ```
@@ -93,7 +95,7 @@ backend/tsconfig.json                               # TypeScript strict mode
 **Instância:** `kimi-10a71fc7` 🟡  
 **Commit atual:** `e36c519` — `feat(cash-box): migrate cash_box to PostgreSQL + update auto-deduct`  
 **Build:** ✅ Vite build passando (0 erros)  
-**Testes:** ✅ 41/41 passando  
+**Testes:** ✅ 46/46 passando  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
 **Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB)  
 **PostgreSQL:** ✅ Neon DB, 22 tabelas, 5 entidades ativas em PG  

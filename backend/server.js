@@ -3645,10 +3645,7 @@ async function updateCashBoxFromTransactions(transactions) {
 
 const CHANGELOG_FILE = path.join(__dirname, 'changelog.json');
 const CHANGELOG_DATA_FILE = path.join(DATA_DIR, 'changelog.json');
-const LINKS_INDEX_FILE = path.join(DATA_DIR, 'links-index.json');
-if (!fs.existsSync(LINKS_INDEX_FILE)) {
-  writeJSON(LINKS_INDEX_FILE, { links: [], lastUpdated: new Date().toISOString() });
-}
+
 
 function ensureChangelog() {
   // Cria apenas se o arquivo não existe — não sobrescreve dados existentes
@@ -6678,8 +6675,8 @@ app.get('/api/links', async (req, res) => {
       sortBy, order, limit = 50, offset = 0, enriched = 'true'
     } = req.query;
 
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    let links = [...(index.links || [])];
+    const result = await dataStore.getLinks();
+    let links = [...(result.links || [])];
 
     // Enriquecer links sem preview — background async para não bloquear HTTP response
     if (enriched === 'true') {
@@ -6689,21 +6686,21 @@ app.get('/api/links', async (req, res) => {
       if (needsSave) {
         setImmediate(async () => {
           try {
-            const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-            let bgLinks = [...(index.links || [])];
             for (const link of unenriched.slice(0, 5)) {
               try {
                 const preview = await fetchLinkPreview(link.url);
                 const classification = classifyUrl(link.url);
-                const idx = bgLinks.findIndex(l => l.id === link.id || l.url === link.url);
-                if (idx !== -1) {
-                  bgLinks[idx] = { ...bgLinks[idx], preview, ...classification, enrichedAt: new Date().toISOString() };
+                const existing = links.find(l => l.id === link.id || l.url === link.url);
+                if (existing) {
+                  existing.preview = preview;
+                  Object.assign(existing, classification);
+                  existing.enrichedAt = new Date().toISOString();
+                  await dataStore.saveLink(existing);
                 }
               } catch (previewErr) {
                 console.error('[LINKS] Preview failed for', link.url, previewErr.message);
               }
             }
-            writeJSON(LINKS_INDEX_FILE, { links: bgLinks, lastUpdated: new Date().toISOString() });
             broadcast({ type: 'links:enriched', data: { count: unenriched.length } });
           } catch (bgErr) {
             console.error('[LINKS] Background enrichment error:', bgErr.message);
@@ -6779,8 +6776,8 @@ app.get('/api/links/platforms', (req, res) => {
 // GET /api/links/stats
 app.get('/api/links/stats', async (req, res) => {
   try {
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    const links = index.links || [];
+    const result = await dataStore.getLinks();
+    const links = result.links || [];
     res.json({
       success: true,
       total: links.length,
@@ -6788,7 +6785,7 @@ app.get('/api/links/stats', async (req, res) => {
       byCategory: links.reduce((acc, l) => { acc[l.category] = (acc[l.category] || 0) + 1; return acc; }, {}),
       broken: links.filter(l => l.preview?.isBroken).length,
       needsEnrichment: links.filter(l => !l.enrichedAt).length,
-      lastUpdated: index.lastUpdated
+      lastUpdated: new Date().toISOString()
     });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -6798,17 +6795,17 @@ app.get('/api/links/stats', async (req, res) => {
 // POST /api/links/enrich — Forçar enriquecimento
 app.post('/api/links/enrich', async (req, res) => {
   try {
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    let links = index.links || [];
+    const result = await dataStore.getLinks();
+    let links = result.links || [];
     for (const link of links.slice(0, 20)) {
       const preview = await fetchLinkPreview(link.url);
       const classification = classifyUrl(link.url);
       const idx = links.findIndex(l => l.id === link.id || l.url === link.url);
       if (idx !== -1) {
         links[idx] = { ...links[idx], preview, ...classification, enrichedAt: new Date().toISOString() };
+        await dataStore.saveLink(links[idx]);
       }
     }
-    writeJSON(LINKS_INDEX_FILE, { links, lastUpdated: new Date().toISOString() });
     res.json({ success: true, enriched: links.length, message: `${links.length} links enriquecidos` });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -6816,35 +6813,39 @@ app.post('/api/links/enrich', async (req, res) => {
 });
 
 // POST /api/links/sync — Sincronizar com luna-buffer.json
-app.post('/api/links/sync', (req, res) => {
+app.post('/api/links/sync', async (req, res) => {
   try {
     const bufferPath = path.join(DATA_DIR, 'luna-buffer.json');
     const buffer = readJSON(bufferPath) || { links: [] };
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    const existingUrls = new Set(index.links.map(l => l.url));
+    const result = await dataStore.getLinks();
+    const existingUrls = new Set(result.links.map(l => l.url));
 
     let added = 0;
     const allBufferLinks = [...(buffer.links || []), ...(buffer.newLinks || [])];
-    allBufferLinks.forEach(link => {
+    for (const link of allBufferLinks) {
       if (!existingUrls.has(link.url)) {
         const classification = classifyUrl(link.url);
-        index.links.unshift({
+        const newLink = {
           id: link.id || `link-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           url: link.url,
           author: link.author || 'Desconhecido',
           timestamp: link.timestamp || new Date().toISOString(),
           chat: link.chat || 'Desconhecido',
+          notes: '',
+          manual: false,
+          preview: {},
           ...classification,
           enrichedAt: null,
           createdAt: new Date().toISOString()
-        });
+        };
+        await dataStore.saveLink(newLink);
         added++;
       }
-    });
+    }
 
-    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
-    broadcast({ type: 'links:sync', data: { added, total: index.links.length } });
-    res.json({ success: true, added, total: index.links.length, message: `${added} novos links sincronizados do buffer` });
+    const updated = await dataStore.getLinks();
+    broadcast({ type: 'links:sync', data: { added, total: updated.links.length } });
+    res.json({ success: true, added, total: updated.links.length, message: `${added} novos links sincronizados do buffer` });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -6855,8 +6856,8 @@ app.post('/api/links', async (req, res) => {
   try {
     const { url, author, chat, notes } = req.body;
     if (!url) return res.status(400).json({ success: false, error: 'URL obrigatória' });
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    const exists = index.links.find(l => l.url === url);
+    const result = await dataStore.getLinks();
+    const exists = result.links.find(l => l.url === url);
     if (exists) return res.status(409).json({ success: false, error: 'Link já existe', existing: exists });
 
     const preview = await fetchLinkPreview(url);
@@ -6875,9 +6876,7 @@ app.post('/api/links', async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    index.links.unshift(newLink);
-    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
-    broadcast({ type: 'links:new', data: newLink });
+    await dataStore.saveLink(newLink);
     res.status(201).json({ success: true, link: newLink });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -6885,30 +6884,24 @@ app.post('/api/links', async (req, res) => {
 });
 
 // DELETE /api/links/:id
-app.delete('/api/links/:id', (req, res) => {
+app.delete('/api/links/:id', async (req, res) => {
   try {
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    const link = index.links.find(l => l.id === req.params.id);
-    if (!link) return res.status(404).json({ success: false, error: 'Link não encontrado' });
-    index.links = index.links.filter(l => l.id !== req.params.id);
-    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
-    broadcast({ type: 'links:delete', data: { id: req.params.id } });
-    res.json({ success: true, deleted: link });
+    await dataStore.deleteLink(req.params.id);
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
 // PUT /api/links/:id
-app.put('/api/links/:id', (req, res) => {
+app.put('/api/links/:id', async (req, res) => {
   try {
-    const index = readJSON(LINKS_INDEX_FILE) || { links: [] };
-    const idx = index.links.findIndex(l => l.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ success: false, error: 'Link não encontrado' });
-    index.links[idx] = { ...index.links[idx], ...req.body, updatedAt: new Date().toISOString() };
-    writeJSON(LINKS_INDEX_FILE, { links: index.links, lastUpdated: new Date().toISOString() });
-    broadcast({ type: 'links:update', data: index.links[idx] });
-    res.json({ success: true, link: index.links[idx] });
+    const result = await dataStore.getLinks();
+    const existing = result.links.find(l => l.id === req.params.id);
+    if (!existing) return res.status(404).json({ success: false, error: 'Link não encontrado' });
+    const updated = { ...existing, ...req.body, updatedAt: new Date().toISOString() };
+    await dataStore.saveLink(updated);
+    res.json({ success: true, link: updated });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -8861,7 +8854,7 @@ async function startServer() {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
 
     // ── Preload Ollama model to avoid cold starts ──
-    if (lunaOllama) {
+    if (lunaOllama && typeof lunaOllama.preload === 'function') {
       lunaOllama.preload().catch(() => {});
     }
 

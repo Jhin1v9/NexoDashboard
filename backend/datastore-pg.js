@@ -589,6 +589,12 @@ async function saveLink(link) {
   return link;
 }
 
+async function deleteLink(id) {
+  await db.run('DELETE FROM links WHERE id=$1', [id]);
+  notifyChange('links', await getLinks());
+  return true;
+}
+
 // ============================================================
 // TRANSACTIONS (schema real — NOMES REAIS)
 // ============================================================
@@ -838,7 +844,7 @@ module.exports = {
   getLeads, saveLead, deleteLead,
   getSecurityLogs, saveSecurityLog,
   getNotifications, saveNotification, deleteNotification,
-  getLinks, saveLink,
+  getLinks, saveLink, deleteLink,
   getTransactions, saveTransaction,
   getChangelog, saveChangelog,
   getWhatsappHistory, saveWhatsappMessage,
