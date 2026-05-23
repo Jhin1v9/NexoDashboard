@@ -40,11 +40,11 @@ const TEMPLATES = [
   { id: 'boas_vindas', name: 'Boas-vindas', subject: 'Bem-vindo à Nexo Digital!' },
 ]
 
-export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSent, onCancel, initialBody = '' }) {
-  const [to, setTo] = useState('')
+export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSent, onCancel, initialBody = '', initialTo = '', initialSubject = '' }) {
+  const [to, setTo] = useState(initialTo || '')
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
-  const [subject, setSubject] = useState('')
+  const [subject, setSubject] = useState(initialSubject || '')
   const [showCc, setShowCc] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [sending, setSending] = useState(false)
@@ -68,7 +68,7 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
     },
   })
 
-  // Preencher campos quando é resposta ou quando recebe initialBody
+  // Preencher campos quando é resposta, initialBody, initialTo, initialSubject
   useEffect(() => {
     if (replyTo) {
       const fromEmail = replyTo.from?.match(/<([^>]+)>/)?.[1] || replyTo.from
@@ -83,10 +83,12 @@ export default function EmailCompose({ mode = 'compose', replyTo, threadId, onSe
         setSubject(`Fwd: ${replyTo.subject || ''}`)
       }
     }
+    if (initialTo) setTo(initialTo)
+    if (initialSubject) setSubject(initialSubject)
     if (initialBody && editor) {
       editor.commands.setContent(`<p>${initialBody.replace(/\n/g, '</p><p>')}</p>`)
     }
-  }, [replyTo, mode, initialBody, editor])
+  }, [replyTo, mode, initialBody, initialTo, initialSubject, editor])
 
   // Auto-save rascunho a cada 10s
   useEffect(() => {

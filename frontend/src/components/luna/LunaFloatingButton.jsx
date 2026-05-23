@@ -10,6 +10,7 @@ import { formatHelpForModule } from './LunaModuleSuggestions'
 import LunaActionFlow from './LunaActionFlow'
 import LunaBatchAction from './LunaBatchAction'
 import LunaActionCenter from './LunaActionCenter'
+import LunaChatPanel from './LunaChatPanel'
 import { decideExecution, logDecision } from '../../lib/lunaDecisionEngine'
 import axios from 'axios'
 
@@ -49,17 +50,13 @@ export default function LunaFloatingButton() {
   const drag = useRef({ active: false, dragged: false, mx: 0, my: 0, bx: 0, by: 0 })
   const fabRef = useRef(null)
 
-  const inputRef = useRef(null)
   const { understand, isLoading, error } = useLunaNLU()
   const { currentModule, chatState } = useLunaContext()
   const { addToast } = useToast()
 
-  const placeholderText = 'Diga o que precisa...'
-
-  // Foca no input quando abre + emite evento de estado
+  // Emite evento de estado quando abre/fecha
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100)
       lunaEventBus.emit('luna:stateChange', { chatState: 'listening', isOpen: true })
     } else {
       lunaEventBus.emit('luna:stateChange', { chatState: 'idle', isOpen: false })
@@ -170,6 +167,27 @@ export default function LunaFloatingButton() {
     const intent = nluResult.intent
     const schema = getSchema(intent)
 
+    // ── CASO ESPECIAL: Email → abre EmailCompose diretamente ──
+    const emailIntent = intent?.toLowerCase() || ''
+    if (emailIntent === 'email.enviar' || emailIntent === 'email.responder' || emailIntent === 'email.criar_rascunho') {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
+      setIsOpen(false)
+      const to = nluResult.entities?.find(e => e.entity === 'email' || e.entity === 'para')?.option || ''
+      const subject = nluResult.entities?.find(e => e.entity === 'assunto')?.option || ''
+      const params = new URLSearchParams()
+      params.append('compose', '1')
+      if (to) params.append('to', to)
+      if (subject) params.append('subject', subject)
+      window.location.href = `/email?${params.toString()}`
+      return
+    }
+    if (emailIntent === 'email.listar_nao_lidos' || emailIntent === 'email.listar' || emailIntent === 'email.sincronizar') {
+      lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
+      setIsOpen(false)
+      window.location.href = '/email'
+      return
+    }
+
     // ── CASO 1: Intent com formulário editável → Decision Engine (Passo 3) ──
     if (hasFormFields(intent)) {
       const schema = getSchema(intent)
@@ -232,6 +250,25 @@ export default function LunaFloatingButton() {
         contextModule: currentModule || null,
       })
       const data = res.data
+
+      // ── CASO ESPECIAL: Email intents do IntentParser → navega para EmailHub ──
+      const backendIntent = data.intent || ''
+      const emailAction = data.actions?.find(a => a.type === 'enviar_email' || a.type === 'responder_email' || a.type === 'consultar_emails')
+      if (emailAction || backendIntent === 'enviar_email' || backendIntent === 'responder_email' || backendIntent === 'consultar_emails') {
+        lunaEventBus.emit('luna:stateChange', { chatState: 'acting' })
+        setIsOpen(false)
+        setChatLoading(false)
+        const params = new URLSearchParams()
+        if (backendIntent === 'enviar_email' || emailAction?.type === 'enviar_email') {
+          params.append('compose', '1')
+          const p = emailAction?.params || {}
+          if (p.destinatario) params.append('to', p.destinatario)
+          if (p.assunto) params.append('subject', p.assunto)
+          if (p.contexto) params.append('body', p.contexto)
+        }
+        window.location.href = `/email${params.toString() ? '?' + params.toString() : ''}`
+        return
+      }
 
       if (data.needsConfirmation && data.actions) {
         setPendingActions(data.actions)
@@ -349,92 +386,8 @@ export default function LunaFloatingButton() {
 
   return (
     <>
-      {/* Input Overlay */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90]"
-            onClick={() => setIsOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.95 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute bottom-24 right-6 left-6 sm:left-auto sm:w-[420px]"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="glass-card p-4 space-y-3 shadow-xl shadow-black/40">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-nexo-primary to-purple-600 flex items-center justify-center">
-                      <Sparkles className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="text-xs font-medium text-nexo-text">Luna</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setText('ajuda')
-                      inputRef.current?.focus()
-                    }}
-                    className="text-[10px] px-2 py-1 rounded-full bg-nexo-card border border-nexo-border text-nexo-muted hover:text-nexo-primary hover:border-nexo-primary/50 transition-colors"
-                    title="Ver todos os comandos"
-                  >
-                    ?
-                  </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="flex gap-2">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={text}
-                    onChange={e => setText(e.target.value)}
-                    placeholder={placeholderText}
-                    className="flex-1 bg-nexo-bg border border-nexo-border rounded-lg px-3 py-2 text-sm text-nexo-text placeholder:text-nexo-muted/50 outline-none focus:border-nexo-primary transition-colors"
-                    disabled={isLoading || chatLoading}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isLoading || chatLoading || !text.trim()}
-                    className="p-2 bg-nexo-primary text-white rounded-lg hover:bg-nexo-primary/80 transition-colors disabled:opacity-50"
-                  >
-                    {isLoading || chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </button>
-                </form>
-
-                {error && (
-                  <p className="text-xs text-nexo-danger">{error}</p>
-                )}
-
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'criar tarefa',
-                    'saldo do caixa',
-                    'listar projetos',
-                    'verificar menções',
-                    'ajuda',
-                  ].map(suggestion => (
-                    <button
-                      key={suggestion}
-                      onClick={() => {
-                        setText(suggestion)
-                        inputRef.current?.focus()
-                      }}
-                      className="px-2 py-1 text-[10px] rounded-full bg-nexo-card border border-nexo-border text-nexo-muted hover:text-nexo-text hover:border-nexo-primary/50 transition-colors"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Luna Chat Panel (replaces ugly inline input) */}
+      <LunaChatPanel isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
       {/* Painel de Resultado do Chat (fallback para consultas) */}
       <AnimatePresence>

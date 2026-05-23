@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   Search, X, Mail, PanelRightOpen, PanelRightClose,
@@ -19,6 +19,7 @@ import { useEmailDensity } from '../context/EmailDensityContext'
 
 export default function EmailHub() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { isFocusMode, toggleFocusMode } = useEmailFocusMode()
   const { density, setDensity } = useEmailDensity()
   const { status: authStatus, connect, disconnect, refresh: refreshAuth } = useGmailAuth()
@@ -38,7 +39,22 @@ export default function EmailHub() {
   const [pendingDrafts, setPendingDrafts] = useState([])
   const [approvedDraftBody, setApprovedDraftBody] = useState('')
   const [unreadCounts, setUnreadCounts] = useState({})
+  const [composeInitialTo, setComposeInitialTo] = useState('')
+  const [composeInitialSubject, setComposeInitialSubject] = useState('')
   const searchInputRef = useRef(null)
+
+  // Abrir compose automaticamente via query params (?compose=1&to=...&subject=...)
+  useEffect(() => {
+    const shouldCompose = searchParams.get('compose') === '1'
+    if (shouldCompose) {
+      setComposeInitialTo(searchParams.get('to') || '')
+      setComposeInitialSubject(searchParams.get('subject') || '')
+      setApprovedDraftBody(searchParams.get('body') || '')
+      setShowCompose(true)
+      // Limpar query params para não reabrir no refresh
+      navigate('/email', { replace: true })
+    }
+  }, [searchParams, navigate])
 
   // Buscar emails
   const fetchEmails = useCallback(async () => {
@@ -428,9 +444,11 @@ export default function EmailHub() {
             </div>
             <div className="flex-1 overflow-hidden">
               <EmailCompose
-                onSent={() => { setShowCompose(false); setApprovedDraftBody(''); fetchEmails() }}
-                onCancel={() => setShowCompose(false)}
+                onSent={() => { setShowCompose(false); setApprovedDraftBody(''); setComposeInitialTo(''); setComposeInitialSubject(''); fetchEmails() }}
+                onCancel={() => { setShowCompose(false); setComposeInitialTo(''); setComposeInitialSubject('') }}
                 initialBody={approvedDraftBody}
+                initialTo={composeInitialTo}
+                initialSubject={composeInitialSubject}
               />
             </div>
           </div>

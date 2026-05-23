@@ -665,6 +665,11 @@ async function saveChangelog(entry) {
   return entry;
 }
 
+async function deleteChangelog(id) {
+  await db.run('DELETE FROM changelog WHERE id = $1', [id]);
+  notifyChange('changelog', await getChangelog());
+}
+
 // ============================================================
 // WHATSAPP HISTORY (schema real — NOMES REAIS)
 // ============================================================
@@ -852,7 +857,7 @@ module.exports = {
   getNotifications, saveNotification, deleteNotification,
   getLinks, saveLink, deleteLink,
   getTransactions, saveTransaction,
-  getChangelog, saveChangelog,
+  getChangelog, saveChangelog, deleteChangelog,
   getWhatsappHistory, saveWhatsappMessage,
   getLunaThreads, saveLunaThread,
   getLunaBuffer, saveLunaBuffer,

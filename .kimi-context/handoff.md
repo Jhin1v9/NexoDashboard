@@ -97,7 +97,7 @@ backend/tsconfig.json                               # TypeScript strict mode
 
 **Instância:** `kimi-10a71fc7` 🟡  
 **Commit atual:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
-**Commit atual (security_logs):** Pendente — aguardando OK do usuário  
+**Commit atual (security_logs):** `86e0887` — `feat(security-logs): migrate security_logs to PostgreSQL + 5 tests`  
 **Build:** ✅ Vite build passando (0 erros)  
 **Testes:** ✅ 51/51 passando  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
@@ -195,6 +195,20 @@ backend/workspace/tpv-sorveteria/
 - [x] **server.js:** `lunaOllama` usa `gemma3:1b` como padrão (mais rápido, metade da RAM)
 
 ### ✅ COMPLETO — Fase 1: Email Modal (REVISADO — 100% testes passando)
+- [x] **EmailCompose.jsx:** Adicionadas props `initialTo`, `initialSubject`
+- [x] **EmailHub.jsx:** Lê query params `?compose=1&to=...&subject=...` e abre compose preenchido
+- [x] **LunaFloatingButton.jsx:** Fast path + fallback navegam para `/email?compose=1&...` quando intent for `enviar_email`
+- [x] **Teste IntentParser:** 28/28 testes = 100% acerto
+- [x] **Teste end-to-end:** "enviar email para joao sobre orcamento" → detecta `enviar_email` → navega para `/email?compose=1&to=joao&subject=orcamento` → abre EmailCompose preenchido ✅
+
+### 🚧 EM ANDAMENTO — Fase 2: Chat Reformulado
+- [x] **LunaChatPanel.jsx revivido:** Integrado no `LunaFloatingButton.jsx` — clique no FAB agora abre chat panel (420px slide-in) em vez do input inline feio
+- [x] **Navegação de email no chat:** `LunaChatPanel.sendChatMessage()` também detecta `enviar_email`/`responder_email`/`consultar_emails` e navega para `/email?compose=1&...`
+- [ ] **Testar WebSocket:** Verificar se `/ws` está funcionando no backend (dev local pode ter problemas)
+- [ ] **Testar threads:** Verificar se `GET /api/luna/threads` retorna threads grupo/privado
+- [ ] **Limpar código morto:** Remover estados/refs do FAB que eram usados pelo input inline removido
+- [ ] **Remover badge "Gemini":** O chat panel ainda mostra badge "Gemini" no header — trocar para "Ollama" ou remover
+- [ ] **Animação "respirando":** Adicionar pulso sutil no FAB quando há notificações pendentes
 - [x] **EmailCompose.jsx:** Adicionadas props `initialTo`, `initialSubject`
 - [x] **EmailHub.jsx:** Lê query params `?compose=1&to=...&subject=...` e abre compose preenchido
 - [x] **LunaFloatingButton.jsx:** Fast path + fallback navegam para `/email?compose=1&...` quando intent for `enviar_email`

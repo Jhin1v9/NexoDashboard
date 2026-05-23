@@ -64,7 +64,7 @@ class IntentParser {
     // Regex de fallback para comandos óbvios (rápido, sem LLM)
     this.patterns = {
       task: {
-        regex: /\b(criar?\s+tarefa|anotar?\s+tarefa|adicionar?\s+tarefa|nova\s+tarefa|bota\s+tarefa|coloca\s+tarefa|faz(?:er)?\s+tarefa|tarefa\s*(?::|para|pra|pro)?)\b/i,
+        regex: /\b(criar?\s+tarefa|anotar?\s+tarefa|adicionar?\s+tarefa|nova\s+tarefa|bota\s+tarefa|coloca\s+tarefa|faz(?:er)?\s+tarefa)\b/i,
         action: 'criar_tarefa',
         extract: (text) => {
           // Limpa a frase removendo prefixos comuns
@@ -152,7 +152,7 @@ class IntentParser {
         }
       },
       status: {
-        regex: /\b(?:status|resumo|como\s+anda|o\s+que\s+tem|quais\s+as|me\s+(?:manda|dá|da)\s+(?:o\s+)?resumo)\b/i,
+        regex: /\b(?:status(?!\s+do\s+(?:sistema|servidor|stack|server|caixa|financeiro))|resumo(?!\s+do\s+sistema)|como\s+anda|o\s+que\s+tem|quais\s+as|me\s+(?:manda|dá|da)\s+(?:o\s+)?resumo)\b/i,
         action: 'consultar_status',
         extract: () => ({ filtro: 'geral' })
       },
@@ -214,7 +214,7 @@ class IntentParser {
         }
       },
       query_tasks: {
-        regex: /\b(quais\s+tarefas|lista\s+tarefas|tarefas\s+pendentes|minhas\s+tarefas|o\s+que\s+tem\s+pra\s+fazer)\b/i,
+        regex: /\b(quais\s+tarefas|lista\s+tarefas|tarefas\s+pendentes|minhas\s+tarefas|o\s+que\s+tem\s+pra\s+fazer|quantas\s+tarefas|mostrar\s+tarefas)\b/i,
         action: 'consultar_tarefas',
         extract: (text) => {
           let filtro = 'pendentes';
@@ -229,12 +229,12 @@ class IntentParser {
         extract: () => ({ filtro: 'todos' })
       },
       query_finance: {
-        regex: /\b(como\s+est[áa]\s+(?:o\s+)?financeiro|resumo\s+financeiro|caixa|saldo|recebimentos|gastos)\b/i,
+        regex: /\b(como\s+est[áa]\s+(?:o\s+)?financeiro|resumo\s+financeiro|caixa(?!\s+de\s+entrada)|saldo|recebimentos|gastos)\b/i,
         action: 'consultar_financeiro',
         extract: () => ({ filtro: 'geral' })
       },
       delete_task: {
-        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i,
+        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i,
         action: 'excluir_tarefa',
         extract: (text) => {
           const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i);
@@ -242,7 +242,7 @@ class IntentParser {
         }
       },
       delete_payment: {
-        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+)?(?:pagamento|recibo|entrada|recebimento)\s*(?:"|'| do | de |:)?\s*(.+)/i,
+        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:o\s+|este\s+|esse\s+)?(?:pagamento|recibo|entrada|recebimento)\s*(?:"|'| do | de |:)?\s*(.+)/i,
         action: 'excluir_pagamento',
         extract: (text) => {
           const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+)?(?:pagamento|recibo|entrada|recebimento)\s*(?:"|'| do | de |:)?\s*(.+)/i);
@@ -250,7 +250,7 @@ class IntentParser {
         }
       },
       delete_expense: {
-        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+)?(?:despesa|gasto|sa[ií]da)\s*(?:"|'| do | de |:)?\s*(.+)/i,
+        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:a\s+|esta\s+|essa\s+)?(?:despesa|gasto|sa[ií]da)\s*(?:"|'| do | de |:)?\s*(.+)/i,
         action: 'excluir_despesa',
         extract: (text) => {
           const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+)?(?:despesa|gasto|sa[ií]da)\s*(?:"|'| do | de |:)?\s*(.+)/i);
@@ -258,7 +258,7 @@ class IntentParser {
         }
       },
       delete_lead: {
-        regex: /\b(apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+|a\s+|esta\s+|essa\s+)?(?:lead|cliente|potencial)\s*(?:"|'| do | da | de |:)?\s*(.+)/i,
+        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:o\s+|este\s+|esse\s+|a\s+|esta\s+|essa\s+)?(?:lead|cliente|potencial)\s*(?:"|'| do | da | de |:)?\s*(.+)/i,
         action: 'excluir_lead',
         extract: (text) => {
           const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:o\s+|este\s+|esse\s+|a\s+|esta\s+|essa\s+)?(?:lead|cliente|potencial)\s*(?:"|'| do | da | de |:)?\s*(.+)/i);
@@ -266,7 +266,7 @@ class IntentParser {
         }
       },
       query_email: {
-        regex: /\b(emails?|caixa\s+de\s+entrada|inbox|ver\s+emails?|checar\s+emails?|responder\s+emails?|novos?\s+emails?)\b/i,
+        regex: /(?<!\b(?:enviar|mandar|compor|escrever|criar|fazer|redigir|draftar|responder|reponder|reply)\s+(?:um\s+|uma\s+)?)\b(emails?|caixa\s+de\s+entrada|inbox|ver\s+emails?|checar\s+emails?|novos?\s+emails?|mensagens\s+do\s+email)\b/i,
         action: 'consultar_emails',
         extract: (text) => {
           const unreadOnly = /\b(não\s+lido|nao\s+lido|novo|novos|pendente)\b/i.test(text);
@@ -277,6 +277,103 @@ class IntentParser {
         regex: /\b(men[çc][õo]es\s+(?:do\s+)?whatsapp|check\s+whatsapp|whatsapp|men[çc][õo]es\s+pendentes)\b/i,
         action: 'consultar_whatsapp',
         extract: () => ({ filtro: 'geral' })
+      },
+      // ── EMAIL: enviar/responder ──
+      send_email: {
+        regex: /\b(enviar|mandar|compor|escrever|criar|fazer|redigir|draftar)\s+(?:um\s+|uma\s+)?(?:email|e-mail|correio|mensagem)\b/i,
+        action: 'enviar_email',
+        extract: (text) => {
+          const destMatch = text.match(/(?:para|pra|pro)\s+([A-Za-zÀ-ÿ\s]+?)(?:\s+(?:sobre|assunto|com|dizendo|falando|falar)|$)/i);
+          const assuntoMatch = text.match(/(?:sobre|assunto|falando|falar)\s+(.+)/i);
+          return { destinatario: destMatch?.[1]?.trim() || null, assunto: assuntoMatch?.[1]?.trim() || null, contexto: text };
+        }
+      },
+      reply_email: {
+        regex: /\b(responder|reponder|reply|resposta\s+a)\s+(?:o\s+|ao\s+|a\s+)?(?:email|e-mail|correio|mensagem)\b/i,
+        action: 'responder_email',
+        extract: (text) => {
+          const idMatch = text.match(/(?:email|e-mail|mensagem)\s+(?:do|da|de|nº|numero|número)?\s*(.+?)(?:\s+(?:dizendo|com|sobre|falando)|$)/i);
+          return { emailId: idMatch?.[1]?.trim() || null, contexto: text };
+        }
+      },
+      // ── SOCIAL / CONHECIMENTO GERAL ──
+      social_knowledge: {
+        regex: /\b(previs[aã]o\s+do\s+tempo|clima|not[íi]cia|not[íi]cias|jornal|capital\s+(?:de|da|do|dos)|quem\s+(?:foi|é|s[aã]o)|o\s+que\s+(?:é|s[aã]o|significa)|qual\s+(?:a|o|é|foi)|como\s+(?:funciona|é|faz|vai|explicar|explica)|hist[óo]ria\s+(?:de|da|do)|geografia|ci[êe]ncia|curiosidade|fato|trivia|significado\s+de|tradu[çc][ãa]o|por\s+que|porque|quando|onde|quantos?|defini[çc][ãa]o\s+de|explique|explique\s+me|me\s+explique)\b/i,
+        action: 'social',
+        extract: (text) => ({ tipo: 'conhecimento_geral', texto: text })
+      },
+      // ── IDEIA ──
+      idea: {
+        regex: /\b(?:ideia\s*:|ideia\s+para|nova\s+ideia|anotar\s+ideia|salvar\s+ideia|registrar\s+ideia)(?=\s|$)/i,
+        action: 'criar_ideia',
+        extract: (text) => {
+          const m = text.match(/(?:ideia:?|nova\s+ideia|ideia\s+para|anotar\s+ideia|salvar\s+ideia|registrar\s+ideia)\s*(.+)/i);
+          return { titulo: m?.[1]?.trim() || text, descricao: '' };
+        }
+      },
+      // ── LISTAGENS ──
+      list_projects: {
+        regex: /\b(listar?\s+projetos?|projetos?\s+existentes?|quais\s+projetos?|ver\s+projetos?|mostrar\s+projetos?)\b/i,
+        action: 'listar_projetos',
+        extract: () => ({ filtro: 'todos' })
+      },
+      list_ideas: {
+        regex: /\b(listar?\s+ideias?|ideias?\s+salvas?|ver\s+ideias?|quais\s+ideias?|mostrar\s+ideias?)\b/i,
+        action: 'listar_ideias',
+        extract: () => ({ filtro: 'todas' })
+      },
+      list_links: {
+        regex: /\b(listar?\s+links?|ver\s+links?|links?\s+salvos?|quais\s+links?|mostrar\s+links?)\b/i,
+        action: 'listar_links',
+        extract: () => ({ filtro: 'todos' })
+      },
+      list_notifications: {
+        regex: /\b(listar?\s+notifica[çc][õo]es?|ver\s+notifica[çc][õo]es?|notifica[çc][õo]es?\s+novas?|alertas?|mostrar\s+notifica)/i,
+        action: 'listar_notificacoes',
+        extract: () => ({ filtro: 'nao_lidas' })
+      },
+      list_clients: {
+        regex: /\b(listar?\s+clientes?|ver\s+clientes?|quais\s+clientes?|mostrar\s+clientes?)\b/i,
+        action: 'listar_clientes',
+        extract: () => ({ filtro: 'todos' })
+      },
+      list_quotes: {
+        regex: /\b(listar?\s+or[çc]amentos?|ver\s+or[çc]amentos?|quais\s+or[çc]amentos?|mostrar\s+or[çc]amentos?)\b/i,
+        action: 'listar_orcamentos',
+        extract: () => ({ filtro: 'todos' })
+      },
+      // ── STACK / SISTEMA ──
+      check_stack: {
+        regex: /\b(status\s+do\s+sistema|status\s+do\s+servidor|como\s+est[áa]\s+o\s+sistema|verificar\s+stack|health\s+check|servidor|uptime|logs\s+do\s+sistema)\b/i,
+        action: 'verificar_stack',
+        extract: () => ({ filtro: 'geral' })
+      },
+      // ── PROJETO ──
+      create_project: {
+        regex: /\b(novo\s+projeto|criar\s+projeto|projeto\s+(?:novo|para|de))\b/i,
+        action: 'criar_projeto',
+        extract: (text) => {
+          const m = text.match(/(?:projeto)\s*[:\-]?\s*(.+)/i);
+          return { nome: m?.[1]?.trim() || text, descricao: '', status: 'pending' };
+        }
+      },
+      // ── ORÇAMENTO ──
+      create_quote: {
+        regex: /\b(novo\s+or[çc]amento|criar\s+or[çc]amento|or[çc]amento\s+(?:de|para|do))\b/i,
+        action: 'criar_orcamento',
+        extract: (text) => {
+          const valorMatch = text.match(/(\d+[\.,]?\d*)/);
+          return { valor: parseFloat((valorMatch?.[1] || '0').replace(',', '.')), titulo: text };
+        }
+      },
+      // ── CLIENTE ──
+      create_client: {
+        regex: /\b(novo\s+cliente\s+(?:nome|cadastrar|adicionar)|cadastrar\s+cliente|adicionar\s+cliente)\b/i,
+        action: 'criar_cliente',
+        extract: (text) => {
+          const m = text.match(/(?:cliente|nome)\s*[:\-]?\s*([A-Za-zÀ-ÿ\s]+?)(?:\s+(?:email|telefone|tel|@)|$)/i);
+          return { nome: m?.[1]?.trim() || 'Cliente não identificado' };
+        }
       }
     };
   }

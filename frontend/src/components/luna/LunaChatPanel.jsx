@@ -212,6 +212,21 @@ export default function LunaChatPanel({ isOpen, onClose }) {
       const data = res.data
 
       if (data.success && data.messages) {
+        // ── Navegação especial para intents de email ──
+        const emailAction = data.actions?.find(a => a.type === 'enviar_email' || a.type === 'responder_email' || a.type === 'consultar_emails')
+        if (emailAction || data.intent === 'enviar_email' || data.intent === 'responder_email' || data.intent === 'consultar_emails') {
+          const params = new URLSearchParams()
+          if (data.intent === 'enviar_email' || emailAction?.type === 'enviar_email') {
+            params.append('compose', '1')
+            const p = emailAction?.params || {}
+            if (p.destinatario) params.append('to', p.destinatario)
+            if (p.assunto) params.append('subject', p.assunto)
+            if (p.contexto) params.append('body', p.contexto)
+          }
+          window.location.href = `/email${params.toString() ? '?' + params.toString() : ''}`
+          return
+        }
+
         setThreadMessages(prev => ({
           ...prev,
           [activeThreadId]: [...(prev[activeThreadId] || []), ...data.messages]
@@ -348,8 +363,8 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-nexo-text">Luna</span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-nexo-info/10 text-nexo-info border border-nexo-info/20">
-                      <Sparkles className="w-2.5 h-2.5" /> Gemini
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-nexo-success/10 text-nexo-success border border-nexo-success/20">
+                      <Sparkles className="w-2.5 h-2.5" /> Online
                     </span>
                   </div>
 
