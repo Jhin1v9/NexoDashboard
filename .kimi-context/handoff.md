@@ -2,9 +2,9 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-568adf4a` 🟢 — última atualização: 2026-05-23 04:15
+> **Sessão ativa:** `kimi-atual` 🟢 — última atualização: 2026-05-21 08:53
 > 
-> **Último commit:** `45ee23a` — `feat(ideas): migrate ideas to PostgreSQL + 5 tests`
+> **Último commit:** `f12f5c5` — `fix: NotificationCenter a11y + sync (bugs 2,3)`
 
 ---
 
@@ -62,7 +62,8 @@
 | `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — complementa NLP.js |
 | `kimi-19007e56` 🔴 | `backend/server.js` | ContextModule/contextId nos endpoints de chat |
 | `kimi-19007e56` 🔴 | Frontend EmailHub | Banner drafts, LunaEmailAssistant — não conflita |
-| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 11 entidades |
+| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 19 entidades |
+| **Fase 0.2 atual** | `frontend/src/components/NotificationCenter.jsx`, `LandingPage.jsx` | Bugs frontend/WebSocket corrigidos |
 
 ---
 
@@ -366,6 +367,8 @@ Ver seção "Bugs Observados" acima.
 | 5 | `lunaOllama.preload` erro | `ollama-client.js` | Método `preload()` adicionado — dummy generate para warmup |
 | 6 | Código morto no FAB | `LunaFloatingButton.jsx` | Reescrito de forma enxuta, ~400 linhas removidas |
 | 7 | Migração 005 falha | `005-real-schema.sql` | PL/pgSQL condicional para verificar coluna `name` |
+| 8 | **Acessibilidade NotificationCenter** | `NotificationCenter.jsx` | `aria-expanded`, `aria-haspopup`, `role=dialog`, `aria-modal`, `aria-labelledby`, focus management, Escape key |
+| 9 | **Polling adaptativo sem WS** | `NotificationCenter.jsx` | 15s quando WS offline, 30s quando online + `useCallback` para `fetchNotifications` |
 
 ### ✅ FASE 1: Visual HUD Futurista
 
@@ -423,7 +426,7 @@ Ver seção "Bugs Observados" acima.
 - **Ollama preload:** ✅ `[OllamaClient] Preloading intent model: gemma3:1b`
 
 ### 🎯 Status desta sessão
-- **Bugs:** ✅ 7/7 corrigidos
+- **Bugs:** ✅ 9/9 corrigidos
 - **Visual HUD:** ✅ Completo
 - **Context Awareness:** ✅ Completo
 - **Inline Actions:** ✅ Completo
