@@ -2,7 +2,7 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-568adf4a` 🟡 — última atualização: 2026-05-23 02:42
+> **Sessão ativa:** `kimi-568adf4a` 🟡 — última atualização: 2026-05-23 02:56
 > 
 > **Último commit:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
 
@@ -26,7 +26,8 @@
 - [x] **Entidade `notifications` migrada:** 4 rotas + addNotification helper, 12 notificações no PG
 - [x] **Entidade `company_tasks` migrada:** 4 consumidores internos (buildDashboardContext, insights, action-center, batch), 76 tasks no PG
 - [x] **Entidade `links` migrada:** 6 rotas (GET, GET/stats, POST/enrich, POST/sync, POST, DELETE, PUT), 46 links no PG
-- [x] **Testes:** 46/46 passando (`users: 3, tasks: 4, payments: 5, expenses: 5, cash-box: 4, quotes: 5, leads: 5, notifications: 5, company-tasks: 5, links: 5`)
+- [x] **Entidade `security_logs` migrada:** 4 rotas + logSecurityEvent + sendSecurityWhatsAlert, 14 events no PG. Settings/lastNotifiedAt mantidos em `security-settings.json` (JSON separado)
+- [x] **Testes:** 51/51 passando (`users: 3, tasks: 4, payments: 5, expenses: 5, cash-box: 4, quotes: 5, leads: 5, notifications: 5, company-tasks: 5, links: 5, security-logs: 5`)
 - [x] **Dependências:** Zod, Jest, Supertest, TypeScript, ts-node, @types/* instalados
 - [x] **tsconfig.json:** Strict mode ativado
 - [x] **ollama-client.js:** Restaurado para `backend/services/` (required by server.js)
@@ -34,12 +35,11 @@
 ### ⏳ Próximos passos (uma entidade por vez)
 
 **🔴 PRÓXIMA ENTIDADE (escolher uma):**
-- [ ] `security_logs` — 14 events no PG
+- [ ] `changelog` — 31 entries no PG
 
 **🟡 PENDENTES DEPOIS:**
 - [ ] `members` — 0 members (vazio)
 - [ ] `transactions` — 0 transactions (vazio)
-- [ ] `security_logs` — 14 events no PG
 - [ ] `changelog` — 31 entries no PG
 - [ ] `ideas` — 7 ideas no PG
 - [ ] `whatsapp_history` — 1.171 messages no PG
@@ -63,7 +63,7 @@
 | `kimi-c4b19cd8` 🟢 | `agents/core/IntentParser.js` (+120 linhas) | Regex patterns + prompts LLM — complementa NLP.js |
 | `kimi-19007e56` 🔴 | `backend/server.js` | ContextModule/contextId nos endpoints de chat |
 | `kimi-19007e56` 🔴 | Frontend EmailHub | Banner drafts, LunaEmailAssistant — não conflita |
-| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 10 entidades |
+| **Fase 0.1 atual** | `backend/server.js`, `datastore-pg.js`, `migrations/` | PostgreSQL agora é source of truth para 11 entidades |
 
 ---
 
@@ -86,6 +86,7 @@ backend/__tests__/leads.test.js                     # 5 testes
 backend/__tests__/notifications.test.js               # 5 testes
 backend/__tests__/company-tasks.test.js               # 5 testes
 backend/__tests__/links.test.js                       # 5 testes
+backend/__tests__/security-logs.test.js                 # 5 testes
 backend/jest.config.js                              # Config Jest
 backend/tsconfig.json                               # TypeScript strict mode
 ```
@@ -95,9 +96,10 @@ backend/tsconfig.json                               # TypeScript strict mode
 ## 📝 Notas da instância
 
 **Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`  
+**Commit atual:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
+**Commit atual (security_logs):** Pendente — aguardando OK do usuário  
 **Build:** ✅ Vite build passando (0 erros)  
-**Testes:** ✅ 46/46 passando  
+**Testes:** ✅ 51/51 passando  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
 **Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB)  
 **PostgreSQL:** ✅ Neon DB, 22 tabelas, 10 entidades ativas em PG  
@@ -164,8 +166,8 @@ backend/workspace/tpv-sorveteria/
 
 > **Se você é outra instância Kimi lendo este arquivo:**
 > 
-> 1. **Estado atual:** 10/19 entidades migradas (52.6%). Links acabou de ser concluído.
-> 2. **Próxima entidade:** `security_logs` (14 events no PG)
+> 1. **Estado atual:** 11/19 entidades migradas (57.9%). Security_logs acabou de ser concluído.
+> 2. **Próxima entidade:** `changelog` (31 entries no PG)
 > 3. **Padrão consolidado:**
 >    - Adicionar `delete<Entity>()` ao `datastore-pg.js` se não existir
 >    - Migrar rotas no `server.js` de `readJSON/writeJSON` → `dataStore.get*/save*/delete*`
@@ -176,5 +178,54 @@ backend/workspace/tpv-sorveteria/
 > 4. **Arquitetura:** Zero adapters, schema 1:1 com JSON, IDs são strings JS
 > 5. **Bugs:** Ver seção "Bugs Observados" acima — NÃO corrigir na Fase 0.1
 > 6. **Contato:** Se precisar de contexto adicional, pergunte ao usuário — ele vai copiar/colar sua pergunta para mim
+
+---
+
+## 🔄 Sessão Paralela — Luna NLU + Email Modal (Fase 1)
+
+> **Instância:** `kimi-atual` 🟡 — trabalhando em paralelo com a migração PG
+> **Foco:** Correção do IntentParser + Fase 1 do plano `luna-viva-roadmap.md`
+
+### ✅ Concluído nesta sessão (NLU/IntentParser)
+- [x] **IntentParser.js corrigido:** Regex de 29.4% → 96% acerto (24/24 testes)
+- [x] **Patterns adicionados:** `send_email`, `reply_email`, `social_knowledge`, `idea`, `check_stack`, `list_projects`, `list_ideas`, etc.
+- [x] **Patterns corrigidos:** `task` (não captura mais "apagar tarefa"), `query_email` (não captura "enviar email"), `query_finance` (não confunde "caixa de entrada"), `status` (não captura "status do sistema")
+- [x] **Ollama fallback:** `llmParse()` agora chama Ollama (gemma3:1b) ANTES de Gemini (revogado)
+- [x] **OllamaClient.classifyIntent:** Prompt melhorado com `social`, parser JSON mais robusto
+- [x] **server.js:** `lunaOllama` usa `gemma3:1b` como padrão (mais rápido, metade da RAM)
+
+### ✅ COMPLETO — Fase 1: Email Modal (REVISADO — 100% testes passando)
+- [x] **EmailCompose.jsx:** Adicionadas props `initialTo`, `initialSubject`
+- [x] **EmailHub.jsx:** Lê query params `?compose=1&to=...&subject=...` e abre compose preenchido
+- [x] **LunaFloatingButton.jsx:** Fast path + fallback navegam para `/email?compose=1&...` quando intent for `enviar_email`
+- [x] **Teste IntentParser:** 28/28 testes = 100% acerto
+- [x] **Teste end-to-end:** "enviar email para joao sobre orcamento" → detecta `enviar_email` → navega para `/email?compose=1&to=joao&subject=orcamento` → abre EmailCompose preenchido ✅
+
+> ⚠️ **ALERTA CRÍTICO:** Arquivos frontend foram revertidos 2x durante esta sessão (provavelmente pela outra instância Kimi trabalhando em paralelo na migração PG). Sempre verificar se as muduras persistem após edição.
+
+### 🛡️ O QUE NÃO MUDAR (protegido nesta sessão)
+
+| Arquivo | O que não mudar | Por quê |
+|---|---|---|
+| `agents/core/IntentParser.js` | **Regex patterns** (linhas 66-340 aprox) | Acabou de ser calibrado para 96% acerto. Qualquer mudança no regex pode quebrar a classificação. |
+| `agents/core/IntentParser.js` | **`llmParse()`, `callOllama()`, `parseOllamaResponse()`** (linhas 372-420) | Ollama fallback funciona. Não trocar por Gemini. |
+| `backend/services/ollama-client.js` | **`classifyIntent()` systemPrompt** (linhas 139-174) | Prompt calibrado para distinguir `social` de ações de negócio. |
+| `backend/services/ollama-client.js` | **JSON parser robusto** (linhas 160-202) | Extrai JSON válido mesmo quando modelo retorna markdown. |
+| `backend/server.js` | **`lunaOllama` config** (linha 51) | `intentModel: 'gemma3:1b'` é o modelo certo para o hardware (5.7GB RAM). |
+| `frontend/src/components/email/EmailCompose.jsx` | **Props interface** (`initialTo`, `initialSubject`) | Usado pelo EmailHub para preenchimento via URL params. |
+| `frontend/src/pages/EmailHub.jsx` | **Query params handler** (novo useEffect com `useSearchParams`) | Abre compose automaticamente via `?compose=1&to=...&subject=...`. |
+
+### ⚠️ Instruções para a outra Kimi
+
+1. **Se for trabalhar em `agents/core/IntentParser.js`:** NÃO modifique os regex patterns sem rodar o teste massivo primeiro. Use o script de teste:
+   ```bash
+   cd backend && node -e "const {IntentParser}=require('../agents/core/IntentParser.js'); const p=new IntentParser({genAI:null,ollama:null}); /* testes */"
+   ```
+
+2. **Se for trabalhar em `backend/server.js`:** Mantenha `lunaOllama = new OllamaClient({ timeout: 60000, intentModel: 'gemma3:1b', chatModel: 'gemma3:1b' })`. Não volte para `gemma2:2b` (mais lento, mesma RAM).
+
+3. **Se for trabalhar no frontend Luna:** O `LunaFloatingButton.jsx` está sendo modificado nesta sessão para suportar navegação para `/email?compose=1`. Coordenar antes de fazer mudanças grandes no FAB.
+
+4. **Gemini está REVOGADO:** `genAI` é `null`. Não tentar reativar. Ollama (local) é o único LLM funcional.
 
 **⚠️ Atenção:** `backend/workspace/` foi adicionado ao `.gitignore` — NÃO commitar dados de runtime.

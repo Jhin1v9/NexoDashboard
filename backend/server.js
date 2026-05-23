@@ -88,7 +88,10 @@ if (!JWT_SECRET) {
   console.warn('[SECURITY] Ação recomendada: defina JWT_SECRET no Render Dashboard.');
 }
 const JWT_EXPIRES_IN = '8h';
-const SECURITY_LOG_FILE = path.join(DATA_DIR, 'security-log.json');
+const SECURITY_SETTINGS_FILE = path.join(DATA_DIR, 'security-settings.json');
+if (!fs.existsSync(SECURITY_SETTINGS_FILE)) {
+  writeJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: { maxAttemptsBeforeAlert: 1 }, lastNotifiedAt: null });
+}
 
 
 // Middleware: verifica JWT em rotas protegidas
@@ -373,15 +376,12 @@ async function detectVpnTorProxy(ip, fingerprint = {}) {
 
 // Helper: logar evento de segurança
 async function logSecurityEvent(event) {
-  const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
   const entry = {
     id: `sec-${Date.now()}`,
     timestamp: new Date().toISOString(),
     ...event
   };
-  log.events.unshift(entry);
-  if (log.events.length > 200) log.events = log.events.slice(0, 200);
-  writeJSON(SECURITY_LOG_FILE, log);
+  await dataStore.saveSecurityLog(entry);
 
   // Broadcast para dashboards em tempo real
   broadcast({ type: 'security:alert', data: entry });
@@ -835,8 +835,8 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
 // Retorna { sent: boolean, reason?: string }
 async function sendSecurityWhatsAlert(message, opts = {}) {
   const { skipRateLimit = false, skipSettingsCheck = false } = opts;
-  const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], lastNotifiedAt: null, settings: {} });
-  const settings = log.settings || {};
+  const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+  const settings = settingsData.settings || {};
 
   if (!skipSettingsCheck && settings.whatsappAlerts === false) {
     return { sent: false, reason: 'whatsapp_alerts_disabled' };
@@ -844,7 +844,7 @@ async function sendSecurityWhatsAlert(message, opts = {}) {
 
   // Rate limiting: máximo 1 mensagem a cada 5 minutos (exceto para testes)
   if (!skipRateLimit) {
-    const lastNotified = log.lastNotifiedAt ? new Date(log.lastNotifiedAt).getTime() : 0;
+    const lastNotified = settingsData.lastNotifiedAt ? new Date(settingsData.lastNotifiedAt).getTime() : 0;
     const now = Date.now();
     if (now - lastNotified < 5 * 60 * 1000) {
       return { sent: false, reason: 'rate_limited', retryAfter: Math.ceil((5 * 60 * 1000 - (now - lastNotified)) / 1000) };
@@ -855,8 +855,8 @@ async function sendSecurityWhatsAlert(message, opts = {}) {
     const WhatsAppSender = require('./services/whatsapp-sender');
     const sender = new WhatsAppSender();
     await sender.sendMessage({ chatName: 'Production', text: message });
-    log.lastNotifiedAt = new Date().toISOString();
-    writeJSON(SECURITY_LOG_FILE, log);
+    settingsData.lastNotifiedAt = new Date().toISOString();
+    writeJSON(SECURITY_SETTINGS_FILE, settingsData);
     return { sent: true };
   } catch (e) {
     console.error('[SECURITY] Falha ao enviar WhatsApp:', e.message);
@@ -8133,13 +8133,14 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // Verificar se atingiu limite de tentativas para alertar
-      const log = readJSON(SECURITY_LOG_FILE, { events: [], settings: {} });
-      const recentAttempts = log.events.filter(e =>
+      const secResult = await dataStore.getSecurityLogs();
+      const recentAttempts = secResult.events.filter(e =>
         e.type === 'failed_login' &&
         e.ip === ip &&
         new Date(e.timestamp) > new Date(Date.now() - 60 * 60 * 1000)
       );
-      const settings = log.settings || {};
+      const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+      const settings = settingsData.settings || {};
       const maxAttempts = settings.maxAttemptsBeforeAlert || 1;
 
       if (recentAttempts.length >= maxAttempts) {
@@ -8158,15 +8159,10 @@ app.post('/api/auth/login', async (req, res) => {
           event.notificationChannel = (event.notificationChannel || '') + '+whatsapp';
         }
 
-        // Persistir status de notificação no security log
+        // Persistir status de notificação no security log (PG)
         if (event.notified) {
-          const secLog = readJSON(SECURITY_LOG_FILE, { events: [] });
-          const evtIdx = secLog.events.findIndex(e => e.id === event.id);
-          if (evtIdx !== -1) {
-            secLog.events[evtIdx].notified = event.notified;
-            secLog.events[evtIdx].notificationChannel = event.notificationChannel;
-            writeJSON(SECURITY_LOG_FILE, secLog);
-          }
+          const updated = { ...event, notified: event.notified, notificationChannel: event.notificationChannel };
+          await dataStore.saveSecurityLog(updated);
         }
       }
 
@@ -8256,10 +8252,11 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/security/log — Retorna security log (protegido)
-app.get('/api/security/log', requireAuth, (req, res) => {
+app.get('/api/security/log', requireAuth, async (req, res) => {
   try {
-    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
-    res.json({ success: true, events: log.events.slice(0, 50), settings: log.settings });
+    const result = await dataStore.getSecurityLogs();
+    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    res.json({ success: true, events: result.events.slice(0, 50), settings: settingsData.settings || {} });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -8268,8 +8265,8 @@ app.get('/api/security/log', requireAuth, (req, res) => {
 // GET /api/security/settings — Retorna configurações de segurança
 app.get('/api/security/settings', requireAuth, (req, res) => {
   try {
-    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
-    res.json({ success: true, settings: log.settings || {} });
+    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    res.json({ success: true, settings: settingsData.settings || {} });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -8278,10 +8275,10 @@ app.get('/api/security/settings', requireAuth, (req, res) => {
 // PUT /api/security/settings — Atualiza configurações de segurança
 app.put('/api/security/settings', requireAuth, (req, res) => {
   try {
-    const log = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
-    log.settings = { ...log.settings, ...req.body };
-    writeJSON(SECURITY_LOG_FILE, log);
-    res.json({ success: true, settings: log.settings });
+    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    settingsData.settings = { ...settingsData.settings, ...req.body };
+    writeJSON(SECURITY_SETTINGS_FILE, settingsData);
+    res.json({ success: true, settings: settingsData.settings });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -8290,8 +8287,8 @@ app.put('/api/security/settings', requireAuth, (req, res) => {
 // POST /api/security/test-whatsapp — Testa envio de alerta no WhatsApp
 app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
   try {
-    const settingsLog = readJSON(SECURITY_LOG_FILE, { version: '1.0', events: [], settings: {} });
-    if (settingsLog.settings?.whatsappAlerts === false) {
+    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    if (settingsData.settings?.whatsappAlerts === false) {
       return res.status(400).json({ success: false, error: 'Alertas no WhatsApp estão desativados. Ative na aba Segurança primeiro.' });
     }
 

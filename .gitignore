@@ -80,3 +80,4 @@ backend/workspace/
 backend/data/luna-model.nlp
 backend/data/gmail-tokens.json
 test_security_flow.py
+backend/data/security-settings.json

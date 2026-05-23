@@ -525,6 +525,12 @@ async function saveSecurityLog(event) {
   return event;
 }
 
+async function deleteSecurityLog(id) {
+  await db.run('DELETE FROM security_logs WHERE id=$1', [id]);
+  notifyChange('securityLogs', await getSecurityLogs());
+  return true;
+}
+
 // ============================================================
 // NOTIFICATIONS
 // ============================================================
@@ -842,7 +848,7 @@ module.exports = {
   getSettings, setSettings,
   getIdeas, saveIdea,
   getLeads, saveLead, deleteLead,
-  getSecurityLogs, saveSecurityLog,
+  getSecurityLogs, saveSecurityLog, deleteSecurityLog,
   getNotifications, saveNotification, deleteNotification,
   getLinks, saveLink, deleteLink,
   getTransactions, saveTransaction,
