@@ -1,7 +1,29 @@
 {
   "version": "1.2",
-  "lastUpdated": "2026-05-23T17:13:59.000Z",
+  "lastUpdated": "2026-05-23T18:30:42.000Z",
   "entries": [
+    {
+      "id": "changelog-dashboard-100-percent",
+      "version": "3.8.1",
+      "title": "Dashboard 100% Funcional — Correções Críticas",
+      "description": "Correção massiva de problemas críticos para deixar o dashboard 100% operacional: (1) AuthContext não remove mais token em erros de rede (só em 401), resolvendo o problema de precisar logar toda vez que entra no dashboard; (2) Webhook Discord de segurança movido de hardcoded no server.js para variável de ambiente DISCORD_SECURITY_WEBHOOK; (3) StackStatus e AutoFixPanel removidos do frontend (chamavam APIs inexistentes no backend); (4) Build frontend sincronizado com backend/public; (5) Backend reiniciado e estável; (6) Conflito de polling do Telegram resolvido (PID 326409 encerrado); (7) Migrações 005/006 registradas na tabela _migrations.",
+      "category": "bugfix",
+      "emoji": "🚀",
+      "author": "NEXO Team",
+      "tier": 1,
+      "date": "2026-05-23T18:30:42.000Z",
+      "tags": [
+        "dashboard",
+        "auth",
+        "segurança",
+        "discord",
+        "telegram",
+        "build"
+      ],
+      "readBy": [],
+      "status": "✅ 100% PRONTO",
+      "statusDetail": "Backend estável. Frontend build sincronizado. Login persistente corrigido. Webhook seguro."
+    },
     {
       "id": "changelog-e2e-playwright-v1",
       "version": "3.8.0",
