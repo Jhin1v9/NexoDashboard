@@ -94,6 +94,25 @@
 
 ---
 
+## ⚠️ Infraestrutura & Estabilidade
+
+### Neon PostgreSQL (banco remoto)
+- **Host:** `pg.neon.tech` (IP: `35.168.64.81`)
+- **Instabilidade conhecida:** O Neon pode ficar temporariamente offline após commits/pushes do usuário ou outras sessões Kimi
+- **Sintomas:** `ETIMEDOUT`, `ENETUNREACH`, todas as APIs retornam 500
+- **Solução:** ESPERE 30-60 segundos. O Neon se recupera sozinho. NÃO fique reiniciando o backend freneticamente.
+
+### JWT Token (auth in-memory)
+- **Secret:** Gerado aleatoriamente em cada startup do backend
+- **Consequência:** Token armazenado no localStorage do browser INVALIDA após restart do backend
+- **Solução:** Sempre limpe o localStorage e faça login novamente após reiniciar o backend
+
+### Múltiplas instâncias do backend
+- **Problema:** Rodar `node server.js` sem matar a instância anterior causa conflito de porta (3456) e erro 409 no Telegram
+- **Solução:** `pkill -f "node server.js"` antes de iniciar uma nova instância
+
+---
+
 ## 🔗 Arquivos chave desta sessão
 
 ```

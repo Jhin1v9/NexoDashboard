@@ -139,7 +139,8 @@ router.post('/', async (req, res) => {
       message: 'Obrigado! Nossa equipe entrará em contato em até 24h.',
       notifications: {
         email: notifications.email?.success || false,
-        discord: notifications.discord?.success || false
+        discord: notifications.discord?.success || false,
+        telegram: notifications.telegram?.sent || false
       }
     });
 

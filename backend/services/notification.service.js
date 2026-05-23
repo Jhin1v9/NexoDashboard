@@ -1,12 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * Notification Service — NEXO Dashboard PRO
- * Orquestra notificações: Email (primário) → Discord (fallback)
+ * Orquestra notificações: Email (primário) → Discord → Telegram
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
 const { sendLeadNotification, isConfigured: emailConfigured } = require('./email.service');
 const { sendWebhookMessage } = require('./discord-notifier');
+const telegramNotify = require('./telegram-notification.service');
 
 /**
  * Notifica a equipe NEXO sobre um novo lead
@@ -17,7 +18,8 @@ const { sendWebhookMessage } = require('./discord-notifier');
 async function notifyNewLead(lead) {
   const results = {
     email: null,
-    discord: null
+    discord: null,
+    telegram: null
   };
 
   // 1. Tentar email
@@ -57,11 +59,28 @@ async function notifyNewLead(lead) {
     results.discord = { success: false, error: err.message };
   }
 
+  // 3. Telegram (sempre tenta, é o canal mais rápido para a equipe)
+  if (telegramNotify.isConfigured) {
+    try {
+      results.telegram = await telegramNotify.notifyNewLead({
+        displayName: lead.displayName,
+        email: lead.email,
+        companyName: lead.companyName,
+        companySize: lead.companySize,
+        phone: lead.phone,
+        notes: lead.notes
+      });
+    } catch (err) {
+      results.telegram = { sent: false, error: err.message };
+    }
+  }
+
   // Log resumo
   const emailOk = results.email?.success;
   const discordOk = results.discord?.success;
-  if (emailOk || discordOk) {
-    console.log('[NotificationService] Lead notificado:', { email: emailOk, discord: discordOk });
+  const telegramOk = results.telegram?.sent;
+  if (emailOk || discordOk || telegramOk) {
+    console.log('[NotificationService] Lead notificado:', { email: emailOk, discord: discordOk, telegram: telegramOk });
   } else {
     console.warn('[NotificationService] Nenhuma notificação entregue:', results);
   }
