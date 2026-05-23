@@ -346,53 +346,69 @@ class ActionExecutor {
       updatedAt: new Date().toISOString()
     };
 
-    // Tentar via API primeiro
+    // Tentar via API (fonte única de verdade)
     const apiResult = await this.apiPost('/tasks', task);
-    if (apiResult && !apiResult.error && !apiResult.success === false) {
+    if (apiResult && !apiResult.error && apiResult.success !== false) {
       return { type: 'task', id: task.id, title, assignedTo, source: 'api' };
     }
 
-    // Fallback: salvar direto no JSON
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
-    tasks.push(task);
-    this.writeJson(tasksFile, tasks);
-    // Broadcast para atualizar o dashboard
-    try {
-      if (global.broadcast) global.broadcast({ type: 'tasks', data: tasks });
-    } catch {}
-
-    return { type: 'task', id: task.id, title, assignedTo, source: 'file' };
+    // Não escreve mais no JSON — retorna erro para evitar dual source of truth
+    return {
+      type: 'task',
+      error: true,
+      message: `Não consegui criar a tarefa no servidor: ${apiResult?.error || 'erro desconhecido'}`,
+      id: task.id,
+      title
+    };
   }
 
   async completeTask(params, authorName) {
     const titulo = params.titulo || '';
+    if (!titulo) {
+      return { type: 'task_done', error: true, message: 'Informe a tarefa para concluir' };
+    }
 
-    // Buscar tarefa similar
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
+    // 1. Buscar na API primeiro
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks) && apiTasks.length > 0) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
 
     // Procura por similaridade no título
     const match = tasks.find(t => {
-      const taskTitle = (t.titulo || t.body || '').toLowerCase();
+      const taskTitle = (t.titulo || t.title || t.body || '').toLowerCase();
       const searchTitle = titulo.toLowerCase();
       return taskTitle.includes(searchTitle) || searchTitle.includes(taskTitle.slice(0, 30));
     });
 
-    if (match) {
-      match.status = 'concluida';
-      match.dataConclusao = new Date().toISOString();
-      match.concluidoPor = authorName;
-      this.writeJson(tasksFile, tasks);
-      return { type: 'task_done', id: match.id, titulo: match.titulo, source: 'file' };
+    if (!match) {
+      return {
+        type: 'task_done',
+        error: true,
+        message: `Não encontrei nenhuma tarefa correspondente a "${titulo}". Tente ser mais específico ou verifique o título exato.`
+      };
     }
 
-    // Se não achou, retorna erro
+    // 2. Atualizar via API (fonte única de verdade)
+    const apiResult = await this.apiPut(`/tasks/${match.id}`, {
+      status: 'completed',
+      completedAt: new Date().toISOString()
+    });
+
+    if (apiResult && !apiResult.error) {
+      return { type: 'task_done', id: match.id, titulo: match.title || match.titulo, source: 'api' };
+    }
+
+    // Se API falhar, retorna erro (não escreve mais no JSON)
     return {
       type: 'task_done',
       error: true,
-      message: `Não encontrei nenhuma tarefa correspondente a "${titulo || 'desconhecida'}". Tente ser mais específico ou verifique o título exato.`,
-      source: 'file'
+      message: `Encontrei a tarefa "${match.title || match.titulo}" mas não consegui atualizar no servidor: ${apiResult?.error || 'erro desconhecido'}`
     };
   }
 
@@ -400,8 +416,16 @@ class ActionExecutor {
     const taskTitle = params.taskTitle || '';
     const commentText = params.commentText || '';
 
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
+    // 1. Buscar na API primeiro
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks) && apiTasks.length > 0) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
 
     const match = tasks.find(t => {
       const tTitle = (t.titulo || t.title || t.body || '').toLowerCase();
@@ -419,25 +443,30 @@ class ActionExecutor {
       createdAt: new Date().toISOString()
     };
 
+    // 2. Enviar via API (fonte única de verdade)
     const apiResult = await this.apiPost(`/tasks/${match.id}/comments`, comment);
     if (apiResult && !apiResult.error && apiResult.success !== false) {
       return { type: 'comment', taskId: match.id, taskTitle: match.title || match.titulo, text: commentText, source: 'api' };
     }
 
-    match.comments = match.comments || [];
-    match.comments.push(comment);
-    match.updatedAt = new Date().toISOString();
-    this.writeJson(tasksFile, tasks);
-
-    return { type: 'comment', taskId: match.id, taskTitle: match.title || match.titulo, text: commentText, source: 'file' };
+    // Não escreve mais no JSON — retorna erro
+    throw new Error(`Não consegui adicionar comentário no servidor: ${apiResult?.error || 'erro desconhecido'}`);
   }
 
   async updateTaskStatus(params, authorName) {
     const taskTitle = params.taskTitle || '';
     const status = params.status || 'pending';
 
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
+    // 1. Buscar na API primeiro
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks) && apiTasks.length > 0) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
 
     const match = tasks.find(t => {
       const tTitle = (t.titulo || t.title || t.body || '').toLowerCase();
@@ -449,22 +478,14 @@ class ActionExecutor {
       throw new Error(`Tarefa "${taskTitle}" não encontrada`);
     }
 
+    // 2. Atualizar via API (fonte única de verdade)
     const apiResult = await this.apiPut(`/tasks/${match.id}`, { status });
     if (apiResult && !apiResult.error && apiResult.success !== false) {
       return { type: 'status_update', taskId: match.id, taskTitle: match.title || match.titulo, status, source: 'api' };
     }
 
-    match.status = status;
-    if (status === 'in_progress' && !match.startedAt) {
-      match.startedAt = new Date().toISOString();
-    }
-    if (status === 'completed' && !match.completedAt) {
-      match.completedAt = new Date().toISOString();
-    }
-    match.updatedAt = new Date().toISOString();
-    this.writeJson(tasksFile, tasks);
-
-    return { type: 'status_update', taskId: match.id, taskTitle: match.title || match.titulo, status, source: 'file' };
+    // Não escreve mais no JSON — retorna erro
+    throw new Error(`Não consegui atualizar a tarefa no servidor: ${apiResult?.error || 'erro desconhecido'}`);
   }
 
   // ============================================================
@@ -729,22 +750,34 @@ class ActionExecutor {
     const titulo = params.titulo || params.id || '';
     if (!titulo) throw new Error('Informe a tarefa para excluir');
 
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
+    // 1. Buscar na API primeiro
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks) && apiTasks.length > 0) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
 
-    const idx = tasks.findIndex(t => {
+    const match = tasks.find(t => {
       if (params.id && t.id === params.id) return true;
       const taskTitle = (t.titulo || t.title || '').toLowerCase();
       const searchTitle = titulo.toLowerCase();
       return taskTitle.includes(searchTitle) || searchTitle.includes(taskTitle.slice(0, 30));
     });
 
-    if (idx === -1) throw new Error(`Tarefa "${titulo}" não encontrada`);
+    if (!match) throw new Error(`Tarefa "${titulo}" não encontrada`);
 
-    const removed = tasks.splice(idx, 1)[0];
-    this.writeJson(tasksFile, tasks);
+    // 2. Deletar via API (fonte única de verdade)
+    const apiResult = await this.apiDelete(`/tasks/${match.id}`);
+    if (apiResult && !apiResult.error) {
+      return { type: 'task_deleted', id: match.id, titulo: match.title || match.titulo, source: 'api' };
+    }
 
-    return { type: 'task_deleted', id: removed.id, titulo: removed.title || removed.titulo, source: 'file' };
+    // Se API falhar, retorna erro (não deleta mais do JSON)
+    throw new Error(`Não consegui excluir a tarefa no servidor: ${apiResult?.error || 'erro desconhecido'}`);
   }
 
   async deletePayment(params, authorName) {
@@ -849,11 +882,20 @@ class ActionExecutor {
   async getStatus(params) {
     const filtro = params.filtro || 'geral';
 
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
+    // 1. Buscar tarefas da API (fonte única de verdade)
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks)) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
+
     const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
     const cashFile = path.join(this.dataDir, 'cash-box.json');
 
-    const tasks = this.readJson(tasksFile, []);
     const clientsRegistry = this.readJson(clientsFile, { clients: {} });
     const leads = Object.values(clientsRegistry.clients || {}).filter(c => c.type === 'lead' || c.status === 'potencial');
     const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
@@ -877,12 +919,21 @@ class ActionExecutor {
   // AÇÕES: Consultas avançadas (Consciência do Dashboard)
   // ============================================================
   async queryTasks(params) {
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const companyTasksFile = path.join(this.dataDir, 'company-tasks.json');
-    const tasks = this.readJson(tasksFile, []);
-    const companyTasksRaw = this.readJson(companyTasksFile, {});
-    const companyTasks = Array.isArray(companyTasksRaw) ? companyTasksRaw : Object.values(companyTasksRaw.categories || {}).flatMap(c => c.tasks || []);
-    const all = [...tasks, ...companyTasks];
+    // 1. Buscar tarefas da API (fonte única de verdade)
+    const apiTasks = await this.apiGet('/tasks');
+    let all = [];
+    if (Array.isArray(apiTasks)) {
+      all = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      const companyTasksFile = path.join(this.dataDir, 'company-tasks.json');
+      const tasks = this.readJson(tasksFile, []);
+      const companyTasksRaw = this.readJson(companyTasksFile, {});
+      const companyTasks = Array.isArray(companyTasksRaw) ? companyTasksRaw : Object.values(companyTasksRaw.categories || {}).flatMap(c => c.tasks || []);
+      all = [...tasks, ...companyTasks];
+    }
+
     const filtro = params.filtro || 'pendentes';
 
     let result = all;
@@ -1220,8 +1271,17 @@ class ActionExecutor {
     const titulo = params.titulo || params.title;
     if (!id && !titulo) throw new Error('ID ou título da tarefa necessário');
 
-    const tasksFile = path.join(this.dataDir, 'tasks.json');
-    const tasks = this.readJson(tasksFile, []);
+    // 1. Buscar na API primeiro
+    const apiTasks = await this.apiGet('/tasks');
+    let tasks = [];
+    if (Array.isArray(apiTasks) && apiTasks.length > 0) {
+      tasks = apiTasks;
+    } else {
+      // Fallback: ler do JSON legado (apenas leitura)
+      const tasksFile = path.join(this.dataDir, 'tasks.json');
+      tasks = this.readJson(tasksFile, []);
+    }
+
     let task = tasks.find(t => t.id === id);
     if (!task && titulo) task = tasks.find(t => (t.title || t.titulo || '').toLowerCase().includes(titulo.toLowerCase()));
     if (!task) throw new Error('Tarefa não encontrada');
@@ -1237,14 +1297,14 @@ class ActionExecutor {
     if (params.status) task.status = params.status;
     task.updatedAt = new Date().toISOString();
 
+    // 2. Atualizar via API (fonte única de verdade)
     const apiResult = await this.apiPut(`/tasks/${task.id}`, task);
     if (apiResult && !apiResult.error) {
-      this.writeJson(tasksFile, tasks);
       return { type: 'task_updated', id: task.id, title: task.title, source: 'api' };
     }
 
-    this.writeJson(tasksFile, tasks);
-    return { type: 'task_updated', id: task.id, title: task.title, source: 'file' };
+    // Não escreve mais no JSON — retorna erro
+    throw new Error(`Não consegui atualizar a tarefa no servidor: ${apiResult?.error || 'erro desconhecido'}`);
   }
 
   // ============================================================

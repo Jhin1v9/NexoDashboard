@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Lightbulb, Plus, LayoutGrid, List, Table2, Kanban,
-  Search, Loader2, Bot
+  Search, Loader2, Bot, X
 } from 'lucide-react'
 import axios from 'axios'
 import IdeaStats from '../components/ideas/IdeaStats'
@@ -27,6 +27,7 @@ export default function Ideias() {
   const [ideas, setIdeas] = useState([])
   const [stats, setStats] = useState({})
   const [filters, setFilters] = useState({})
+  const [searchQuery, setSearchQuery] = useState('')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -55,6 +56,28 @@ export default function Ideias() {
       setLoading(false)
     }
   }, [filters])
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // BUSCA LOCAL
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const filteredIdeas = useMemo(() => {
+    if (!searchQuery.trim()) return ideas
+    const q = searchQuery.toLowerCase().trim()
+    return ideas.filter(idea => {
+      const searchable = [
+        idea.title,
+        idea.description,
+        idea.content,
+        idea.createdByName,
+        idea.linkedTo?.clientName,
+        idea.status,
+        idea.priority,
+        idea.type,
+        ...(idea.tags || [])
+      ].filter(Boolean).join(' ').toLowerCase()
+      return searchable.includes(q)
+    })
+  }, [ideas, searchQuery])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -118,7 +141,7 @@ export default function Ideias() {
       {/* STATS CARDS */}
       <IdeaStats stats={stats} />
 
-      {/* TABS + FILTERS */}
+      {/* TABS + SEARCH + FILTERS */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           {/* Tabs */}
@@ -143,11 +166,54 @@ export default function Ideias() {
             })}
           </div>
 
-          {/* Filters */}
-          <div className="flex-1 max-w-lg">
-            <IdeaFilters filters={filters} onChange={setFilters} />
+          {/* Search + Filters */}
+          <div className="flex items-center gap-2 flex-1 max-w-2xl">
+            {/* Campo de busca */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexo-muted pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar em título, tags, autor, cliente..."
+                className="w-full pl-9 pr-8 py-2 bg-nexo-card border border-nexo-border rounded-lg text-sm text-nexo-text placeholder:text-nexo-muted/60 focus:outline-none focus:border-nexo-primary/50 focus:ring-1 focus:ring-nexo-primary/20 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-white/10 text-nexo-muted hover:text-nexo-text transition-colors"
+                  title="Limpar busca"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="flex-1 max-w-md">
+              <IdeaFilters filters={filters} onChange={setFilters} />
+            </div>
           </div>
         </div>
+
+        {/* Contador de resultados */}
+        {(searchQuery || Object.keys(filters).some(k => filters[k])) && (
+          <div className="flex items-center gap-2 text-xs text-nexo-muted">
+            <span className="px-2 py-1 bg-nexo-primary/10 text-nexo-primary rounded-md font-medium">
+              {filteredIdeas.length} {filteredIdeas.length === 1 ? 'resultado' : 'resultados'}
+            </span>
+            {searchQuery && (
+              <span>
+                buscando por "<span className="text-nexo-text font-medium">{searchQuery}</span>"
+              </span>
+            )}
+            {ideas.length !== filteredIdeas.length && (
+              <span className="text-nexo-muted/60">
+                (de {ideas.length} total)
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* CONTENT AREA com AnimatePresence */}
@@ -166,10 +232,10 @@ export default function Ideias() {
             </div>
           ) : (
             <>
-              {view === 'table' && <IdeasTable ideas={ideas} onRefresh={fetchIdeas} />}
-              {view === 'kanban' && <IdeasKanban ideas={ideas} onRefresh={fetchIdeas} />}
-              {view === 'gallery' && <IdeasGallery ideas={ideas} onRefresh={fetchIdeas} />}
-              {view === 'list' && <IdeasList ideas={ideas} onRefresh={fetchIdeas} />}
+              {view === 'table' && <IdeasTable ideas={filteredIdeas} onRefresh={fetchIdeas} />}
+              {view === 'kanban' && <IdeasKanban ideas={filteredIdeas} onRefresh={fetchIdeas} />}
+              {view === 'gallery' && <IdeasGallery ideas={filteredIdeas} onRefresh={fetchIdeas} />}
+              {view === 'list' && <IdeasList ideas={filteredIdeas} onRefresh={fetchIdeas} />}
             </>
           )}
         </motion.div>
