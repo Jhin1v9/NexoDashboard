@@ -942,54 +942,21 @@ const writeJSON = (file, data) => {
   }
 };
 
-// ── LUNA CHAT THREADS v1.0 ──
-const LUNA_THREADS_FILE = path.join(DATA_DIR, 'luna-chat-threads.json');
+// ── LUNA CHAT THREADS v1.0 — migrado para PostgreSQL ──
 
-function ensureThreadsFile() {
-  if (fs.existsSync(LUNA_THREADS_FILE)) return;
-  const defaultThreads = {
-    version: '1.0',
-    lastUpdated: new Date().toISOString(),
-    threads: {
-      abner: {
-        id: 'abner', type: 'individual', title: 'Abner + Luna',
-        participants: ['abner'], createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
-      },
-      nonoke: {
-        id: 'nonoke', type: 'individual', title: 'Nonoke + Luna',
-        participants: ['nonoke'], createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
-      },
-      elias: {
-        id: 'elias', type: 'individual', title: 'Elias + Luna',
-        participants: ['elias'], createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
-      },
-      group: {
-        id: 'group', type: 'group', title: 'NEXO + Luna',
-        participants: ['abner', 'nonoke', 'elias'], createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(), messageCount: 0, messages: []
-      }
-    }
-  };
-  writeJSON(LUNA_THREADS_FILE, defaultThreads);
+async function loadThreads() {
+  return await dataStore.getLunaThreads();
 }
-ensureThreadsFile();
-
-function loadThreads() {
-  return readJSON(LUNA_THREADS_FILE, { threads: {} });
-}
-function saveThreads(data) {
+async function saveThreads(data) {
   data.lastUpdated = new Date().toISOString();
-  writeJSON(LUNA_THREADS_FILE, data);
+  await dataStore.saveLunaThreads(data);
 }
-function getThread(threadId) {
-  const data = loadThreads();
+async function getThread(threadId) {
+  const data = await loadThreads();
   return data.threads?.[threadId] || null;
 }
-function addMessageToThread(threadId, message) {
-  const data = loadThreads();
+async function addMessageToThread(threadId, message) {
+  const data = await loadThreads();
   if (!data.threads[threadId]) return null;
   const thread = data.threads[threadId];
   message.id = message.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1002,20 +969,20 @@ function addMessageToThread(threadId, message) {
     thread.messages = thread.messages.slice(-500);
     thread.messageCount = thread.messages.length;
   }
-  saveThreads(data);
+  await saveThreads(data);
   return message;
 }
-function clearThreadMessages(threadId) {
-  const data = loadThreads();
+async function clearThreadMessages(threadId) {
+  const data = await loadThreads();
   if (!data.threads[threadId]) return false;
   data.threads[threadId].messages = [];
   data.threads[threadId].messageCount = 0;
   data.threads[threadId].updatedAt = new Date().toISOString();
-  saveThreads(data);
+  await saveThreads(data);
   return true;
 }
-function getUserThreads(userId) {
-  const data = loadThreads();
+async function getUserThreads(userId) {
+  const data = await loadThreads();
   const threads = [];
   for (const [id, thread] of Object.entries(data.threads || {})) {
     // Group ou threads onde o user é participant
@@ -1034,8 +1001,8 @@ function getUserThreads(userId) {
   // Ordena por updatedAt desc
   return threads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 }
-function getThreadMessages(threadId, limit = 50, offset = 0) {
-  const thread = getThread(threadId);
+async function getThreadMessages(threadId, limit = 50, offset = 0) {
+  const thread = await getThread(threadId);
   if (!thread) return null;
   const msgs = thread.messages || [];
   const total = msgs.length;
@@ -1048,8 +1015,8 @@ function getThreadMessages(threadId, limit = 50, offset = 0) {
     messages: sliced
   };
 }
-function buildThreadContext(threadId, limit = 20) {
-  const thread = getThread(threadId);
+async function buildThreadContext(threadId, limit = 20) {
+  const thread = await getThread(threadId);
   if (!thread) return [];
   return (thread.messages || []).slice(-limit).map(m => ({
     role: m.role,
@@ -5790,7 +5757,7 @@ app.get('/api/luna/threads', async (req, res) => {
   try {
     const users = await dataStore.getUsers();
     const activeId = users.active || 'abner';
-    const threads = getUserThreads(activeId);
+    const threads = await getUserThreads(activeId);
     res.json({ success: true, threads });
   } catch (err) {
     console.error('[THREADS] Erro ao listar threads:', err.message);
@@ -5799,11 +5766,11 @@ app.get('/api/luna/threads', async (req, res) => {
 });
 
 // GET /api/luna/threads/:id — Detalhes da thread + últimas 50 mensagens
-app.get('/api/luna/threads/:id', (req, res) => {
+app.get('/api/luna/threads/:id', async (req, res) => {
   try {
-    const thread = getThread(req.params.id);
+    const thread = await getThread(req.params.id);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
-    const msgs = getThreadMessages(req.params.id, 50);
+    const msgs = await getThreadMessages(req.params.id, 50);
     res.json({
       success: true,
       thread: {
@@ -5824,13 +5791,13 @@ app.get('/api/luna/threads/:id', (req, res) => {
 });
 
 // GET /api/luna/threads/:id/messages — Mensagens com paginação
-app.get('/api/luna/threads/:id/messages', (req, res) => {
+app.get('/api/luna/threads/:id/messages', async (req, res) => {
   try {
-    const thread = getThread(req.params.id);
+    const thread = await getThread(req.params.id);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = parseInt(req.query.offset) || 0;
-    const msgs = getThreadMessages(req.params.id, limit, offset);
+    const msgs = await getThreadMessages(req.params.id, limit, offset);
     res.json({ success: true, ...msgs });
   } catch (err) {
     console.error('[THREADS] Erro ao obter mensagens:', err.message);
@@ -5842,7 +5809,7 @@ app.get('/api/luna/threads/:id/messages', (req, res) => {
 app.post('/api/luna/threads/:id/messages', async (req, res) => {
   try {
     const threadId = req.params.id;
-    const thread = getThread(threadId);
+    const thread = await getThread(threadId);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
 
     const { text, authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile } = req.body;
@@ -5865,10 +5832,10 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       text: text.trim(),
       timestamp: new Date().toISOString()
     };
-    addMessageToThread(threadId, userMessage);
+    await addMessageToThread(threadId, userMessage);
 
     // 2. Carrega contexto da thread (últimas 20 msgs)
-    const threadContext = buildThreadContext(threadId, 20);
+    const threadContext = await buildThreadContext(threadId, 20);
 
     // 3. Chama o endpoint interno /api/luna/chat para processar a mensagem
     const chatPayload = {
@@ -5913,7 +5880,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       quotaExhausted: chatResult.quotaExhausted || false,
       resetAt: chatResult.resetAt || null
     };
-    addMessageToThread(threadId, lunaMessage);
+    await addMessageToThread(threadId, lunaMessage);
 
     // 5. Se for grupo, broadcast para todos online
     if (thread.type === 'group') {
@@ -5943,10 +5910,10 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
 app.delete('/api/luna/threads/:id/messages', (req, res) => {
   try {
     const threadId = req.params.id;
-    const thread = getThread(threadId);
+    const thread = await getThread(threadId);
     if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
 
-    const cleared = clearThreadMessages(threadId);
+    const cleared = await clearThreadMessages(threadId);
     if (cleared) {
       // Se for grupo, notifica que foi limpo
       if (thread.type === 'group') {

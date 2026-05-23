@@ -764,6 +764,18 @@ async function saveLunaThread(thread) {
   return thread;
 }
 
+async function saveLunaThreads(data) {
+  for (const thread of Object.values(data.threads || {})) {
+    await saveLunaThread(thread);
+  }
+  return data;
+}
+
+async function deleteLunaThread(id) {
+  await db.run('DELETE FROM luna_threads WHERE id = $1', [id]);
+  notifyChange('lunaThreads', await getLunaThreads());
+}
+
 // ============================================================
 // LUNA BUFFER (schema real — NOMES REAIS)
 // ============================================================
@@ -885,7 +897,7 @@ module.exports = {
   getTransactions, saveTransaction,
   getChangelog, saveChangelog, deleteChangelog,
   getWhatsappHistory, saveWhatsappMessage, saveWhatsappHistory, deleteWhatsappMessage,
-  getLunaThreads, saveLunaThread,
+  getLunaThreads, saveLunaThread, saveLunaThreads, deleteLunaThread,
   getLunaBuffer, saveLunaBuffer,
   getWorkspaceClients, saveWorkspaceClient, deleteWorkspaceClient,
 };
