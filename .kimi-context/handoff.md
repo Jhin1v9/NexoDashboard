@@ -292,3 +292,56 @@ f4662d5 feat(changelog): migrate changelog to PostgreSQL + 5 tests
 Ver seção "Bugs Observados" acima.
 
 **Aguardando autorização para push de todos os commits.**
+
+
+---
+
+## 🔍 AUDITORIA PÓS-MIGRAÇÃO — Bugs Encontrados e Corrigidos
+
+**Data:** 2026-05-23 04:30
+**Auditor:** Kimi (revisão macro)
+**Commits de correção:** `d753dc5`, `5bd25d8`
+
+### ✅ Correções aplicadas
+
+| Severidade | Arquivo | Linha | Problema | Correção |
+|---|---|---|---|---|
+| **CRÍTICO** | `server.js` | 1690 | Rota `/api/whatsapp/history` usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 1760 | Rota `/api/classifications/review` usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 1782 | Rota `/api/classifications/:id/correct` usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 1828 | Rota `/api/classifications/stats` usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 3741 | Rota `/api/luna/status` usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 5903 | Rota `/api/luna/threads/:id/messages` (DELETE) usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 8349 | Rota `/api/workspace/clients` (GET) usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 8388 | Rota `/api/workspace/clients` (POST) usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 8401 | Rota `/api/workspace/clients/:id` (GET) usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 8411 | Rota `/api/workspace/clients/:id` (PUT) usava `await` sem `async` | Adicionado `async` ao handler |
+| **CRÍTICO** | `server.js` | 8420 | Rota `/api/workspace/clients/:id` (DELETE) usava `await` sem `async` | Adicionado `async` ao handler |
+| **ALTO** | `server.js` | 2419 | Rota `/api/expenses/search` lia `EXPENSES_FILE` do JSON em vez de PG | Migrado para `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 2481 | Rota de projeção financeira lia `PAYMENTS_FILE` e `EXPENSES_FILE` do JSON | Migrado para `dataStore.getPayments()` e `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 2582 | Rota de extrato financeiro lia `PAYMENTS_FILE` e `EXPENSES_FILE` do JSON | Migrado para `dataStore.getPayments()` e `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 3078 | Rota de criação de despesa lia `EXPENSES_FILE` do JSON | Migrado para `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 3141 | Rota `/api/finance/summary` lia `PAYMENTS_FILE` e `EXPENSES_FILE` do JSON | Migrado para `dataStore.getPayments()` e `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 3201 | `checkAndGenerateAlerts` lia `PAYMENTS_FILE` e `EXPENSES_FILE` do JSON | Migrado para `dataStore.getPayments()` e `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 3288 | `deductRecurringExpenses` lia `EXPENSES_FILE` do JSON | Migrado para `dataStore.getExpenses()` |
+| **ALTO** | `server.js` | 4274 | Rota `/api/luna/analytics` lia `HISTORY_FILE` do JSON | Migrado para `dataStore.getWhatsappHistory()` |
+| **ALTO** | `server.js` | 6441 | Rota `/api/nexo-state` lia `TASKS_FILE` do JSON | Migrado para `dataStore.getTasks()` |
+| **MÉDIO** | `routes/ideas.js` | 429 | `executeToolCall` usava `await` sem `async` | Adicionado `async` à função |
+
+### 🧪 Validação pós-correção
+- **Syntax check:** Todos os arquivos modificados passam (`node -c`)
+- **Server load:** Backend inicia sem erros de sintaxe/runtime
+- **Testes:** 90/90 passando (19 suites)
+- **Nenhuma regressão** em entidades previamente migradas
+
+### ⚠️ Observações (não corrigidas — comportamento aceitável)
+1. **Arquivos de inicialização JSON:** As linhas `if (!fs.existsSync(XXX_FILE)) writeJSON(...)` ainda existem no server.js. Elas criam arquivos JSON vazios se não existirem, mas NÃO são mais lidos pelas rotas migradas. São inofensivas.
+2. **Templates de despesas:** `EXPENSE_TEMPLATES_FILE` permanece em JSON (templates são configuração, não dados).
+3. **Configurações de segurança:** `SECURITY_SETTINGS_FILE` permanece em JSON (settings são configuração).
+4. **Outros arquivos de config:** `OPS_STATE_FILE`, `WAPP_FILE`, `AGENT_DATA_FILE`, etc. permanecem em JSON.
+
+### 🎯 Status final
+- **Fase 0.1:** ✅ 100% completa (19/19 entidades)
+- **Testes:** ✅ 90/90 passando
+- **Bugs críticos:** 0 remanescentes
+- **Próxima fase:** Fase 0.2 — correção de bugs de frontend/WebSocket
