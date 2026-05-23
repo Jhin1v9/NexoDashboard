@@ -14,6 +14,8 @@
 | Backend (Render) | ✅ Deploy concluído — hardening ativo |
 | Frontend (local) | ✅ OK |
 | Frontend (Render) | ✅ OK |
+| PostgreSQL (Neon) | ✅ 19 entidades migradas — source of truth |
+| Testes Jest | ✅ 90/90 passando |
 
 ---
 
@@ -55,15 +57,28 @@
 - [ ] **Atualizar Discord Webhook** — token atual retorna 401 (Invalid Webhook Token)
 - [ ] **Reinstalar WhatsApp sender** — módulo `playwright` ausente no ambiente
 
-### Fase Migração de Dados (AGUARDANDO APROVAÇÃO)
-- [ ] Migrar `tasks.json` → PostgreSQL
-- [ ] Migrar `leads.json` → PostgreSQL
-- [ ] Migrar `payments.json` → PostgreSQL
-- [ ] Migrar `expenses.json` → PostgreSQL
-- [ ] Migrar `cash-box.json` → PostgreSQL
-- [ ] Migrar `quotes.json` → PostgreSQL
-- [ ] Migrar `ideas-registry.json` → PostgreSQL
-- [ ] Manter em JSON (volátil): `cache/*`, `dev-servers.json`, `nexo-news.json`
+### Fase Migração de Dados (✅ CONCLUÍDA — 2026-05-23)
+- [x] Migrar `users` → PostgreSQL
+- [x] Migrar `tasks` → PostgreSQL
+- [x] Migrar `payments` → PostgreSQL
+- [x] Migrar `expenses` → PostgreSQL
+- [x] Migrar `cash-box` → PostgreSQL
+- [x] Migrar `quotes` → PostgreSQL
+- [x] Migrar `leads` → PostgreSQL
+- [x] Migrar `notifications` → PostgreSQL
+- [x] Migrar `company_tasks` → PostgreSQL
+- [x] Migrar `links` → PostgreSQL
+- [x] Migrar `security_logs` → PostgreSQL
+- [x] Migrar `changelog` → PostgreSQL
+- [x] Migrar `whatsapp_history` → PostgreSQL
+- [x] Migrar `luna_threads` → PostgreSQL
+- [x] Migrar `luna_buffer` → PostgreSQL
+- [x] Migrar `workspace_clients` → PostgreSQL
+- [x] Migrar `members` → PostgreSQL
+- [x] Migrar `transactions` → PostgreSQL
+- [x] Migrar `ideas` → PostgreSQL
+- [x] Manter em JSON (config): `cache/*`, `dev-servers.json`, `nexo-news.json`, `security-settings.json`
+- [x] Manter em JSON (híbrido): `ideas-registry.json` (templates/categories apenas)
 
 ### Fase Terminal Secreto — Decisão Pendente
 **Opção A (Recomendada):** Página `/login` tradicional com email/senha  
