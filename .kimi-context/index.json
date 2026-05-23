@@ -3,8 +3,8 @@
   "_description": "Índice mestre de sessões do Kimi. Cada instância do Kimi tem um ID único. NUNCA apague entradas — apenas marque como archived.",
   "project": "NEXO Dashboard Pro",
   "projectRoot": "/home/jhin/NEXO_DASHBOARD_PRO",
-  "lastUpdated": "2026-05-20T13:45:00+02:00",
-  "activeSessionId": "kimi-10a71fc7",
+  "lastUpdated": "2026-05-23T08:58:00+02:00",
+  "activeSessionId": "kimi-atual-hud-v3",
   "sessions": [
     {
       "id": "kimi-bbf526dc",
@@ -49,12 +49,22 @@
     {
       "id": "kimi-10a71fc7",
       "startedAt": "2026-05-19T15:00:00+02:00",
-      "status": "active",
+      "status": "archived",
       "focus": "Workspace File Viewer v2 + Telegram Bot v3.0. Editor com syntax highlighting, preview Markdown/HTML, atalhos Ctrl+S/ESC. Bot @lunanexobot com framework wizard declarativo (6 acoes interativas), extracao inteligente de params, inicio automatico no startup. Commits ate 8613bdd.",
       "snapshotFile": "sessions/2026-05-19-kimi-10a71fc7.md",
       "handoffFile": "handoff.md",
       "totalTurns": 1,
       "lastCompactionAt": "2026-05-19T20:15:00+02:00"
+    },
+    {
+      "id": "kimi-atual-hud-v3",
+      "startedAt": "2026-05-23T06:00:00+02:00",
+      "status": "active",
+      "focus": "Luna HUD v3.0 — 100% Fusão Dashboard-Luna. 7 bugs críticos corrigidos + Visual HUD Futurista + Context Awareness + Inline Actions + Markdown HUD + Constellation Reactions + Neural Uplink Voice Input + Ethereal Presence Ghost Mode.",
+      "snapshotFile": "sessions/2026-05-23-kimi-atual-hud-v3.md",
+      "handoffFile": "handoff.md",
+      "totalTurns": 1,
+      "lastCompactionAt": null
     }
   ],
   "agents": {
@@ -91,7 +101,14 @@
       "signature": "KIMI-10A71FC7",
       "color": "🟡",
       "role": "coding-agent",
-      "notes": "Sessao atual. NLU unificado, NLU Expansion 36->137 intents, ActionExecutor, botao flutuante estilizado, changelog recuperado. Telegram Bot v3.0: framework wizard declarativo, 6 wizards (tarefa/pagamento/despesa/lead/email/ideia), extracao inteligente, dashboard links por acao, inicio automatico no startup."
+      "notes": "Sessao anterior. NLU unificado, NLU Expansion 36->137 intents, ActionExecutor, botao flutuante estilizado, changelog recuperado. Telegram Bot v3.0: framework wizard declarativo, 6 wizards (tarefa/pagamento/despesa/lead/email/ideia), extracao inteligente, dashboard links por acao, inicio automatico no startup."
+    },
+    "kimi-atual-hud-v3": {
+      "instanceHash": "atual",
+      "signature": "KIMI-ATUAL-HUD-V3",
+      "color": "🔥",
+      "role": "coding-agent",
+      "notes": "SESSAO ATUAL. Luna HUD v3.0 — 100% Fusão. Corrigiu 7 bugs críticos. Implementou Visual HUD Futurista (scan lines, corner accents, typing animation). Dashboard Context Awareness (endpoint dashboard-state, prompt enriquecido). Inline Actions (navigate, filter, highlight). Luna Syntax Core Markdown (terminal HUD, syntax highlight). Constellation Reactions (orbes flutuantes, partículas). Neural Uplink Voice Input (waveform viva, Web Audio API). Ethereal Presence Ghost Mode (tecla G, partículas, notificações holográficas). Build Vite 3148 modules 0 erros. Backend porta 3456 OK."
     }
   },
   "rules": {

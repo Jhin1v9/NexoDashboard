@@ -8,6 +8,9 @@ import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
 import { useLunaContext } from '../../hooks/useLunaContext'
 import EditablePreviewCard from './EditablePreviewCard'
+import LunaMarkdown from './LunaMarkdown'
+import LunaMessageReactions from './LunaMessageReactions'
+import LunaVoiceInput from './LunaVoiceInput'
 
 const LUNA_AVATAR = '/luna-avatar.png'
 
@@ -111,6 +114,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
   const [pendingConfirmation, setPendingConfirmation] = useState(null)
   const [typingMsgId, setTypingMsgId] = useState(null)
   const [dashboardState, setDashboardState] = useState(null)
+  const [ghostMode, setGhostMode] = useState(false)
 
   // Fetch dashboard state periodically
   useEffect(() => {
@@ -123,6 +127,20 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     fetchState()
     const interval = setInterval(fetchState, 30000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Ghost mode sync
+  useEffect(() => {
+    const syncGhost = () => {
+      setGhostMode(localStorage.getItem('luna_ghost_mode') === 'true')
+    }
+    syncGhost()
+    window.addEventListener('storage', syncGhost)
+    const interval = setInterval(syncGhost, 500)
+    return () => {
+      window.removeEventListener('storage', syncGhost)
+      clearInterval(interval)
+    }
   }, [])
 
   const chatEndRef = useRef(null)
@@ -158,7 +176,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     if (activeThreadId) fetchThreadMessages(activeThreadId)
   }, [activeThreadId])
 
-  // WebSocket for real-time messages
+  // WebSocket for real-time messages & reactions
   useEffect(() => {
     let ws
     let reconnectTimer
@@ -177,6 +195,16 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               const msgs = prev[threadId] || []
               if (msgs.some(m => m.id === message.id)) return prev
               return { ...prev, [threadId]: [...msgs, message] }
+            })
+          }
+          if (data.type === 'luna:chat:reaction' && data.threadId && data.messageId) {
+            const { threadId, messageId, reactions } = data
+            setThreadMessages(prev => {
+              const msgs = prev[threadId] || []
+              return {
+                ...prev,
+                [threadId]: msgs.map(m => m.id === messageId ? { ...m, reactions } : m)
+              }
             })
           }
         } catch (e) { /* ignore non-JSON */ }
@@ -636,8 +664,10 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                       )}
                       {isTyping ? (
                         <TypingText text={msg.text} />
-                      ) : (
+                      ) : isUser ? (
                         <p className="whitespace-pre-wrap">{msg.text}</p>
+                      ) : (
+                        <LunaMarkdown content={msg.text} />
                       )}
 
                       {/* Editable Preview Card */}
@@ -688,6 +718,15 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                           Ação executada com sucesso!
                         </div>
                       )}
+
+                      {/* Reactions */}
+                      <LunaMessageReactions
+                        message={msg}
+                        threadId={activeThreadId}
+                        currentUser={activeUser}
+                        isGroup={isGroup}
+                        isOwnMessage={isUser}
+                      />
 
                       {/* Timestamp */}
                       <span className={`text-[10px] mt-1.5 block font-mono ${isUser ? 'text-white/60' : 'text-nexo-muted'}`}>
@@ -755,6 +794,13 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
                   placeholder={`Mensagem em ${getThreadDisplayTitle()}...`}
                   className="flex-1 bg-transparent text-sm text-white placeholder-nexo-muted outline-none font-mono"
+                  disabled={chatLoading}
+                />
+                <LunaVoiceInput
+                  onTranscript={(text) => {
+                    setChatInput(prev => (prev ? prev + ' ' : '') + text)
+                    setTimeout(() => inputRef.current?.focus(), 100)
+                  }}
                   disabled={chatLoading}
                 />
                 <button

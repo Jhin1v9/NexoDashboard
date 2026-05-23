@@ -14,6 +14,7 @@ import LunaProactiveToast from './components/luna/LunaProactiveToast'
 import LunaActionBridge from './components/luna/LunaActionBridge'
 import { RouteHarvester } from './components/luna/harvesters'
 import LandingPage from './pages/LandingPage'
+import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
 import Workspace from './pages/Workspace'
@@ -107,8 +108,14 @@ function App() {
     <EmailFocusModeProvider>
       <EmailDensityProvider>
         <Routes>
-          {/* Landing page pública — camuflagem com terminal secreto */}
+          {/* Landing page pública */}
           <Route path="/" element={<LandingPage />} />
+
+          {/* Login tradicional */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Terminal secreto (easter egg / modo legacy) */}
+          <Route path="/terminal" element={<LandingPage terminalMode={true} />} />
 
           {/* Todas as rotas internas protegidas */}
           <Route element={<ProtectedRoute />}>

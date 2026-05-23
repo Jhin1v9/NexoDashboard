@@ -1140,19 +1140,26 @@ function Footer() {
 /* ============================================================
    MAIN LANDING PAGE
    ============================================================ */
-export default function LandingPage() {
+export default function LandingPage({ terminalMode = false }) {
   const navigate = useNavigate()
-  const [terminalOpen, setTerminalOpen] = useState(false)
+  const [terminalOpen, setTerminalOpen] = useState(terminalMode)
   const [syncOpen, setSyncOpen] = useState(false)
   const tapRef = useRef(null)
 
-  // Redirect logged-in users to dashboard
+  // Redirect logged-in users to dashboard (não redireciona se estiver em terminal mode)
   useEffect(() => {
     const token = localStorage.getItem('nexo_token')
-    if (token) {
+    if (token && !terminalMode) {
       navigate('/dashboard', { replace: true })
     }
-  }, [navigate])
+  }, [navigate, terminalMode])
+
+  // Abre terminal automaticamente no modo terminal
+  useEffect(() => {
+    if (terminalMode) {
+      setTerminalOpen(true)
+    }
+  }, [terminalMode])
 
   useSyncTap({ targetRef: tapRef, threshold: 7, timeout: 1500, onTrigger: () => setSyncOpen(true) })
 

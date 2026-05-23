@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Wand2 } from 'lucide-react'
+import { X, Wand2, Ghost } from 'lucide-react'
 import { lunaEventBus } from '../../lib/lunaEventBus'
 import LunaChatPanel from './LunaChatPanel'
 import LunaActionCenter from './LunaActionCenter'
@@ -16,6 +16,11 @@ export default function LunaFloatingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [proactiveBadge, setProactiveBadge] = useState(null)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
+  const [ghostMode, setGhostMode] = useState(() => {
+    try { return localStorage.getItem('luna_ghost_mode') === 'true' } catch { return false }
+  })
+  const [ghostNotification, setGhostNotification] = useState(null)
+  const [ghostParticles, setGhostParticles] = useState([])
 
   // ── Drag state ──
   const [pos, setPos] = useState(() => {
@@ -26,6 +31,64 @@ export default function LunaFloatingButton() {
   })
   const drag = useRef({ active: false, dragged: false, mx: 0, my: 0, bx: 0, by: 0 })
   const fabRef = useRef(null)
+  const particleIdRef = useRef(0)
+
+  // ── Ghost Mode ──
+  const toggleGhost = useCallback(() => {
+    const next = !ghostMode
+    setGhostMode(next)
+    localStorage.setItem('luna_ghost_mode', String(next))
+    // Emitir evento para outros componentes
+    window.dispatchEvent(new StorageEvent('storage', { key: 'luna_ghost_mode' }))
+    if (next) {
+      setIsOpen(false)
+      setActionCenterOpen(false)
+    }
+  }, [ghostMode])
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'g' || e.key === 'G') {
+        // Don't trigger if typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+        toggleGhost()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [toggleGhost])
+
+  // Ghost mode particle trail
+  useEffect(() => {
+    if (!ghostMode) {
+      setGhostParticles([])
+      return
+    }
+    const interval = setInterval(() => {
+      const id = particleIdRef.current++
+      setGhostParticles(prev => [...prev.slice(-8), { id, x: pos.x, y: pos.y }])
+    }, 300)
+    return () => clearInterval(interval)
+  }, [ghostMode, pos.x, pos.y])
+
+  // Ghost mode proactive notification
+  useEffect(() => {
+    if (!ghostMode || !proactiveBadge || proactiveBadge.count === 0) return
+    const timer = setTimeout(() => {
+      setGhostNotification({
+        text: `${proactiveBadge.count} pendência${proactiveBadge.count > 1 ? 's' : ''} precisa${proactiveBadge.count > 1 ? 'm' : ''} de atenção`,
+        timestamp: Date.now(),
+      })
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [ghostMode, proactiveBadge])
+
+  // Auto-dismiss ghost notification
+  useEffect(() => {
+    if (!ghostNotification) return
+    const timer = setTimeout(() => setGhostNotification(null), 6000)
+    return () => clearTimeout(timer)
+  }, [ghostNotification])
 
   // Emite evento de estado quando abre/fecha
   useEffect(() => {
@@ -109,11 +172,57 @@ export default function LunaFloatingButton() {
   }, [])
 
   const isActive = isOpen || actionCenterOpen
+  const isGhost = ghostMode
+
+  // Ghost mode styles
+  const ghostStyles = isGhost ? {
+    opacity: 0.35,
+    scale: 0.72,
+    bg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+    shadow: '0 0 15px rgba(148,163,184,0.1)',
+  } : {
+    opacity: 1,
+    scale: 1,
+    bg: isActive
+      ? 'linear-gradient(135deg, #ff4757 0%, #ff6b81 100%)'
+      : 'linear-gradient(135deg, rgba(0,240,255,0.9) 0%, rgba(155,89,182,0.9) 100%)',
+    shadow: isActive
+      ? '0 0 20px rgba(255,71,87,0.4), 0 0 40px rgba(255,71,87,0.2)'
+      : '0 0 20px rgba(0,240,255,0.3), 0 0 40px rgba(155,89,182,0.2), inset 0 0 10px rgba(255,255,255,0.1)',
+  }
 
   return (
     <>
       {/* Luna Chat Panel */}
-      <LunaChatPanel isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <LunaChatPanel isOpen={isOpen && !isGhost} onClose={() => setIsOpen(false)} />
+
+      {/* Ghost particle trail */}
+      <AnimatePresence>
+        {isGhost && ghostParticles.map((p) => (
+          <motion.div
+            key={p.id}
+            className="fixed bottom-6 right-6 z-[99] pointer-events-none rounded-full"
+            style={{
+              transform: `translate3d(${p.x}px, ${p.y}px, 0)`,
+              width: 8,
+              height: 8,
+              marginLeft: 20,
+              marginTop: 20,
+            }}
+            initial={{ opacity: 0.3, scale: 1 }}
+            animate={{ opacity: 0, scale: 0.3 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
+          >
+            <div
+              className="w-full h-full rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(148,163,184,0.4) 0%, transparent 70%)',
+              }}
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
       {/* Orb Holográfico — arrastável */}
       <div
@@ -121,9 +230,35 @@ export default function LunaFloatingButton() {
         className="fixed bottom-6 right-6 z-[100] select-none"
         style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, cursor: 'grab' }}
       >
+        {/* Ghost ethereal aura */}
+        <AnimatePresence>
+          {isGhost && (
+            <>
+              <motion.div
+                className="absolute inset-[-8px] rounded-full"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.2, 0.1] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  background: 'radial-gradient(circle, rgba(148,163,184,0.15) 0%, transparent 70%)',
+                }}
+              />
+              <motion.div
+                className="absolute inset-[-16px] rounded-full"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: [1, 1.5, 1], opacity: [0.05, 0.1, 0.05] }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                style={{
+                  background: 'radial-gradient(circle, rgba(148,163,184,0.1) 0%, transparent 70%)',
+                }}
+              />
+            </>
+          )}
+        </AnimatePresence>
+
         {/* Campo de força / glow externo */}
         <AnimatePresence>
-          {!isActive && proactiveBadge && proactiveBadge.count > 0 && (
+          {!isActive && !isGhost && proactiveBadge && proactiveBadge.count > 0 && (
             <motion.div
               className="absolute inset-0 rounded-full"
               initial={{ scale: 1, opacity: 0.6 }}
@@ -137,25 +272,26 @@ export default function LunaFloatingButton() {
         </AnimatePresence>
 
         {/* Anel externo no hover */}
-        <motion.div
-          className="absolute inset-[-4px] rounded-full border border-cyan-500/20"
-          whileHover={{ scale: 1.15, opacity: 1 }}
-          initial={{ scale: 1, opacity: 0 }}
-          animate={{ opacity: isActive ? 0 : 0.6 }}
-          transition={{ duration: 0.3 }}
-        />
+        {!isGhost && (
+          <motion.div
+            className="absolute inset-[-4px] rounded-full border border-cyan-500/20"
+            whileHover={{ scale: 1.15, opacity: 1 }}
+            initial={{ scale: 1, opacity: 0 }}
+            animate={{ opacity: isActive ? 0 : 0.6 }}
+            transition={{ duration: 0.3 }}
+          />
+        )}
 
         <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          className="relative flex items-center justify-center w-14 h-14 rounded-full shadow-2xl transition-all"
+          whileHover={isGhost ? {} : { scale: 1.08 }}
+          whileTap={isGhost ? {} : { scale: 0.92 }}
+          className="relative flex items-center justify-center rounded-full shadow-2xl transition-all"
           style={{
-            background: isActive
-              ? 'linear-gradient(135deg, #ff4757 0%, #ff6b81 100%)'
-              : 'linear-gradient(135deg, rgba(0,240,255,0.9) 0%, rgba(155,89,182,0.9) 100%)',
-            boxShadow: isActive
-              ? '0 0 20px rgba(255,71,87,0.4), 0 0 40px rgba(255,71,87,0.2)'
-              : '0 0 20px rgba(0,240,255,0.3), 0 0 40px rgba(155,89,182,0.2), inset 0 0 10px rgba(255,255,255,0.1)',
+            width: isGhost ? 40 : 56,
+            height: isGhost ? 40 : 56,
+            opacity: ghostStyles.opacity,
+            background: ghostStyles.bg,
+            boxShadow: ghostStyles.shadow,
           }}
           onMouseDown={(e) => {
             const d = drag.current
@@ -192,6 +328,10 @@ export default function LunaFloatingButton() {
           }}
           onClick={() => {
             if (drag.current.dragged) return
+            if (isGhost) {
+              // In ghost mode, clicking shows a brief pulse but doesn't open
+              return
+            }
             if (actionCenterOpen) {
               setActionCenterOpen(false)
               return
@@ -203,29 +343,80 @@ export default function LunaFloatingButton() {
           <div
             className="absolute inset-0 rounded-full"
             style={{
-              background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 60%)',
+              background: isGhost
+                ? 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.05) 0%, transparent 60%)'
+                : 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 60%)',
             }}
           />
-          {isActive ? (
+          {isGhost ? (
+            <Ghost className="w-4 h-4 text-slate-400/60 relative z-10" />
+          ) : isActive ? (
             <X className="w-5 h-5 text-white relative z-10" />
           ) : (
             <Wand2 className="w-5 h-5 text-white relative z-10" />
           )}
         </motion.button>
 
-        {/* Badge Proativo — clique separado abre Action Center */}
+        {/* Badge Proativo */}
         {!isActive && proactiveBadge && proactiveBadge.count > 0 && (
           <button
-            onClick={() => setActionCenterOpen(true)}
-            className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full text-white text-[10px] font-bold shadow-lg animate-pulse hover:scale-110 transition-transform cursor-pointer z-[101] font-mono"
+            onClick={() => !isGhost && setActionCenterOpen(true)}
+            className={`absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full text-white text-[10px] font-bold shadow-lg animate-pulse hover:scale-110 transition-transform cursor-pointer z-[101] font-mono ${isGhost ? 'opacity-50' : ''}`}
             style={{
-              background: 'linear-gradient(135deg, #ff4757 0%, #ff6b81 100%)',
-              boxShadow: '0 0 10px rgba(255,71,87,0.5)',
+              background: isGhost
+                ? 'linear-gradient(135deg, #475569 0%, #64748b 100%)'
+                : 'linear-gradient(135deg, #ff4757 0%, #ff6b81 100%)',
+              boxShadow: isGhost
+                ? '0 0 8px rgba(148,163,184,0.2)'
+                : '0 0 10px rgba(255,71,87,0.5)',
             }}
           >
             {proactiveBadge.count > 9 ? '9+' : proactiveBadge.count}
           </button>
         )}
+
+        {/* Ghost mode holographic notification */}
+        <AnimatePresence>
+          {isGhost && ghostNotification && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: -70, scale: 1 }}
+              exit={{ opacity: 0, y: -90, scale: 0.9 }}
+              transition={{ duration: 0.4, type: 'spring', stiffness: 200 }}
+              className="absolute left-1/2 -translate-x-1/2 w-48 px-3 py-2 rounded-lg cursor-pointer z-[102]"
+              style={{
+                background: 'rgba(8,8,12,0.9)',
+                border: '1px solid rgba(0,240,255,0.2)',
+                boxShadow: '0 0 20px rgba(0,240,255,0.1), 0 4px 16px rgba(0,0,0,0.3)',
+                backdropFilter: 'blur(12px)',
+              }}
+              onClick={() => {
+                toggleGhost()
+                setActionCenterOpen(true)
+                setGhostNotification(null)
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse mt-1.5 flex-shrink-0" />
+                <div>
+                  <p className="text-[11px] text-cyan-300 font-mono leading-snug">
+                    {ghostNotification.text}
+                  </p>
+                  <p className="text-[9px] text-nexo-muted/50 font-mono mt-0.5">
+                    Clique para materializar
+                  </p>
+                </div>
+              </div>
+              {/* Scan line decoration */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[1px]"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, rgba(0,240,255,0.4), transparent)',
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Luna Action Center */}

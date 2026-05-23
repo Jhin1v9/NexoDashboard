@@ -5996,6 +5996,72 @@ app.delete('/api/luna/threads/:id/messages', async (req, res) => {
   }
 });
 
+// POST /api/luna/threads/:threadId/messages/:msgId/react — Adiciona/remove reação
+app.post('/api/luna/threads/:threadId/messages/:msgId/react', async (req, res) => {
+  try {
+    const { threadId, msgId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user?.name?.toLowerCase() || req.user?.id?.toLowerCase() || 'anonymous';
+
+    if (!emoji) return res.status(400).json({ success: false, error: 'Emoji obrigatório' });
+
+    const thread = await getThread(threadId);
+    if (!thread) return res.status(404).json({ success: false, error: 'Thread não encontrada' });
+
+    // Find message
+    const msgIndex = thread.messages.findIndex(m => m.id === msgId);
+    if (msgIndex === -1) return res.status(404).json({ success: false, error: 'Mensagem não encontrada' });
+
+    const message = thread.messages[msgIndex];
+    const reactions = message.reactions || [];
+
+    // Toggle reaction
+    const existingIdx = reactions.findIndex(r => r.emoji === emoji);
+    let newReactions;
+
+    if (existingIdx >= 0) {
+      const users = reactions[existingIdx].users || [];
+      if (users.includes(userId)) {
+        // Remove user from this reaction
+        const newUsers = users.filter(u => u !== userId);
+        if (newUsers.length === 0) {
+          newReactions = reactions.filter((_, i) => i !== existingIdx);
+        } else {
+          newReactions = reactions.map((r, i) => i === existingIdx ? { ...r, users: newUsers } : r);
+        }
+      } else {
+        // Add user to existing reaction
+        newReactions = reactions.map((r, i) => i === existingIdx ? { ...r, users: [...users, userId] } : r);
+      }
+    } else {
+      // Add new reaction
+      newReactions = [...reactions, { emoji, users: [userId] }];
+    }
+
+    // Update message
+    thread.messages[msgIndex] = { ...message, reactions: newReactions };
+    thread.updated_at = new Date().toISOString();
+    await saveLunaThread(thread);
+
+    // Broadcast to group
+    if (thread.type === 'group') {
+      broadcast({
+        type: 'luna:chat:reaction',
+        threadId,
+        messageId: msgId,
+        reactions: newReactions,
+        emoji,
+        userId,
+      });
+    }
+
+    res.json({ success: true, reactions: newReactions });
+  } catch (err) {
+    console.error('[THREADS] Erro ao reagir:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── Helpers do MODO CONCIERGE ──
 function buildEditableTaskFields(params) {
   return {
