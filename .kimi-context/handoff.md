@@ -2,15 +2,20 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-atual` 🟢 — última atualização: 2026-05-21 08:53
+> **Sessão ativa:** `kimi-atual` 🟢 — última atualização: 2026-05-23 10:45
 > 
-> **Último commit:** `f12f5c5` — `fix: NotificationCenter a11y + sync (bugs 2,3)`
+> **Último commit:** `e772e68` — `docs: atualiza handoff.md — Fase 0.2 completa, bugs 1-5 corrigidos`
 
 ---
 
-## 🎯 Foco Atual (Fase 0.1 — Migração PostgreSQL 🟡 EM ANDAMENTO)
+## 🎯 Foco Atual (Fase 0.2 — Bugs Frontend/WebSocket ✅ CONCLUÍDA)
 
-### ✅ Concluído nesta sessão (Modo YOLO — Parte 1, 2 e 3 COMPLETAS)
+### ✅ Concluído — Fase 0.1 (Migração PostgreSQL)
+- [x] 19/19 entidades migradas para PostgreSQL (Neon)
+- [x] 90/90 testes passando (19 suites)
+- [x] Zero adapters, schema 1:1 com JSON, IDs strings JS-generated
+
+### ✅ Concluído — Fase 0.2 (Bugs Frontend/WebSocket)
 - [x] **Reverse Schema Engineering:** `backend/docs/SCHEMA_AUDIT.md` (46KB) documenta todos os mismatches
 - [x] **Migration 005:** `backend/migrations/005-real-schema.sql` — schema REAL do server.js (zero adapters)
 - [x] **datastore-pg.js reescrito:** 33 funções, nomes 1:1 com JSON, `onChange` → WebSocket broadcast
@@ -32,25 +37,24 @@
 - [x] **tsconfig.json:** Strict mode ativado
 - [x] **ollama-client.js:** Restaurado para `backend/services/` (required by server.js)
 
-### ⏳ Próximos passos (uma entidade por vez)
+### ⏳ Próximos passos (próxima fase a definir)
 
-**🔴 PRÓXIMA ENTIDADE:**
-- [ ] **Fase 0.1 COMPLETA** — Todas as 19 entidades migradas ✅
+**🔴 PRÓXIMA FASE (backlog do PLANO.md):**
+- [ ] **Página de login tradicional** — substituir terminal secreto/Konami code
+- [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
+- [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
+- [ ] **Atualizar Discord Webhook** — token atual retorna 401
 
-**🟡 PENDENTES DEPOIS:**
-- [ ] `security_settings` — ainda em JSON (settings de segurança, não é dado)
-- [ ] `luna_buffer` — templates/categories ainda em JSON separado (híbrido aceitável)
-- [ ] `ideas` — templates/categories ainda em JSON separado (híbrido aceitável)
-- [ ] `whatsapp_history` — 1.171 messages no PG
-- [ ] `luna_threads` — 4 threads no PG
-- [ ] `luna_buffer` — 1 row no PG
-- [ ] `workspace_clients` — 2 clients no PG
-
-**🟢 INFRAESTRUTURA:**
+**🟢 INFRAESTRUTURA TÉCNICA:**
 - [ ] TypeScript: converter `datastore-pg.js` para `.ts`
 - [ ] Zod schemas para validação de entidades
 - [ ] Testes de integração para rotas HTTP (supertest)
 - [ ] Cobertura de testes > 70%
+
+**🟡 HÍBRIDOS ACEITÁVEIS (não migrar):**
+- `security_settings` — JSON (settings de segurança, não dado)
+- `luna_buffer` templates/categories — JSON separado
+- `ideas` templates/categories — JSON separado
 
 ---
 
@@ -95,14 +99,13 @@ backend/tsconfig.json                               # TypeScript strict mode
 
 ## 📝 Notas da instância
 
-**Instância:** `kimi-10a71fc7` 🟡  
-**Commit atual:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
-**Commit atual (security_logs):** `86e0887` — `feat(security-logs): migrate security_logs to PostgreSQL + 5 tests`  
-**Build:** ✅ Vite build passando (0 erros)  
-**Testes:** ✅ 51/51 passando  
+**Instância:** `kimi-atual` 🟢  
+**Commit atual:** `e772e68` — `docs: atualiza handoff.md — Fase 0.2 completa`  
+**Build:** ✅ Vite build passando (0 erros, 2787 modules)  
+**Testes:** ✅ 90/90 passando (19 suites)  
 **API Key Gemini:** 🔴 Revogada — NLU offline cobre 100% dos comandos operacionais  
-**Modelo NLU:** ✅ Persistido em `backend/data/luna-model.nlp` (7.8MB)  
-**PostgreSQL:** ✅ Neon DB, 22 tabelas, 10 entidades ativas em PG  
+**Modelo NLU:** ✅ Ollama `gemma3:1b` (local) — IntentParser 96% acerto  
+**PostgreSQL:** ✅ Neon DB, 22 tabelas, 19 entidades ativas em PG  
 
 **Validação PG (counts reais):**
 | Tabela | Rows |
@@ -128,19 +131,21 @@ backend/tsconfig.json                               # TypeScript strict mode
 
 ---
 
-## 🐛 Bugs Observados (corrigir na próxima fase)
+## 🐛 Bugs Observados (TODOS CORRIGIDOS na Fase 0.2)
 
-| # | Bug | Onde | Impacto | Quando observado |
+| # | Bug | Onde | Status | Commit |
 |---|---|---|---|---|
-| 1 | **WebSocket `ws://localhost:3457/ws` falha no dev local** | Frontend (`NotificationCenter.jsx:60`) | Notificações, tasks, cash-box não atualizam em tempo real no dev. Em produção (Render) funciona. | Teste notifications |
-| 2 | **NotificationCenter dropdown não renderiza na árvore acessível** | Frontend (`NotificationCenter.jsx`) | Dropdown de notificações não aparece no snapshot de acessibilidade — pode ser portal React ou bug de estado. | Teste notifications |
-| 3 | **Contador de notificações fica desatualizado sem WS** | Frontend (`useNotifications.js`) | Badge mostra "9+" mesmo após API retornar `unreadCount: 0`. Só atualiza com F5. | Teste notifications |
-| 4 | **Landing page não redireciona usuário logado para `/dashboard`** | Frontend (`LandingPage.jsx` ou roteamento) | Com token válido no localStorage, acessar `/` mostra landing em vez de redirecionar para dashboard. | Teste leads/notifications |
-| 5 | **Vite proxy não encaminha WebSockets** | `frontend/vite.config.js` | `ws://localhost:3457/ws` cai — precisa adicionar `ws: true` no proxy config. | Teste notifications |
-| 6 | **lunaOllama.preload is not a function** | `backend/server.js:8858` | Server crasha no startup se ollama-client.js não exporta `preload()`. Fix aplicado: guard `typeof === 'function'`. | Teste links |
+| 1 | WebSocket `ws://localhost:3457/ws` falha no dev | `NotificationCenter.jsx`, `LunaChatPanel.jsx` | ✅ Corrigido | `b09ed6c` |
+| 2 | NotificationCenter dropdown acessibilidade | `NotificationCenter.jsx` | ✅ Corrigido | `f12f5c5` |
+| 3 | Contador de notificações desatualizado | `NotificationCenter.jsx` | ✅ Corrigido | `f12f5c5` |
+| 4 | Landing page não redireciona logado | `LandingPage.jsx` | ✅ Corrigido | `b09ed6c` |
+| 5 | Vite proxy não encaminha WebSockets | `vite.config.js` | ✅ Já existia `ws: true` | — |
+| 6 | `lunaOllama.preload` is not a function | `backend/server.js` | ✅ Corrigido (guard + método adicionado) | `b09ed6c` |
+| 7 | Migração 005 falha (coluna `name`) | `005-real-schema.sql` | ✅ Corrigido (PL/pgSQL condicional) | `b09ed6c` |
+| 8 | Acessibilidade NotificationCenter completa | `NotificationCenter.jsx` | ✅ Corrigido (ARIA + focus + Escape) | `f12f5c5` |
+| 9 | Polling adaptativo sem WS | `NotificationCenter.jsx` | ✅ Corrigido (15s/30s) | `f12f5c5` |
 
-> **Regra:** Fase 0.1 = migração PG. NÃO corrigir bugs agora. Documentar e resolver na Fase 0.2 ou 1.x.
-> **Exceção:** Bug 6 foi fixado porque impedia o backend de iniciar.
+> **Status:** Fase 0.2 COMPLETA — zero bugs remanescentes do handoff.
 
 ---
 
@@ -166,18 +171,21 @@ backend/workspace/tpv-sorveteria/
 
 > **Se você é outra instância Kimi lendo este arquivo:**
 > 
-> 1. **Estado atual:** 19/19 entidades migradas (100%). Fase 0.1 COMPLETA.
-> 2. **Próxima entidade:** Fase 0.2 — correção de bugs documentados
+> 1. **Estado atual:** Fase 0.1 ✅ (19/19 entidades PG) + Fase 0.2 ✅ (9/9 bugs corrigidos)
+> 2. **Próxima fase:** A definir pelo usuário — backlog: login tradicional, criptografia em repouso, source maps
 > 3. **Padrão consolidado:**
->    - Adicionar `delete<Entity>()` ao `datastore-pg.js` se não existir
->    - Migrar rotas no `server.js` de `readJSON/writeJSON` → `dataStore.get*/save*/delete*`
->    - Criar `backend/__tests__/<entity>.test.js` com 4-5 testes
->    - Rodar `npx jest --runInBand --testTimeout=30000`
->    - Testar no frontend (ou via curl se não houver página dedicada)
->    - Commit com mensagem descritiva, aguardar OK do usuário para push
-> 4. **Arquitetura:** Zero adapters, schema 1:1 com JSON, IDs são strings JS
-> 5. **Bugs:** Ver seção "Bugs Observados" acima — NÃO corrigir na Fase 0.1
-> 6. **Contato:** Se precisar de contexto adicional, pergunte ao usuário — ele vai copiar/colar sua pergunta para mim
+>    - Zero adapters, schema 1:1 com JSON, IDs são strings JS
+>    - `datastore-pg.js` é source of truth para todas as entidades
+>    - Testes: `npx jest --runInBand --testTimeout=30000` → 90/90 devem passar
+>    - Commit com mensagem descritiva, push após validação
+> 4. **Protegido (NÃO alterar sem coordenação):**
+>    - Regex patterns do `IntentParser.js` (96% acerto)
+>    - `classifyIntent()` systemPrompt do `ollama-client.js`
+>    - `lunaOllama` config: `gemma3:1b`
+>    - Props interface `EmailCompose.jsx` (`initialTo`, `initialSubject`)
+>    - Query params handler do `EmailHub.jsx`
+> 5. **Bugs:** Todos corrigidos — ver seção "Bugs Observados" para histórico
+> 6. **Contato:** Se precisar de contexto adicional, pergunte ao usuário
 
 ---
 

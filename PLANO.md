@@ -2,7 +2,7 @@
 
 > **LEIA ESTE ARQUIVO PRIMEIRO** antes de qualquer ação no projeto.  
 > Este documento mantém o estado atual, decisões aprovadas e próximos passos.  
-> **Atualizado:** 2026-05-19 22:30 UTC
+> **Atualizado:** 2026-05-23 10:45 UTC
 
 ---
 
@@ -47,17 +47,18 @@
 
 ## 🔒 Pendente de Aprovação / Próximos Passos
 
-### Fase Segurança — Parte 3 (AGUARDANDO APROVAÇÃO)
+### Fase Segurança — Parte 3 (EM ANDAMENTO)
 - [ ] **Página de login tradicional** — substituir o terminal secreto/Konami code
 - [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
-- [ ] **Path traversal fix** — workspace file access (`../` bypass)
+- [x] **Path traversal fix** — workspace file access (`../` bypass) ✅ commit `a2c5e00`
 - [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
-- [ ] **HTTP headers de segurança** — HSTS, X-Frame-Options, CSP, etc.
-- [ ] **Audit log persistente** — security log no PostgreSQL (não JSON)
+- [x] **HTTP headers de segurança** — HSTS, X-Frame-Options, CSP, Permissions-Policy ✅ commit `a2c5e00`
+- [x] **Audit log persistente** — security log no PostgreSQL ✅ Fase 0.1
 - [ ] **Atualizar Discord Webhook** — token atual retorna 401 (Invalid Webhook Token)
-- [ ] **Reinstalar WhatsApp sender** — módulo `playwright` ausente no ambiente
+- [x] **WhatsApp sender / Playwright** — módulo `playwright` instalado ✅ commit `05df74e`
 
-### Fase Migração de Dados (✅ CONCLUÍDA — 2026-05-23)
+### Fase 0.1 — Migração PostgreSQL (✅ CONCLUÍDA — 2026-05-23)
+- 19/19 entidades migradas, 90/90 testes passando, zero adapters
 - [x] Migrar `users` → PostgreSQL
 - [x] Migrar `tasks` → PostgreSQL
 - [x] Migrar `payments` → PostgreSQL
@@ -79,6 +80,15 @@
 - [x] Migrar `ideas` → PostgreSQL
 - [x] Manter em JSON (config): `cache/*`, `dev-servers.json`, `nexo-news.json`, `security-settings.json`
 - [x] Manter em JSON (híbrido): `ideas-registry.json` (templates/categories apenas)
+
+### Fase 0.2 — Correção Bugs Frontend/WebSocket (✅ CONCLUÍDA — 2026-05-23)
+| # | Bug | Arquivo | Commit |
+|---|---|---|---|
+| 1 | WebSocket `ws://localhost:3457/ws` falha no dev | `NotificationCenter.jsx`, `LunaChatPanel.jsx` | `b09ed6c` |
+| 2 | NotificationCenter dropdown acessibilidade | `NotificationCenter.jsx` | `f12f5c5` |
+| 3 | Contador de notificações desatualizado sem WS | `NotificationCenter.jsx` | `f12f5c5` |
+| 4 | Landing page não redireciona logado | `LandingPage.jsx` | `b09ed6c` |
+| 5 | Vite proxy não encaminha WebSockets | `vite.config.js` | já existia |
 
 ### Fase Terminal Secreto — Decisão Pendente
 **Opção A (Recomendada):** Página `/login` tradicional com email/senha  

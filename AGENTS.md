@@ -3,8 +3,8 @@
 # AGENTS.md — NEXO COMMAND CENTER v4.0
 # Documento de contexto para agentes de IA
 # Data: 2026-05-12
-# Última atualização: 2026-05-12 18:35
-# Último commit: c8b762b (codex/initial-nexo-dashboard-pro-v16)
+# Última atualização: 2026-05-23 10:45
+# Último commit: e772e68 (main)
 # ═══════════════════════════════════════════════════════════════════
 
 ## 🏢 EMPRESA
@@ -22,7 +22,11 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 
 ### Análise de Código Real — Validado por Kimi Code CLI
 
-#### Backend (server.js — ~4000 linhas)
+> **⚠️ ATUALIZAÇÃO CRÍTICA:** O backend foi migrado de JSON files para PostgreSQL (Neon) em 2026-05-23.
+> Todas as entidades de dados agora usam `datastore-pg.js` como source of truth.
+> Arquivos JSON de inicialização ainda existem no código mas são inofensivos (não mais lidos pelas rotas).
+
+#### Backend (server.js — ~8750 linhas)
 | # | Feature | Status | Evidência |
 |---|---------|--------|-----------|
 | 1 | BOM-safe `readJSON()` | ✅ Funciona | Usado globalmente |
@@ -44,9 +48,16 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 | 17 | Luna Control Center v2 | ✅ REESCRITO | 3 abas: Terminal (logs realtime), Chat (interação direta), Comandos Rápidos |
 | 18 | System Engine | ✅ IMPLEMENTADO | `/api/system/status`, `/api/system/logs`, `/api/system/control` — controle Backend/Frontend |
 | 19 | WhatsApp Bidirecional | ✅ IMPLEMENTADO | `POST /api/whatsapp/send` via Playwright CDP + input no chat |
-| 20 | Email Hub (IMAP/SMTP) | ✅ IMPLEMENTADO | 3-col layout, compose modal, sync inbox |
+| 20 | Email Hub (IMAP/SMTP) | ✅ IMPLEMENTADO | 3-col layout, compose modal, sync inbox, query params auto-compose |
 | 21 | Instagram Hub | ✅ IMPLEMENTADO | Profile iframe + messages import JSON |
 | 22 | detectClient() + Toast | ✅ IMPLEMENTADO | `/api/detect-client`, ToastContainer com useToast |
+| 23 | **PostgreSQL Migration** | ✅ **19/19 ENTIDADES** | `datastore-pg.js` — zero adapters, schema 1:1 |
+| 24 | **Security Headers** | ✅ IMPLEMENTADO | HSTS, CSP, X-Frame-Options, Permissions-Policy |
+| 25 | **Path Traversal Fix** | ✅ IMPLEMENTADO | `sanitizeClientId` + regex sanitização |
+| 26 | **Luna NLU v2** | ✅ IMPLEMENTADO | IntentParser 96% acerto, navigate/filter intents |
+| 27 | **Luna HUD v2** | ✅ IMPLEMENTADO | ChatPanel futurista, FAB orb holográfico, inline actions |
+| 28 | **Dashboard Context** | ✅ IMPLEMENTADO | `GET /api/luna/dashboard-state`, context awareness |
+| 29 | **Playwright WhatsApp** | ✅ INSTALADO | `whatsapp-sender.js` com CDP automation |
 
 #### Agente Luna (luna-cto-agent.cjs + SmartClassifier)
 | # | Feature | Status | Evidência |
@@ -80,42 +91,61 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 ```
 NEXO_DASHBOARD_PRO/
 ├── backend/
-│   ├── server.js                    ← ~4000 linhas. APIs: /api/system/*, /api/links/*, /api/cash-box/entries/*
+│   ├── server.js                    ← ~8750 linhas. APIs REST + WebSocket
+│   ├── datastore-pg.js              ← 58 funções — source of truth PostgreSQL
+│   ├── db.js                        ← Pool node-postgres (Neon)
 │   ├── services/
 │   │   ├── url-classifier.js        ← classificação de URL por plataforma
-│   │   └── link-preview.js          ← fetch OGP + cache 24h
-│   ├── data/
-│   │   ├── luna-buffer.json         ← newMessages: [] (volátil por design)
-│   │   ├── whatsapp-history.json    ← 84+ mensagens com resolvedAuthor
-│   │   ├── cash-box.json            ← Saldo protegido, histórico imutável, auditLog
-│   │   ├── links-index.json         ← 45 links classificados
+│   │   ├── link-preview.js          ← fetch OGP + cache 24h
+│   │   ├── ollama-client.js         ← Cliente Ollama (gemma3:1b)
+│   │   └── luna-semantic-nlu.js     ← Semantic Embedding Engine
+│   ├── migrations/
+│   │   └── 005-real-schema.sql      ← Schema real do PostgreSQL
+│   ├── __tests__/                   ← 19 suites, 90 testes Jest
+│   ├── data/                        ← JSON de config (inofensivos, não mais lidos)
+│   │   ├── luna-buffer.json         ← volátil por design
+│   │   ├── whatsapp-history.json    ← backup (dados agora no PG)
 │   │   └── schema/
-│   │       └── contacts-map.json    ← 535 linhas, dados ricos dos 3 founders
-│   └── fix-bom.js                   ← Script de remoção de BOM + backup
+│   │       └── contacts-map.json    ← 535 linhas, dados dos 3 founders
+│   └── workspace/                   ← Filesystem de clientes (não commitar)
 ├── agents/
+│   ├── core/
+│   │   ├── IntentParser.js          ← NLU v2 — 96% acerto, navigate/filter
+│   │   └── ActionExecutor.js        ← 109 métodos, 21 categorias
 │   ├── luna-cto-agent.cjs           ← Agente principal (Playwright CDP)
 │   ├── SmartClassifier_v16.js       ← Classificador + resolveAuthor()
-│   └── LunaBrain_v16.js             ← 7 personalidades
+│   └── telegram-luna-agent.cjs      ← Bot Telegram (@lunanexobot)
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── LinkHub.jsx          ← grid/list, filtros, preview, busca
-│       │   └── Sidebar.jsx          ← EVOLUÍDO — item "Sistema" adicionado
-│       ├── hooks/
-│       │   └── useLinks.js          ← consumo de /api/links com WebSocket
+│       │   ├── luna/
+│       │   │   ├── LunaChatPanel.jsx      ← HUD futurista v2
+│       │   │   ├── LunaFloatingButton.jsx ← Orb holográfico
+│       │   │   ├── LunaActionBridge.jsx   ← Ações inline cross-module
+│       │   │   └── LunaProactiveToast.jsx ← Notificações proativas
+│       │   ├── email/
+│       │   │   ├── EmailHub.jsx           ← 3-col layout, query params
+│       │   │   └── EmailCompose.jsx       ← Compose com props initialTo/Subject
+│       │   ├── NotificationCenter.jsx     ← Dropdown acessível, WS realtime
+│       │   ├── LinkHub.jsx                ← grid/list, filtros, preview
+│       │   └── Sidebar.jsx                ← v4.0 — Sistema, Comunicação
 │       ├── pages/
-│       │   ├── WhatsApp.jsx         ← history primária, resolvedAuthor, LinkHub
-│       │   ├── Dashboard.jsx        ← WhatsApp card usa histórico
-│       │   ├── Caixa.jsx            ← CRUD completo de entradas
+│       │   ├── WhatsApp.jsx         ← history primária, resolvedAuthor
+│       │   ├── Dashboard.jsx        ← cards com dados do PG
+│       │   ├── Caixa.jsx            ← CRUD completo
 │       │   ├── Financeiro.jsx       ← summary completo
-│       │   ├── LunaControl.jsx      ← REESCRITO v2 — Terminal + Chat + Comandos
-│       │   └── SystemEngine.jsx     ← NOVO — controle Backend/Frontend/Supervisor
+│       │   ├── LandingPage.jsx      ← redirect automático se logado
+│       │   ├── LunaControl.jsx      ← Terminal + Chat + Comandos
+│       │   └── SystemEngine.jsx     ← controle Backend/Frontend
 │       ├── context/
-│       │   └── ToastContext.jsx     ← ATIVADO
-│       └── main.jsx                 ← ToastProvider envolve App
-└── docs/
-    └── planos/
-        └── PLANO_EVOLUCAO_v16.1.md  ← Plano completo de evolução
+│       │   ├── ToastContext.jsx     ← ATIVADO
+│       │   └── AuthContext.jsx      ← JWT + interceptador 401
+│       └── main.jsx                 ← ToastProvider + AuthProvider
+├── .kimi-context/
+│   ├── handoff.md                 ← Estado de trabalho entre sessões
+│   └── nlu-gap-analysis.md        ← Análise de gaps do NLU
+├── AGENTS.md                      ← Este documento
+└── PLANO.md                       ← Plano vivo — backlog e decisões
 ```
 
 ---
@@ -195,12 +225,16 @@ NEXO_DASHBOARD_PRO/
 - [x] NotificationCenter com WebSocket realtime
 - [x] Caixa.jsx refetch fix após salvar
 
-### Pendente futuro
-- [ ] Dashboard: Atividade Recente com contexto (usar history + classification)
-- [ ] Alertas: Exibir `alerts` do `/api/finance/summary` no Dashboard
-- [ ] Link Hub: enriquecimento background mais robusto (workers ou fila)
-- [ ] Cash Box: endpoint `GET /api/cash-box/entries` para listar com filtros
-- [ ] Landing page de vendas personalizada (aguardando CEO enviar HTML/JSX)
+### Pendente futuro (priorizado)
+- [ ] **Página de login tradicional** — substituir terminal secreto/Konami code (Opção A recomendada)
+- [ ] **Criptografia em repouso** — `gmail-tokens.json`, `email-config.json`
+- [ ] **Source maps** — desabilitar em produção (bundle JS exposto)
+- [ ] **Dashboard: Atividade Recente** com contexto (usar history + classification)
+- [ ] **Alertas:** Exibir `alerts` do `/api/finance/summary` no Dashboard
+- [ ] **Link Hub:** enriquecimento background mais robusto (workers ou fila)
+- [ ] **Cash Box:** endpoint `GET /api/cash-box/entries` para listar com filtros
+- [ ] **Landing page de vendas personalizada** (aguardando CEO enviar HTML/JSX)
+- [ ] **Atualizar Discord Webhook** — token atual retorna 401 (Invalid Webhook Token)
 
 ### Mojibake corrigido (2026-05-09)
 - `backend/data/cash-box.json` — 2 strings (despesa rápida, dedução do caixa)
@@ -243,7 +277,12 @@ Frontend Dashboard (localhost:3457)
 └─ MobileBottomNav — navegação mobile ativa
 ```
 
-**Princípio arquitetural estabelecido:** O `luna-buffer.json` é VOLÁTIL — ele esvazia após processamento. O histórico (`whatsapp-history.json`) é PERSISTENTE. O frontend consome o histórico como fonte primária, e o buffer apenas como "novidades do último scan".
+**Princípio arquitetural estabelecido:**
+1. **PostgreSQL é o source of truth** para todas as 19 entidades de dados via `datastore-pg.js`
+2. **`onChange` hook** dispara WebSocket broadcast para sincronização realtime frontend
+3. **O `luna-buffer.json` é VOLÁTIL** — esvazia após processamento
+4. **O histórico (`whatsapp-history.json`) agora está no PG** — arquivo local é backup apenas
+5. **Zero adapters** — schema PG é 1:1 com estruturas JSON originais, IDs são strings JS-generated
 
 ---
 
@@ -297,11 +336,14 @@ Get-Content "backend/data/cash-box.json" | ConvertFrom-Json | Select-Object -Exp
 - O usuário quer **EXTRAORDINÁRIO**, não "bom o suficiente"
 - O backend está em `localhost:3456`, frontend em `localhost:3457`
 - O agente Luna roda em Windows, usa Chrome CDP (porta 9223)
-- Ollama roda em `localhost:11434` com modelo `gemma2:2b`
+- Ollama roda em `localhost:11434` com modelo **`gemma3:1b`** (substituiu gemma2:2b — mais rápido, metade da RAM)
 - WhatsApp Web está logado no perfil "Luna" do Chrome
 - **NUNCA** enviar mensagens no grupo do Paulo (regra absoluta)
 - **NUNCA** reconstruir — apenas evoluir o que existe
 - **NUNCA** implementar "KIMI API VS LOCAL" (instrução explícita do usuário para ignorar)
+- **NUNCA** modificar regex patterns do `IntentParser.js` sem rodar testes massivos primeiro
+- **NUNCA** mudar `lunaOllama` config de `gemma3:1b` sem validar performance
+- **SEMPRE** ler `PLANO.md`, `handoff.md` e `AGENTS.md` antes de qualquer ação
 
 ---
 
