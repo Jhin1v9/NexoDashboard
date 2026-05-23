@@ -125,6 +125,12 @@ async function saveCompanyTask(task) {
   return task;
 }
 
+async function deleteCompanyTask(id) {
+  await db.run('DELETE FROM company_tasks WHERE id=$1', [id]);
+  notifyChange('companyTasks', await getCompanyTasks());
+  return true;
+}
+
 // ============================================================
 // PAYMENTS (schema real do server.js — NOMES REAIS)
 // ============================================================
@@ -821,7 +827,7 @@ module.exports = {
   onChange,
   getUsers, saveUser,
   getTasks, saveTask, deleteTask,
-  getCompanyTasks, saveCompanyTask,
+  getCompanyTasks, saveCompanyTask, deleteCompanyTask,
   getPayments, savePayment, deletePayment,
   getExpenses, saveExpense, deleteExpense,
   getCashBox, saveCashBox,

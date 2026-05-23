@@ -48,7 +48,7 @@ const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
 const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
 const { OllamaClient } = require('./services/ollama-client.js');
 
-const lunaOllama = new OllamaClient({ timeout: 60000 });
+const lunaOllama = new OllamaClient({ timeout: 60000, intentModel: 'gemma3:1b', chatModel: 'gemma3:1b' });
 const lunaIntentParser = new IntentParser({
   genAI,
   ollama: lunaOllama,
@@ -4506,19 +4506,17 @@ app.get('/api/luna/analytics', (req, res) => {
 
 // POST /api/luna/chat — Chat direto com Luna via LLM
 // ── v18.0 NEXO DIRECT: Funções auxiliares para o chat ──
-function buildDashboardContext(contextModule = null, contextId = null, contextFile = null) {
+async function buildDashboardContext(contextModule = null, contextId = null, contextFile = null) {
   try {
     const buffer = readLunaBuffer();
     const tasksFile = path.join(DATA_DIR, 'tasks.json');
-    const companyTasksFile = path.join(DATA_DIR, 'company-tasks.json');
     const cashFile = path.join(DATA_DIR, 'cash-box.json');
     const paymentsFile = path.join(DATA_DIR, 'payments.json');
     const expensesFile = path.join(DATA_DIR, 'expenses.json');
     const clientsFile = path.join(SCHEMA_DIR, 'clients-registry.json');
 
     const tasks = readJSON(tasksFile, []);
-    const companyTasksRaw = readJSON(companyTasksFile, {});
-    const companyTasks = Array.isArray(companyTasksRaw) ? companyTasksRaw : Object.values(companyTasksRaw.categories || {}).flatMap(c => c.tasks || []);
+    const companyTasks = await dataStore.getCompanyTasks();
     const allTasks = [...tasks, ...companyTasks];
     const pendingTasks = allTasks.filter(t => t.status !== 'completed' && t.status !== 'done' && !t.completed);
     const p0 = pendingTasks.filter(t => (t.priority === 'P0' || t.priority === 'high' || t.prioridade === 'P0'));
@@ -4861,10 +4859,10 @@ app.post('/api/luna/learn', requireAuth, async (req, res) => {
 
 // GET /api/luna/proactive — Retorna contagem de pendências para badge no botão
 // Agora usa buildActionCenterItems para garantir consistência com o Action Center
-app.get('/api/luna/proactive', requireAuth, (req, res) => {
+app.get('/api/luna/proactive', requireAuth, async (req, res) => {
   try {
     const dataDir = path.join(__dirname, 'data');
-    const items = buildActionCenterItems(dataDir);
+    const items = await buildActionCenterItems(dataDir);
 
     const breakdown = {
       tasksCritical: items.filter(i => i.type === 'task' && i.priority === 'critical').length,
@@ -4902,7 +4900,7 @@ app.get('/api/luna/insights', requireAuth, async (req, res) => {
 
     // ── Tarefas ──
     try {
-      const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
+      const tasks = await dataStore.getCompanyTasks();
       const pending = tasks.filter(t => t.status !== 'completed');
       const p0 = pending.filter(t => t.priority === 'P0' || t.priority === 'high');
       const overdue = pending.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
@@ -5040,13 +5038,14 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
     let modified = 0;
     let errors = [];
 
-    // Tarefas (verifica tanto tasks.json quanto company-tasks.json)
+    // Tarefas (tasks regulares + company_tasks no PG)
     if (domain === 'tarefa') {
-      const tasksFiles = ['tasks.json', 'company-tasks.json'];
-      for (const file of tasksFiles) {
-        const tasksPath = path.join(dataDir, file);
-        if (!fs.existsSync(tasksPath)) continue;
-        const tasks = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
+      const allTaskSources = [
+        { name: 'tasks', get: () => dataStore.getTasks() },
+        { name: 'company_tasks', get: () => dataStore.getCompanyTasks() }
+      ];
+      for (const source of allTaskSources) {
+        const tasks = await source.get();
         let changed = false;
         const toDelete = action === 'deletar' || action === 'excluir';
         if (toDelete) {
@@ -5055,28 +5054,33 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
           const remaining = tasks.filter(t => !idsSet.has(String(t.id)));
           const deleted = beforeLen - remaining.length;
           if (deleted > 0) {
-            tasks.length = 0;
-            tasks.push(...remaining);
+            for (const t of tasks.filter(t => idsSet.has(String(t.id)))) {
+              if (source.name === 'tasks') await dataStore.deleteTask(t.id);
+              else await dataStore.deleteCompanyTask(t.id);
+            }
             modified += deleted;
             changed = true;
           }
         } else {
-          tasks.forEach(t => {
-            if (!ids.includes(t.id) && !ids.includes(String(t.id))) return;
+          for (const t of tasks) {
+            if (!ids.includes(t.id) && !ids.includes(String(t.id))) continue;
             if (action === 'concluir') {
               t.status = 'completed';
               t.completedAt = new Date().toISOString();
+              if (source.name === 'tasks') await dataStore.saveTask(t);
+              else await dataStore.saveCompanyTask(t);
               modified++;
               changed = true;
             }
             if (action === 'atribuir' && req.body.assignTo) {
               t.assignedTo = req.body.assignTo;
+              if (source.name === 'tasks') await dataStore.saveTask(t);
+              else await dataStore.saveCompanyTask(t);
               modified++;
               changed = true;
             }
-          });
+          }
         }
-        if (changed) writeJSON(tasksPath, tasks);
       }
     }
 
@@ -5165,14 +5169,14 @@ function isDismissed(id, dismissed) {
   return age < 24 * 60 * 60 * 1000;
 }
 
-function buildActionCenterItems(dataDir) {
+async function buildActionCenterItems(dataDir) {
   const items = [];
   const now = new Date();
   const dismissed = readDismissed().dismissed;
 
   // ── Tarefas ──
   try {
-    const tasks = JSON.parse(fs.readFileSync(path.join(dataDir, 'company-tasks.json'), 'utf8'));
+    const tasks = await dataStore.getCompanyTasks();
     const pending = tasks.filter(t => t.status !== 'completed');
 
     // P0 críticas
@@ -5331,10 +5335,10 @@ function buildActionCenterItems(dataDir) {
 }
 
 // GET /api/luna/action-center — Retorna ações pendentes acionáveis
-app.get('/api/luna/action-center', requireAuth, (req, res) => {
+app.get('/api/luna/action-center', requireAuth, async (req, res) => {
   try {
     const dataDir = path.join(__dirname, 'data');
-    const items = buildActionCenterItems(dataDir);
+    const items = await buildActionCenterItems(dataDir);
     res.json({ success: true, items, count: items.length });
   } catch (e) {
     console.error('[LunaActionCenter] Erro:', e);
@@ -5343,7 +5347,7 @@ app.get('/api/luna/action-center', requireAuth, (req, res) => {
 });
 
 // POST /api/luna/action-center/dismiss — Ignora uma ação por 24h
-app.post('/api/luna/action-center/dismiss', requireAuth, (req, res) => {
+app.post('/api/luna/action-center/dismiss', requireAuth, async (req, res) => {
   try {
     const { id, dismissAll } = req.body;
     const data = readDismissed();
@@ -5351,7 +5355,7 @@ app.post('/api/luna/action-center/dismiss', requireAuth, (req, res) => {
     if (dismissAll) {
       // Requer lista de IDs atuais para não ignorar indefinidamente coisas futuras
       const dataDir = path.join(__dirname, 'data');
-      const currentItems = buildActionCenterItems(dataDir);
+      const currentItems = await buildActionCenterItems(dataDir);
       currentItems.forEach(item => {
         if (!data.dismissed.find(d => d.id === item.id)) {
           data.dismissed.push({ id: item.id, dismissedAt: new Date().toISOString() });
@@ -5678,7 +5682,7 @@ app.post('/api/luna/chat', async (req, res) => {
     }
 
     // ── 6. FALLBACK: conversa via LLM (Ollama local → Gemini cloud) ──
-    const dataContext = buildDashboardContext(contextModule, contextId, contextFile);
+    const dataContext = await buildDashboardContext(contextModule, contextId, contextFile);
     const conversationHistory = context.slice(-10).map(c => ({
       role: c.role === 'user' ? 'user' : 'model',
       parts: [{ text: c.text }]
