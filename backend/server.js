@@ -1497,7 +1497,7 @@ app.get('/api/whatsapp-agent', (req, res) => {
   try {
     const data = readJSON(AGENT_DATA_FILE);
     const buffer = readLunaBuffer();
-    const history = readWhatsappHistory();
+    const history = await readWhatsappHistory();
     const payload = data && !Array.isArray(data) ? data : {};
     
     // Calcular stats a partir do history.json em tempo real (não dos buffers voláteis)
@@ -1541,10 +1541,10 @@ app.get('/api/whatsapp-agent', (req, res) => {
   }
 });
 
-app.get('/api/whatsapp-agent/status', (req, res) => {
+app.get('/api/whatsapp-agent/status', async (req, res) => {
   const data = readJSON(AGENT_DATA_FILE);
   const buffer = readLunaBuffer();
-  const history = readWhatsappHistory();
+  const history = await readWhatsappHistory();
   const hasBufferActivity = (buffer.newTasks?.length || 0) + (buffer.newLinks?.length || 0) + (buffer.newLeads?.length || 0) > 0;
   res.json({
     active: !!data || hasBufferActivity || history.length > 0,
@@ -1554,14 +1554,12 @@ app.get('/api/whatsapp-agent/status', (req, res) => {
   });
 });
 
-function readWhatsappHistory() {
-  if (!fs.existsSync(WHATSAPP_HISTORY_FILE)) writeJSON(WHATSAPP_HISTORY_FILE, []);
-  const parsed = readJSON(WHATSAPP_HISTORY_FILE);
-  return Array.isArray(parsed) ? parsed : (parsed?.messages || []);
+async function readWhatsappHistory() {
+  return await dataStore.getWhatsappHistory();
 }
 
-function writeWhatsappHistory(history) {
-  writeJSON(WHATSAPP_HISTORY_FILE, Array.isArray(history) ? history : []);
+async function writeWhatsappHistory(history) {
+  await dataStore.saveWhatsappHistory(Array.isArray(history) ? history : []);
 }
 
 function classificationCategory(classification) {
@@ -1729,7 +1727,7 @@ app.get('/api/whatsapp/history', (req, res) => {
   try {
     const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 50));
     const chat = (req.query.chat || '').toString().trim().toLowerCase();
-    let messages = readWhatsappHistory();
+    let messages = await readWhatsappHistory();
 
     if (chat) {
       messages = messages.filter(m => (m.chat || '').toLowerCase().includes(chat));
@@ -1766,7 +1764,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
     const result = await sender.sendMessage({ chatName, text });
 
     // Salvar no historico como "enviado pelo dashboard"
-    const history = readWhatsappHistory();
+    const history = await readWhatsappHistory();
     history.unshift({
       id: `sent-${Date.now()}`,
       text,
@@ -1786,7 +1784,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
         confidence: 1.0
       }
     });
-    writeWhatsappHistory(history);
+    await writeWhatsappHistory(history);
 
     broadcast({ type: 'whatsapp:sent', data: result });
     res.json({ success: true, result });
@@ -1798,7 +1796,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
 app.get('/api/classifications/review', (req, res) => {
   try {
     const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
-    const messages = readWhatsappHistory()
+    const messages = (await readWhatsappHistory())
       .filter(m => m.classification && m.reviewed !== true)
       .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
       .slice(0, limit)
@@ -1824,7 +1822,7 @@ app.post('/api/classifications/:id/correct', (req, res) => {
       return res.status(400).json({ success: false, error: 'correctCategory is required' });
     }
 
-    const history = readWhatsappHistory();
+    const history = await readWhatsappHistory();
     const index = history.findIndex(m => m.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ success: false, error: 'classification not found' });
@@ -1838,7 +1836,7 @@ app.post('/api/classifications/:id/correct', (req, res) => {
       reviewedAt: new Date().toISOString(),
       notes: notes || null
     };
-    writeWhatsappHistory(history);
+    await writeWhatsappHistory(history);
 
     let learningApplied = false;
     try {
@@ -1865,7 +1863,7 @@ app.post('/api/classifications/:id/correct', (req, res) => {
 
 app.get('/api/classifications/stats', (req, res) => {
   try {
-    const history = readWhatsappHistory().filter(m => m.classification);
+    const history = (await readWhatsappHistory()).filter(m => m.classification);
     const byCategory = {};
     let reviewed = 0;
     let corrected = 0;
@@ -3784,7 +3782,7 @@ app.get('/api/luna/status', (req, res) => {
     try {
         const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
         const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
-        const history = readWhatsappHistory();
+        const history = await readWhatsappHistory();
 
         let checkpoint = { hashes: [], lastScan: null, version: '14.1' };
         let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
@@ -6331,7 +6329,7 @@ app.post('/api/luna/command', async (req, res) => {
         // Retorna status em tempo real
         const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
         const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
-        const history = readWhatsappHistory();
+        const history = await readWhatsappHistory();
         let checkpoint = { hashes: [], lastScan: null, version: '18.0' };
         let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
         if (fs.existsSync(checkpointPath)) checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
