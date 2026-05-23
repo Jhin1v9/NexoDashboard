@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Bell, X, Check, AlertTriangle, Shield, Info,
   Zap, Lock, Mail, MessageSquare, DollarSign,
@@ -117,6 +118,7 @@ function NotificationCenter() {
   const [wsConnected, setWsConnected] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
   const [dismissing, setDismissing] = useState(new Set())
+  const [pos, setPos] = useState({ top: 56, right: 16 })
   const buttonRef = useRef(null)
   const dropdownRef = useRef(null)
 
@@ -232,7 +234,14 @@ function NotificationCenter() {
       {/* ── Botão do Sino ─────────────────────────────────────────────────────── */}
       <button
         ref={buttonRef}
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!open && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect()
+            setPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
+          }
+          setOpen(!open)
+        }}
         className="relative p-2 text-nexo-muted hover:text-nexo-text transition-colors rounded-lg hover:bg-white/5"
         aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} não lidas)` : ''}`}
         aria-expanded={open}
@@ -435,7 +444,8 @@ function NotificationCenter() {
               </span>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )

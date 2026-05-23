@@ -11,6 +11,7 @@ import EditablePreviewCard from './EditablePreviewCard'
 import LunaMarkdown from './LunaMarkdown'
 import LunaMessageReactions from './LunaMessageReactions'
 import LunaVoiceInput from './LunaVoiceInput'
+import SmartFormModal from './SmartFormModal'
 
 const LUNA_AVATAR = '/luna-avatar.png'
 
@@ -115,6 +116,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
   const [typingMsgId, setTypingMsgId] = useState(null)
   const [dashboardState, setDashboardState] = useState(null)
   const [ghostMode, setGhostMode] = useState(false)
+  const [smartForm, setSmartForm] = useState(null)
 
   // Fetch dashboard state periodically
   useEffect(() => {
@@ -383,6 +385,23 @@ export default function LunaChatPanel({ isOpen, onClose }) {
           setTypingMsgId(lastMsg.id)
           setTimeout(() => setTypingMsgId(null), 1500)
         }
+      } else if (data.success && data.smartForm) {
+        // 🎯 SMART FORM: abre modal para coletar dados faltantes
+        setSmartForm(data.smartForm)
+        // Adiciona a mensagem da Luna no chat
+        const lunaMsg = {
+          id: 'smartform_' + Date.now(),
+          role: 'assistant',
+          author: 'luna',
+          authorName: 'Luna',
+          authorColor: '#9b59b6',
+          text: data.reply || 'Preciso de mais alguns dados para isso. Preenche aqui embaixo 👇',
+          timestamp: new Date().toISOString()
+        }
+        setThreadMessages(prev => ({
+          ...prev,
+          [activeThreadId]: [...(prev[activeThreadId] || []), lunaMsg]
+        }))
       } else {
         const errorMsg = {
           id: 'err_' + Date.now(),

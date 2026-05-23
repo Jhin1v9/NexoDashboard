@@ -4943,6 +4943,33 @@ app.post('/api/luna/action', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/luna/execute-action — Re-executa uma ação com parâmetros completos (SmartForm)
+app.post('/api/luna/execute-action', requireAuth, async (req, res) => {
+  try {
+    const { actionType, params = {}, context = {} } = req.body;
+    if (!actionType) {
+      return res.status(400).json({ success: false, error: 'actionType é obrigatório' });
+    }
+
+    const action = {
+      type: actionType,
+      params: { ...params },
+      needsConfirmation: false,
+      source: 'smart-form'
+    };
+
+    const result = await lunaActionExecutor.execute([action], {
+      authorName: req.user?.name || context.authorName || 'sistema'
+    });
+    const reply = buildConciergeReply(result, req.user?.name || 'sistema');
+
+    res.json({ success: true, reply, executed: true, result: result.summary });
+  } catch (err) {
+    console.error('[LunaExecuteAction] Erro:', err.message);
+    res.status(500).json({ success: false, error: err.message || 'Erro ao executar ação' });
+  }
+});
+
 // POST /api/luna/batch — Executa ação em lote sobre múltiplos itens
 app.post('/api/luna/batch', requireAuth, async (req, res) => {
   try {
@@ -5435,6 +5462,10 @@ app.post('/api/luna/chat', async (req, res) => {
       'listar_notificacoes', 'marcar_notificacao_lida', 'marcar_todas_lidas', 'excluir_notificacao',
       // Usuários
       'consultar_usuarios', 'trocar_usuario', 'alterar_senha',
+      // Social / Chat
+      'social',
+      // Sistema
+      'ajuda',
       // External Tools
       'listar_repos_github', 'listar_projetos_vercel', 'executar_comando', 'fazer_git_push',
       // BugDetector
@@ -5599,6 +5630,22 @@ app.post('/api/luna/chat', async (req, res) => {
 
       // Executa as ações
       const result = await lunaActionExecutor.execute(parsed.actions, { authorName });
+
+      // 🎯 SMART FORM: detecta se alguma ação pediu dados faltantes
+      const smartFormResult = result.results.find(r =>
+        r.status === 'success' && r.result?.type === 'prompt_missing_params'
+      );
+      if (smartFormResult) {
+        return res.json({
+          success: true,
+          reply: 'Preciso de mais alguns dados para isso. Preenche aqui embaixo 👇',
+          executed: false,
+          smartForm: smartFormResult.result,
+          intent: parsed.intent,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const reply = buildConciergeReply(result, authorName);
 
       return res.json({

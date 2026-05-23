@@ -1820,7 +1820,19 @@ class ActionExecutor {
       bcc: params.bcc
     };
     if (!payload.to || !payload.subject) {
-      throw new Error('Destinatário (para/to) e assunto (assunto/subject) são obrigatórios');
+      // 🎯 SMART FORM: faltam dados → devolve estrutura pro frontend abrir modal
+      return {
+        type: 'prompt_missing_params',
+        actionType: 'enviar_email',
+        title: 'Enviar Email',
+        description: 'Preencha os dados abaixo para enviar o email:',
+        missingFields: [
+          { name: 'para', label: 'Destinatário', type: 'email', required: true, placeholder: 'exemplo@email.com' },
+          { name: 'assunto', label: 'Assunto', type: 'text', required: true, placeholder: 'Assunto do email' },
+          { name: 'mensagem', label: 'Mensagem', type: 'textarea', required: false, placeholder: 'Conteúdo do email...', rows: 4 }
+        ],
+        partialParams: payload
+      };
     }
 
     const apiResult = await this.apiPost('/email/messages/send', payload);
