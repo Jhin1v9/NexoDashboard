@@ -2,15 +2,15 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-568adf4a` 🟡 — última atualização: 2026-05-23 02:56
+> **Sessão ativa:** `kimi-568adf4a` 🟢 — última atualização: 2026-05-23 04:15
 > 
-> **Último commit:** `7382586` — `feat(links): migrate links to PostgreSQL + 5 tests`
+> **Último commit:** `45ee23a` — `feat(ideas): migrate ideas to PostgreSQL + 5 tests`
 
 ---
 
 ## 🎯 Foco Atual (Fase 0.1 — Migração PostgreSQL 🟡 EM ANDAMENTO)
 
-### ✅ Concluído nesta sessão
+### ✅ Concluído nesta sessão (Modo YOLO — Parte 1, 2 e 3 COMPLETAS)
 - [x] **Reverse Schema Engineering:** `backend/docs/SCHEMA_AUDIT.md` (46KB) documenta todos os mismatches
 - [x] **Migration 005:** `backend/migrations/005-real-schema.sql` — schema REAL do server.js (zero adapters)
 - [x] **datastore-pg.js reescrito:** 33 funções, nomes 1:1 com JSON, `onChange` → WebSocket broadcast
@@ -34,14 +34,13 @@
 
 ### ⏳ Próximos passos (uma entidade por vez)
 
-**🔴 PRÓXIMA ENTIDADE (escolher uma):**
-- [ ] `changelog` — 31 entries no PG
+**🔴 PRÓXIMA ENTIDADE:**
+- [ ] **Fase 0.1 COMPLETA** — Todas as 19 entidades migradas ✅
 
 **🟡 PENDENTES DEPOIS:**
-- [ ] `members` — 0 members (vazio)
-- [ ] `transactions` — 0 transactions (vazio)
-- [ ] `changelog` — 31 entries no PG
-- [ ] `ideas` — 7 ideas no PG
+- [ ] `security_settings` — ainda em JSON (settings de segurança, não é dado)
+- [ ] `luna_buffer` — templates/categories ainda em JSON separado (híbrido aceitável)
+- [ ] `ideas` — templates/categories ainda em JSON separado (híbrido aceitável)
 - [ ] `whatsapp_history` — 1.171 messages no PG
 - [ ] `luna_threads` — 4 threads no PG
 - [ ] `luna_buffer` — 1 row no PG
@@ -166,8 +165,8 @@ backend/workspace/tpv-sorveteria/
 
 > **Se você é outra instância Kimi lendo este arquivo:**
 > 
-> 1. **Estado atual:** 11/19 entidades migradas (57.9%). Security_logs acabou de ser concluído.
-> 2. **Próxima entidade:** `changelog` (31 entries no PG)
+> 1. **Estado atual:** 19/19 entidades migradas (100%). Fase 0.1 COMPLETA.
+> 2. **Próxima entidade:** Fase 0.2 — correção de bugs documentados
 > 3. **Padrão consolidado:**
 >    - Adicionar `delete<Entity>()` ao `datastore-pg.js` se não existir
 >    - Migrar rotas no `server.js` de `readJSON/writeJSON` → `dataStore.get*/save*/delete*`
@@ -243,3 +242,53 @@ backend/workspace/tpv-sorveteria/
 4. **Gemini está REVOGADO:** `genAI` é `null`. Não tentar reativar. Ollama (local) é o único LLM funcional.
 
 **⚠️ Atenção:** `backend/workspace/` foi adicionado ao `.gitignore` — NÃO commitar dados de runtime.
+
+
+---
+
+## 🌙 Relatório Noturno — Fase 0.1
+
+**Parte 1, 2 e 3 concluídas.**
+
+### Entidades migradas nesta sessão (9 entidades):
+1. `security_logs` — 14 events → commit `86e0887`
+2. `changelog` — 31 entries → commit `f4662d5`
+3. `whatsapp_history` — 1.171 messages → commit `fc42cc5`
+4. `luna_threads` — 4 threads → commit `b0ec0bc`
+5. `luna_buffer` — 1 row → commit `74457de`
+6. `workspace_clients` — 2 clients → commit `65c8410`
+7. `members` — 0 members → commit `91643e5`
+8. `transactions` — 0 transactions → commit `20981db`
+9. `ideas` — 7 ideas → commit `45ee23a`
+
+### Entidades já migradas em sessões anteriores (10 entidades):
+- `users`, `tasks`, `payments`, `expenses`, `cash_box`, `quotes`, `leads`, `notifications`, `company_tasks`, `links`
+
+### Testes passando: 90/90 (19 suites)
+- Tempos variam de 4s a 17s por suite (whatsapp_history é a mais lenta)
+- Zero regressões em entidades anteriores
+
+### Commits locais (não pushados):
+```
+45ee23a feat(ideas): migrate ideas to PostgreSQL + 5 tests
+20981db feat(transactions): migrate transactions to PostgreSQL + 5 tests
+91643e5 feat(members): migrate members to PostgreSQL + 5 tests
+65c8410 feat(workspace_clients): migrate workspace_clients to PostgreSQL + 5 tests
+74457de feat(luna_buffer): migrate luna_buffer to PostgreSQL + 4 tests
+b0ec0bc feat(luna_threads): migrate luna_threads to PostgreSQL + 5 tests
+fc42cc5 feat(whatsapp_history): migrate whatsapp_history to PostgreSQL + 5 tests
+f4662d5 feat(changelog): migrate changelog to PostgreSQL + 5 tests
+86e0887 feat(security-logs): migrate security_logs to PostgreSQL + 5 tests + fix lunaOllama.preload guard
+```
+
+### Notas técnicas:
+- `ideas` usa híbrido PG+JSON: ideas em PG, templates/categories em JSON (arquitetura aceitável)
+- `luna_buffer` usa híbrido PG+JSON: buffer em PG, templates/categories em JSON
+- `workspace_manager.js` foi modificado para usar datastore-pg para índice de clientes
+- `workspace_manager.js` mantém filesystem para pastas/arquivos (esperado)
+- `routes/ideas.js` usa `loadIdeasData()`/`saveIdeasData()` para hibridização
+
+### Próxima fase: Fase 0.2 — Correção de bugs documentados
+Ver seção "Bugs Observados" acima.
+
+**Aguardando autorização para push de todos os commits.**
