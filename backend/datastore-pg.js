@@ -455,6 +455,11 @@ async function saveIdea(idea) {
   return idea;
 }
 
+async function deleteIdea(id) {
+  await db.run('DELETE FROM ideas WHERE id = $1', [id]);
+  notifyChange('ideas', await getIdeas());
+}
+
 // ============================================================
 // LEADS (schema real — NOMES REAIS)
 // ============================================================
@@ -899,7 +904,7 @@ module.exports = {
   getQuotes, saveQuote, deleteQuote,
   getMembers, saveMember, deleteMember,
   getSettings, setSettings,
-  getIdeas, saveIdea,
+  getIdeas, saveIdea, deleteIdea,
   getLeads, saveLead, deleteLead,
   getSecurityLogs, saveSecurityLog, deleteSecurityLog,
   getNotifications, saveNotification, deleteNotification,

@@ -63,7 +63,9 @@ const USER_IDS = Object.keys(USER_NAMES);
 // ============================================================================
 // HELPERS
 // ============================================================================
-const readJSON = (file, defaultValue = null) => {
+const dataStore = require('../datastore-pg');
+
+const _readJSON = (file, defaultValue = null) => {
   try {
     let raw = fs.readFileSync(file, 'utf8');
     if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
@@ -71,8 +73,47 @@ const readJSON = (file, defaultValue = null) => {
   } catch { return defaultValue; }
 };
 
-const writeJSON = (file, data) => {
+const _writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
+};
+
+// Hybrid PG+JSON loader: ideas in PG, templates/categories in JSON
+async function loadIdeasData() {
+  const pgData = await dataStore.getIdeas();
+  const jsonData = _readJSON(IDEAS_FILE, { ideas: {}, templates: {}, categories: {} });
+  return {
+    ideas: pgData.ideas || jsonData.ideas || {},
+    templates: jsonData.templates || {},
+    categories: jsonData.categories || {},
+    _meta: jsonData._meta || { totalIdeas: Object.keys(pgData.ideas || {}).length, lastIdeaId: null }
+  };
+}
+
+async function saveIdeasData(data) {
+  for (const idea of Object.values(data.ideas || {})) {
+    await dataStore.saveIdea(idea);
+  }
+  const jsonData = {
+    templates: data.templates || {},
+    categories: data.categories || {},
+    _meta: data._meta || {}
+  };
+  backupJSON(IDEAS_FILE);
+  await saveIdeasData(data);
+}
+
+const readJSON = (file, defaultValue = null) => {
+  if (file === IDEAS_FILE) {
+    throw new Error('Use loadIdeasData() instead of readJSON(IDEAS_FILE)');
+  }
+  return _readJSON(file, defaultValue);
+};
+
+const writeJSON = (file, data) => {
+  if (file === IDEAS_FILE) {
+    throw new Error('Use saveIdeasData() instead of writeJSON(IDEAS_FILE)');
+  }
+  return _writeJSON(file, data);
 };
 
 const backupJSON = (file) => {
@@ -387,7 +428,7 @@ function parseToolCalls(response) {
 
 function executeToolCall(toolCall, currentIdeaId, reqUser) {
   const { tool, params } = toolCall;
-  const ideasData = readJSON(IDEAS_FILE, {});
+  const ideasData = await loadIdeasData();
   const now = new Date().toISOString();
 
   switch (tool) {
@@ -445,7 +486,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
         ideasData._meta.lastIdeaId = newId;
       }
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'create_idea', ideaId: newId, message: `Ideia "${newIdea.title}" criada (${newId})` };
     }
 
@@ -487,7 +528,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
 
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'update_idea', ideaId: targetId, message: `Ideia "${idea.title}" atualizada` };
     }
 
@@ -510,7 +551,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'delete_idea', ideaId: targetId, message: `Ideia "${idea.title}" arquivada` };
     }
 
@@ -546,7 +587,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
       idea.updatedAt = now;
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'add_comment', ideaId: targetId, message: 'Comentario adicionado' };
     }
 
@@ -569,7 +610,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'change_status', ideaId: targetId, message: `Status alterado para "${params.status}"` };
     }
 
@@ -621,7 +662,7 @@ function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
       return { success: true, action: 'convert_to_task', ideaId: targetId, taskId: newTaskId, message: `Ideia convertida em tarefa ${newTaskId}` };
     }
 
@@ -639,9 +680,9 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 1. GET /api/ideas - Listar ideias com filtros, busca full-text, paginacao
   // ==========================================================================
-  router.get('/', requireAuth, (req, res) => {
+  router.get('/', requireAuth, async (req, res) => {
     try {
-      const data = readJSON(IDEAS_FILE, {});
+      const data = await loadIdeasData();
       let ideas = data.ideas ? Object.values(data.ideas) : [];
 
       // Filtros simples (AND logico)
@@ -750,7 +791,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 2. POST /api/ideas - Criar ideia (com templateId opcional)
   // ==========================================================================
-  router.post('/', requireAuth, (req, res) => {
+  router.post('/', requireAuth, async (req, res) => {
     try {
       const body = req.body;
 
@@ -794,7 +835,7 @@ module.exports = function(requireAuth) {
       }
 
       // Carregar dados
-      const ideasData = readJSON(IDEAS_FILE, { ideas: {}, templates: {}, categories: {} });
+      const ideasData = await loadIdeasData();
       const ideasArray = ideasData.ideas ? Object.values(ideasData.ideas) : [];
 
       // Gerar ID sequencial
@@ -882,7 +923,7 @@ module.exports = function(requireAuth) {
       }
 
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.status(201).json({ success: true, data: { idea: newIdea } });
 
@@ -895,9 +936,9 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 10. GET /api/ideas/templates - Listar templates (ANTES de /:id)
   // ==========================================================================
-  router.get('/templates', requireAuth, (req, res) => {
+  router.get('/templates', requireAuth, async (req, res) => {
     try {
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
 
       const templates = ideasData.templates
         ? Object.values(ideasData.templates)
@@ -920,7 +961,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 11. POST /api/ideas/from-template - Criar ideia de template (ANTES de /:id)
   // ==========================================================================
-  router.post('/from-template', requireAuth, (req, res) => {
+  router.post('/from-template', requireAuth, async (req, res) => {
     try {
       const body = req.body;
 
@@ -934,7 +975,7 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: 'Titulo maximo 200 caracteres' });
       }
 
-      const ideasData = readJSON(IDEAS_FILE, { ideas: {}, templates: {}, categories: {} });
+      const ideasData = await loadIdeasData();
 
       const template = ideasData.templates && ideasData.templates[body.templateId];
       if (!template) {
@@ -1024,7 +1065,7 @@ module.exports = function(requireAuth) {
       }
 
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.status(201).json({ success: true, data: { idea: newIdea } });
 
@@ -1037,9 +1078,9 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 14. GET /api/ideas/stats - Estatisticas (ANTES de /:id)
   // ==========================================================================
-  router.get('/stats', requireAuth, (req, res) => {
+  router.get('/stats', requireAuth, async (req, res) => {
     try {
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const ideas = ideasData.ideas ? Object.values(ideasData.ideas) : [];
 
       const total = ideas.length;
@@ -1137,10 +1178,10 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 3. GET /api/ideas/:id - Detalhe da ideia
   // ==========================================================================
-  router.get('/:id', requireAuth, (req, res) => {
+  router.get('/:id', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
-      let ideasData = readJSON(IDEAS_FILE, {});
+      let ideasData = await loadIdeasData();
       let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1179,12 +1220,12 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 4. PUT /api/ideas/:id - Atualizar ideia (merge profundo)
   // ==========================================================================
-  router.put('/:id', requireAuth, (req, res) => {
+  router.put('/:id', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
       const body = req.body;
 
-      let ideasData = readJSON(IDEAS_FILE, {});
+      let ideasData = await loadIdeasData();
       let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1309,7 +1350,7 @@ module.exports = function(requireAuth) {
       // Salvar
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({ success: true, data: { idea } });
 
@@ -1322,11 +1363,11 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 5. DELETE /api/ideas/:id - Soft delete (arquivar)
   // ==========================================================================
-  router.delete('/:id', requireAuth, (req, res) => {
+  router.delete('/:id', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1352,7 +1393,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({
         success: true,
@@ -1371,7 +1412,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 6. POST /api/ideas/:id/comments - Adicionar comentario
   // ==========================================================================
-  router.post('/:id/comments', requireAuth, (req, res) => {
+  router.post('/:id/comments', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
       const body = req.body;
@@ -1383,7 +1424,7 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: 'Comentario maximo 2000 caracteres' });
       }
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1424,7 +1465,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.status(201).json({ success: true, data: { comment: newComment } });
 
@@ -1437,12 +1478,12 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 7. DELETE /api/ideas/:id/comments/:cid - Remover comentario
   // ==========================================================================
-  router.delete('/:id/comments/:cid', requireAuth, (req, res) => {
+  router.delete('/:id/comments/:cid', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
       const commentId = req.params.cid;
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1468,7 +1509,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({ success: true, data: { message: 'Comentario removido com sucesso' } });
 
@@ -1481,7 +1522,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 8. POST /api/ideas/:id/comments/:cid/reactions - Toggle reacao
   // ==========================================================================
-  router.post('/:id/comments/:cid/reactions', requireAuth, (req, res) => {
+  router.post('/:id/comments/:cid/reactions', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
       const commentId = req.params.cid;
@@ -1491,7 +1532,7 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: 'Emoji obrigatorio' });
       }
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1537,7 +1578,7 @@ module.exports = function(requireAuth) {
       idea.updatedAt = new Date().toISOString();
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({
         success: true,
@@ -1567,7 +1608,7 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: 'Mensagem obrigatoria' });
       }
 
-      let ideasData = readJSON(IDEAS_FILE, {});
+      let ideasData = await loadIdeasData();
       let idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1656,7 +1697,7 @@ module.exports = function(requireAuth) {
       idea.updatedAt = now;
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({
         success: true,
@@ -1688,11 +1729,11 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 12. POST /api/ideas/:id/convert-task - Converter ideia em tarefa
   // ==========================================================================
-  router.post('/:id/convert-task', requireAuth, (req, res) => {
+  router.post('/:id/convert-task', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1763,7 +1804,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({
         success: true,
@@ -1782,7 +1823,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 13. POST /api/ideas/:id/apply-ai - Aplicar sugestao da IA
   // ==========================================================================
-  router.post('/:id/apply-ai', requireAuth, (req, res) => {
+  router.post('/:id/apply-ai', requireAuth, async (req, res) => {
     try {
       const ideaId = req.params.id;
       const suggestionId = req.body.suggestionId;
@@ -1791,7 +1832,7 @@ module.exports = function(requireAuth) {
         return res.status(400).json({ success: false, error: 'suggestionId obrigatorio' });
       }
 
-      const ideasData = readJSON(IDEAS_FILE, {});
+      const ideasData = await loadIdeasData();
       const idea = ideasData.ideas && ideasData.ideas[ideaId];
 
       if (!idea) {
@@ -1833,7 +1874,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      writeJSON(IDEAS_FILE, ideasData);
+      await saveIdeasData();
 
       res.json({
         success: true,
