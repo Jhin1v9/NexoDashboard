@@ -448,18 +448,23 @@ export default function LunaChatPanel({ isOpen, onClose }) {
       })
       const data = res.data
       if (data.success) {
-        const successMsg = {
-          id: 'sf_ok_' + Date.now(),
+        // Verifica se a ação teve erro interno (mesmo com HTTP 200)
+        const hadErrors = data.result?.errorCount > 0 || data.result?.successCount === 0
+        const msgText = hadErrors
+          ? (data.reply || 'Não consegui completar a ação. Tenta de novo?')
+          : (data.reply || 'Pronto! Ação executada com sucesso ✅')
+        const msg = {
+          id: 'sf_' + (hadErrors ? 'err_' : 'ok_') + Date.now(),
           role: 'assistant',
           author: 'luna',
           authorName: 'Luna',
           authorColor: '#9b59b6',
-          text: data.reply || 'Pronto! Ação executada com sucesso ✅',
+          text: msgText,
           timestamp: new Date().toISOString()
         }
         setThreadMessages(prev => ({
           ...prev,
-          [activeThreadId]: [...(prev[activeThreadId] || []), successMsg]
+          [activeThreadId]: [...(prev[activeThreadId] || []), msg]
         }))
       } else {
         const errorMsg = {
