@@ -35,3 +35,47 @@
 - Serviços systemd limitados a whitelist (nginx, mysql, postgres, ssh, cron, etc.)
 - Processos de sistema (PID < 100) protegidos contra kill
 - ActionExecutor não pode se matar (process.pid protegido)
+
+## [Unreleased] — 2026-05-24 — Fase 1A: Preview Contextual + Confirmação/Neagação
+
+### Removed
+- **System Admin do PC** — removido completamente (não escondido)
+  - Deletado `backend/services/system-admin.js` (-1.341 linhas)
+  - Removidos 16 endpoints `/api/system/*`
+  - Removidas 16 ações do ActionExecutor
+  - Removidos 15 intents da NLU
+  - Modelo NLU reduzido de 8.9M para 7.7M
+
+### Added
+- **Serviço de Preview Contextual** (`backend/services/action-preview.js`)
+  - `buildPreviewForActions()` busca dados reais dos arquivos JSON
+  - Verifica permissões (Admin vs Operador)
+  - Retorna `affectedItems` com detalhes do item a ser excluído
+- **LunaInlinePreview** no chat — renderiza cards ricos com dados reais
+  - Mostra nome, status, prioridade, responsável da tarefa
+  - Botões Confirmar/Cancelar integrados
+- **NLU Intents de Confirmação/Neagação**
+  - `confirmacao.sim` — 72 frases (PT/ES/CA)
+  - `confirmacao.nao` — 63 frases (PT/ES/CA)
+  - Entity extractor para `tarefa.deletar` (extrai título do texto)
+- **Resposta Inteligente ao Cancelamento**
+  - Luna pergunta "O que você queria fazer?" em vez de só "cancelado"
+- **Detecção de Confirmação/Neagação por Texto**
+  - Endpoint detecta "sim"/"não" no contexto de confirmação pendente
+  - Executa ou cancela a ação automaticamente
+  - Respostas instantâneas sem LLM para confirmação pura
+
+### Fixed
+- Preview data retorna corretamente via `/api/luna/threads/:id/messages`
+  - `buildThreadContext` agora inclui `needsConfirmation` e `previewData`
+  - Forward de `previewData` no endpoint de threads
+- NLU modelo atualizado (`backend/data/luna-model.nlp` ← `backend/scripts/model.nlp`)
+- `activeUser.role` usado em vez de `req.user.role` no `/api/luna/chat`
+
+### Testes
+- 5/5 testes Playwright passando
+  - ✅ Preview ao excluir tarefa mostra dados reais
+  - ✅ Cancelamento retorna mensagem contextual
+  - ✅ NLU reconhece confirmação (`confirmacao.sim`)
+  - ✅ NLU reconhece negação (`confirmacao.nao`)
+  - ✅ Preview ao criar tarefa mostra dados
