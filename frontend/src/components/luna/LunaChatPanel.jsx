@@ -9,6 +9,7 @@ import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
 import { useLunaContext } from '../../hooks/useLunaContext'
 import EditablePreviewCard from './EditablePreviewCard'
+import LunaInlinePreview from './LunaInlinePreview'
 import LunaMarkdown from './LunaMarkdown'
 import LunaMessageReactions from './LunaMessageReactions'
 import LunaVoiceInput from './LunaVoiceInput'
@@ -831,25 +832,43 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                         />
                       )}
 
-                      {/* Confirmation buttons */}
+                      {/* Confirmation buttons / Inline Preview */}
                       {msg.needsConfirmation && !msg.editableFields && (
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            onClick={() => {
-                              setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
-                              confirmPendingActions(true)
-                            }}
-                            className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors font-medium border border-emerald-500/20"
-                          >
-                            ✅ Confirmar
-                          </button>
-                          <button
-                            onClick={() => confirmPendingActions(false)}
-                            className="px-3 py-1.5 bg-white/5 text-nexo-text text-xs rounded-lg hover:bg-white/10 transition-colors font-medium border border-white/10"
-                          >
-                            ❌ Cancelar
-                          </button>
-                        </div>
+                        msg.previewData ? (
+                          <div className="mt-3">
+                            {msg.previewData.map((preview, idx) => (
+                              <LunaInlinePreview
+                                key={idx}
+                                intent={preview.intent}
+                                values={preview.values}
+                                affectedItems={preview.affectedItems}
+                                onConfirm={() => {
+                                  setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
+                                  confirmPendingActions(true)
+                                }}
+                                onCancel={() => confirmPendingActions(false)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => {
+                                setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
+                                confirmPendingActions(true)
+                              }}
+                              className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors font-medium border border-emerald-500/20"
+                            >
+                              ✅ Confirmar
+                            </button>
+                            <button
+                              onClick={() => confirmPendingActions(false)}
+                              className="px-3 py-1.5 bg-white/5 text-nexo-text text-xs rounded-lg hover:bg-white/10 transition-colors font-medium border border-white/10"
+                            >
+                              ❌ Cancelar
+                            </button>
+                          </div>
+                        )
                       )}
 
                       {/* Executed confirmation */}
