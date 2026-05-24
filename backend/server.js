@@ -23,6 +23,9 @@ const { genAI, getGeminiResetTime } = require('./services/gemini-client');
 
 // Link Hub v16.1 services
 const { fetchLinkPreview, getCachedPreview, classifyUrl } = require('./services/link-preview');
+
+// Action Preview Service — previews contextuais para ações da Luna
+const { buildPreviewForActions } = require('./services/action-preview');
 const dataStore = require('./datastore-pg');
 
 // Discord Mention Notifier
@@ -5584,12 +5587,26 @@ app.post('/api/luna/chat', async (req, res) => {
         if (deleteAction) {
           const fields = buildEditableDeleteFields(deleteAction.params, deleteAction.type);
           const typeNames = { excluir_tarefa: 'tarefa', excluir_pagamento: 'pagamento', excluir_despesa: 'despesa', excluir_lead: 'lead' };
+          const previewData = buildPreviewForActions(parsed.actions, req.user?.role || 'Admin');
+
+          if (!previewData.allowed) {
+            return res.json({
+              success: true,
+              reply: `⚠️ ${previewData.reasons.join('\n')}`,
+              needsConfirmation: false,
+              executed: false,
+              intent: parsed.intent,
+              timestamp: new Date().toISOString()
+            });
+          }
+
           return res.json({
             success: true,
             reply: `⚠️ Tem certeza que quer excluir essa ${typeNames[deleteAction.type] || 'item'}?\n\nEssa ação não pode ser desfeita.`,
             needsConfirmation: true,
             previewType: 'delete_confirm',
             preview: buildActionPreview(parsed.actions),
+            previewData: previewData.previews,
             editableFields: fields,
             actions: parsed.actions,
             intent: parsed.intent,
@@ -5597,13 +5614,28 @@ app.post('/api/luna/chat', async (req, res) => {
           });
         }
 
-        // Para outras ações críticas: confirmação simples
+        // Para outras ações críticas: confirmação com preview contextual
         const preview = buildActionPreview(parsed.actions);
+        const previewData = buildPreviewForActions(parsed.actions, req.user?.role || 'Admin');
+
+        // Se alguma ação é bloqueada por permissão
+        if (!previewData.allowed) {
+          return res.json({
+            success: true,
+            reply: `⚠️ ${previewData.reasons.join('\n')}`,
+            needsConfirmation: false,
+            executed: false,
+            intent: parsed.intent,
+            timestamp: new Date().toISOString()
+          });
+        }
+
         return res.json({
           success: true,
           reply: `Confirmo isso?\n\n${preview}\n\nResponde "sim" ou clica em confirmar pra eu executar 👍`,
           needsConfirmation: true,
           preview,
+          previewData: previewData.previews,
           actions: parsed.actions,
           intent: parsed.intent,
           timestamp: new Date().toISOString()
