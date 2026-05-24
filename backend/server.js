@@ -1054,7 +1054,9 @@ async function buildThreadContext(threadId, limit = 20) {
     role: m.role,
     text: m.text,
     author: m.author,
-    timestamp: m.timestamp
+    timestamp: m.timestamp,
+    needsConfirmation: m.needsConfirmation || false,
+    previewData: m.previewData || undefined,
   }));
 }
 
@@ -5367,6 +5369,37 @@ app.post('/api/luna/chat', async (req, res) => {
     const authorName = await resolveDashboardAuthor(rawAuthor);
     const msg = message.trim();
 
+    // ── 1A. DETECTAR CONFIRMAÇÃO/NEGAÇÃO POR TEXTO NO CONTEXTO DE CONFIRMAÇÃO ──
+    const pendingConfirmMsg = Array.isArray(context) ? [...context].reverse().find(
+      m => (m.role === 'luna' || m.role === 'assistant') && m.needsConfirmation === true
+    ) : null;
+    const isNegation = /^(n[ãa]o|cancela|cancelar|esquece|desiste|nope|nao|n)/i.test(msg);
+    const isAffirmation = /^(sim|yes|claro|confirmo|ok|beleza|pode|vai|execute)/i.test(msg);
+    if (pendingConfirmMsg && msg.length < 20) {
+      if (isNegation) {
+        return res.json({
+          success: true,
+          reply: 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔',
+          cancelled: true,
+          timestamp: new Date().toISOString()
+        });
+      }
+      if (isAffirmation) {
+        // Recupera as ações pendentes do previewData
+        const pendingActions = (pendingConfirmMsg.previewData || []).map(p => ({
+          type: p.intent === 'tarefa.deletar' ? 'excluir_tarefa' :
+                p.intent === 'tarefa.criar' ? 'criar_tarefa' :
+                p.intent,
+          params: p.values || {}
+        }));
+        if (pendingActions.length > 0) {
+          const result = await lunaActionExecutor.execute(pendingActions, { authorName });
+          const reply = buildConciergeReply(result, authorName);
+          return res.json({ success: true, reply, executed: true, result: result.summary, timestamp: new Date().toISOString() });
+        }
+      }
+    }
+
     // ── 1. MODO CONFIRMAÇÃO: usuário confirmou ações pendentes ──
     if (confirmActions && Array.isArray(pendingActions) && pendingActions.length > 0) {
       // Se veio com editedFields, aplica as correções nos pendingActions
@@ -5488,12 +5521,23 @@ app.post('/api/luna/chat', async (req, res) => {
       'listar_repos_github', 'listar_projetos_vercel', 'executar_comando', 'fazer_git_push',
       // BugDetector
       'listar_relatorios_bug', 'excluir_relatorio_bug',
+      // Confirmação / Negação (tratados como sinalizadores, não executam ação)
+      'confirmar_acao', 'cancelar_acao',
       // Misc
       'ideia', 'link', 'social', 'ajuda', 'navegar'
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
 
-    // ── 3. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
+    // ── 3. CONFIRMAÇÃO/NEGAÇÃO PURA (sem contexto de confirmação pendente) ──
+    const isConfirmOrCancel = parsed.intent === 'confirmacao.sim' || parsed.intent === 'confirmacao.nao';
+    if (isConfirmOrCancel && !pendingConfirmMsg) {
+      const reply = parsed.intent === 'confirmacao.sim'
+        ? 'Beleza! ✅ Só me lembra o que você queria confirmar — às vezes eu perco o fio 😅'
+        : 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔';
+      return res.json({ success: true, reply, intent: parsed.intent, timestamp: new Date().toISOString() });
+    }
+
+    // ── 4. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
     const isGreeting = parsed.intent === 'social' ||
       (parsed.actions.length === 1 && parsed.actions[0].type === 'social');
     if (isGreeting) {
@@ -5507,7 +5551,7 @@ app.post('/api/luna/chat', async (req, res) => {
       return res.json({ success: true, reply, intent: 'social', timestamp: new Date().toISOString() });
     }
 
-    // ── 4. CONSULTA DE STATUS → dados reais do sistema ──
+    // ── 5. CONSULTA DE STATUS → dados reais do sistema ──
     if (parsed.intent === 'consultar_status' || parsed.actions.some(a => a.type === 'consultar_status')) {
       const statusAction = parsed.actions.find(a => a.type === 'consultar_status') || { params: {} };
       const status = await lunaActionExecutor.getStatus(statusAction.params);
@@ -5515,7 +5559,7 @@ app.post('/api/luna/chat', async (req, res) => {
       return res.json({ success: true, reply, intent: 'consultar_status', timestamp: new Date().toISOString() });
     }
 
-    // ── 5. AÇÕES PARA EXECUTAR ──
+    // ── 6. AÇÕES PARA EXECUTAR ──
     if (parsed.actions.length > 0 && parsed.actions.some(a => a.type !== 'social' && a.type !== 'consultar_status')) {
       // Se precisa de confirmação e ainda não foi confirmado → mostra preview editável
       if (parsed.needsConfirmation && !confirmActions) {
@@ -5706,7 +5750,7 @@ app.post('/api/luna/chat', async (req, res) => {
       });
     }
 
-    // ── 6. FALLBACK: conversa via LLM (Ollama local → Gemini cloud) ──
+    // ── 7. FALLBACK: conversa via LLM (Ollama local → Gemini cloud) ──
     const dataContext = await buildDashboardContext(contextModule, contextId, contextFile);
     const conversationHistory = context.slice(-10).map(c => ({
       role: c.role === 'user' ? 'user' : 'model',
@@ -5811,7 +5855,7 @@ ${dataContext}`;
       }
     }
 
-    res.json({ success: true, reply, model: usedModel, intent: 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
+    res.json({ success: true, reply, model: usedModel, intent: parsed?.intent || 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
 
   } catch (e) {
     console.error('[CONCIERGE] Erro no chat:', e.message, e.code || '');

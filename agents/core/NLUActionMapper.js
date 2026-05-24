@@ -106,6 +106,10 @@ const INTENT_TO_ACTION = {
 
   // SOCIAL
   'social': { type: 'social', needsConfirmation: false },
+
+  // CONFIRMAÇÃO / NEGAÇÃO
+  'confirmacao.sim': { type: 'confirmar_acao', needsConfirmation: false },
+  'confirmacao.nao': { type: 'cancelar_acao', needsConfirmation: false },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
