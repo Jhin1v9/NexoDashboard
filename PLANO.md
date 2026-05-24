@@ -2,7 +2,8 @@
 
 > **LEIA ESTE ARQUIVO PRIMEIRO** antes de qualquer ação no projeto.  
 > Este documento mantém o estado atual, decisões aprovadas e próximos passos.  
-> **Atualizado:** 2026-05-23 10:55 UTC
+> **Atualizado:** 2026-05-24  
+> **📋 Backlog completo:** Veja [`BACKLOG-100-FUNCIONAL.md`](./BACKLOG-100-FUNCIONAL.md) para lista consolidada de TODOS os bugs e tarefas pendentes.
 
 ---
 
