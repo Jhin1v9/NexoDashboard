@@ -5587,7 +5587,8 @@ app.post('/api/luna/chat', async (req, res) => {
         if (deleteAction) {
           const fields = buildEditableDeleteFields(deleteAction.params, deleteAction.type);
           const typeNames = { excluir_tarefa: 'tarefa', excluir_pagamento: 'pagamento', excluir_despesa: 'despesa', excluir_lead: 'lead' };
-          const previewData = buildPreviewForActions(parsed.actions, req.user?.role || 'Admin');
+          const userRole = (typeof activeUser !== 'undefined' ? activeUser?.role : null) || 'Admin';
+          const previewData = buildPreviewForActions(parsed.actions, userRole);
 
           if (!previewData.allowed) {
             return res.json({
@@ -5616,7 +5617,7 @@ app.post('/api/luna/chat', async (req, res) => {
 
         // Para outras ações críticas: confirmação com preview contextual
         const preview = buildActionPreview(parsed.actions);
-        const previewData = buildPreviewForActions(parsed.actions, req.user?.role || 'Admin');
+        const previewData = buildPreviewForActions(parsed.actions, activeUser?.role || 'Admin');
 
         // Se alguma ação é bloqueada por permissão
         if (!previewData.allowed) {
@@ -6052,6 +6053,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       previewType: chatResult.previewType || null,
       editableFields: chatResult.editableFields || null,
       preview: chatResult.preview || null,
+      previewData: chatResult.previewData || null,
       quotaExhausted: chatResult.quotaExhausted || false,
       resetAt: chatResult.resetAt || null
     };

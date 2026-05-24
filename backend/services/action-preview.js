@@ -34,7 +34,7 @@ const ADMIN_ONLY_ACTIONS = [
 
 // Mapeia tipo de ação → arquivo JSON e campo ID
 const ENTITY_MAP = {
-  excluir_tarefa: { file: 'tasks.json', idField: 'id', nameField: 'title', extraFields: ['status', 'priority', 'assignedTo'] },
+  excluir_tarefa: { file: 'tasks.json', idField: 'id', nameField: 'title', extraFields: ['status', 'priority', 'assignedTo'], fallbackFile: 'company-tasks.json' },
   excluir_lead: { file: 'leads.json', idField: 'id', nameField: 'name', extraFields: ['email', 'pipelineStatus'] },
   excluir_pagamento: { file: 'payments.json', idField: 'id', nameField: 'client', extraFields: ['amount', 'date'] },
   excluir_despesa: { file: 'expenses.json', idField: 'id', nameField: 'name', extraFields: ['amount', 'category'] },
@@ -88,6 +88,20 @@ function findItem(actionType, params) {
   }
   if (!item && searchName) {
     item = items.find(i => String(i[config.nameField]).toLowerCase().includes(String(searchName).toLowerCase()));
+  }
+
+  // Se não encontrou e tem fallbackFile, tenta lá
+  if (!item && config.fallbackFile) {
+    let fallbackItems = readJson(config.fallbackFile);
+    if (config.isNested && !Array.isArray(fallbackItems)) {
+      fallbackItems = fallbackItems[config.isNested] || [];
+    }
+    if (searchId) {
+      item = fallbackItems.find(i => String(i[config.idField]) === String(searchId));
+    }
+    if (!item && searchName) {
+      item = fallbackItems.find(i => String(i[config.nameField]).toLowerCase().includes(String(searchName).toLowerCase()));
+    }
   }
 
   return { item, config };

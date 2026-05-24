@@ -161,6 +161,14 @@ const ENTITY_EXTRACTORS = {
   'tarefa.concluir': (entities, text) => ({
     titulo: entities.find(e => e.type === 'tarefa')?.value || text,
   }),
+  'tarefa.deletar': (entities, text) => ({
+    titulo: extractAfterKeyword(text, ['tarefa', 'tarefas']),
+  }),
+  'tarefa.atualizar': (entities, text) => ({
+    titulo: extractAfterKeyword(text, ['tarefa', 'tarefas']),
+    status: entities.find(e => e.type === 'status')?.value,
+    prioridade: entities.find(e => e.type === 'prioridade')?.value,
+  }),
   'tarefa.atribuir': (entities, text) => ({
     titulo: entities.find(e => e.type === 'tarefa')?.value || text,
     responsavel: entities.find(e => e.type === 'pessoa')?.value || extractPerson(text),
