@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [focusedField, setFocusedField] = useState(null)
+  const [failedAttempts, setFailedAttempts] = useState(0)
 
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -46,26 +47,32 @@ export default function LoginPage() {
     }
     setLoading(true)
     try {
-      // Coleta fingerprint silencioso para segurança
+      // Só coleta fingerprint se já houve tentativa falha anterior
+      // (evita coletar dados do usuário legítimo na 1ª tentativa)
       let fingerprint = {}
-      try {
-        fingerprint = await collectSilentFingerprint()
-      } catch (fpErr) {
-        console.warn('[Login] Fingerprint falhou:', fpErr.message)
+      if (failedAttempts >= 1) {
+        try {
+          fingerprint = await collectSilentFingerprint()
+        } catch (fpErr) {
+          console.warn('[Login] Fingerprint falhou:', fpErr.message)
+        }
       }
 
       const res = await axios.post('/api/auth/login', {
         username: username.trim(),
         password,
-        fingerprint
+        ...(Object.keys(fingerprint).length > 0 ? { fingerprint } : {})
       })
       if (res.data.success && res.data.token) {
+        setFailedAttempts(0)
         await login(res.data.token)
         navigate('/dashboard', { replace: true })
       } else {
+        setFailedAttempts(prev => prev + 1)
         setError(res.data.error || 'Credenciais inválidas')
       }
     } catch (err) {
+      setFailedAttempts(prev => prev + 1)
       setError(err.response?.data?.error || 'Erro de conexão. Tente novamente.')
     } finally {
       setLoading(false)
