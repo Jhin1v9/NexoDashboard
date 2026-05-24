@@ -79,3 +79,35 @@
   - ✅ NLU reconhece confirmação (`confirmacao.sim`)
   - ✅ NLU reconhece negação (`confirmacao.nao`)
   - ✅ Preview ao criar tarefa mostra dados
+
+## [Unreleased] — 2026-05-25 — Fase 1B: Undo/Redo Persistente
+
+### Added
+- **Undo Service** (`backend/services/undo-service.js`)
+  - Stack de ações por thread (max 20), persistência em `undo-stack.json`
+  - TTL 30 segundos por entrada — expira automaticamente
+  - Métodos: `push()`, `undo()`, `redo()`, `getStack()`, `getLastAction()`
+- **ActionExecutor** integrado com UndoService
+  - `_captureBefore()` tira snapshot do item antes da deleção
+  - `_isDestructiveAction()` detecta ações que geram entrada de undo
+  - `execute()` retorna `undoable: true` quando ação destrutiva é bem-sucedida
+- **Endpoints Undo/Redo**
+  - `POST /api/luna/undo` — desfaz última ação e restaura item via API
+  - `POST /api/luna/redo` — refaz ação desfeita
+  - `GET /api/luna/undo/stack` — consulta stack atual
+- **Frontend: Botão Desfazer**
+  - `UndoButton` com countdown regressivo de 30s
+  - `handleUndo` chama API e atualiza mensagens em tempo real
+  - Indicador visual "Ação desfeita" após undo bem-sucedido
+- **NLU: desfazer / refazer**
+  - 145 intents, treinadas em PT/ES/CA
+  - Respostas instantâneas sem LLM
+- **action-preview.js** agora busca em `dataStore` (PostgreSQL) antes de fallback JSON
+
+### Testes
+- 5/5 testes passando (manual/API)
+  - ✅ Preview de exclusão mostra dados reais
+  - ✅ Confirmação gera undoable=true
+  - ✅ Undo restaura a tarefa deletada
+  - ✅ Tarefa reaparece na lista após undo
+  - ✅ NLU reconhece "desfazer" (intent=desfazer)
