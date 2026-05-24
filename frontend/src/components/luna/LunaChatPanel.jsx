@@ -540,7 +540,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
         author: 'luna',
         authorName: 'Luna',
         authorColor: '#9b59b6',
-        text: 'Beleza, cancelado 👍',
+        text: 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔',
         timestamp: new Date().toISOString()
       }
       setThreadMessages(prev => ({
