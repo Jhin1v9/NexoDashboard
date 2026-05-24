@@ -102,23 +102,7 @@ const INTENT_TO_ACTION = {
   'sistema.navegar': { type: 'navegar', needsConfirmation: false },
   'sistema.notificacoes': { type: 'listar_notificacoes', needsConfirmation: false },
 
-  // ADMINISTRAÇÃO DE SISTEMA
-  'sistema.monitorar': { type: 'monitorar_sistema', needsConfirmation: false },
-  'sistema.processos': { type: 'listar_processos', needsConfirmation: false },
-  'sistema.matar_processo': { type: 'matar_processo', needsConfirmation: true },
-  'sistema.pm2': { type: 'listar_pm2', needsConfirmation: false },
-  'sistema.controlar_pm2': { type: 'controlar_pm2', needsConfirmation: true },
-  'sistema.systemd_status': { type: 'status_systemd', needsConfirmation: false },
-  'sistema.controlar_systemd': { type: 'controlar_systemd', needsConfirmation: true },
-  'sistema.shell': { type: 'executar_shell', needsConfirmation: true },
-  'sistema.arquivos': { type: 'listar_arquivos', needsConfirmation: false },
-  'sistema.ler_arquivo': { type: 'ler_arquivo', needsConfirmation: false },
-  'sistema.tail': { type: 'tail_arquivo', needsConfirmation: false },
-  'sistema.buscar': { type: 'buscar_arquivos', needsConfirmation: false },
-  'sistema.cron': { type: 'listar_cron', needsConfirmation: false },
-  'sistema.cron_add': { type: 'adicionar_cron', needsConfirmation: true },
-  'sistema.cron_remove': { type: 'remover_cron', needsConfirmation: true },
-  'sistema.logs': { type: 'logs_sistema', needsConfirmation: false },
+  // ADMINISTRAÇÃO DE SISTEMA — REMOVIDO (foco no Dashboard, não PC)
 
   // SOCIAL
   'social': { type: 'social', needsConfirmation: false },
@@ -249,52 +233,7 @@ const ENTITY_EXTRACTORS = {
     limite: extractNumber(text) || 20,
     ordenar: text.includes('memória') || text.includes('memoria') ? 'mem' : 'cpu',
   }),
-  'sistema.matar_processo': (entities, text) => ({
-    pid: extractNumber(text),
-    processo: entities.find(e => e.type === 'processo')?.value || extractAfterKeyword(text, ['pid', 'processo']),
-  }),
-  'sistema.pm2': () => ({}),
-  'sistema.controlar_pm2': (entities, text) => ({
-    acao: extractPm2Action(text),
-    alvo: entities.find(e => e.type === 'servico')?.value || extractAfterKeyword(text, ['processo', 'serviço', 'pm2']),
-  }),
-  'sistema.systemd_status': (entities, text) => ({
-    servico: entities.find(e => e.type === 'servico')?.value || extractServiceName(text),
-  }),
-  'sistema.controlar_systemd': (entities, text) => ({
-    acao: extractSystemdAction(text),
-    servico: entities.find(e => e.type === 'servico')?.value || extractServiceName(text),
-  }),
-  'sistema.shell': (entities, text) => ({
-    comando: entities.find(e => e.type === 'comando')?.value || extractAfterKeyword(text, ['executa', 'roda', 'comando', 'shell']),
-  }),
-  'sistema.arquivos': (entities, text) => ({
-    caminho: entities.find(e => e.type === 'caminho')?.value || extractPath(text),
-  }),
-  'sistema.ler_arquivo': (entities, text) => ({
-    caminho: entities.find(e => e.type === 'caminho')?.value || entities.find(e => e.type === 'arquivo')?.value || extractPath(text),
-    linhas: extractNumber(text) || 100,
-  }),
-  'sistema.tail': (entities, text) => ({
-    caminho: entities.find(e => e.type === 'caminho')?.value || entities.find(e => e.type === 'arquivo')?.value || extractPath(text),
-    linhas: extractNumber(text) || 50,
-  }),
-  'sistema.buscar': (entities, text) => ({
-    diretorio: entities.find(e => e.type === 'caminho')?.value || extractPath(text),
-    pattern: entities.find(e => e.type === 'pattern')?.value || extractAfterKeyword(text, ['chamado', 'nome', 'pattern']),
-  }),
-  'sistema.cron': () => ({}),
-  'sistema.cron_add': (entities, text) => ({
-    agenda: entities.find(e => e.type === 'cron')?.value || extractAfterKeyword(text, ['a cada', 'todo', 'cron']),
-    comando: entities.find(e => e.type === 'comando')?.value || extractAfterKeyword(text, ['executa', 'rodar', 'comando']),
-  }),
-  'sistema.cron_remove': (entities, text) => ({
-    id: extractNumber(text),
-  }),
-  'sistema.logs': (entities, text) => ({
-    servico: entities.find(e => e.type === 'servico')?.value || extractServiceName(text) || null,
-    linhas: extractNumber(text) || 50,
-  }),
+  // Extractors de sistema removidos (foco no Dashboard)
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -421,47 +360,6 @@ function extractNumber(text) {
   return match ? parseInt(match[1]) : null;
 }
 
-function extractPm2Action(text) {
-  const lower = text.toLowerCase();
-  if (/\b(inicia|r|start|rodar)\b/.test(lower)) return 'start';
-  if (/\b(para|stop|parar|mata)\b/.test(lower)) return 'stop';
-  if (/\b(reinicia|restart|reiniciar)\b/.test(lower)) return 'restart';
-  if (/\b(recarrega|reload)\b/.test(lower)) return 'reload';
-  if (/\b(deleta|delete|remove|remover)\b/.test(lower)) return 'delete';
-  if (/\b(flush|limpar)\b/.test(lower)) return 'flush';
-  if (/\b(logs|log)\b/.test(lower)) return 'logs';
-  return 'status';
-}
-
-function extractSystemdAction(text) {
-  const lower = text.toLowerCase();
-  if (/\b(inicia|start|ligar|rodar)\b/.test(lower)) return 'start';
-  if (/\b(para|stop|parar|desligar)\b/.test(lower)) return 'stop';
-  if (/\b(reinicia|restart|reiniciar)\b/.test(lower)) return 'restart';
-  if (/\b(recarrega|reload)\b/.test(lower)) return 'reload';
-  if (/\b(ativa|enable|habilitar)\b/.test(lower)) return 'enable';
-  if (/\b(desativa|disable|desabilitar)\b/.test(lower)) return 'disable';
-  return 'status';
-}
-
-function extractPath(text) {
-  // Tenta extrair caminho de arquivo/diretório
-  const match = text.match(/(\/\S+|~\/\S+|\.[\/]\S+)/);
-  if (match) return match[1];
-  // Ou depois de palavras-chave
-  return extractAfterKeyword(text, ['em', 'no', 'na', 'de', 'do', 'da', 'path', 'caminho', 'arquivo', 'diretório', 'pasta']);
-}
-
-function extractServiceName(text) {
-  const lower = text.toLowerCase();
-  // Remove comandos comuns para isolar o nome do serviço
-  const cleaned = lower
-    .replace(/(mostra|ver|status do|logs do|estado do|serviço|service|inicia|para|reinicia|systemctl|journalctl|do|da|de|o|a)\s+/g, ' ')
-    .trim();
-  // Pega a primeira palavra que parece um nome de serviço
-  const words = cleaned.split(/\s+/).filter(w => w.length > 1 && !/^(o|a|os|as|um|uma|e|ou|do|da|no|na|em|de|por|para|pra|pro)$/i.test(w));
-  return words[0] || null;
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN: Converte resultado NLU em ação do ActionExecutor

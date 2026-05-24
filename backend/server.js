@@ -12,7 +12,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const workspaceManager = require('./workspace-manager');
-const systemAdmin = require('./services/system-admin');
 // ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
@@ -3899,118 +3898,8 @@ app.post('/api/luna/control', (req, res) => {
 });
 
 // ============================================================
-// SYSTEM ADMIN ENDPOINTS — Capacidades administrativas do PC
+// SYSTEM ADMIN ENDPOINTS — Removidos (foco no Dashboard, não PC)
 // ============================================================
-
-app.get('/api/system/metrics', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.getMetrics()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/health', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.getHealthSummary()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/processes', requireAuth, async (req, res) => {
-  try {
-    const { sortBy, limit } = req.query;
-    res.json(await systemAdmin.listProcesses({ sortBy, limit: parseInt(limit) || 20 }));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/system/processes/kill', requireAuth, async (req, res) => {
-  try {
-    const { pid, signal } = req.body;
-    res.json(await systemAdmin.killProcess(pid, signal));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/pm2', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.pm2List()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/system/pm2', requireAuth, async (req, res) => {
-  try {
-    const { action, target } = req.body;
-    res.json(await systemAdmin.pm2Action(action, target));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/systemd/:service', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.systemdStatus(req.params.service)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/system/systemd/:service', requireAuth, async (req, res) => {
-  try {
-    const { action } = req.body;
-    res.json(await systemAdmin.systemdAction(action, req.params.service));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/system/shell', requireAuth, async (req, res) => {
-  try {
-    const { command, cwd } = req.body;
-    res.json(await systemAdmin.executeShell(command, { cwd }));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/files', requireAuth, async (req, res) => {
-  try {
-    const { path: dirPath } = req.query;
-    res.json(await systemAdmin.listDirectory(dirPath));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/files/read', requireAuth, async (req, res) => {
-  try {
-    const { path: filePath, lines, offset } = req.query;
-    res.json(await systemAdmin.readFile(filePath, {
-      lines: parseInt(lines) || 100,
-      offset: parseInt(offset) || 0
-    }));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/files/tail', requireAuth, async (req, res) => {
-  try {
-    const { path: filePath, lines } = req.query;
-    res.json(await systemAdmin.tailFile(filePath, parseInt(lines) || 50));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/files/find', requireAuth, async (req, res) => {
-  try {
-    const { dir, pattern, maxDepth } = req.query;
-    res.json(await systemAdmin.findFiles(dir, pattern, parseInt(maxDepth) || 3));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/cron', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.listCronJobs()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/system/cron', requireAuth, async (req, res) => {
-  try {
-    const { schedule, command } = req.body;
-    res.json(await systemAdmin.addCronJob(schedule, command));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.delete('/api/system/cron/:id', requireAuth, async (req, res) => {
-  try { res.json(await systemAdmin.removeCronJob(parseInt(req.params.id))); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/system/logs', requireAuth, async (req, res) => {
-  try {
-    const { service, lines } = req.query;
-    res.json(await systemAdmin.getSystemLogs(service, parseInt(lines) || 50));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
 
 // 4. Forçar scan
 // 5. Extrair mensagens
@@ -5581,12 +5470,7 @@ app.post('/api/luna/chat', async (req, res) => {
       'criar_alerta_operacao', 'excluir_alerta_operacao', 'registrar_mudanca',
       // Sistema
       'controlar_servico', 'ver_logs_stack', 'verificar_stack',
-      // Administração de Sistema
-      'monitorar_sistema', 'listar_processos', 'matar_processo',
-      'listar_pm2', 'controlar_pm2', 'status_systemd', 'controlar_systemd',
-      'executar_shell', 'listar_arquivos', 'ler_arquivo', 'tail_arquivo',
-      'buscar_arquivos', 'listar_cron', 'adicionar_cron', 'remover_cron',
-      'logs_sistema',
+      // Administração de Sistema — REMOVIDO (foco no Dashboard)
       // Segurança
       'consultar_log_seguranca', 'atualizar_config_seguranca', 'testar_whatsapp_seguranca',
       // Notificações
@@ -6453,57 +6337,7 @@ function buildConciergeReply(result, authorName) {
         case 'navigate':
           parts.push(res.message || `Redirecionando para ${res.destino || 'página'}...`);
           break;
-        // ─── Administração de Sistema ───
-        case 'system_health': {
-          const s = res.summary || {};
-          parts.push(`🖥️ Sistema: ${res.hostname || os.hostname()}\n  Uptime: ${s.uptime}\n  Memória: ${s.memory}\n  CPU: ${s.cpuLoad}\n  PM2: ${s.pm2Running} processos\n  ${s.issues?.join('\n  ')}`);
-          break;
-        }
-        case 'process_list':
-          parts.push(`📊 Processos (${res.count}):\n${res.processes?.map(p => `  • ${p.command}(${p.pid}): ${p.cpu}% CPU, ${p.mem}% MEM [${p.user}]`).join('\n')}`);
-          break;
-        case 'process_kill':
-          parts.push(`🔪 Processo ${res.pid} morto com ${res.signal}`);
-          break;
-        case 'pm2_list':
-          parts.push(`⚙️ PM2 (${res.processes?.length || 0} processos):\n${res.processes?.map(p => `  • ${p.name}: ${p.status} (restarts: ${p.restartCount}, CPU: ${p.cpu}%, MEM: ${(p.memory / 1024 / 1024).toFixed(1)}MB)`).join('\n')}`);
-          break;
-        case 'pm2_control':
-          parts.push(`⚙️ PM2 ${res.action} ${res.target}:\n${res.output?.slice(0, 500)}`);
-          break;
-        case 'systemd_status':
-          parts.push(`🔧 ${res.service}: ${res.active ? '✅ rodando' : '❌ parado'}\n${res.statusText}`);
-          break;
-        case 'systemd_control':
-          parts.push(`🔧 systemctl ${res.action} ${res.service}:\n${res.output?.slice(0, 500)}`);
-          break;
-        case 'shell_exec':
-          parts.push(`💻 ${res.command}\n\n${res.stdout?.slice(0, 3000) || res.stderr?.slice(0, 1000) || '(sem saída)'}`);
-          break;
-        case 'file_list':
-          parts.push(`📁 ${res.path} (${res.items?.length || 0} itens):\n${res.items?.map(i => `  ${i.type === 'directory' ? '📂' : '📄'} ${i.name}${i.size ? ` (${(i.size / 1024).toFixed(1)}KB)` : ''}`).join('\n')}`);
-          break;
-        case 'file_read':
-          parts.push(`📄 ${res.path} (linhas ${res.offset || 0}-${(res.offset || 0) + (res.lines || 100)} de ${res.totalLines}):\n\n\`\`\`\n${res.content?.slice(0, 4000)}\n\`\`\``);
-          break;
-        case 'file_tail':
-          parts.push(`📄 ${res.path} (últimas ${res.lines} linhas):\n\n\`\`\`\n${res.content?.slice(0, 4000)}\n\`\`\``);
-          break;
-        case 'file_find':
-          parts.push(`🔍 ${res.count} arquivos em ${res.dir}:\n${res.files?.slice(0, 20).map(f => `  • ${f}`).join('\n')}`);
-          break;
-        case 'cron_list':
-          parts.push(`⏰ Cron jobs (${res.count}):\n${res.jobs?.map(j => `  [${j.id}] ${j.schedule} → ${j.command}`).join('\n') || 'Nenhum job'}`);
-          break;
-        case 'cron_add':
-          parts.push(`⏰ Cron adicionado: ${res.schedule} → ${res.command}`);
-          break;
-        case 'cron_remove':
-          parts.push(`⏰ Cron removido: ID ${res.id}`);
-          break;
-        case 'system_logs':
-          parts.push(`📋 Logs${res.service ? ` (${res.service})` : ''}:\n\n\`\`\`\n${res.content?.slice(0, 4000)}\n\`\`\``);
-          break;
+        // ─── Administração de Sistema — REMOVIDO (foco no Dashboard) ───
       }
     }
     return `Pronto, ${firstName}! ✅\n\n${parts.join('\n')}\n\nSe precisar de mais alguma coisa, é só chamar.`;
