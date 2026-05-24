@@ -7,6 +7,8 @@ const path = require('path');
 
 const rootDir = path.resolve(__dirname, '../..');
 
+const { execSync } = require('child_process');
+
 function waitForUrl(url, timeout = 30000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
@@ -25,8 +27,37 @@ function waitForUrl(url, timeout = 30000) {
   });
 }
 
+function killProcessOnPort(port) {
+  try {
+    // Tenta matar processo usando a porta (Linux)
+    const pid = execSync(`lsof -t -i:${port} 2>/dev/null || echo ''`, { encoding: 'utf8' }).trim();
+    if (pid) {
+      try {
+        process.kill(parseInt(pid), 'SIGTERM');
+        console.log(`  ⚠️ Processo na porta ${port} (PID ${pid}) encerrado`);
+        // Aguarda um pouco para a porta ser liberada
+        const start = Date.now();
+        while (Date.now() - start < 5000) {
+          try {
+            const stillRunning = execSync(`lsof -t -i:${port} 2>/dev/null || echo ''`, { encoding: 'utf8' }).trim();
+            if (!stillRunning) break;
+          } catch {}
+        }
+      } catch (e) {
+        // já encerrado
+      }
+    }
+  } catch (e) {
+    // nada na porta
+  }
+}
+
 module.exports = async function globalSetup() {
   console.log('\n🚀 [E2E Setup] Iniciando serviços...\n');
+
+  // 0. Limpa portas se houver processos zumbis
+  killProcessOnPort(3456);
+  killProcessOnPort(3457);
 
   // 1. Sobe o backend
   const backend = spawn('node', ['server.js'], {

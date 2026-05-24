@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, ArrowRight, Shield, Terminal, Zap, Lock, AlertTriangle } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Shield, Zap, Lock, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { collectSilentFingerprint } from '../lib/security-evidence'
 import axios from 'axios'
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -45,7 +46,19 @@ export default function LoginPage() {
     }
     setLoading(true)
     try {
-      const res = await axios.post('/api/auth/login', { username: username.trim(), password })
+      // Coleta fingerprint silencioso para segurança
+      let fingerprint = {}
+      try {
+        fingerprint = await collectSilentFingerprint()
+      } catch (fpErr) {
+        console.warn('[Login] Fingerprint falhou:', fpErr.message)
+      }
+
+      const res = await axios.post('/api/auth/login', {
+        username: username.trim(),
+        password,
+        fingerprint
+      })
       if (res.data.success && res.data.token) {
         await login(res.data.token)
         navigate('/dashboard', { replace: true })
@@ -362,13 +375,12 @@ export default function LoginPage() {
               ← Voltar para o site
             </Link>
 
-            {/* Easter egg: terminal secreto */}
+            {/* Links auxiliares */}
             <Link
-              to="/terminal"
+              to="/register"
               className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[11px] text-nexo-muted/40 hover:text-nexo-muted/70 transition-colors"
             >
-              <Terminal size={12} />
-              Acesso via terminal (modo legacy)
+              Solicitar uma demo
             </Link>
           </div>
         </motion.div>

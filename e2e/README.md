@@ -44,7 +44,8 @@ e2e/
 └── specs/                    # Os testes em si
     ├── auth.spec.js          # Login, logout, proteção de rotas
     ├── leads.spec.js         # Captura de leads (demo request)
-    └── notifications.spec.js # Central de Notificações
+    ├── notifications.spec.js # Central de Notificações
+    └── luna-fase1.spec.js    # Luna: Preview + Confirmação + Undo
 ```
 
 ## 🧬 Page Object Pattern

@@ -118,9 +118,6 @@ function App() {
           {/* Registro / Demo Request */}
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Terminal secreto (easter egg / modo legacy) */}
-          <Route path="/terminal" element={<LandingPage terminalMode={true} />} />
-
           {/* Todas as rotas internas protegidas */}
           <Route element={<ProtectedRoute />}>
             <Route path="/*" element={<ProtectedLayout />} />

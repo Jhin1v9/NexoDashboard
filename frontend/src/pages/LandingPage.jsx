@@ -30,7 +30,6 @@ import {
   MapPin,
   Phone,
 } from 'lucide-react'
-import SecretTerminal from '../components/SecretTerminal'
 import useSyncTap from '../hooks/useSyncTap'
 import SyncSessionModal from '../components/SyncSessionModal'
 
@@ -1157,61 +1156,20 @@ function Footer() {
 /* ============================================================
    MAIN LANDING PAGE
    ============================================================ */
-export default function LandingPage({ terminalMode = false }) {
+export default function LandingPage() {
   const navigate = useNavigate()
-  const [terminalOpen, setTerminalOpen] = useState(terminalMode)
   const [syncOpen, setSyncOpen] = useState(false)
   const tapRef = useRef(null)
 
-  // Redirect logged-in users to dashboard (não redireciona se estiver em terminal mode)
+  // Redirect logged-in users to dashboard
   useEffect(() => {
     const token = localStorage.getItem('nexo_token')
-    if (token && !terminalMode) {
+    if (token) {
       navigate('/dashboard', { replace: true })
     }
-  }, [navigate, terminalMode])
-
-  // Abre terminal automaticamente no modo terminal
-  useEffect(() => {
-    if (terminalMode) {
-      setTerminalOpen(true)
-    }
-  }, [terminalMode])
+  }, [navigate])
 
   useSyncTap({ targetRef: tapRef, threshold: 7, timeout: 1500, onTrigger: () => setSyncOpen(true) })
-
-  useEffect(() => {
-    const konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']
-    let index = 0
-
-    const handler = (e) => {
-      // Ignore if user is typing in an input/textarea
-      const tag = e.target?.tagName?.toLowerCase()
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
-        return
-      }
-      // Check if current key matches next in sequence
-      if (e.key === konami[index]) {
-        // Prevent default for ALL konami keys to avoid page interaction
-        e.preventDefault()
-        e.stopPropagation()
-        index++
-        if (index === konami.length) {
-          setTerminalOpen(true)
-          index = 0
-        }
-      } else if (e.key === konami[0]) {
-        e.preventDefault()
-        e.stopPropagation()
-        index = 1
-      } else {
-        index = 0
-      }
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
 
   return (
     <div ref={tapRef} className="min-h-screen bg-[#0a0a0f]">
@@ -1228,7 +1186,6 @@ export default function LandingPage({ terminalMode = false }) {
       <CTA />
       <FAQ />
       <Footer />
-      <SecretTerminal isOpen={terminalOpen} onClose={() => setTerminalOpen(false)} />
       <SyncSessionModal open={syncOpen} onClose={() => setSyncOpen(false)} />
     </div>
   )
