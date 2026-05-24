@@ -110,6 +110,10 @@ const INTENT_TO_ACTION = {
   // CONFIRMAÇÃO / NEGAÇÃO
   'confirmacao.sim': { type: 'confirmar_acao', needsConfirmation: false },
   'confirmacao.nao': { type: 'cancelar_acao', needsConfirmation: false },
+
+  // UTILITÁRIO
+  'desfazer': { type: 'desfazer_acao', needsConfirmation: false },
+  'refazer': { type: 'refazer_acao', needsConfirmation: false },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -49,7 +49,7 @@ function validateLead(body) {
   if (companyName && companyName.length > 200) {
     errors.push('Nome da empresa muito longo');
   }
-  if (companySize && !['1-10', '11-50', '51-200', '200+'].includes(companySize)) {
+  if (companySize && (typeof companySize !== 'string' || companySize.length > 50)) {
     errors.push('Tamanho da equipe inválido');
   }
   if (phone && phone.length > 50) {
@@ -125,7 +125,7 @@ router.post('/', async (req, res) => {
     // Notificar equipe (email + Discord)
     const notifications = await notifyNewLead({
       id: leadId,
-      displayName: leadData.display_name,
+      displayName: leadData.displayName,
       email: leadData.email,
       companyName: leadData.name,
       companySize: companySize,

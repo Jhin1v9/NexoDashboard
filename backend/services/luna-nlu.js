@@ -231,6 +231,13 @@ const DOMAINS = {
       'confirmacao.nao',
     ],
   },
+  utilitario: {
+    description: 'Comandos utilitários: undo, redo, ajuda',
+    intents: [
+      'desfazer',
+      'refazer',
+    ],
+  },
   instagram: {
     description: 'Comandos relacionados ao Instagram',
     intents: [
@@ -1439,6 +1446,46 @@ const TRAINING_CORPUS = {
       'no facis', 'no executis', 'cancel·la això', 'atura', 'no és això',
       'deixa-ho estar', 'no facis això', 'no executis això', 'cancel·la tot', 'desisteix',
       'no és això el que vull', 'torna', 'desfés', 'no prossegueixis',
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DOMÍNIO: UTILITÁRIO — Undo, Redo, Ajuda
+  // ══════════════════════════════════════════════════════════════════════════
+  'desfazer': {
+    pt: [
+      'desfazer', 'desfaz', 'voltar', 'volta', 'ctrl z', 'control z',
+      'volta atrás', 'voltar atrás', 'desfazer isso', 'volta isso',
+      'não era isso', 'me enganei', 'errei', 'volta como estava',
+      'desfaz a última ação', 'volta a última coisa', 'cancela o que fez',
+      'deshacer', 'ctrl z', 'volver atrás', 'retroceder',
+    ],
+    es: [
+      'deshacer', 'deshaz', 'volver', 'vuelve', 'ctrl z', 'control z',
+      'volver atrás', 'retroceder', 'deshacer esto', 'vuelve esto',
+      'no era eso', 'me equivoqué', 'erré', 'vuelve como estaba',
+      'deshaz la última acción', 'vuelve la última cosa', 'cancela lo que hiciste',
+    ],
+    ca: [
+      'desfer', 'desfés', 'tornar', 'torna', 'ctrl z', 'control z',
+      'tornar enrere', 'retrocedir', 'desfer això', 'torna això',
+      'no era això', 'm\'he equivocat', 'he errat', 'torna com estava',
+      'desfés l\'última acció', 'torna l\'última cosa', 'cancel·la el que vas fer',
+    ],
+  },
+  'refazer': {
+    pt: [
+      'refazer', 'refaz', 'ctrl y', 'control y', 'fazer de novo',
+      'refazer isso', 'refaz a última', 'refazer a ação', 'refaz o que desfez',
+      'rehacer', 'ctrl y', 'hacer de nuevo',
+    ],
+    es: [
+      'rehacer', 'rehaz', 'ctrl y', 'control y', 'hacer de nuevo',
+      'rehacer esto', 'rehaz la última', 'rehacer la acción', 'rehaz lo que deshiciste',
+    ],
+    ca: [
+      'refer', 'refés', 'ctrl y', 'control y', 'fer de nou',
+      'refer això', 'refés l\'última', 'refer l\'acció', 'refés el que vas desfer',
     ],
   },
 
@@ -4431,6 +4478,16 @@ async function populateCorpus() {
       pt: 'Entendido, cancelando.',
       es: 'Entendido, cancelando.',
       ca: 'Entesos, cancel·lant.',
+    },
+    'desfazer': {
+      pt: 'Desfazendo a última ação... 🔄',
+      es: 'Deshaciendo la última acción... 🔄',
+      ca: 'Desfent l\'última acció... 🔄',
+    },
+    'refazer': {
+      pt: 'Refazendo a última ação... 🔄',
+      es: 'Rehaciendo la última acción... 🔄',
+      ca: 'Refent l\'última acció... 🔄',
     },
   };
 

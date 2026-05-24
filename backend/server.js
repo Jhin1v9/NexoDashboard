@@ -73,9 +73,13 @@ const lunaIntentParser = new IntentParser({
   geminiModel: 'gemini-2.5-flash-lite',
   timeout: 15000
 });
+const { getUndoService } = require('./services/undo-service');
+const lunaUndoService = getUndoService();
+
 const lunaActionExecutor = new ActionExecutor({
   apiBase: `http://localhost:${process.env.PORT || 3456}/api`,
-  dataDir: DATA_DIR
+  dataDir: DATA_DIR,
+  undoService: lunaUndoService
 });
 // Helper para identificar o CEO logado pelo datastore
 async function resolveDashboardAuthor(reqBodyAuthor) {
@@ -5355,13 +5359,111 @@ app.post('/api/luna/action-center/dismiss', requireAuth, async (req, res) => {
 });
 
 // ============================================================
+// UNDO / REDO — Fase 1B
+// ============================================================
+app.post('/api/luna/undo', async (req, res) => {
+  try {
+    const { threadId } = req.body;
+    if (!threadId) return res.status(400).json({ success: false, error: 'threadId obrigatório' });
+
+    const undoResult = lunaUndoService.undo(threadId);
+    if (!undoResult.success) {
+      return res.json({ success: false, error: undoResult.error });
+    }
+
+    const entry = undoResult.entry;
+    let restored = false;
+    let restoreError = null;
+
+    // Restaura o item deletado
+    if (entry.before && entry.module) {
+      try {
+        const payload = { ...entry.before };
+        // Remove campos internos
+        delete payload.id;
+        delete payload._id;
+        delete payload.deletedAt;
+
+        const response = await fetch(`${req.protocol}://${req.get('host')}${entry.module}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.authorization || `Bearer ${SERVICE_TOKEN}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          restored = true;
+        } else {
+          const errText = await response.text();
+          restoreError = `API retornou ${response.status}: ${errText.slice(0, 200)}`;
+        }
+      } catch (e) {
+        restoreError = e.message;
+      }
+    }
+
+    res.json({
+      success: true,
+      restored,
+      entry: {
+        id: entry.id,
+        type: entry.type,
+        description: entry.description,
+      },
+      restoreError,
+      stack: lunaUndoService.getStack(threadId),
+    });
+  } catch (e) {
+    console.error('[Undo] Erro:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/luna/redo', async (req, res) => {
+  try {
+    const { threadId } = req.body;
+    if (!threadId) return res.status(400).json({ success: false, error: 'threadId obrigatório' });
+
+    const redoResult = lunaUndoService.redo(threadId);
+    if (!redoResult.success) {
+      return res.json({ success: false, error: redoResult.error });
+    }
+
+    res.json({
+      success: true,
+      entry: {
+        id: redoResult.entry.id,
+        type: redoResult.entry.type,
+        description: redoResult.entry.description,
+      },
+      stack: lunaUndoService.getStack(threadId),
+    });
+  } catch (e) {
+    console.error('[Redo] Erro:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/luna/undo/stack', async (req, res) => {
+  try {
+    const { threadId } = req.query;
+    if (!threadId) return res.status(400).json({ success: false, error: 'threadId obrigatório' });
+    res.json({ success: true, stack: lunaUndoService.getStack(threadId) });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ============================================================
 // POST /api/luna/chat — MODO CONCIERGE v19.0
 // IntentParser (regex/LLM) → ActionExecutor → resposta humanizada
 // LLM usado APENAS como fallback para conversas sociais
 // ============================================================
 app.post('/api/luna/chat', async (req, res) => {
   try {
-    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext } = req.body;
+    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext, threadId } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'Mensagem vazia' });
     }
@@ -5370,7 +5472,9 @@ app.post('/api/luna/chat', async (req, res) => {
     const msg = message.trim();
 
     // ── 1A. DETECTAR CONFIRMAÇÃO/NEGAÇÃO POR TEXTO NO CONTEXTO DE CONFIRMAÇÃO ──
-    const pendingConfirmMsg = Array.isArray(context) ? [...context].reverse().find(
+    // ⚠️ Só executa se o frontend NÃO enviou confirmActions explícito.
+    //    Se confirmActions veio do frontend (clique no botão), pula para o bloco 1.
+    const pendingConfirmMsg = !confirmActions && Array.isArray(context) ? [...context].reverse().find(
       m => (m.role === 'luna' || m.role === 'assistant') && m.needsConfirmation === true
     ) : null;
     const isNegation = /^(n[ãa]o|cancela|cancelar|esquece|desiste|nope|nao|n)/i.test(msg);
@@ -5385,17 +5489,50 @@ app.post('/api/luna/chat', async (req, res) => {
         });
       }
       if (isAffirmation) {
-        // Recupera as ações pendentes do previewData
+        // Recupera as ações pendentes do previewData com mapeamento completo de intents
+        const INTENT_MAP = {
+          'tarefa.deletar': 'excluir_tarefa',
+          'tarefa.criar': 'criar_tarefa',
+          'lead.deletar': 'excluir_lead',
+          'lead.criar': 'criar_lead',
+          'financeiro.excluir_pagamento': 'excluir_pagamento',
+          'financeiro.excluir_despesa': 'excluir_despesa',
+          'financeiro.adicionar_receita': 'registrar_pagamento',
+          'financeiro.adicionar_despesa': 'registrar_despesa',
+          'projeto.deletar': 'excluir_projeto',
+          'ideia.deletar': 'excluir_ideia',
+          'orcamento.deletar': 'excluir_orcamento',
+          'cliente.deletar': 'excluir_cliente',
+          'link.excluir': 'excluir_link',
+          'email.enviar': 'enviar_email',
+          'whatsapp.enviar_mensagem': 'enviar_mensagem_whatsapp',
+          'tarefa.atualizar': 'atualizar_tarefa',
+          'lead.atualizar_status': 'atualizar_lead',
+          'lead.converter': 'converter_lead',
+        };
         const pendingActions = (pendingConfirmMsg.previewData || []).map(p => ({
-          type: p.intent === 'tarefa.deletar' ? 'excluir_tarefa' :
-                p.intent === 'tarefa.criar' ? 'criar_tarefa' :
-                p.intent,
+          type: INTENT_MAP[p.intent] || p.intent,
           params: p.values || {}
-        }));
+        })).filter(a => a.type && a.type !== 'default');
+        console.log('[LunaConfirm] Bloco 1A — pendingConfirmMsg encontrado:', {
+          previewIntent: pendingConfirmMsg.previewData?.[0]?.intent,
+          mappedActions: pendingActions.map(a => a.type),
+          messagePreview: pendingConfirmMsg.text?.slice(0, 60)
+        });
         if (pendingActions.length > 0) {
-          const result = await lunaActionExecutor.execute(pendingActions, { authorName });
+          const result = await lunaActionExecutor.execute(pendingActions, { authorName, threadId });
           const reply = buildConciergeReply(result, authorName);
-          return res.json({ success: true, reply, executed: true, result: result.summary, timestamp: new Date().toISOString() });
+          const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
+          return res.json({
+            success: true,
+            reply,
+            executed: true,
+            result: result.summary,
+            undoable: result.undoable || false,
+            undoExpiresAt: lastUndo?.expiresAt || null,
+            undoDescription: lastUndo?.description || null,
+            timestamp: new Date().toISOString()
+          });
         }
       }
     }
@@ -5417,9 +5554,19 @@ app.post('/api/luna/chat', async (req, res) => {
           }
         }
       }
-      const result = await lunaActionExecutor.execute(pendingActions, { authorName });
+      const result = await lunaActionExecutor.execute(pendingActions, { authorName, threadId });
       const reply = buildConciergeReply(result, authorName);
-      return res.json({ success: true, reply, executed: true, result: result.summary, timestamp: new Date().toISOString() });
+      const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
+      return res.json({
+        success: true,
+        reply,
+        executed: true,
+        result: result.summary,
+        undoable: result.undoable || false,
+        undoExpiresAt: lastUndo?.expiresAt || null,
+        undoDescription: lastUndo?.description || null,
+        timestamp: new Date().toISOString()
+      });
     }
 
     // ── 2. PARSE DA INTENÇÃO (NLU primeiro → regex → LLM fallback) ──
@@ -5721,7 +5868,7 @@ app.post('/api/luna/chat', async (req, res) => {
       }
 
       // Executa as ações
-      const result = await lunaActionExecutor.execute(parsed.actions, { authorName });
+      const result = await lunaActionExecutor.execute(parsed.actions, { authorName, threadId });
 
       // 🎯 SMART FORM: detecta se alguma ação pediu dados faltantes
       const smartFormResult = result.results.find(r =>
@@ -5739,6 +5886,7 @@ app.post('/api/luna/chat', async (req, res) => {
       }
 
       const reply = buildConciergeReply(result, authorName);
+      const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
 
       return res.json({
         success: true,
@@ -5746,6 +5894,9 @@ app.post('/api/luna/chat', async (req, res) => {
         executed: true,
         result: result.summary,
         intent: parsed.intent,
+        undoable: result.undoable || false,
+        undoExpiresAt: lastUndo?.expiresAt || null,
+        undoDescription: lastUndo?.description || null,
         timestamp: new Date().toISOString()
       });
     }
@@ -6064,7 +6215,8 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       contextModule,
       contextId,
       contextFile,
-      dashboardContext
+      dashboardContext,
+      threadId
     };
 
     const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
@@ -6099,7 +6251,10 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       preview: chatResult.preview || null,
       previewData: chatResult.previewData || null,
       quotaExhausted: chatResult.quotaExhausted || false,
-      resetAt: chatResult.resetAt || null
+      resetAt: chatResult.resetAt || null,
+      undoable: chatResult.undoable || false,
+      undoExpiresAt: chatResult.undoExpiresAt || null,
+      undoDescription: chatResult.undoDescription || null,
     };
     await addMessageToThread(threadId, lunaMessage);
 

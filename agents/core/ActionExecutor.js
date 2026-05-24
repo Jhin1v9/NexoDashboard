@@ -13,6 +13,7 @@ class ActionExecutor {
     this.apiKey = config.apiKey || null;
     this.timeout = config.timeout || 10000;
     this.dataDir = config.dataDir || path.join(__dirname, '../../backend/data');
+    this.undoService = config.undoService || null;
 
     // Cache em memória dos dados
     this.cache = {
@@ -45,11 +46,31 @@ class ActionExecutor {
   async execute(actions, context = {}) {
     const results = [];
     const authorName = context.authorName || 'Sistema';
+    const threadId = context.threadId || null;
 
     for (const action of actions) {
       try {
+        // ── UNDO: captura estado antes de ações destrutivas ──
+        let beforeSnapshot = null;
+        const isDestructive = this._isDestructiveAction(action.type);
+        if (isDestructive && this.undoService && threadId) {
+          beforeSnapshot = await this._captureBefore(action);
+        }
+
         const result = await this.executeSingle(action, authorName);
         results.push({ action, status: 'success', result });
+
+        // ── UNDO: salva na stack após sucesso ──
+        if (isDestructive && this.undoService && threadId && beforeSnapshot) {
+          this.undoService.push(threadId, {
+            type: this._undoTypeFromAction(action.type),
+            description: this._undoDescription(action, beforeSnapshot),
+            before: beforeSnapshot,
+            after: null,
+            restoreFn: null,
+            module: this._undoModuleFromAction(action.type),
+          });
+        }
       } catch (err) {
         results.push({ action, status: 'error', error: err.message });
       }
@@ -58,8 +79,108 @@ class ActionExecutor {
     return {
       allSuccess: results.every(r => r.status === 'success'),
       results,
-      summary: this.buildSummary(results)
+      summary: this.buildSummary(results),
+      undoable: results.some(r => r.status === 'success' && this._isDestructiveAction(r.action.type)),
     };
+  }
+
+  // Ações que geram entrada de undo
+  _isDestructiveAction(type) {
+    return ['excluir_tarefa', 'excluir_pagamento', 'excluir_despesa', 'excluir_lead', 'excluir_ideia', 'excluir_projeto', 'excluir_cliente'].includes(type);
+  }
+
+  _undoTypeFromAction(type) {
+    const map = {
+      excluir_tarefa: 'delete_task',
+      excluir_pagamento: 'delete_payment',
+      excluir_despesa: 'delete_expense',
+      excluir_lead: 'delete_lead',
+      excluir_ideia: 'delete_idea',
+      excluir_projeto: 'delete_project',
+      excluir_cliente: 'delete_client',
+    };
+    return map[type] || type;
+  }
+
+  _undoModuleFromAction(type) {
+    const map = {
+      excluir_tarefa: '/tasks',
+      excluir_pagamento: '/cash/payments',
+      excluir_despesa: '/cash/expenses',
+      excluir_lead: '/leads',
+      excluir_ideia: '/ideas',
+      excluir_projeto: '/projects',
+      excluir_cliente: '/clients',
+    };
+    return map[type] || null;
+  }
+
+  _undoDescription(action, before) {
+    const name = before?.title || before?.name || before?.displayName || before?.description || 'item';
+    const typeMap = {
+      excluir_tarefa: 'Excluir tarefa',
+      excluir_pagamento: 'Excluir pagamento',
+      excluir_despesa: 'Excluir despesa',
+      excluir_lead: 'Excluir lead',
+      excluir_ideia: 'Excluir ideia',
+      excluir_projeto: 'Excluir projeto',
+      excluir_cliente: 'Excluir cliente',
+    };
+    return `${typeMap[action.type] || 'Ação'} "${name}"`;
+  }
+
+  // Captura snapshot do item antes da deleção
+  async _captureBefore(action) {
+    try {
+      switch (action.type) {
+        case 'excluir_tarefa': {
+          const titulo = action.params?.titulo || action.params?.id || '';
+          if (!titulo) return null;
+          const tasks = await this.apiGet('/tasks');
+          return tasks.find(t => t.id === titulo || t.title?.toLowerCase().includes(titulo.toLowerCase())) || null;
+        }
+        case 'excluir_pagamento':
+        case 'excluir_despesa': {
+          const search = action.params?.id || action.params?.de || action.params?.para || action.params?.descricao || '';
+          if (!search) return null;
+          const cashFile = path.join(this.dataDir, 'cash-box.json');
+          const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
+          const entry = cash.history?.find(h =>
+            h.id === search ||
+            h.description?.toLowerCase().includes(search.toLowerCase()) ||
+            h.from?.toLowerCase().includes(search.toLowerCase()) ||
+            h.to?.toLowerCase().includes(search.toLowerCase())
+          );
+          return entry || null;
+        }
+        case 'excluir_lead': {
+          const search = action.params?.id || action.params?.nome || action.params?.email || '';
+          if (!search) return null;
+          const leadsFile = path.join(this.dataDir, 'leads.json');
+          const leads = this.readJson(leadsFile, []);
+          return leads.find(l =>
+            l.id === search ||
+            l.name?.toLowerCase().includes(search.toLowerCase()) ||
+            l.email?.toLowerCase().includes(search.toLowerCase())
+          ) || null;
+        }
+        case 'excluir_ideia': {
+          const search = action.params?.id || action.params?.titulo || '';
+          if (!search) return null;
+          const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
+          const ideasData = this.readJson(ideasFile, { ideas: {} });
+          const idea = Object.values(ideasData.ideas || {}).find(i =>
+            i.id === search || i.title?.toLowerCase().includes(search.toLowerCase())
+          );
+          return idea || null;
+        }
+        default:
+          return null;
+      }
+    } catch (e) {
+      console.error('[ActionExecutor] Erro ao capturar before para undo:', e.message);
+      return null;
+    }
   }
 
   async executeSingle(action, authorName) {
@@ -765,6 +886,7 @@ class ActionExecutor {
 
     const match = tasks.find(t => {
       if (params.id && t.id === params.id) return true;
+      if (!titulo.trim()) return false; // não faz match com título vazio
       const taskTitle = (t.titulo || t.title || '').toLowerCase();
       const searchTitle = titulo.toLowerCase();
       return taskTitle.includes(searchTitle) || searchTitle.includes(taskTitle.slice(0, 30));

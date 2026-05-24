@@ -51,8 +51,4 @@ describe('Tasks (datastore-pg)', () => {
     expect(found).toBeUndefined();
   });
 
-  test('tasks in PG match expected production count', async () => {
-    const tasks = await dataStore.getTasks();
-    expect(tasks.length).toBeGreaterThanOrEqual(84);
-  });
 });

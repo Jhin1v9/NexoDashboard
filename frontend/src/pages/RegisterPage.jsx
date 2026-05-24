@@ -18,7 +18,8 @@ const COMPANY_SIZES = [
   { value: '1-10', label: '1-10 funcionários' },
   { value: '11-50', label: '11-50 funcionários' },
   { value: '51-200', label: '51-200 funcionários' },
-  { value: '200+', label: '200+ funcionários' }
+  { value: '200+', label: '200+ funcionários' },
+  { value: 'other', label: 'Outros' }
 ];
 
 export default function RegisterPage() {
@@ -35,6 +36,7 @@ export default function RegisterPage() {
     phone: '',
     companyName: '',
     companySize: '',
+    customCompanySize: '',
     message: ''
   })
 
@@ -52,6 +54,9 @@ export default function RegisterPage() {
   const validateStep2 = () => {
     if (!form.companyName.trim()) return 'Nome da empresa é obrigatório'
     if (!form.companySize) return 'Selecione o tamanho da equipe'
+    if (form.companySize === 'other' && (!form.customCompanySize || form.customCompanySize.trim() === '')) {
+      return 'Informe o número de funcionários'
+    }
     return ''
   }
 
@@ -76,12 +81,16 @@ export default function RegisterPage() {
     setError('')
 
     try {
+      const companySizeValue = form.companySize === 'other'
+        ? form.customCompanySize.trim()
+        : form.companySize
+
       const res = await axios.post('/api/leads', {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
         companyName: form.companyName.trim(),
-        companySize: form.companySize,
+        companySize: companySizeValue,
         message: form.message.trim()
       })
 
@@ -363,6 +372,31 @@ export default function RegisterPage() {
                             </button>
                           ))}
                         </div>
+                        {/* Input livre para "Outros" */}
+                        <AnimatePresence>
+                          {form.companySize === 'other' && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.25 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="relative rounded-xl overflow-hidden transition-all duration-300 mt-2" style={inputStyle('customCompanySize')}>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={form.customCompanySize}
+                                  onChange={e => updateField('customCompanySize', e.target.value)}
+                                  onFocus={() => setFocusedField('customCompanySize')}
+                                  onBlur={() => setFocusedField(null)}
+                                  placeholder="Número de funcionários"
+                                  className="w-full bg-transparent px-4 py-3 text-sm text-nexo-text placeholder:text-nexo-muted/40 outline-none"
+                                />
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
 
                       {/* Mensagem */}

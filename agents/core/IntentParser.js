@@ -234,11 +234,11 @@ class IntentParser {
         extract: () => ({ filtro: 'geral' })
       },
       delete_task: {
-        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i,
+        regex: /\b(apaga(?:r)?|deleta(?:r)?|remove(?:r)?|exclui(?:r)?|cancela(?:r)?|elimina(?:r)?)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\b/i,
         action: 'excluir_tarefa',
         extract: (text) => {
           const m = text.match(/(?:apaga|deleta|remove|exclui|cancela|elimina)\s+(?:a\s+|esta\s+|essa\s+|a\s+)?(?:tarefa|task)\s*(?:"|'| chamada | de |:)?\s*(.+)/i);
-          return { titulo: m?.[1]?.trim() || text };
+          return { titulo: m?.[1]?.trim() || '' };
         }
       },
       delete_payment: {

@@ -88,3 +88,5 @@ e2e/screenshots/
 
 # Playwright report
 e2e/playwright-report/
+luna-test-results/
+e2e/e2e/

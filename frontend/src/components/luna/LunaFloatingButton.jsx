@@ -19,6 +19,7 @@ export default function LunaFloatingButton() {
   const [ghostMode, setGhostMode] = useState(() => {
     try { return localStorage.getItem('luna_ghost_mode') === 'true' } catch { return false }
   })
+  const [showGhostLabel, setShowGhostLabel] = useState(false)
   const [ghostNotification, setGhostNotification] = useState(null)
   const [ghostParticles, setGhostParticles] = useState([])
 
@@ -32,10 +33,22 @@ export default function LunaFloatingButton() {
       y: Math.min(Math.max(p.y, -maxY), maxY),
     }
   }
+  const resetPos = () => {
+    const defaultPos = { x: 0, y: 0 }
+    setPos(defaultPos)
+    try { localStorage.setItem('luna_fab_pos', JSON.stringify(defaultPos)) } catch {}
+  }
   const [pos, setPos] = useState(() => {
     try {
       const raw = localStorage.getItem('luna_fab_pos')
       const parsed = raw ? JSON.parse(raw) : { x: 0, y: 0 }
+      // Se a posição salva estiver muito longe do canto visível, resetar
+      const maxX = Math.max(0, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 120)
+      const maxY = Math.max(0, (typeof window !== 'undefined' ? window.innerHeight : 800) - 120)
+      if (Math.abs(parsed.x) > maxX + 200 || Math.abs(parsed.y) > maxY + 200) {
+        console.warn('[LunaFAB] Posição salva fora da viewport — resetando para padrão')
+        return { x: 0, y: 0 }
+      }
       return clampPos(parsed)
     } catch { return { x: 0, y: 0 } }
   })
@@ -58,9 +71,18 @@ export default function LunaFloatingButton() {
 
   useEffect(() => {
     const handleKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
+      // Shift+G = reset posição + desativa ghost mode (emergência)
+      if ((e.key === 'g' || e.key === 'G') && e.shiftKey) {
+        e.preventDefault()
+        setGhostMode(false)
+        localStorage.setItem('luna_ghost_mode', 'false')
+        resetPos()
+        setShowGhostLabel(false)
+        return
+      }
+      // G = toggle ghost mode
       if (e.key === 'g' || e.key === 'G') {
-        // Don't trigger if typing in an input
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return
         toggleGhost()
       }
     }
@@ -72,13 +94,20 @@ export default function LunaFloatingButton() {
   useEffect(() => {
     if (!ghostMode) {
       setGhostParticles([])
+      setShowGhostLabel(false)
       return
     }
+    // Mostra label "Ghost" brevemente ao entrar em ghost mode
+    setShowGhostLabel(true)
+    const labelTimer = setTimeout(() => setShowGhostLabel(false), 3000)
     const interval = setInterval(() => {
       const id = particleIdRef.current++
       setGhostParticles(prev => [...prev.slice(-8), { id, x: pos.x, y: pos.y }])
     }, 300)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(labelTimer)
+    }
   }, [ghostMode, pos.x, pos.y])
 
   // Ghost mode proactive notification
@@ -193,10 +222,10 @@ export default function LunaFloatingButton() {
 
   // Ghost mode styles
   const ghostStyles = isGhost ? {
-    opacity: 0.35,
-    scale: 0.72,
+    opacity: 0.6,
+    scale: 0.85,
     bg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-    shadow: '0 0 15px rgba(148,163,184,0.1)',
+    shadow: '0 0 15px rgba(148,163,184,0.15)',
   } : {
     opacity: 1,
     scale: 1,
@@ -346,7 +375,8 @@ export default function LunaFloatingButton() {
           onClick={() => {
             if (drag.current.dragged) return
             if (isGhost) {
-              // In ghost mode, clicking shows a brief pulse but doesn't open
+              // Em ghost mode, clique desmaterializa (sai do ghost mode)
+              toggleGhost()
               return
             }
             if (actionCenterOpen) {
@@ -373,6 +403,27 @@ export default function LunaFloatingButton() {
             <Wand2 className="w-5 h-5 text-white relative z-10" />
           )}
         </motion.button>
+
+        {/* Ghost mode label indicator */}
+        <AnimatePresence>
+          {isGhost && showGhostLabel && (
+            <motion.div
+              initial={{ opacity: 0, y: 5, scale: 0.9 }}
+              animate={{ opacity: 1, y: -10, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ duration: 0.3 }}
+              className="absolute left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider whitespace-nowrap pointer-events-none"
+              style={{
+                background: 'rgba(30,41,59,0.9)',
+                border: '1px solid rgba(148,163,184,0.3)',
+                color: '#94a3b8',
+                bottom: 'calc(100% + 4px)',
+              }}
+            >
+              👻 GHOST MODE — clique para materializar
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Badge Proativo */}
         {!isActive && proactiveBadge && proactiveBadge.count > 0 && (
