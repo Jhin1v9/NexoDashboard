@@ -224,6 +224,13 @@ const DOMAINS = {
       'workspace.logs',
     ],
   },
+  confirmacao: {
+    description: 'Confirmação e negação de ações',
+    intents: [
+      'confirmacao.sim',
+      'confirmacao.nao',
+    ],
+  },
   instagram: {
     description: 'Comandos relacionados ao Instagram',
     intents: [
@@ -1388,6 +1395,50 @@ const TRAINING_CORPUS = {
       'hi ha algun problema',
       'com està tot',
       'verifica estat',
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DOMÍNIO: CONFIRMAÇÃO / NEGAÇÃO
+  // ══════════════════════════════════════════════════════════════════════════
+  'confirmacao.sim': {
+    pt: [
+      'sim', 'confirmo', 'pode', 'executa', 'vai', 'faz', 'ok', 'beleza', 'certo',
+      'isso mesmo', 'exatamente', 'pode ir', 'pode fazer', 'confirma', 'aprovo',
+      'manda ver', 'pode executar', 'faz isso', 'vai em frente', 'deixa assim',
+      'correto', 'tá certo', 'tudo certo', 'show', 'pode prosseguir', 'segue',
+    ],
+    es: [
+      'si', 'confirmo', 'puede', 'ejecuta', 'vale', 'hazlo', 'ok', 'correcto',
+      'eso mismo', 'exactamente', 'puede ir', 'puede hacer', 'confirma', 'apruebo',
+      'dale', 'puede ejecutar', 'haz eso', 'sigue adelante', 'déjalo así',
+      'correcto', 'todo correcto', 'puede proseguir', 'sigue',
+    ],
+    ca: [
+      'sí', 'confirmo', 'puc', 'executa', 'val', 'fes-ho', 'ok', 'correcte',
+      'això mateix', 'exactament', 'pot anar', 'pot fer', 'confirma', 'aprovo',
+      'endavant', 'pot executar', 'fes això', 'segueix endavant', 'deixa-ho així',
+      'correcte', 'tot correcte', 'pot proseguir', 'segueix',
+    ],
+  },
+  'confirmacao.nao': {
+    pt: [
+      'não', 'cancela', 'espera', 'para', 'não quero', 'errado', 'deixa',
+      'não faz', 'não executa', 'cancela isso', 'pare', 'não é isso',
+      'deixa quieto', 'não faça', 'não execute', 'cancela tudo', 'desiste',
+      'não é isso que eu quero', 'volta', 'desfaz', 'não prossegue',
+    ],
+    es: [
+      'no', 'cancela', 'espera', 'para', 'no quiero', 'errado', 'deja',
+      'no hagas', 'no ejecutes', 'cancela eso', 'para', 'no es eso',
+      'déjalo', 'no hagas eso', 'no ejecutes eso', 'cancela todo', 'desiste',
+      'no es eso lo que quiero', 'vuelve', 'deshaz', 'no prosigas',
+    ],
+    ca: [
+      'no', 'cancel·la', 'espera', 'para', 'no vull', 'errat', 'deixa',
+      'no facis', 'no executis', 'cancel·la això', 'atura', 'no és això',
+      'deixa-ho estar', 'no facis això', 'no executis això', 'cancel·la tot', 'desisteix',
+      'no és això el que vull', 'torna', 'desfés', 'no prossegueixis',
     ],
   },
 
@@ -4371,6 +4422,16 @@ async function populateCorpus() {
       ca: 'Puc ajudar amb emails, tasques, projectes, clients, finances, WhatsApp, pressupostos, leads, idees i administració del sistema. Què necessites?',
     },
     // Respostas de sistema removidas (foco no Dashboard)
+    'confirmacao.sim': {
+      pt: 'OK, executando! ✅',
+      es: '¡OK, ejecutando! ✅',
+      ca: 'D\'acord, executant! ✅',
+    },
+    'confirmacao.nao': {
+      pt: 'Entendido, cancelando.',
+      es: 'Entendido, cancelando.',
+      ca: 'Entesos, cancel·lant.',
+    },
   };
 
   for (const [intent, translations] of Object.entries(DEFAULT_ANSWERS)) {
