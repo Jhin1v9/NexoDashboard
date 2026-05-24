@@ -5398,10 +5398,20 @@ app.post('/api/luna/undo', async (req, res) => {
         } else {
           const errText = await response.text();
           restoreError = `API retornou ${response.status}: ${errText.slice(0, 200)}`;
+          console.warn('[Undo] Falha ao restaurar:', restoreError);
         }
       } catch (e) {
         restoreError = e.message;
+        console.warn('[Undo] Exceção ao restaurar:', e.message);
       }
+    }
+
+    // Se restauração falhou, re-empilha na undo stack
+    if (!restored && entry.before) {
+      const stack = lunaUndoService.stacks.get(threadId) || { undo: [], redo: [] };
+      stack.undo.push(entry);
+      lunaUndoService.stacks.set(threadId, stack);
+      lunaUndoService.save();
     }
 
     res.json({
@@ -5514,11 +5524,6 @@ app.post('/api/luna/chat', async (req, res) => {
           type: INTENT_MAP[p.intent] || p.intent,
           params: p.values || {}
         })).filter(a => a.type && a.type !== 'default');
-        console.log('[LunaConfirm] Bloco 1A — pendingConfirmMsg encontrado:', {
-          previewIntent: pendingConfirmMsg.previewData?.[0]?.intent,
-          mappedActions: pendingActions.map(a => a.type),
-          messagePreview: pendingConfirmMsg.text?.slice(0, 60)
-        });
         if (pendingActions.length > 0) {
           const result = await lunaActionExecutor.execute(pendingActions, { authorName, threadId });
           const reply = buildConciergeReply(result, authorName);
@@ -5668,20 +5673,56 @@ app.post('/api/luna/chat', async (req, res) => {
       'listar_repos_github', 'listar_projetos_vercel', 'executar_comando', 'fazer_git_push',
       // BugDetector
       'listar_relatorios_bug', 'excluir_relatorio_bug',
-      // Confirmação / Negação (tratados como sinalizadores, não executam ação)
-      'confirmar_acao', 'cancelar_acao',
+      // Confirmação / Negação / Undo / Redo
+      'confirmar_acao', 'cancelar_acao', 'desfazer_acao', 'refazer_acao',
       // Misc
       'ideia', 'link', 'social', 'ajuda', 'navegar'
     ];
     parsed.actions = parsed.actions.filter(a => knownActions.includes(a.type));
 
-    // ── 3. CONFIRMAÇÃO/NEGAÇÃO PURA (sem contexto de confirmação pendente) ──
+    // ── 3. CONFIRMAÇÃO/NEGAÇÃO/UNDO/REDO PURA ──
     const isConfirmOrCancel = parsed.intent === 'confirmacao.sim' || parsed.intent === 'confirmacao.nao';
     if (isConfirmOrCancel && !pendingConfirmMsg) {
       const reply = parsed.intent === 'confirmacao.sim'
         ? 'Beleza! ✅ Só me lembra o que você queria confirmar — às vezes eu perco o fio 😅'
         : 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔';
       return res.json({ success: true, reply, intent: parsed.intent, timestamp: new Date().toISOString() });
+    }
+
+    // ── 3A. UNDO / REDO ──
+    if (parsed.intent === 'desfazer') {
+      const undoResult = lunaUndoService.undo(threadId);
+      if (!undoResult.success) {
+        return res.json({ success: true, reply: `Não consegui desfazer: ${undoResult.error} 😕`, intent: 'desfazer', timestamp: new Date().toISOString() });
+      }
+      const entry = undoResult.entry;
+      let restored = false;
+      let restoreError = null;
+      if (entry.before && entry.module) {
+        try {
+          const payload = { ...entry.before };
+          delete payload.id; delete payload._id; delete payload.deletedAt;
+          const response = await fetch(`http://localhost:${PORT}${entry.module}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': req.headers.authorization || `Bearer ${SERVICE_TOKEN}` },
+            body: JSON.stringify(payload)
+          });
+          restored = response.ok;
+          if (!response.ok) restoreError = await response.text();
+        } catch (e) { restoreError = e.message; }
+      }
+      const reply = restored
+        ? `✅ Desfeito! ${entry.description} foi restaurado.`
+        : `⚠️ Não consegui restaurar completamente. ${restoreError ? `Erro: ${restoreError.slice(0, 100)}` : 'O item pode ter sido recriado manualmente.'}`;
+      return res.json({ success: true, reply, intent: 'desfazer', restored, timestamp: new Date().toISOString() });
+    }
+
+    if (parsed.intent === 'refazer') {
+      const redoResult = lunaUndoService.redo(threadId);
+      if (!redoResult.success) {
+        return res.json({ success: true, reply: `Não consegui refazer: ${redoResult.error} 😕`, intent: 'refazer', timestamp: new Date().toISOString() });
+      }
+      return res.json({ success: true, reply: `🔄 Refeito! ${redoResult.entry.description}.`, intent: 'refazer', timestamp: new Date().toISOString() });
     }
 
     // ── 4. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
@@ -5779,7 +5820,7 @@ app.post('/api/luna/chat', async (req, res) => {
           const fields = buildEditableDeleteFields(deleteAction.params, deleteAction.type);
           const typeNames = { excluir_tarefa: 'tarefa', excluir_pagamento: 'pagamento', excluir_despesa: 'despesa', excluir_lead: 'lead' };
           const userRole = (typeof activeUser !== 'undefined' ? activeUser?.role : null) || 'Admin';
-          const previewData = buildPreviewForActions(parsed.actions, userRole);
+          const previewData = await buildPreviewForActions(parsed.actions, userRole, dataStore);
 
           if (!previewData.allowed) {
             return res.json({
@@ -5808,7 +5849,7 @@ app.post('/api/luna/chat', async (req, res) => {
 
         // Para outras ações críticas: confirmação com preview contextual
         const preview = buildActionPreview(parsed.actions);
-        const previewData = buildPreviewForActions(parsed.actions, activeUser?.role || 'Admin');
+        const previewData = await buildPreviewForActions(parsed.actions, activeUser?.role || 'Admin', dataStore);
 
         // Se alguma ação é bloqueada por permissão
         if (!previewData.allowed) {

@@ -104,13 +104,13 @@ class ActionExecutor {
 
   _undoModuleFromAction(type) {
     const map = {
-      excluir_tarefa: '/tasks',
-      excluir_pagamento: '/cash/payments',
-      excluir_despesa: '/cash/expenses',
-      excluir_lead: '/leads',
-      excluir_ideia: '/ideas',
-      excluir_projeto: '/projects',
-      excluir_cliente: '/clients',
+      excluir_tarefa: '/api/tasks',
+      excluir_pagamento: '/api/cash/payments',
+      excluir_despesa: '/api/cash/expenses',
+      excluir_lead: '/api/leads',
+      excluir_ideia: '/api/ideas',
+      excluir_projeto: '/api/projects',
+      excluir_cliente: '/api/clients',
     };
     return map[type] || null;
   }
@@ -136,7 +136,9 @@ class ActionExecutor {
         case 'excluir_tarefa': {
           const titulo = action.params?.titulo || action.params?.id || '';
           if (!titulo) return null;
-          const tasks = await this.apiGet('/tasks');
+          const tasksRes = await this.apiGet('/tasks');
+          const tasks = Array.isArray(tasksRes) ? tasksRes : (tasksRes?.tasks || []);
+          if (!Array.isArray(tasks)) return null;
           return tasks.find(t => t.id === titulo || t.title?.toLowerCase().includes(titulo.toLowerCase())) || null;
         }
         case 'excluir_pagamento':

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageCircle, Send, Bot, User, Users, CheckCircle,
   ChevronDown, Eraser, Loader, X, Sparkles, Activity,
-  Volume2, VolumeX
+  Volume2, VolumeX, RotateCcw
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
@@ -74,6 +74,34 @@ function TypingIndicator() {
         />
       ))}
     </div>
+  )
+}
+
+/* ── Undo Button Component ── */
+function UndoButton({ expiresAt, description, onUndo }) {
+  const [remaining, setRemaining] = useState(0)
+  useEffect(() => {
+    if (!expiresAt) return
+    const update = () => {
+      const ms = new Date(expiresAt).getTime() - Date.now()
+      setRemaining(Math.max(0, Math.ceil(ms / 1000)))
+    }
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [expiresAt])
+
+  if (remaining <= 0) return null
+
+  return (
+    <button
+      onClick={onUndo}
+      className="mt-1.5 w-full px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-400 flex items-center justify-center gap-1.5 hover:bg-amber-500/20 transition-colors font-mono"
+    >
+      <RotateCcw className="w-3 h-3" />
+      <span>Desfazer {description ? `"${description.split('"')[1]}"` : ''}</span>
+      <span className="ml-auto text-amber-500/60">{remaining}s</span>
+    </button>
   )
 }
 
@@ -582,6 +610,51 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     }
   }
 
+  const handleUndo = async (messageId) => {
+    try {
+      const res = await axios.post('/api/luna/undo', { threadId: activeThreadId })
+      const data = res.data
+      if (data.success && data.restored) {
+        // Atualiza a mensagem original para marcar como desfeita
+        setThreadMessages(prev => {
+          const msgs = [...(prev[activeThreadId] || [])]
+          const idx = msgs.findIndex(m => m.id === messageId)
+          if (idx !== -1) {
+            msgs[idx] = { ...msgs[idx], undoable: false, undone: true }
+          }
+          // Adiciona mensagem de confirmação do undo
+          msgs.push({
+            id: 'undo_' + Date.now(),
+            role: 'assistant',
+            author: 'luna',
+            authorName: 'Luna',
+            authorColor: '#9b59b6',
+            text: `✅ Desfeito! ${data.entry?.description || 'Ação desfeita.'}`,
+            timestamp: new Date().toISOString()
+          })
+          return { ...prev, [activeThreadId]: msgs }
+        })
+        speak(`Desfeito! ${data.entry?.description || ''}`)
+      } else {
+        // Mostra erro
+        setThreadMessages(prev => ({
+          ...prev,
+          [activeThreadId]: [...(prev[activeThreadId] || []), {
+            id: 'undo_err_' + Date.now(),
+            role: 'assistant',
+            author: 'luna',
+            authorName: 'Luna',
+            authorColor: '#9b59b6',
+            text: `⚠️ ${data.error || 'Não consegui desfazer.'}`,
+            timestamp: new Date().toISOString()
+          }]
+        }))
+      }
+    } catch (e) {
+      console.error('[LunaChatPanel] Erro ao desfazer:', e.message)
+    }
+  }
+
   const currentMessages = threadMessages[activeThreadId] || []
   const isGroup = activeThreadId === 'group'
 
@@ -871,11 +944,26 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                         )
                       )}
 
-                      {/* Executed confirmation */}
+                      {/* Executed confirmation + Undo button */}
                       {!msg.needsConfirmation && msg.executed && (
-                        <div className="mt-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 flex items-center gap-1.5 font-mono">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          Ação executada com sucesso!
+                        <div className="mt-2">
+                          <div className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 flex items-center gap-1.5 font-mono">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Ação executada com sucesso!
+                          </div>
+                          {msg.undoable && !msg.undone && (
+                            <UndoButton
+                              expiresAt={msg.undoExpiresAt}
+                              description={msg.undoDescription}
+                              onUndo={() => handleUndo(msg.id)}
+                            />
+                          )}
+                          {msg.undone && (
+                            <div className="mt-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-400 flex items-center gap-1.5 font-mono">
+                              <RotateCcw className="w-3 h-3" />
+                              Ação desfeita
+                            </div>
+                          )}
                         </div>
                       )}
 

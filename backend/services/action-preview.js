@@ -67,15 +67,37 @@ function formatValue(key, value) {
   return String(value);
 }
 
-function findItem(actionType, params) {
+async function findItem(actionType, params, dataStore = null) {
   const config = ENTITY_MAP[actionType];
   if (!config) return null;
 
-  let items = readJson(config.file);
-  if (config.isNested && Array.isArray(items)) {
-    // Já está correto
-  } else if (config.isNested) {
-    items = items[config.isNested] || [];
+  let items = [];
+
+  // Se tem dataStore, busca primeiro na fonte primária (PostgreSQL)
+  if (dataStore) {
+    try {
+      if (actionType === 'excluir_tarefa') {
+        items = await dataStore.getTasks();
+      } else if (actionType === 'excluir_lead') {
+        items = await dataStore.getLeads();
+      } else if (actionType === 'excluir_pagamento') {
+        const cash = await dataStore.getCashBox();
+        items = cash?.history?.filter(h => h.type === 'income') || [];
+      } else if (actionType === 'excluir_despesa') {
+        const cash = await dataStore.getCashBox();
+        items = cash?.history?.filter(h => h.type === 'expense') || [];
+      }
+    } catch (e) {
+      // Falha silenciosa, cai no JSON fallback
+    }
+  }
+
+  // Se não encontrou no dataStore, busca no JSON
+  if (!items || items.length === 0) {
+    items = readJson(config.file);
+    if (config.isNested && !Array.isArray(items)) {
+      items = items[config.isNested] || [];
+    }
   }
 
   // Tenta encontrar por ID
@@ -107,8 +129,8 @@ function findItem(actionType, params) {
   return { item, config };
 }
 
-function buildAffectedItem(actionType, params) {
-  const found = findItem(actionType, params);
+async function buildAffectedItem(actionType, params, dataStore) {
+  const found = await findItem(actionType, params, dataStore);
   if (!found || !found.item) {
     // Se não encontrou o item, retorna o que foi passado nos params
     const label = params.titulo || params.title || params.nome || params.name || params.id || 'Item desconhecido';
@@ -152,7 +174,7 @@ function getIntentFromAction(actionType) {
   return mapping[actionType] || 'default';
 }
 
-function buildPreview(action, userRole = 'Admin') {
+async function buildPreview(action, userRole = 'Admin', dataStore = null) {
   const { type, params = {} } = action;
 
   const isDestructive = DESTRUCTIVE_ACTIONS.includes(type);
@@ -174,7 +196,7 @@ function buildPreview(action, userRole = 'Admin') {
   // Para ações destrutivas, busca o item real
   const affectedItems = [];
   if (isDestructive && ENTITY_MAP[type]) {
-    affectedItems.push(buildAffectedItem(type, params));
+    affectedItems.push(await buildAffectedItem(type, params, dataStore));
   }
 
   // Para criações, formata os valores
@@ -201,8 +223,11 @@ function buildPreview(action, userRole = 'Admin') {
   };
 }
 
-function buildPreviewForActions(actions, userRole = 'Admin') {
-  const previews = actions.map(a => buildPreview(a, userRole));
+async function buildPreviewForActions(actions, userRole = 'Admin', dataStore = null) {
+  const previews = [];
+  for (const action of actions) {
+    previews.push(await buildPreview(action, userRole, dataStore));
+  }
 
   const hasBlocked = previews.some(p => !p.allowed);
   const blockedReasons = previews.filter(p => !p.allowed).map(p => p.reason);
