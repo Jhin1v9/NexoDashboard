@@ -25,3 +25,5 @@ services:
         sync: false  # Set after creating Cloudflare Tunnel: https://your-tunnel.trycloudflare.com
       - key: KIMI_BRIDGE_API_KEY
         generateValue: true  # Auto-generated API key for bridge API auth
+      - key: AUTO_START_TELEGRAM_BOT
+        value: 'false'  # Bot roda localmente via luna-local-mode.sh
