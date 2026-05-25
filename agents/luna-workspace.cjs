@@ -554,6 +554,12 @@ class WorkspaceManager {
     return result;
   }
 
+  removeActiveFile(userId, filePath) {
+    const ws = this.workspaces.get(userId);
+    if (!ws) return false;
+    return ws.activeFiles.delete(filePath);
+  }
+
   clearWorkspace(userId = 'default') {
     this.workspaces.delete(userId);
   }

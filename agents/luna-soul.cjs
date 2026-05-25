@@ -20,6 +20,7 @@ const { SessionManager } = require('./session-manager.cjs');
 const { KimiBridge } = require('./kimi-bridge.cjs');
 const { ComputerUseEngine } = require('./computer-use-engine.cjs');
 const lunaTools = require('./luna-tools.cjs');
+const { workspaceManager } = require('./luna-workspace.cjs');
 
 const LUNA_DIR = path.join(os.homedir(), '.luna');
 const SKILLS_DIR = path.join(LUNA_DIR, 'skills');
@@ -1222,8 +1223,12 @@ class LunaSoul extends EventEmitter {
       // Build system prompt
       const systemPrompt = buildSystemPrompt({ skillIndex, personaContent, memoryContext, personaRegistry, skillRegistry, agentsMd });
 
+      // Workspace context (if set)
+      const workspaceContext = workspaceManager.getFormattedManifest('luna-cli');
+      const activeFilesContext = workspaceManager.getActiveFilesContext('luna-cli');
+
       // Build full prompt
-      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}${workspaceContext ? '\n\n--- WORKSPACE ---\n' + workspaceContext : ''}${activeFilesContext ? '\n\n' + activeFilesContext : ''}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
 
       // Debug log
       if (process.env.LUNA_DEBUG) {
@@ -1241,13 +1246,18 @@ REGRAS: Responda APENAS em JSON. NUNCA diga que não pode fazer algo — use fer
 FERRAMENTAS: readFile, writeFile, replaceInFile, executeShell, searchFiles, grep, viewDirectory, gitStatus, gitCommit, searchWeb, fetchURL, downloadFile, clipboardRead, clipboardWrite.
 FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"mode":"PLAN","steps":[...]} | {"mode":"DONE",...}`;
 
+      // Workspace context (if set) — include in follow-ups too
+      const workspaceCtx = workspaceManager.getFormattedManifest('luna-cli');
+      const activeFilesCtx = workspaceManager.getActiveFilesContext('luna-cli');
+      const workspaceSnippet = workspaceCtx ? `\nWORKSPACE: ${workspaceCtx.split('\n')[0]}${workspaceCtx.split('\n')[1] ? ' ' + workspaceCtx.split('\n')[1] : ''}` : '';
+
       // For tool results, keep it even shorter
       const isToolResult = options.isToolResult === true;
       let prompt;
       if (isToolResult) {
-        prompt = `${miniReminder}\n\nResultado da ferramenta:\n${userInput}\n\nResponda em JSON com o próximo passo ou uma mensagem amigável ao usuário:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\nResultado da ferramenta:\n${userInput}\n\nResponda em JSON com o próximo passo ou uma mensagem amigável ao usuário:`;
       } else {
-        prompt = `${miniReminder}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}${activeFilesCtx ? '\n\n' + activeFilesCtx : ''}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
       }
 
       // Debug log

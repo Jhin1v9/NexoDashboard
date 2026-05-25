@@ -9,6 +9,7 @@ import { render, Box, Text, useInput, useApp, useWindowSize } from 'ink';
 import { Spinner, Badge } from '@inkjs/ui';
 import { LunaSoul } from './luna-soul.cjs';
 import { SessionManager } from './session-manager.cjs';
+import { workspaceManager } from './luna-workspace.cjs';
 import { execSync, spawn } from 'child_process';
 
 const h = React.createElement;
@@ -514,6 +515,10 @@ function HelpOverlay({ onClose }) {
     ['/compact', 'Resume contexto e inicia nova thread'],
     ['/modo <nome>', 'Muda persona'],
     ['/modo instant/thinking', 'Muda modo'],
+    ['/workspace <path>', 'Define workspace do projeto'],
+    ['/workspace', 'Mostra workspace atual'],
+    ['/add <file>', 'Adiciona arquivo ao contexto ativo'],
+    ['/drop <file>', 'Remove arquivo do contexto ativo'],
     ['/skills', 'Lista skills'],
     ['/auto', 'Toggle auto-switch'],
     ['/sim /nao', 'Confirma/rejeita sugestão'],
@@ -766,6 +771,92 @@ function App({ luna, sessionManager, initialSession }) {
     if (text === '/limpar') {
       sessionManager.clearContext(session.id);
       setMessages([]); return;
+    }
+
+    // /workspace <path> — define workspace
+    if (text.startsWith('/workspace ')) {
+      const wp = text.slice(10).trim();
+      try {
+        const result = await workspaceManager.bootstrap(wp, 'luna-cli');
+        setMessages(prev => [...prev, {
+          type: 'system',
+          content: `📁 Workspace definido: ${result.manifest.name}\n${result.formatted}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /workspace — mostra workspace atual
+    if (text === '/workspace') {
+      const manifest = workspaceManager.getFormattedManifest('luna-cli');
+      if (manifest) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `📁 Workspace atual:\n${manifest}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          type: 'system', content: '⚠️ Nenhum workspace definido. Use /workspace <path>',
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /add <file> — adiciona arquivo ao contexto ativo
+    if (text.startsWith('/add ')) {
+      const filePath = text.slice(5).trim();
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const resolved = path.resolve(filePath);
+        if (!fs.existsSync(resolved)) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `❌ Arquivo não encontrado: ${resolved}`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+          return;
+        }
+        const content = fs.readFileSync(resolved, 'utf8');
+        workspaceManager.addActiveFile('luna-cli', resolved, content);
+        const lines = content.split('\n').length;
+        setMessages(prev => [...prev, {
+          type: 'system', content: `📄 Adicionado ao contexto: ${resolved} (${lines} linhas, ${content.length} chars)`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /drop <file> — remove arquivo do contexto ativo
+    if (text.startsWith('/drop ')) {
+      const filePath = text.slice(6).trim();
+      const path = await import('path');
+      const resolved = path.resolve(filePath);
+      const removed = workspaceManager.removeActiveFile('luna-cli', resolved);
+      if (removed) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `🗑️ Removido do contexto: ${resolved}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `⚠️ Arquivo não estava no contexto: ${resolved}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
     }
 
     // /modo <arg>
