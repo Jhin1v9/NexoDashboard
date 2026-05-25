@@ -2,9 +2,9 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-atual-hud-v3` 🔥 — última atualização: 2026-05-23 19:15
+> **Sessão ativa:** `kimi-fase1-fix` 🔥 — última atualização: 2026-05-25 00:30
 > 
-> **Último commit:** `e1e7e4e` — feat: email fallback SMTP + E2E suite + changelog update
+> **Último commit:** `a8b66be` — fix: corrige bug confirmPendingActions + warmup NLU + remove Ollama
 
 ---
 
@@ -28,6 +28,45 @@
 **WebSocket:** ✅ `/ws` funcionando  
 **Ollama:** ✅ `gemma3:1b` preload OK  
 **PostgreSQL:** ✅ 19/19 entidades migradas  
+
+---
+
+## 🎯 Sessão Atual — Fase 1: Preview + Confirmação + Undo (CORREÇÕES)
+
+> **Data:** 2026-05-24/25
+> **Foco:** Corrigir bugs críticos que impediam uso rotineiro da Luna
+
+### ✅ Bugs Corrigidos
+
+| # | Bug | Arquivo | Solução |
+|---|---|---|---|
+| 1 | **Clique em Confirmar não executava ação** | `LunaChatPanel.jsx` | `confirmPendingActions` agora aceita `actionsOverride` — não depende mais do estado React atualizar |
+| 2 | **NLU demorava 5s na 1ª requisição** | `luna-nlu.js` + `server.js` | Warmup bloqueante no startup — backend só fica online quando NLU está pronto |
+| 3 | **Ollama consumia RAM/CPU sem uso** | `server.js` | Ollama removido completamente — será substituído por API externa |
+| 4 | **Comentário de bloco desbalanceado** | `server.js` | `/* Ollama removido */` continha `/* ignore */` dentro, quebrava syntax de todo o arquivo |
+| 5 | **Porta 3456/3457 em uso (processos zumbis)** | `global-setup.js` | `killProcessOnPort()` mata processos antigos antes de subir novos |
+| 6 | **Testes E2E usavam nomes esquisitos** | `luna-fase1.spec.js` | Nomes normais: "Ligar para fornecedor", "Enviar proposta" |
+
+### 🧪 Testes E2E — 3/3 passando
+
+```
+✓ admin exclui tarefa com preview e desfaz
+✓ cancelar exclusão responde com mensagem inteligente
+✓ NLU reconhece comandos básicos
+```
+
+### 📁 Arquivos Modificados
+- `frontend/src/components/luna/LunaChatPanel.jsx` — Fix `confirmPendingActions` + `actionsOverride`
+- `backend/services/luna-nlu.js` — Warmup após carregar modelo
+- `backend/server.js` — NLU preload bloqueante, Ollama removido, syntax fix
+- `e2e/specs/luna-fase1.spec.js` — Testes realistas
+- `e2e/pages/LunaChatPage.js` — Selectors corrigidos
+- `e2e/setup/global-setup.js` — Kill processos zumbis
+
+### ⚠️ Notas
+- **Ollama removido:** Todas as chamadas a `lunaOllama.chat()` foram substituídas por fallback estático. O usuário vai integrar API externa depois.
+- **NLU warmup:** Adiciona ~5-6s no startup do backend, mas elimina o delay da 1ª requisição.
+- **Demora residual:** Ainda há ~6-8s por requisição devido à chamada HTTP interna (`/api/luna/threads/:id/messages` → `/api/luna/chat`). Otimização futura: chamar diretamente a função em vez de fazer fetch interno.
 
 ---
 

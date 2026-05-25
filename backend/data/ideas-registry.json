@@ -23,10 +23,10 @@
   },
   "_meta": {
     "company": "NEXO DIGITAL",
-    "totalIdeas": 9,
+    "totalIdeas": 10,
     "totalTemplates": 4,
     "totalCategories": 6,
-    "lastIdeaId": "idea-009",
+    "lastIdeaId": "idea-010",
     "idPadding": 3,
     "idPrefix": "idea-",
     "currency": "EUR",
@@ -4020,6 +4020,209 @@
           "changedBy": "luna-agent",
           "changedAt": "2026-05-25T00:34:14.882Z",
           "changeSummary": "Nota de atualizacao: modos Instant/Thinking, Agent, Agent Swarm, K2.6"
+        }
+      ]
+    },
+    "idea-010": {
+      "id": "idea-010",
+      "title": "Otimizar performance da Luna — chamadas internas HTTP → funcao direta",
+      "status": "rascunho",
+      "type": "processo",
+      "priority": "alta",
+      "linkedTo": {
+        "clientId": null,
+        "clientName": null,
+        "leadId": null,
+        "projectId": null
+      },
+      "content": {
+        "blocks": [
+          {
+            "id": "blk-1779669451091-c42z1",
+            "type": "heading",
+            "level": 1,
+            "content": "Contexto"
+          },
+          {
+            "id": "blk-1779669451091-zlq62",
+            "type": "paragraph",
+            "content": "Outra instancia Kimi (kimi-k2.6) acabou de finalizar uma rodada de correcoes criticas no sistema da Luna. O dashboard agora funciona para uso rotineiro — criar/apagar tarefas pelo chat da Luna esta operacional. Porem ainda ha demora residual de ~6-8s por requisicao."
+          },
+          {
+            "id": "blk-1779669451091-639pt",
+            "type": "heading",
+            "level": 1,
+            "content": "O que a outra instancia ja fez"
+          },
+          {
+            "id": "blk-1779669451091-53lhr",
+            "type": "paragraph",
+            "content": "• confirmPendingActions agora recebe actionsOverride — clique em Confirmar/Excluir no preview funciona"
+          },
+          {
+            "id": "blk-1779669451091-5n34o",
+            "type": "paragraph",
+            "content": "• Warmup do NLU apos carregar modelo (evita 5s de delay na 1a requisicao)"
+          },
+          {
+            "id": "blk-1779669451091-f502q",
+            "type": "paragraph",
+            "content": "• NLU pre-carregado bloqueante no startup; Ollama removido; syntax corrigida"
+          },
+          {
+            "id": "blk-1779669451091-ui830",
+            "type": "paragraph",
+            "content": "• Testes E2E simplificados com nomes reais, 3/3 passando"
+          },
+          {
+            "id": "blk-1779669451091-y71ca",
+            "type": "paragraph",
+            "content": "• Seletores corrigidos para cards de confirmacao"
+          },
+          {
+            "id": "blk-1779669451091-t1o6v",
+            "type": "paragraph",
+            "content": "• Mata processos zumbis nas portas 3456/3457 antes de iniciar"
+          },
+          {
+            "id": "blk-1779669451091-ypev9",
+            "type": "heading",
+            "level": 1,
+            "content": "Problema atual"
+          },
+          {
+            "id": "blk-1779669451092-w2uk1",
+            "type": "paragraph",
+            "content": "A demora residual (~6-8s) vem da requisicao HTTP interna + PostgreSQL remoto (Neon)."
+          },
+          {
+            "id": "blk-1779669451092-zu98z",
+            "type": "heading",
+            "level": 1,
+            "content": "Solucao proposta"
+          },
+          {
+            "id": "blk-1779669451092-nqhhk",
+            "type": "paragraph",
+            "content": "Converter a chamada interna HTTP (frontend -> backend -> NLU) em uma FUNCAO DIRETA no backend. Em vez de fazer fetch interno para /api/luna/interpret, chamar a funcao de interpretacao diretamente no mesmo processo Node.js. Isso elimina:"
+          },
+          {
+            "id": "blk-1779669451092-pbjre",
+            "type": "paragraph",
+            "content": "• Overhead de HTTP interno"
+          },
+          {
+            "id": "blk-1779669451092-hatd2",
+            "type": "paragraph",
+            "content": "• Latencia de rede (mesmo que localhost)"
+          },
+          {
+            "id": "blk-1779669451092-5st0l",
+            "type": "paragraph",
+            "content": "• Serializacao/deserializacao JSON extra"
+          },
+          {
+            "id": "blk-1779669451092-9q84j",
+            "type": "paragraph",
+            "content": "• Tempo de setup de conexao TCP"
+          },
+          {
+            "id": "blk-1779669451092-olam0",
+            "type": "heading",
+            "level": 1,
+            "content": "Arquivos envolvidos"
+          },
+          {
+            "id": "blk-1779669451092-4fld9",
+            "type": "paragraph",
+            "content": "• backend/server.js (onde a rota /api/luna/interpret chama o NLU)"
+          },
+          {
+            "id": "blk-1779669451092-4d4bs",
+            "type": "paragraph",
+            "content": "• backend/services/luna-nlu.js (funcao de interpretacao)"
+          },
+          {
+            "id": "blk-1779669451092-69fvr",
+            "type": "paragraph",
+            "content": "• frontend/src/components/luna/LunaChatPanel.jsx (onde faz o fetch)"
+          },
+          {
+            "id": "blk-1779669451092-a6t99",
+            "type": "heading",
+            "level": 1,
+            "content": "Impacto esperado"
+          },
+          {
+            "id": "blk-1779669451092-2kmia",
+            "type": "paragraph",
+            "content": "Reducao de 6-8s para <1s por requisicao de chat da Luna."
+          },
+          {
+            "id": "blk-1779669451092-6guxg",
+            "type": "heading",
+            "level": 1,
+            "content": "Proximo passo"
+          },
+          {
+            "id": "blk-1779669451092-ebwaz",
+            "type": "paragraph",
+            "content": "Refatorar o endpoint /api/luna/interpret para chamar a funcao de NLU diretamente em vez de fazer fetch interno."
+          }
+        ]
+      },
+      "aiContext": {
+        "brainstormHistory": [],
+        "aiSuggestions": [],
+        "aiInsights": []
+      },
+      "tags": [
+        "luna",
+        "performance",
+        "otimizacao",
+        "nlu",
+        "backend",
+        "refactor"
+      ],
+      "createdBy": "luna-agent",
+      "createdByName": "Luna",
+      "createdAt": "2026-05-25T00:37:31.089Z",
+      "updatedAt": "2026-05-25T00:37:31.089Z",
+      "collaborators": [],
+      "comments": [
+        {
+          "id": "cmt-1779669451092-c1",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Ideia registrada com base no trabalho da outra instancia Kimi (kimi-k2.6). A screenshot mostra que o dashboard agora funciona rotineiramente, mas ainda ha ~6-8s de delay por requisicao HTTP interna + PostgreSQL remoto.",
+          "timestamp": "2026-05-25T00:37:31.089Z",
+          "reactions": [],
+          "mentions": []
+        },
+        {
+          "id": "cmt-1779669451092-c2",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Arquivos ja modificados pela outra instancia: LunaChatPanel.jsx, luna-nlu.js, server.js, e2e/specs/luna-fase1.spec.js, e2e/pages/LunaChatPage.js, e2e/setup/global-setup.js. NAO modificar esses arquivos sem revisar primeiro.",
+          "timestamp": "2026-05-25T00:37:31.089Z",
+          "reactions": [],
+          "mentions": []
+        }
+      ],
+      "attachments": [],
+      "versionHistory": [
+        {
+          "version": 1,
+          "snapshot": {
+            "title": "Otimizar performance da Luna — chamadas internas HTTP → funcao direta",
+            "status": "rascunho",
+            "content": {
+              "blocks": []
+            }
+          },
+          "changedBy": "luna-agent",
+          "changedAt": "2026-05-25T00:37:31.089Z",
+          "changeSummary": "Ideia criada pela Luna com base no trabalho de outra instancia"
         }
       ]
     }

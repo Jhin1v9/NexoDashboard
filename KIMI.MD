@@ -20,10 +20,10 @@
 ## 0. Instance Identity
 
 ```yaml
-active_instance: kimi-10a71fc7
-signature: KIMI-10A71FC7 🟡
+active_instance: kimi-fase1-fix
+signature: KIMI-FASE1-FIX 🟢
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-23T01:00:00+02:00
+last_updated: 2026-05-25T00:30:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -49,9 +49,24 @@ last_updated: 2026-05-23T01:00:00+02:00
 
 ## 2. Current Focus
 
-### 🎯 Sprint Ativo: Fase 0.1 — Reverse Schema Engineering + Migração PG
+### 🎯 Sprint Ativo: Fase 1 — Preview Contextual + Confirmação + Undo (CORREÇÕES CRÍTICAS)
 
-**Status:** 🟡 Em andamento — 10 de 19 entidades migradas (52.6%)
+**Status:** ✅ Concluído — 3/3 testes E2E passando, dashboard operacional para uso rotineiro
+
+**Commits:**
+- `f05e9f1` fix(frontend): corrige bug confirmPendingActions lendo estado antes do React atualizar
+- `a8b66be` docs: atualiza handoff + registry de ideas
+
+**Bugs corrigidos:**
+1. ✅ Clique em Confirmar no preview agora executa a ação (bug crítico do `confirmPendingActions`)
+2. ✅ NLU pré-carregado no startup (evita 5s de delay na 1ª requisição)
+3. ✅ Ollama removido (consumia RAM/CPU sem uso — será substituído por API)
+4. ✅ Syntax error por comentário de bloco desbalanceado corrigido
+5. ✅ Testes E2E simplificados e passando (nomes reais, não esquisitos)
+
+### 🗄️ Fase 0.1 — Reverse Schema Engineering + Migração PG
+
+**Status:** ✅ Concluído — 19/19 entidades migradas (100%)
 
 #### Arquitetura de Persistência (REESCRITA)
 - `backend/datastore-pg.js` — Datastore 100% PostgreSQL. 33 funções, zero fallback JSON.
