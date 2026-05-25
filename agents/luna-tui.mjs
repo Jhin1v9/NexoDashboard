@@ -179,14 +179,14 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
   return null;
 });
 
-function MessageList({ messages, streamingText, thinkingText, isStreaming }) {
+function MessageList({ messages, streamingText, thinkingText, isStreaming, showThinkingStream }) {
   // Show all messages — Ink handles overflow naturally
   // Using React.memo on MessageItem prevents re-render of old messages during streaming
   return h(Box, { flexDirection: 'column', width: '100%' },
     messages.map(msg => h(MessageItem, { key: msg.id, msg })),
 
-    // Thinking mode: dimmed, lower opacity reasoning text
-    isStreaming && thinkingText && h(Box, { flexDirection: 'column', marginY: 1 },
+    // Thinking mode: either full stream or compact indicator
+    isStreaming && thinkingText && showThinkingStream && h(Box, { flexDirection: 'column', marginY: 1 },
       h(Box, { flexDirection: 'row' },
         h(Text, { color: C.dim, dimColor: true, bold: true }, '🧠 '),
         h(Text, { color: C.dim, dimColor: true, bold: true }, 'Pensando...')
@@ -509,7 +509,9 @@ function HelpOverlay({ onClose }) {
     ['/sair, /exit', 'Encerra'],
     ['/reiniciar', 'Reinicia Luna para carregar atualizações'],
     ['/novo', 'Nova sessão'],
+    ['/newthread', 'Nova thread no Kimi Web (reset contexto)'],
     ['/limpar', 'Limpa contexto'],
+    ['/compact', 'Resume contexto e inicia nova thread'],
     ['/modo <nome>', 'Muda persona'],
     ['/modo instant/thinking', 'Muda modo'],
     ['/skills', 'Lista skills'],
@@ -519,6 +521,7 @@ function HelpOverlay({ onClose }) {
     ['/login', 'Login no Kimi Web (inicia Chrome se necessário)'],
     ['/logout', 'Desloga e fecha Chrome'],
     ['/yolo', 'Toggle YOLO'],
+    ['/thinking', 'Toggle thinking display (compact/stream)'],
     ['/help', 'Ajuda'],
     ['Ctrl+H', 'Toggle ajuda'],
     ['Ctrl+S', 'Steer (interromper/responder)'],
@@ -573,6 +576,12 @@ function App({ luna, sessionManager, initialSession }) {
   const [bridgeStatus, setBridgeStatus] = useState({ active: false });
   const [sessionStartTime, setSessionStartTime] = useState(Date.now());
   const [awaitingLogin, setAwaitingLogin] = useState(false);
+  const [showThinkingStream, setShowThinkingStream] = useState(session?.showThinkingStream ?? false);
+
+  // Refs for accumulated text to reduce re-renders
+  const thinkingRef = useRef('');
+  const responseRef = useRef('');
+  const thinkingStartRef = useRef(null);
 
   // Message queue: when AI is processing, user input queues here
   const messageQueue = useRef([]);
@@ -704,6 +713,53 @@ function App({ luna, sessionManager, initialSession }) {
     if (text === '/novo') {
       const s = sessionManager.createSession({ title: 'Nova sessão' });
       setSession(s); setMessages([]); return;
+    }
+
+    // /newthread — force new Kimi Web thread (full system prompt on next msg)
+    if (text === '/newthread') {
+      setMessages(prev => [...prev, { type: 'system', content: '🔄 Criando nova thread no Kimi Web...', id: nextId(), timestamp: new Date().toISOString() }]);
+      try {
+        const result = await luna.newThread?.('luna-default');
+        sessionManager.clearContext(session.id);
+        setMessages([{ type: 'system', content: `✅ Nova thread criada. Próxima mensagem enviará o system prompt completo.`, id: nextId(), timestamp: new Date().toISOString() }]);
+      } catch (err) {
+        setMessages(prev => [...prev, { type: 'system', content: `❌ Erro ao criar thread: ${err.message}`, id: nextId(), timestamp: new Date().toISOString() }]);
+      }
+      return;
+    }
+
+    // /compact — summarize context and start fresh thread
+    if (text === '/compact') {
+      setMessages(prev => [...prev, { type: 'system', content: '📦 Compactando contexto...', id: nextId(), timestamp: new Date().toISOString() }]);
+      try {
+        // Build a summary of the current session
+        const events = sessionManager.readContext(session.id) || [];
+        const summaryLines = [];
+        for (const ev of events.slice(-20)) {
+          if (ev.type === 'user') summaryLines.push(`User: ${ev.content?.slice(0, 100)}`);
+          else if (ev.type === 'assistant') summaryLines.push(`Luna: ${ev.response?.slice(0, 100) || ev.content?.slice(0, 100)}`);
+          else if (ev.type === 'tool_result') summaryLines.push(`Tool ${ev.tool}: ${ev.success ? '✅' : '❌'}`);
+        }
+        const summary = summaryLines.join('\n');
+
+        // Create new thread in Kimi Web
+        await luna.newThread?.('luna-default');
+
+        // Clear local context but keep session
+        sessionManager.clearContext(session.id);
+
+        // Store summary as first event so next message includes it
+        sessionManager.appendEvent(session.id, {
+          type: 'system',
+          content: `Resumo da sessão anterior:\n${summary}`,
+          timestamp: new Date().toISOString(),
+        });
+
+        setMessages([{ type: 'system', content: `✅ Contexto compactado. Thread nova. Resumo salvo.`, id: nextId(), timestamp: new Date().toISOString() }]);
+      } catch (err) {
+        setMessages(prev => [...prev, { type: 'system', content: `❌ Erro ao compactar: ${err.message}`, id: nextId(), timestamp: new Date().toISOString() }]);
+      }
+      return;
     }
 
     // /limpar
@@ -893,6 +949,19 @@ function App({ luna, sessionManager, initialSession }) {
       return;
     }
 
+    // /thinking — toggle thinking display mode (compact vs stream)
+    if (text === '/thinking') {
+      const next = !showThinkingStream;
+      setShowThinkingStream(next);
+      setSession(prev => ({ ...prev, showThinkingStream: next }));
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: `🧠 Thinking display: ${next ? 'STREAM (full text)' : 'COMPACT (indicator only)'}`,
+        id: nextId(), timestamp: new Date().toISOString()
+      }]);
+      return;
+    }
+
     // ─── Mensagem normal para LunaSoul ────────────────────────────────────
     setMessages(prev => [...prev, {
       type: 'user', content: text,
@@ -902,6 +971,9 @@ function App({ luna, sessionManager, initialSession }) {
     setStatusText('🧠 Analisando...');
     setStreamingText('');
     setThinkingText('');
+    thinkingRef.current = '';
+    responseRef.current = '';
+    thinkingStartRef.current = null;
     setCanSteer(false);
 
     try {
@@ -918,17 +990,34 @@ function App({ luna, sessionManager, initialSession }) {
         switch (ev.type) {
           case 'thinking_start':
             setStatusText('🧠 Pensando...');
+            thinkingStartRef.current = Date.now();
             break;
 
-          case 'thinking_delta':
-            setThinkingText(ev.fullThinking || '');
-            setStatusText('🧠 Pensando...');
+          case 'thinking_delta': {
+            const full = ev.fullThinking || '';
+            thinkingRef.current = full;
+            if (showThinkingStream) {
+              setThinkingText(full);
+            }
+            // Compute compact indicator
+            const elapsed = thinkingStartRef.current ? ((Date.now() - thinkingStartRef.current) / 1000).toFixed(1) : '0.0';
+            const tokens = estimateTokens(full);
+            const tokStr = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
+            if (!showThinkingStream) {
+              setStatusText(`🧠 Thinking ${'.'.repeat((Date.now() / 200) % 4)}  ${elapsed}s · ${tokStr} tokens`);
+            } else {
+              setStatusText('🧠 Pensando...');
+            }
             break;
+          }
 
-          case 'response_delta':
-            setStreamingText(ev.fullResponse || '');
+          case 'response_delta': {
+            const full = ev.fullResponse || '';
+            responseRef.current = full;
+            setStreamingText(full);
             setStatusText('💬 Respondendo...');
             break;
+          }
 
           case 'can_steer':
             setCanSteer(ev.value);
@@ -940,7 +1029,7 @@ function App({ luna, sessionManager, initialSession }) {
 
           case 'response_done':
             setStreamingText(ev.response || '');
-            setThinkingText('');
+            setThinkingText(showThinkingStream ? '' : thinkingRef.current);
             break;
 
           case 'mode_detected':
@@ -964,9 +1053,12 @@ function App({ luna, sessionManager, initialSession }) {
             setActiveToolCalls(n => Math.max(0, n - 1));
             const res = ev.result;
             if (res) {
+              const friendly = res.result?.friendlyMessage || res.friendlyMessage;
+              const technical = res.result?.stdout || res.result?.output || res.result?.text || JSON.stringify(res.result);
               setMessages(prev => [...prev, {
                 type: 'tool_result', success: res.success !== false,
-                output: res.result?.stdout || res.result?.output || res.result?.text || JSON.stringify(res.result),
+                output: friendly || technical,
+                friendly: !!friendly,
                 timestamp: new Date().toISOString(),
                 id: nextId(),
               }]);
@@ -1072,6 +1164,38 @@ function App({ luna, sessionManager, initialSession }) {
             }]);
             break;
 
+          case 'compact_start':
+            setStatusText('📦 Compactando contexto...');
+            setMessages(prev => [...prev, {
+              type: 'system', content: ev.message,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+            break;
+
+          case 'compact_progress':
+            setStatusText(ev.message);
+            setMessages(prev => [...prev, {
+              type: 'system', content: ev.message,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+            break;
+
+          case 'compact_end':
+            setStatusText('✅ Contexto compactado');
+            setMessages(prev => [...prev, {
+              type: 'system', content: ev.message,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+            break;
+
+          case 'compact_error':
+            setStatusText('❌ Erro na compactação');
+            setMessages(prev => [...prev, {
+              type: 'system', content: ev.message,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+            break;
+
           case 'done':
             finalResult = ev.result;
             break;
@@ -1119,6 +1243,9 @@ function App({ luna, sessionManager, initialSession }) {
       setIsProcessing(false);
       setStreamingText('');
       setThinkingText('');
+      thinkingRef.current = '';
+      responseRef.current = '';
+      thinkingStartRef.current = null;
       setStatusText('');
       setActiveToolCalls(0);
       setCanSteer(false);
@@ -1262,7 +1389,7 @@ function App({ luna, sessionManager, initialSession }) {
       width: '100%',
       minHeight: 2,
     },
-      h(MessageList, { messages, streamingText, thinkingText, isProcessing }),
+      h(MessageList, { messages, streamingText, thinkingText, isProcessing, showThinkingStream }),
     ),
 
     // Status
