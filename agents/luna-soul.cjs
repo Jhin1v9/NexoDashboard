@@ -21,6 +21,7 @@ const { KimiBridge } = require('./kimi-bridge.cjs');
 const { ComputerUseEngine } = require('./computer-use-engine.cjs');
 const lunaTools = require('./luna-tools.cjs');
 const { workspaceManager } = require('./luna-workspace.cjs');
+const { LunaGit } = require('./luna-git.cjs');
 
 const LUNA_DIR = path.join(os.homedir(), '.luna');
 const SKILLS_DIR = path.join(LUNA_DIR, 'skills');
@@ -654,6 +655,22 @@ class LunaSoul extends EventEmitter {
     this.taskTimeoutMs = options.taskTimeoutMs || 5 * 60 * 1000;
     this.defaultMode = options.defaultMode || 'thinking';
     this.autoSwitchEnabled = options.autoSwitch !== false; // default true
+    this.lunaGit = null;
+  }
+
+  /** Initialize git for workspace if available */
+  async _ensureGit() {
+    const ws = workspaceManager.getWorkspace('luna-cli');
+    if (!ws) return null;
+    if (this.lunaGit && this.lunaGit.workspacePath === ws.path) return this.lunaGit;
+    this.lunaGit = new LunaGit(ws.path);
+    const result = await this.lunaGit.init();
+    if (!result.success) {
+      // Not a git repo — that's ok, just no git features
+      this.lunaGit = null;
+      return null;
+    }
+    return this.lunaGit;
   }
 
   /** Initialize Kimi Bridge connection */
@@ -1568,6 +1585,26 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
       }
     } catch (err) {
       result = { success: false, error: err.message };
+    }
+
+    // Auto-commit git hook for file-modifying tools
+    const MODIFYING_TOOLS = ['writeFile', 'appendFile', 'replaceInFile', 'deleteFile', 'moveFile'];
+    if (result.success && MODIFYING_TOOLS.includes(tool)) {
+      try {
+        const git = await this._ensureGit();
+        if (git) {
+          const filePath = params.path || params.filePath || params.source || params.from;
+          if (filePath) {
+            const commitResult = await git.commit(filePath, `luna: ${tool} ${path.basename(filePath)}`);
+            if (commitResult.success && commitResult.hash) {
+              result.gitCommit = commitResult.hash;
+            }
+          }
+        }
+      } catch (gitErr) {
+        // Git errors shouldn't fail the tool call
+        result.gitWarning = gitErr.message;
+      }
     }
 
     // Format output for storage

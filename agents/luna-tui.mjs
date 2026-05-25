@@ -525,6 +525,9 @@ function HelpOverlay({ onClose }) {
     ['/status', 'Status do sistema'],
     ['/login', 'Login no Kimi Web (inicia Chrome se necessário)'],
     ['/logout', 'Desloga e fecha Chrome'],
+    ['/undo', 'Reverte todas as mudanças da sessão'],
+    ['/diff', 'Mostra diff da sessão'],
+    ['/reset', 'Descarta sessão e volta para branch base'],
     ['/yolo', 'Toggle YOLO'],
     ['/thinking', 'Toggle thinking display (compact/stream)'],
     ['/help', 'Ajuda'],
@@ -853,6 +856,111 @@ function App({ luna, sessionManager, initialSession }) {
       } else {
         setMessages(prev => [...prev, {
           type: 'system', content: `⚠️ Arquivo não estava no contexto: ${resolved}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /undo — reverte TODAS as mudanças da sessão
+    if (text === '/undo') {
+      try {
+        const { LunaGit } = await import('./luna-git.cjs');
+        const ws = workspaceManager.getWorkspace('luna-cli');
+        if (!ws) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: '⚠️ Nenhum workspace definido.',
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+          return;
+        }
+        const git = new LunaGit(ws.path);
+        git.isRepo = true; // bypass init check
+        git.sessionBranch = git._getCurrentBranch();
+        const result = await git.undo();
+        if (result.success) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `↩️ Revertidos ${result.reverted} commits. Workspace restaurado.`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `❌ Erro ao reverter: ${result.error}`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        }
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /diff — mostra diff da sessão
+    if (text === '/diff') {
+      try {
+        const { LunaGit } = await import('./luna-git.cjs');
+        const ws = workspaceManager.getWorkspace('luna-cli');
+        if (!ws) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: '⚠️ Nenhum workspace definido.',
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+          return;
+        }
+        const git = new LunaGit(ws.path);
+        const result = await git.diffFull();
+        if (result.success) {
+          const diffText = result.diff || 'Nenhuma mudança.';
+          setMessages(prev => [...prev, {
+            type: 'system', content: `🌿 Diff da sessão:\n\`\`\`diff\n${diffText.slice(0, 2000)}\n\`\`\``,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `❌ Erro: ${result.error}`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        }
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
+          id: nextId(), timestamp: new Date().toISOString(),
+        }]);
+      }
+      return;
+    }
+
+    // /reset — descarta tudo e volta pra base
+    if (text === '/reset') {
+      try {
+        const { LunaGit } = await import('./luna-git.cjs');
+        const ws = workspaceManager.getWorkspace('luna-cli');
+        if (!ws) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: '⚠️ Nenhum workspace definido.',
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+          return;
+        }
+        const git = new LunaGit(ws.path);
+        const result = await git.reset();
+        if (result.success) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `🗑️ Sessão descartada. Voltando para ${result.baseBranch}.`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `❌ Erro: ${result.error}`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+        }
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
           id: nextId(), timestamp: new Date().toISOString(),
         }]);
       }
