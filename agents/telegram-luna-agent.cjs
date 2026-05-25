@@ -712,9 +712,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
+        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+
         const enrichedQuestion = context
-          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${replyContext}${namePrefix}${question}`;
+          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${noGreeting}${replyContext}${namePrefix}${question}`;
 
         const result = await askBridge(userId, enrichedQuestion, null, null);
 
@@ -764,9 +766,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
+        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+
         const enrichedQuestion = context
-          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${replyContext}${namePrefix}${question}`;
+          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${noGreeting}${replyContext}${namePrefix}${question}`;
         const result = await askBridge(userId, enrichedQuestion, 'instant', null);
         await finalize(result.response, 'instant');
       } catch (err) {
@@ -814,9 +818,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
+        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+
         const enrichedQuestion = context
-          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${replyContext}${namePrefix}${question}`;
+          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${noGreeting}${replyContext}${namePrefix}${question}`;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', null);
         await finalize(result.response, 'thinking');
       } catch (err) {
@@ -1318,6 +1324,112 @@ class TelegramLunaAgent {
   }
 
   // ── HANDLER PRINCIPAL ──
+  // ── COMPUTER USE DETECTOR (chat privado sem /pc) ──
+  _isComputerUseCommand(text) {
+    const pcPatterns = [
+      /\b(abre|abrir|fecha|fechar|minimize|minimizar|maximiza|maximizar)\s+(o\s+)?(chrome|terminal|telegram|vscode|app|aplicativo|navegador)\b/i,
+      /\b(clica|click|clique|digita|digitar|escreve|escrever|cola|colar)\s+(em|no|na|aqui)?\b/i,
+      /\b(executa|executar|roda|rodar|run)\s+(o\s+)?(comando|script|programa)?\b/i,
+      /\b(tira|tire|captura|capturar)\s+(um\s+)?(screenshot|print|printscreen|captura\s+de\s+tela)\b/i,
+      /\b(vai|vai\s+para|navega|navegar|entra|entrar|acesse|acessar)\s+(em|no|na|para)\b/i,
+      /\b(instala|instalar|update|atualiza|atualizar|upgrade)\b/i,
+      /\b(configura|configurar|define|definir|ajusta|ajustar)\s+(o\s+)?(sistema|pc|computador|rede|wifi|display|tela)\b/i,
+      /\b(mostra|me\s+mostra|me\s+diga|qual\s+(é|eh))\s+(o\s+)?(ip|hora|data|espaco|memoria|cpu|processos|disco|versao)\b/i,
+      /\b(lista|listar|mostra|mostrar)\s+(os\s+)?(arquivos|pastas|diretorios|processos|janelas)\b/i,
+      /\b(cria|criar|deleta|deletar|apaga|apagar|remove|remover)\s+(um\s+)?(arquivo|pasta|diretorio)\b/i,
+      /\b(abre|abrir|mostra|mostrar)\s+(o\s+)?(downloads|documentos|desktop|home)\b/i,
+      /\b(desliga|reinicia|suspender|lock|bloqueia)\s+(o\s+)?(pc|computador|tela)\b/i,
+    ];
+    return pcPatterns.some(p => p.test(text));
+  }
+
+  async _handlePrivateComputerUse(msg, text) {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    log('info', `[PC_AUTO] Chat privado detectou comando de PC: ${text.slice(0, 60)}`);
+
+    // Simple commands → direct execution
+    const simpleShellPatterns = [
+      { regex: /\b(mostra|me\s+diga|qual)\s+(o\s+)?(ip|hora|data|dia)\b/i, command: (t) => t.match(/ip/i) ? 'ip addr show | grep "inet " | head -2' : 'date' },
+      { regex: /\b(espaco|memoria|ram|cpu|processos)\b/i, command: () => 'free -h && echo "---" && df -h / && echo "---" && ps aux --sort=-%cpu | head -5' },
+      { regex: /\b(lista|listar)\s+(os\s+)?arquivos\b/i, command: () => 'ls -lah ~/' },
+      { regex: /\b(tira|captura)\s+(um\s+)?screenshot\b/i, command: null, type: 'screenshot' },
+    ];
+
+    for (const pattern of simpleShellPatterns) {
+      if (pattern.regex.test(text)) {
+        const statusMsg = await this.bot.sendMessage(chatId, '🖥️ Executando...', { reply_to_message_id: msg.message_id });
+
+        try {
+          let result;
+          if (pattern.type === 'screenshot') {
+            const ssResult = await pcEngine.executeSingle({ type: 'screenshot' });
+            if (ssResult.success && ssResult.screenshot) {
+              await this.bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+              await this.bot.sendPhoto(chatId, ssResult.screenshot, { caption: '📸 Screenshot do PC', reply_to_message_id: msg.message_id });
+              return;
+            }
+          } else {
+            const cmd = typeof pattern.command === 'function' ? pattern.command(text) : pattern.command;
+            result = await pcEngine.executeSingle({ type: 'shell', params: { command: cmd } });
+            const output = result.stdout || result.stderr || 'Sem saída';
+            const emoji = result.success ? '✅' : '❌';
+            await this.bot.editMessageText(`${emoji} \`${cmd}\`\n\n\`\`\`\n${output.slice(0, 3500)}\n\`\`\``, {
+              chat_id: chatId,
+              message_id: statusMsg.message_id,
+              parse_mode: 'Markdown',
+            });
+            return;
+          }
+        } catch (err) {
+          await this.bot.editMessageText(`❌ Erro: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+          return;
+        }
+      }
+    }
+
+    // Complex commands → ReAct loop
+    const statusMsg = await this.bot.sendMessage(chatId, '🤖 [Computer Use]\n📝 ' + text + '\n\n① Analisando...', { reply_to_message_id: msg.message_id });
+    let messageText = '🤖 [Computer Use]\n📝 ' + text + '\n';
+
+    try {
+      const bridge = await this.getKimiBridge();
+      const self = this;
+      const react = new ComputerUseReAct({
+        kimiBridge: bridge,
+        userId: String(userId),
+        mode: 'thinking',
+        maxIterations: 12,
+        async onStep(step) {
+          messageText += '\n' + step.message;
+          try {
+            await self.bot.editMessageText(messageText.slice(0, 4000), {
+              chat_id: chatId,
+              message_id: statusMsg.message_id,
+            });
+          } catch {}
+        },
+      });
+
+      const result = await react.runTask(text);
+
+      if (result.success) {
+        messageText += '\n\n✅ *Tarefa concluída!*';
+      } else {
+        messageText += '\n\n❌ *Erro:* ' + result.error;
+      }
+
+      await this.bot.editMessageText(messageText.slice(0, 4000), {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: 'Markdown',
+      });
+    } catch (err) {
+      await this.bot.editMessageText(`❌ Erro: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+    }
+  }
+
   async handleMessage(msg) {
     log('info', `[MSG] from ${msg.from?.first_name || 'unknown'}: ${(msg.text || '').slice(0, 60)}`);
     const text = msg.text || msg.caption || '';
@@ -1327,6 +1439,12 @@ class TelegramLunaAgent {
     // Kimi and PC commands are handled by onText — skip here to avoid double processing
     if (/^\/kimi/.test(text)) return;
     if (/^\/pc/.test(text)) return;
+
+    // ── CHAT PRIVADO: detecção automática de comandos de PC ──
+    if (msg.chat.type === 'private' && this._isComputerUseCommand(text)) {
+      await this._handlePrivateComputerUse(msg, text);
+      return;
+    }
 
     // Wizard ativo?
     if (this.hasActiveWizard(chatId)) {
