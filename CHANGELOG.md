@@ -23,6 +23,21 @@
   - Comandos slash: /new, /models, /compact, /clear, /history, /export,
     /skills, /personas
   - Modo META: Kimi Web pode criar ferramentas, skills, scripts, personas
+- **Luna CLI v3.1** — Thinking/Response Separation + Streaming Compact
+  - Arquitetura 4 camadas de extração thinking/response do Kimi Web:
+    1. Stream interceptor (fetch/XHR/EventSource/WebSocket) — parseia
+       deltas SSE em reasoning_content / content
+    2. React Fiber inspection — encontra memoizedProps.message.reasoning_content
+    3. Heurística de estilo computado (grey + italic = thinking)
+    4. Fallback CSS selector + heurística de padrão de conteúdo
+  - Final extraction sempre prefere texto limpo de _extractResponse ao
+    invés de lastResponse poluído acumulado durante polling DOM
+  - WebSocket interception adicionado para detectar transporte do Kimi Web
+  - Modo compacto de thinking (default): texto de thinking acumulado em
+    ref, apenas status line mostra '🧠 Thinking ... 2.1s · 800 tokens'
+  - Comando `/thinking` toggle entre stream completo e indicador compacto
+  - React.memo em MessageItem previne re-render do histórico durante streaming
+  - Testes: 12 unitários + 4 integração + 1 teste real ao vivo
 - **LunaSoul v3.0** (`agents/luna-soul.cjs`)
   - Engine orquestrador unificado (CLI-first, multi-channel, self-improving)
   - Loop: recebe msg → contexto → Kimi Web → parse → executa → responde
@@ -53,6 +68,13 @@
   - `test-engine.cjs`: teste isolado do Computer Use Engine
   - `test-input.cjs`: teste de input (xdotool/ydotool)
   - `test-react-real.cjs`: teste do componente React do Computer Use
+- **Testes de Thinking/Response Separation**
+  - `test-thinking-extraction.mjs`: 12 testes unitários (SSE parsing, DOM
+    extraction, React Fiber, style heuristic, content-pattern split)
+  - `test-bridge-integration.mjs`: 4 testes de integração (layer fallback,
+    stream interceptor priority)
+  - `test-real-site.mjs`: teste ao vivo contra Kimi Web com verificação
+    de separação thinking/response
 
 ### Changed
 - `agents/package.json`: adiciona `ink` (^7.0.4) e `react` (^19.2.6)
