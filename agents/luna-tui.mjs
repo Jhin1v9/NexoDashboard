@@ -9,7 +9,7 @@ import { render, Box, Text, useInput, useApp, useWindowSize } from 'ink';
 import { Spinner, Badge } from '@inkjs/ui';
 import { LunaSoul } from './luna-soul.cjs';
 import { SessionManager } from './session-manager.cjs';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 
 const h = React.createElement;
 
@@ -509,6 +509,7 @@ function HelpOverlay({ onClose }) {
 
   const cmds = [
     ['/sair, /exit', 'Encerra'],
+    ['/reiniciar', 'Reinicia Luna para carregar atualizações'],
     ['/novo', 'Nova sessão'],
     ['/limpar', 'Limpa contexto'],
     ['/modo <nome>', 'Muda persona'],
@@ -675,6 +676,28 @@ function App({ luna, sessionManager, initialSession }) {
 
     // /sair
     if (text === '/sair' || text === '/exit') { exit(); return; }
+
+    // /reiniciar
+    if (text === '/reiniciar') {
+      setMessages(prev => [...prev, {
+        type: 'system', content: '🔄 Reiniciando Luna para carregar atualizações...',
+        timestamp: new Date().toISOString(), id: nextId(),
+      }]);
+      // Small delay so the message renders
+      setTimeout(() => {
+        try {
+          luna.disconnect?.().catch(() => {});
+        } catch {}
+        // Respawn the same process
+        spawn(process.argv[0], process.argv.slice(1), {
+          detached: true,
+          stdio: 'inherit',
+          env: process.env,
+        });
+        exit();
+      }, 500);
+      return;
+    }
 
     // /help
     if (text === '/help') { setShowHelp(true); return; }
