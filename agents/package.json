@@ -8,6 +8,7 @@
     "whatsapp": "node whatsapp-agent.js"
   },
   "dependencies": {
+    "@inkjs/ui": "^2.0.0",
     "axios": "^1.16.0",
     "ink": "^7.0.4",
     "node-cron": "^3.0.3",
