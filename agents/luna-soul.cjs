@@ -27,6 +27,108 @@ const PERSONAS_DIR = path.join(LUNA_DIR, 'personas');
 const MEMORIES_DIR = path.join(LUNA_DIR, 'memories');
 
 // ============================================================
+// AGENTS.md AUTO-DISCOVERY (inspired by kimi-cli)
+// Searches for AGENTS.md from cwd up to homedir
+// ============================================================
+const AGENTS_MD_MAX_BYTES = 32 * 1024; // 32 KiB budget, same as kimi-cli
+
+function findProjectRoot(startDir) {
+  // Simple heuristic: find the nearest .git directory or package.json
+  let current = path.resolve(startDir);
+  const home = os.homedir();
+  while (current.startsWith(home) && current !== home) {
+    if (fs.existsSync(path.join(current, '.git')) ||
+        fs.existsSync(path.join(current, 'package.json')) ||
+        fs.existsSync(path.join(current, 'AGENTS.md'))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return startDir;
+}
+
+function loadAgentsMd(cwd) {
+  if (!cwd) cwd = process.cwd();
+  const projectRoot = findProjectRoot(cwd);
+
+  // Collect directories from projectRoot down to cwd
+  const dirs = [];
+  let current = path.resolve(cwd);
+  const root = path.resolve(projectRoot);
+  while (true) {
+    dirs.push(current);
+    if (current === root) break;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  dirs.reverse(); // root -> leaf
+
+  // Phase 1: collect all candidate files (root -> leaf order)
+  const discovered = [];
+  for (const d of dirs) {
+    // .kimi/AGENTS.md is checked independently (can coexist with root-level file)
+    const kimiPath = path.join(d, '.kimi', 'AGENTS.md');
+    // AGENTS.md and agents.md are mutually exclusive (uppercase wins)
+    const rootCandidates = [path.join(d, 'AGENTS.md'), path.join(d, 'agents.md')];
+
+    const candidates = [];
+    if (fs.existsSync(kimiPath) && fs.statSync(kimiPath).isFile()) {
+      candidates.push(kimiPath);
+    }
+    for (const rc of rootCandidates) {
+      if (fs.existsSync(rc) && fs.statSync(rc).isFile()) {
+        candidates.push(rc);
+        break;
+      }
+    }
+
+    for (const filePath of candidates) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8').trim();
+        if (content) discovered.push({ path: filePath, content });
+      } catch { /* ignore read errors */ }
+    }
+  }
+
+  if (!discovered.length) return null;
+
+  // Phase 2: allocate budget leaf-first so deeper files are never truncated
+  let remaining = AGENTS_MD_MAX_BYTES;
+  const budgeted = new Array(discovered.length).fill(null);
+  for (let i = discovered.length - 1; i >= 0; i--) {
+    const { path: filePath, content } = discovered[i];
+    const annotation = `<!-- From: ${filePath} -->\n`;
+    const separatorCost = i < discovered.length - 1 ? Buffer.byteLength('\n\n', 'utf8') : 0;
+    const overhead = Buffer.byteLength(annotation, 'utf8') + separatorCost;
+    remaining -= overhead;
+    if (remaining <= 0) {
+      budgeted[i] = { path: filePath, content: '' };
+      remaining = 0;
+      continue;
+    }
+    const encoded = Buffer.from(content, 'utf8');
+    if (encoded.length > remaining) {
+      const truncated = encoded.slice(0, remaining).toString('utf8').trim();
+      budgeted[i] = { path: filePath, content: truncated };
+      remaining = 0;
+    } else {
+      budgeted[i] = { path: filePath, content };
+      remaining -= encoded.length;
+    }
+  }
+
+  // Phase 3: assemble in root -> leaf order
+  const parts = [];
+  for (const { path: filePath, content } of budgeted) {
+    if (content) parts.push(`<!-- From: ${filePath} -->\n${content}`);
+  }
+  return parts.join('\n\n') || null;
+}
+
+// ============================================================
 // SYSTEM PROMPT ORQUESTRADOR v3 (com META mode)
 // ============================================================
 
@@ -66,7 +168,7 @@ function loadSkillRegistry() {
 }
 
 function buildSystemPrompt(opts = {}) {
-  const { skillIndex = '', personaContent = '', memoryContext = '', personaRegistry = '', skillRegistry = '' } = opts;
+  const { skillIndex = '', personaContent = '', memoryContext = '', personaRegistry = '', skillRegistry = '', agentsMd = '' } = opts;
 
   return `╔══════════════════════════════════════════════════════════════════════════╗
 ║  YOU ARE LUNA — AUTONOMOUS AGENT FOR ABNER GABRIEL (CEO, NEXO DIGITAL)  ║
@@ -215,6 +317,15 @@ If another persona or skill would be better suited, respond with mode SUGGEST.
   Performance, profiling          → SUGGEST skill "performance-engineer"
   TypeScript, typing              → SUGGEST skill "typescript-master"
   React, hooks, components        → SUGGEST skill "react-specialist"
+
+════════════════════════════════════════════════════════════════════════════
+PROJECT CONTEXT — AGENTS.md
+════════════════════════════════════════════════════════════════════════════
+
+${agentsMd ? agentsMd + '\n\n' : ''}Markdown files named \`AGENTS.md\` usually contain the background, structure, coding styles, user preferences and other relevant information about the project. You should use this information to understand the project and the user's preferences. \`AGENTS.md\` files may exist at different locations in the project, but typically there is one in the project root.
+
+The \`AGENTS.md\` instructions (merged from all applicable directories):
+${agentsMd ? agentsMd : '(No AGENTS.md found in current directory)'}
 
 ════════════════════════════════════════════════════════════════════════════
 CONTEXT
@@ -560,6 +671,131 @@ class LunaSoul extends EventEmitter {
     }
   }
 
+  /**
+   * Create a new thread in Kimi Web for the given user.
+   * This forces a fresh conversation where the full system prompt
+   * will be sent again on the next message.
+   */
+  async newThread(userId = 'luna-default') {
+    if (!this.kimiBridge) {
+      throw new Error('KimiBridge not initialized');
+    }
+    const result = await this.kimiBridge.newChat(userId);
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SMART COMPACTION — auto-compact context when it grows too large
+  // Inspired by kimi-cli's compaction strategy
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Check if the session context should be compacted.
+   * Triggers when: event count > threshold OR explicit flag.
+   */
+  _shouldCompact(sessionId, explicit = false) {
+    const COMPACT_EVENT_THRESHOLD = parseInt(process.env.LUNA_COMPACT_THRESHOLD, 10) || 24;
+    const COMPACT_TOKEN_THRESHOLD = parseInt(process.env.LUNA_COMPACT_TOKEN_THRESHOLD, 10) || 120000; // ~60% of 200K
+
+    if (explicit) return true;
+
+    const events = this.sessionManager.readRecentEvents(sessionId, 999);
+    const eventCount = events.length;
+
+    // Rough token estimate: ~4 chars per token
+    const totalChars = events.reduce((sum, ev) => {
+      const text = ev.content || ev.response || ev.stdout || JSON.stringify(ev.params || {});
+      return sum + (text?.length || 0);
+    }, 0);
+    const estimatedTokens = Math.ceil(totalChars / 4);
+
+    if (process.env.LUNA_DEBUG) {
+      console.error(`[LunaDebug] Compaction check: events=${eventCount}/${COMPACT_EVENT_THRESHOLD}, tokens=${estimatedTokens}/${COMPACT_TOKEN_THRESHOLD}`);
+    }
+
+    return eventCount >= COMPACT_EVENT_THRESHOLD || estimatedTokens >= COMPACT_TOKEN_THRESHOLD;
+  }
+
+  /**
+   * Auto-compact: summarize context + new thread + keep continuity.
+   * Yields progress events for the TUI.
+   */
+  async *_autoCompact(sessionId, userId = 'luna-default') {
+    yield { type: 'compact_start', message: '📦 Contexto grande demais. Compactando...', sessionId };
+
+    try {
+      // 1. Read all events
+      const events = this.sessionManager.readRecentEvents(sessionId, 999);
+
+      // 2. Build a local summary (fast, no LLM call needed)
+      const summary = this._buildCompactSummary(events);
+
+      // 3. Create new thread in Kimi Web
+      if (this.kimiBridge) {
+        yield { type: 'compact_progress', message: '🔄 Criando nova thread no Kimi Web...', sessionId };
+        await this.kimiBridge.newChat(userId);
+      }
+
+      // 4. Clear local context
+      this.sessionManager.clearContext(sessionId);
+
+      // 5. Store summary as first event (so next message knows it's not first)
+      this.sessionManager.appendEvent(sessionId, {
+        type: 'assistant',
+        mode: 'CHAT',
+        response: `Resumo do contexto anterior:\n${summary}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      yield { type: 'compact_end', message: '✅ Contexto compactado. Nova thread pronta.', summary, sessionId };
+      return { success: true, summary };
+    } catch (err) {
+      yield { type: 'compact_error', message: `❌ Erro na compactação: ${err.message}`, sessionId };
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Build a compact summary from events.
+   * Preserves: user requests, assistant decisions, tool results, errors.
+   * Drops: intermediate thinking, duplicated content.
+   */
+  _buildCompactSummary(events) {
+    const lines = [];
+    let toolCallCount = 0;
+    let fileOps = [];
+    let errors = [];
+
+    for (const ev of events) {
+      if (ev.type === 'user') {
+        const text = (ev.content || '').slice(0, 200);
+        if (text) lines.push(`[User] ${text}`);
+      } else if (ev.type === 'assistant') {
+        const mode = ev.mode || 'CHAT';
+        const resp = (ev.response || '').slice(0, 200);
+        if (resp) lines.push(`[Assistant/${mode}] ${resp}`);
+      } else if (ev.type === 'tool_call') {
+        toolCallCount++;
+        const tool = ev.tool || '?';
+        if (['writeFile', 'replaceInFile', 'moveFile', 'copyFile', 'deleteFile'].includes(tool)) {
+          const p = ev.params || {};
+          fileOps.push(`${tool}(${p.path || p.source || '?'})`);
+        }
+      } else if (ev.type === 'tool_result' && !ev.success) {
+        errors.push(`${ev.tool}: ${(ev.error || '').slice(0, 100)}`);
+      }
+    }
+
+    const summaryParts = [
+      `== Resumo da sessão (${events.length} eventos, ${toolCallCount} tool calls) ==`,
+      ...lines.slice(-20), // keep last 20 significant events
+      fileOps.length > 0 ? `== Arquivos modificados ==\n${fileOps.join(', ')}` : '',
+      errors.length > 0 ? `== Erros ==\n${errors.join('\n')}` : '',
+    ];
+
+    return summaryParts.filter(Boolean).join('\n');
+  }
+
   /** Main entry: process a user message (legacy, non-streaming) */
   async processMessage(input, options = {}) {
     const sessionId = options.sessionId || this.sessionManager.getOrCreateCurrentSession({
@@ -634,63 +870,110 @@ class LunaSoul extends EventEmitter {
       timestamp: new Date().toISOString(),
     });
 
-    yield { type: 'thinking_start', sessionId };
-
-    // Build full context
-    const context = await this._buildContext(sessionId, input, options);
-
-    // Stream from Kimi Bridge
-    let fullThinking = '';
-    let fullResponse = '';
-    let canSteer = false;
-
-    try {
-      const stream = this.kimiBridge.sendMessageStream(userId, context.prompt, { mode });
-
-      for await (const event of stream) {
-        switch (event.type) {
-          case 'thinking_delta':
-            fullThinking += event.text;
-            yield { type: 'thinking_delta', text: event.text, fullThinking, sessionId };
-            break;
-
-          case 'response_delta':
-            fullResponse += event.text;
-            yield { type: 'response_delta', text: event.text, fullResponse, sessionId };
-            break;
-
-          case 'can_steer':
-            canSteer = event.value;
-            yield { type: 'can_steer', value: canSteer, sessionId };
-            break;
-
-          case 'waiting':
-            yield { type: 'waiting', message: event.message, sessionId };
-            break;
-
-          case 'done':
-            fullResponse = event.response;
-            yield { type: 'response_done', response: fullResponse, thinking: fullThinking, sessionId };
-            break;
-        }
+    // ── SMART COMPACTION ──
+    // If context is too large, auto-compact before sending to Kimi.
+    // This prevents token bloat and keeps responses fast.
+    if (this._shouldCompact(sessionId, options.forceCompact)) {
+      for await (const ev of this._autoCompact(sessionId, userId)) {
+        yield ev;
       }
-    } catch (err) {
-      yield { type: 'error', error: err.message, sessionId };
-      return;
     }
 
-    // Parse the full response
-    let parsed = parseKimiResponse(fullResponse);
-    if (!parsed) {
-      yield { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId };
-      parsed = { mode: 'CHAT', response: fullResponse };
+    // Auto-continue loop: Kimi decides → Luna executes → result goes back to Kimi → Kimi responds
+    let loopInput = input;
+
+    // Detect if this is the FIRST message in a new thread.
+    // We check if the session has any prior assistant/tool events.
+    // If not, we send the FULL system prompt. Otherwise, only a mini-reminder.
+    const recentEvents = this.sessionManager.readRecentEvents(sessionId, 30);
+    const hasPriorConversation = recentEvents.some(ev => ev.type === 'assistant' || ev.type === 'tool_call');
+    const isFirstMessage = !hasPriorConversation;
+
+    let loopContext = await this._buildContext(sessionId, input, { ...options, isFirstMessage });
+    let safety = 0;
+    const MAX_LOOPS = 8;
+
+    while (safety < MAX_LOOPS) {
+      safety++;
+      let fullThinking = '';
+      let fullResponse = '';
+      let canSteer = false;
+
+      yield { type: 'thinking_start', sessionId };
+
+      try {
+        const stream = this.kimiBridge.sendMessageStream(userId, loopContext.prompt, { mode });
+
+        for await (const event of stream) {
+          switch (event.type) {
+            case 'thinking_delta':
+              fullThinking += event.text;
+              yield { type: 'thinking_delta', text: event.text, fullThinking, sessionId };
+              break;
+
+            case 'response_delta':
+              fullResponse += event.text;
+              yield { type: 'response_delta', text: event.text, fullResponse, sessionId };
+              break;
+
+            case 'can_steer':
+              canSteer = event.value;
+              yield { type: 'can_steer', value: canSteer, sessionId };
+              break;
+
+            case 'waiting':
+              yield { type: 'waiting', message: event.message, sessionId };
+              break;
+
+            case 'done':
+              fullResponse = event.response;
+              yield { type: 'response_done', response: fullResponse, thinking: fullThinking, sessionId };
+              break;
+          }
+        }
+      } catch (err) {
+        yield { type: 'error', error: err.message, sessionId };
+        return;
+      }
+
+      // Parse the full response
+      let parsed = parseKimiResponse(fullResponse);
+      if (!parsed) {
+        yield { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId };
+        parsed = { mode: 'CHAT', response: fullResponse };
+      }
+
+      yield { type: 'mode_detected', mode: parsed.mode, sessionId };
+
+      // Execute tools and yield progress
+      const result = await this._processModeResult(parsed, sessionId, loopInput, options);
+
+      // Yield all events from mode processing
+      for (const ev of result.events) {
+        yield ev;
+      }
+
+      // If Kimi said CHAT or DONE, we're finished — show the friendly response
+      if (parsed.mode === 'CHAT' || parsed.mode === 'DONE') {
+        yield { type: 'done', result: { success: true, mode: parsed.mode, response: parsed.response, sessionId }, sessionId };
+        return;
+      }
+
+      // ACTION or PLAN executed — send result back to Kimi for next iteration
+      if (result.output) {
+        loopInput = `Resultado da ferramenta ${result.tool || ''}:\n${result.output}\n\nContinue com o próximo passo ou responda ao usuário.`;
+        // Always use mini-reminder for tool results (thread already has full prompt)
+        loopContext = await this._buildContext(sessionId, loopInput, { ...options, isFirstMessage: false, isToolResult: true });
+        // Continue loop — send result back to Kimi
+        continue;
+      }
+
+      // No output or unrecognized mode — break to avoid infinite loop
+      break;
     }
 
-    // Process mode and yield results
-    yield { type: 'mode_detected', mode: parsed.mode, sessionId };
-
-    for await (const ev of this._processModeStream(parsed, sessionId, input, options)) {
-      yield ev;
+    if (safety >= MAX_LOOPS) {
+      yield { type: 'warning', message: '⚠️ Limite de iterações atingido. Encerrando.', sessionId };
     }
   }
 
@@ -751,6 +1034,97 @@ class LunaSoul extends EventEmitter {
     }
   }
 
+  /**
+   * Non-generator version of _processModeStream.
+   * Returns { events: [], output: string, tool: string } for auto-continue loop.
+   */
+  async _processModeResult(parsed, sessionId, originalInput, options) {
+    const mode = parsed.mode || 'CHAT';
+    const events = [];
+    let output = '';
+    let tool = '';
+
+    switch (mode) {
+      case 'CHAT': {
+        const chatResult = this._handleChat(parsed, sessionId);
+        events.push(chatResult);
+        output = parsed.response || '';
+        break;
+      }
+
+      case 'ACTION': {
+        tool = parsed.tool || '';
+        events.push({ type: 'action_start', tool: parsed.tool, params: parsed.params, sessionId });
+        const actionResult = await this._handleAction(parsed, sessionId, options);
+        events.push({ type: 'action_end', result: actionResult, sessionId });
+        output = actionResult.result?.stdout || actionResult.result?.output || actionResult.result?.text || JSON.stringify(actionResult.result);
+        break;
+      }
+
+      case 'PLAN': {
+        const steps = parsed.steps || [];
+        events.push({ type: 'plan_start', steps, sessionId });
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          events.push({
+            type: 'plan_step',
+            stepIndex: i,
+            total: steps.length,
+            tool: step.tool,
+            params: step.params,
+            sessionId,
+          });
+          const stepResult = await this._handleAction(
+            { tool: step.tool, params: step.params, reasoning: step.reasoning },
+            sessionId,
+            options
+          );
+          if (!stepResult.success) {
+            events.push({ type: 'plan_error', stepIndex: i, error: stepResult.error, sessionId });
+            output = `Falha no passo ${i + 1}: ${stepResult.error}`;
+            break;
+          }
+          await new Promise(r => setTimeout(r, 500));
+        }
+        events.push({ type: 'plan_complete', sessionId });
+        break;
+      }
+
+      case 'DONE': {
+        const doneResult = this._handleDone(parsed, sessionId);
+        events.push(doneResult);
+        output = parsed.response || '';
+        break;
+      }
+
+      case 'LOAD_SKILL':
+        events.push(this._handleLoadSkill(parsed, sessionId));
+        break;
+
+      case 'UPDATE_MEMORY':
+        events.push(this._handleUpdateMemory(parsed, sessionId));
+        break;
+
+      case 'META': {
+        events.push({ type: 'meta_start', metaAction: parsed.meta_action, sessionId });
+        const metaResult = await this._handleMeta(parsed, sessionId);
+        events.push({ type: 'meta_end', result: metaResult, sessionId });
+        break;
+      }
+
+      case 'SUGGEST': {
+        const suggestResult = await this._handleSuggest(parsed, sessionId, options);
+        events.push({ type: 'suggest', suggestion: parsed.suggestion, result: suggestResult, sessionId });
+        break;
+      }
+
+      default:
+        events.push(this._handleChat({ response: `Modo desconhecido: ${mode}. Resposta: ${JSON.stringify(parsed)}` }, sessionId));
+    }
+
+    return { events, output, tool };
+  }
+
   /** Stream-aware plan handler */
   async *_handlePlanStream(parsed, sessionId, originalInput, options) {
     const steps = parsed.steps || [];
@@ -807,17 +1181,6 @@ class LunaSoul extends EventEmitter {
       }
     }
 
-    // Load skills index
-    const skills = loadSkillIndex();
-    const skillIndex = skills.map(s => `- ${s.name}: ${s.description} (triggers: ${s.triggers?.join(', ') || 'none'})`).join('\n');
-
-    // Load persona
-    const personaContent = loadPersona(session?.persona || 'default') || '';
-
-    // Load memories
-    const memories = loadMemories();
-    const memoryContext = memories.map(m => `[${m.file}]\n${m.content}`).join('\n\n');
-
     // Desktop state (optional)
     let desktopState = '';
     if (options.includeDesktop !== false) {
@@ -829,19 +1192,71 @@ class LunaSoul extends EventEmitter {
       }
     }
 
-    // Build registries for auto-selection
-    const personaReg = loadPersonaRegistry();
-    const personaRegistry = personaReg.map(p => `- ${p.name}: ${p.description}`).join('\n');
-    const skillReg = loadSkillRegistry();
-    const skillRegistry = skillReg.map(s => `- ${s.name}: ${s.description}`).join('\n');
+    // Determine if this is the FIRST message in a new thread
+    // If the session has no prior assistant events, we need to send the full system prompt
+    const hasPriorConversation = recentEvents.some(ev => ev.type === 'assistant' || ev.type === 'tool_call');
+    const isFirstMessage = options.isFirstMessage !== undefined ? options.isFirstMessage : !hasPriorConversation;
 
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt({ skillIndex, personaContent, memoryContext, personaRegistry, skillRegistry });
+    if (isFirstMessage) {
+      // ── FIRST MESSAGE: full system prompt + context ──
+      // Load skills index
+      const skills = loadSkillIndex();
+      const skillIndex = skills.map(s => `- ${s.name}: ${s.description} (triggers: ${s.triggers?.join(', ') || 'none'})`).join('\n');
 
-    // Build full prompt
-    const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+      // Load persona
+      const personaContent = loadPersona(session?.persona || 'default') || '';
 
-    return { prompt, systemPrompt, historyLines, desktopState };
+      // Load memories
+      const memories = loadMemories();
+      const memoryContext = memories.map(m => `[${m.file}]\n${m.content}`).join('\n\n');
+
+      // Load AGENTS.md from current working directory (kimi-cli style)
+      const agentsMd = loadAgentsMd(process.cwd());
+
+      // Build registries for auto-selection
+      const personaReg = loadPersonaRegistry();
+      const personaRegistry = personaReg.map(p => `- ${p.name}: ${p.description}`).join('\n');
+      const skillReg = loadSkillRegistry();
+      const skillRegistry = skillReg.map(s => `- ${s.name}: ${s.description}`).join('\n');
+
+      // Build system prompt
+      const systemPrompt = buildSystemPrompt({ skillIndex, personaContent, memoryContext, personaRegistry, skillRegistry, agentsMd });
+
+      // Build full prompt
+      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+
+      // Debug log
+      if (process.env.LUNA_DEBUG) {
+        console.error(`[LunaDebug] FIRST_MESSAGE promptSize=${Buffer.byteLength(prompt, 'utf8')} bytes, systemPromptSize=${Buffer.byteLength(systemPrompt, 'utf8')} bytes, agentsMd=${agentsMd ? 'YES' : 'NO'}`);
+      }
+
+      return { prompt, systemPrompt, historyLines, desktopState, isFirstMessage: true };
+    } else {
+      // ── SUBSEQUENT MESSAGES: minimal reminder only ──
+      // The Kimi Web thread already has the full system prompt in its history.
+      // We only need a short reminder + the current user input or tool result.
+      // Include a condensed tool registry so Kimi remembers available actions.
+      const miniReminder = `Você é Luna, agente autônomo de Abner Gabriel (CEO, NEXO DIGITAL S.L., Barcelona).
+REGRAS: Responda APENAS em JSON. NUNCA diga que não pode fazer algo — use ferramentas ou crie via META.
+FERRAMENTAS: readFile, writeFile, replaceInFile, executeShell, searchFiles, grep, viewDirectory, gitStatus, gitCommit, searchWeb, fetchURL, downloadFile, clipboardRead, clipboardWrite.
+FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"mode":"PLAN","steps":[...]} | {"mode":"DONE",...}`;
+
+      // For tool results, keep it even shorter
+      const isToolResult = options.isToolResult === true;
+      let prompt;
+      if (isToolResult) {
+        prompt = `${miniReminder}\n\nResultado da ferramenta:\n${userInput}\n\nResponda em JSON com o próximo passo ou uma mensagem amigável ao usuário:`;
+      } else {
+        prompt = `${miniReminder}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+      }
+
+      // Debug log
+      if (process.env.LUNA_DEBUG) {
+        console.error(`[LunaDebug] FOLLOW_UP promptSize=${Buffer.byteLength(prompt, 'utf8')} bytes, toolResult=${isToolResult}, historyLines=${historyLines.length}`);
+      }
+
+      return { prompt, systemPrompt: miniReminder, historyLines, desktopState, isFirstMessage: false };
+    }
   }
 
   /** Process parsed mode */
@@ -876,6 +1291,87 @@ class LunaSoul extends EventEmitter {
       default:
         // Unknown mode — treat as chat
         return this._handleChat({ response: `Modo desconhecido: ${mode}. Resposta: ${JSON.stringify(parsed)}` }, sessionId);
+    }
+  }
+
+  /**
+   * Generate a friendly Portuguese feedback message after tool execution.
+   */
+  _makeFriendlyFeedback(tool, params, result) {
+    const p = params || {};
+    if (!result.success) {
+      const fallbacks = [
+        `Opa, deu errado ao usar ${tool}. Quer que eu tente de outra forma?`,
+        `Não consegui executar ${tool}. Pode me dar mais detalhes?`,
+        `Falha no ${tool}. Vou tentar um approach diferente se precisar.`,
+      ];
+      return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    }
+
+    switch (tool) {
+      case 'writeFile':
+        return `✅ Pronto, Abner! Criei o arquivo em \`${p.path || p.filePath}\`. Precisa de mais alguma coisa?`;
+      case 'readFile':
+        return `📖 Li o arquivo. Dá uma olhada no conteúdo acima. Quer que eu edite algo?`;
+      case 'replaceInFile':
+        return `✏️ Feito! Substitui \`${p.old || p.oldStr}\` por \`${p.new || p.newStr}\` no arquivo.`;
+      case 'appendFile':
+        return `📝 Adicionei o texto no final do arquivo \`${p.path || p.filePath}\`.`;
+      case 'deleteFile':
+        return `🗑️ Arquivo \`${p.path || p.filePath}\` deletado com sucesso.`;
+      case 'moveFile':
+        return `📦 Movido de \`${p.source || p.from}\` para \`${p.destination || p.to}\`.`;
+      case 'copyFile':
+        return `📋 Copiado de \`${p.source || p.from}\` para \`${p.destination || p.to}\`.`;
+      case 'createDirectory':
+        return `📁 Diretório \`${p.path || p.dirPath}\` criado.`;
+      case 'removeDirectory':
+        return `🗑️ Diretório \`${p.path || p.dirPath}\` removido.`;
+      case 'executeShell': {
+        const out = result.stdout || result.output || '';
+        if (out.length > 0 && out.length < 200) {
+          return `🖥️ Comando executado. Resultado:\n\`\`\`\n${out}\n\`\`\``;
+        }
+        return `🖥️ Comando executado com sucesso.`;
+      }
+      case 'searchFiles':
+      case 'grep': {
+        const matches = result.matches || [];
+        return `🔍 Encontrei ${matches.length} resultado(s).`;
+      }
+      case 'gitStatus':
+        return `🌿 Status do git verificado.`;
+      case 'gitCommit':
+        return `💾 Commit feito: \`${p.message || ''}\``;
+      case 'gitDiff':
+        return `🌿 Diff gerado. Dá uma olhada no resultado acima.`;
+      case 'gitLog':
+        return `📜 Histórico de commits recuperado.`;
+      case 'applyPatch':
+        return `🩹 Patch aplicado com sucesso.`;
+      case 'downloadFile':
+        return `⬇️ Download concluído em \`${p.destination || p.path}\`.`;
+      case 'fetchURL':
+        return `🌐 Página carregada. Veja o conteúdo acima.`;
+      case 'runTests': {
+        const out = result.stdout || '';
+        const passed = out.includes('PASS') || out.includes('passing');
+        return passed ? `🧪 Testes passaram!` : `🧪 Testes executados. Veja o resultado.`;
+      }
+      case 'checkSyntax':
+        return `✅ Sintaxe OK.`;
+      case 'clipboardWrite':
+        return `📋 Copiado para o clipboard.`;
+      case 'clipboardRead': {
+        const content = result.content || '';
+        return `📋 Clipboard: \`${content.slice(0, 100)}${content.length > 100 ? '...' : ''}\``;
+      }
+      case 'screenshot':
+        return `📸 Screenshot tirado e salvo.`;
+      case 'think':
+        return `🧠 Reflexão registrada.`;
+      default:
+        return `✅ ${tool} executado com sucesso.`;
     }
   }
 
@@ -1066,6 +1562,12 @@ class LunaSoul extends EventEmitter {
 
     // Format output for storage
     const outputText = result.content || result.stdout || result.output || JSON.stringify(result).slice(0, 2000);
+
+    // Generate friendly feedback message
+    const friendlyMessage = this._makeFriendlyFeedback(tool, params, result);
+    if (friendlyMessage) {
+      result.friendlyMessage = friendlyMessage;
+    }
 
     // Store result
     this.sessionManager.appendEvent(sessionId, {
