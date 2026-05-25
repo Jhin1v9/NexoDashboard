@@ -3930,6 +3930,94 @@
             "id": "blk-update9-1779669254883",
             "type": "paragraph",
             "content": "Sucessor do K2.5. Ate 300 sub-agentes no Swarm. Image-to-code nativo, full-stack output (frontend + backend), melhor integracao com Next.js/React. Open-source MIT."
+          },
+          {
+            "id": "blk-map1-1779670500000",
+            "type": "heading",
+            "level": 2,
+            "content": "Mapeamento dos Seletores CSS da Kimi Web (Maio 2026)"
+          },
+          {
+            "id": "blk-map2-1779670500000",
+            "type": "paragraph",
+            "content": "MAPEAMENTO REALIZADO via Playwright + Chrome do Abner (perfil logado). URL base: kimi.com/chat. Todas as classes sao do framework Vue.js da Kimi (data-v-* attributes)."
+          },
+          {
+            "id": "blk-map3-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Novos Chat e Input"
+          },
+          {
+            "id": "blk-map4-1779670500000",
+            "type": "paragraph",
+            "content": "• Novo chat: clicar em .new-chat-btn ou navegar para /?chat_enter_method=new_chat\\n• Caixa de texto: textarea, [contenteditable=true], ou input[type=text] dentro de .chat-editor\\n• Botao enviar: .send-button-container (classe .disabled quando input vazio) — SVG name=Send dentro de .iconify.send-icon\\n• Anexar arquivo: .icon-button.toolkit-trigger-btn — SVG name=Add"
+          },
+          {
+            "id": "blk-map5-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Acoes na Resposta do Assistente"
+          },
+          {
+            "id": "blk-map6-1779670500000",
+            "type": "paragraph",
+            "content": "Container: .segment-assistant-actions > .segment-assistant-actions-content\\nBotoes sao .icon-button (28x28px) com SVGs iconify:\\n• [0] SVG name=Copy — copiar resposta para clipboard\\n• [1] SVG name=Refresh — regenerar resposta\\n• [2] SVG name=Share_a — compartilhar resposta\\n• [3] SVG name=Like — thumbs up (feedback)\\n• [4] SVG name=Dislike — thumbs down (feedback)\\nEstrategia: page.evaluate(() => document.querySelectorAll('.segment-assistant-actions svg')[0].closest('.icon-button').click())"
+          },
+          {
+            "id": "blk-map7-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Acoes na Mensagem do Usuario"
+          },
+          {
+            "id": "blk-map8-1779670500000",
+            "type": "paragraph",
+            "content": "Container: .segment-user-actions\\nBotoes: .simple-button.size-small com texto + SVG iconify:\\n• Edit — SVG name=Edit\\n• Copy — SVG name=Copy\\n• Share — SVG name=Share_a"
+          },
+          {
+            "id": "blk-map9-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Header do Chat (Exportar Chat Inteiro)"
+          },
+          {
+            "id": "blk-map10-1779670500000",
+            "type": "paragraph",
+            "content": "Container: .chat-header-actions (canto superior direito)\\nIcone: SVG name=Share_a dentro de .icon\\nEste eh o botao de 'upward arrow' que abre menu de exportacao (PDF, Word, Clipboard).\\nPara exportar: clicar no .chat-header-actions, esperar dropdown, clicar na opcao desejada."
+          },
+          {
+            "id": "blk-map11-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Seletor de Modo (K2.6, Thinking, Instant, Agent)"
+          },
+          {
+            "id": "blk-map12-1779670500000",
+            "type": "paragraph",
+            "content": "Container: .chat-editor-action > .left-area > .current-model > .model-name\\nTexto atual: 'K2.6 Thinking' (pode variar)\\nPara trocar de modo: clicar em .current-model, esperar dropdown, selecionar opcao.\\nSVGs no editor: name=Down (scroll to bottom), name=Add (anexar), name=Down_b (dropdown seta), name=Send (enviar)"
+          },
+          {
+            "id": "blk-map13-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Conteudo da Resposta"
+          },
+          {
+            "id": "blk-map14-1779670500000",
+            "type": "paragraph",
+            "content": "Texto da resposta do assistente esta em:\\n.segment-content-box > .container-block > .block-item > .markdown-container > .markdown > .paragraph\\nPara extrair sem clipboard: page.evaluate(() => document.querySelector('.markdown-container .paragraph').innerText)"
+          },
+          {
+            "id": "blk-map15-1779670500000",
+            "type": "heading",
+            "level": 3,
+            "content": "Exemplo de Codigo Playwright"
+          },
+          {
+            "id": "blk-map16-1779670500000",
+            "type": "paragraph",
+            "content": "// Conectar ao Chrome do Abner (perfil logado)\\nconst browser = await chromium.connectOverCDP('http://localhost:9222');\\nconst page = await browser.newPage();\\nawait page.goto('https://kimi.com/?chat_enter_method=new_chat');\\n\\n// Digitar e enviar\\nawait page.fill('textarea', 'Ola Kimi');\\nawait page.press('textarea', 'Enter');\\n\\n// Esperar resposta\\nawait page.waitForTimeout(8000);\\n\\n// Copiar resposta (clicar no botao Copy)\\nawait page.evaluate(() => {\\n  const copyBtn = document.querySelectorAll('.segment-assistant-actions .icon-button')[0];\\n  if (copyBtn) copyBtn.click();\\n});\\n\\n// Ler clipboard (requer permissao)\\nconst text = await page.evaluate(() => navigator.clipboard.readText());"
           }
         ]
       },
@@ -3948,14 +4036,25 @@
         "browser-automation",
         "ia",
         "kimi-k2.6",
-        "agent-swarm"
+        "agent-swarm",
+        "css-selectors",
+        "mapeamento-ui"
       ],
       "createdBy": "luna-agent",
       "createdByName": "Luna",
       "createdAt": "2026-05-25T00:29:04.457Z",
-      "updatedAt": "2026-05-25T00:34:14.882Z",
+      "updatedAt": "2026-05-25T04:00:00.000Z",
       "collaborators": [],
       "comments": [
+        {
+          "id": "cmt-1779670500000-map",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "✅ MAPEAMENTO UI CONCLUIDO — Seletores CSS da Kimi Web mapeados em tempo real via Playwright conectado ao Chrome do Abner (perfil logado em ~/.config/google-chrome).\\n\\nPRINCIPAIS DESCOBERTAS:\\n• Copiar resposta: .segment-assistant-actions .icon-button com SVG name=Copy (indice 0)\\n• Regenerar: SVG name=Refresh (indice 1)\\n• Compartilhar resposta: SVG name=Share_a (indice 2)\\n• Thumbs up/down: SVG name=Like/Dislike (indices 3,4)\\n• Exportar chat inteiro: .chat-header-actions com SVG name=Share_a (header direito)\\n• Modo atual: .current-model > .model-name (ex: 'K2.6 Thinking')\\n• Enviar: .send-button-container com SVG name=Send\\n• Resposta text: .markdown-container .paragraph\\n\\nEXEMPLO FUNCIONAL de conexao ao Chrome logado:\\nconst browser = await chromium.connectOverCDP('http://localhost:9222');\\n\\nChrome rodando com: --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-user-profile (copia do perfil do Abner)",
+          "timestamp": "2026-05-25T03:40:00.000Z",
+          "reactions": [],
+          "mentions": []
+        },
         {
           "id": "cmt-1779668944460-b1",
           "author": "luna-agent",
@@ -3991,6 +4090,15 @@
           "timestamp": "2026-05-25T00:34:14.882Z",
           "reactions": [],
           "mentions": []
+        },
+        {
+          "id": "cmt-v2-impl",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "✅ BRIDGE v2.0 IMPLEMENTADA — Reescrita completa do agents/kimi-bridge.cjs com multi-user support, extração Turndown, streaming detection e modos Instant/Thinking.\n\nO QUE MUDOU:\n• Multi-tab: um Page por Telegram userId, semaphore limita 5 páginas, idle cleanup a 10min\n• Extração: Turndown converte HTML .markdown em Markdown completo (código, listas, tabelas preservados)\n• Streaming: combined signal (botões de ação + estabilidade de texto por 2s) em vez de wait fixo de 15s\n• Modos: /kimi_instant e /kimi_thinking trocam o modo antes de enviar\n• Comandos: /kimi, /kimi_instant, /kimi_thinking, /kimi_novo, /kimi_status\n• Padrões do CTO Agent: Logger persistente, Keep-alive, SessionStore (JSON), Multi-strategy selector\n• Script: scripts/start-kimi-chrome.sh lança Chrome com perfil logado cross-platform\n• Segurança: verificação de sessão expirada, typing humano (50ms/char), cooldown por usuário\n\nFUTURO (não implementado): Agent Mode e Agent Swarm — documentados mas aguardando estabilização da Kimi Web.",
+          "timestamp": "2026-05-25T04:00:00.000Z",
+          "reactions": [],
+          "mentions": []
         }
       ],
       "attachments": [],
@@ -4020,6 +4128,19 @@
           "changedBy": "luna-agent",
           "changedAt": "2026-05-25T00:34:14.882Z",
           "changeSummary": "Nota de atualizacao: modos Instant/Thinking, Agent, Agent Swarm, K2.6"
+        },
+        {
+          "version": 3,
+          "snapshot": {
+            "title": "Luna-Kimi Bridge: Agente Telegram para Chat Multi-IA via Browser",
+            "status": "rascunho",
+            "content": {
+              "blocks": []
+            }
+          },
+          "changedBy": "luna-agent",
+          "changedAt": "2026-05-25T03:40:00.000Z",
+          "changeSummary": "Mapeamento completo dos seletores CSS da Kimi Web via Playwright + Chrome logado do Abner. Inclui: botoes de acao (Copy, Refresh, Share, Like, Dislike), header export, mode selector, input/send, e exemplo de codigo Playwright."
         }
       ]
     },

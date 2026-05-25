@@ -10,6 +10,9 @@ require('dotenv').config({ path: require('path').join(__dirname, '../backend/.en
 const fs = require('fs');
 const path = require('path');
 
+// ── KIMI BRIDGE v2 ──
+const { KimiBridge } = require('./kimi-bridge.cjs');
+
 // ── CONFIG ──
 const CONFIG = {
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
@@ -398,6 +401,16 @@ class TelegramLunaAgent {
     this.running = false;
     this.me = null;
     this.conversations = new Map(); // chatId -> { schemaKey, stepIndex, data, mentionId, messageId, author }
+    this.kimiBridge = null; // lazy init
+  }
+
+  async getKimiBridge() {
+    if (!this.kimiBridge) {
+      this.kimiBridge = new KimiBridge({ debug: true });
+      await this.kimiBridge.connect();
+      log('success', 'Kimi Bridge v2 connected');
+    }
+    return this.kimiBridge;
   }
 
   async start() {
@@ -424,6 +437,9 @@ class TelegramLunaAgent {
   }
 
   setupHandlers() {
+    // Kimi Bridge command handlers (onText has priority over generic message handler)
+    this._setupKimiHandlers();
+
     this.bot.on('message', async (msg) => {
       try { await this.handleMessage(msg); } catch (e) { log('error', `Erro no handler: ${e.message}`); }
     });
@@ -435,6 +451,133 @@ class TelegramLunaAgent {
     });
     this.bot.on('error', (err) => {
       log('warn', `Bot error (bot continua rodando): ${err.message || err}`);
+    });
+  }
+
+  // ── KIMI BRIDGE HANDLERS ──
+  _setupKimiHandlers() {
+    // /kimi [pergunta] — default Thinking mode
+    this.bot.onText(/^\/kimi(?:\s+(.+))?/, async (msg, match) => {
+      const userId = msg.from.id;
+      const question = match[1]?.trim();
+      const chatId = msg.chat.id;
+
+      if (!question) {
+        await this.bot.sendMessage(chatId, '🌙 Use: `/kimi [sua pergunta]`\n\nModos disponíveis:\n• `/kimi_instant` — resposta rápida\n• `/kimi_thinking` — raciocínio profundo', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      await this.bot.sendChatAction(chatId, 'typing');
+      try {
+        const bridge = await this.getKimiBridge();
+        const { response, mode } = await bridge.sendMessage(userId, question);
+        const modeEmoji = mode === 'instant' ? '⚡' : '🧠';
+        await this.bot.sendMessage(chatId, `${modeEmoji} *Kimi*\n\n${response}`, {
+          parse_mode: 'Markdown',
+          reply_to_message_id: msg.message_id,
+        });
+      } catch (err) {
+        log('error', `Kimi error: ${err.message}`);
+        await this.bot.sendMessage(chatId, `❌ Erro no Kimi: ${err.message}`, { reply_to_message_id: msg.message_id });
+      }
+    });
+
+    // /kimi_instant [pergunta]
+    this.bot.onText(/^\/kimi_instant(?:\s+(.+))?/, async (msg, match) => {
+      const userId = msg.from.id;
+      const question = match[1]?.trim();
+      const chatId = msg.chat.id;
+
+      if (!question) {
+        await this.bot.sendMessage(chatId, '⚡ Use: `/kimi_instant [sua pergunta]`', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      await this.bot.sendChatAction(chatId, 'typing');
+      try {
+        const bridge = await this.getKimiBridge();
+        const { response } = await bridge.sendMessage(userId, question, { mode: 'instant' });
+        await this.bot.sendMessage(chatId, `⚡ *Kimi Instant*\n\n${response}`, {
+          parse_mode: 'Markdown',
+          reply_to_message_id: msg.message_id,
+        });
+      } catch (err) {
+        log('error', `Kimi instant error: ${err.message}`);
+        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+      }
+    });
+
+    // /kimi_thinking [pergunta]
+    this.bot.onText(/^\/kimi_thinking(?:\s+(.+))?/, async (msg, match) => {
+      const userId = msg.from.id;
+      const question = match[1]?.trim();
+      const chatId = msg.chat.id;
+
+      if (!question) {
+        await this.bot.sendMessage(chatId, '🧠 Use: `/kimi_thinking [sua pergunta]`', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      await this.bot.sendChatAction(chatId, 'typing');
+      try {
+        const bridge = await this.getKimiBridge();
+        const { response } = await bridge.sendMessage(userId, question, { mode: 'thinking' });
+        await this.bot.sendMessage(chatId, `🧠 *Kimi Thinking*\n\n${response}`, {
+          parse_mode: 'Markdown',
+          reply_to_message_id: msg.message_id,
+        });
+      } catch (err) {
+        log('error', `Kimi thinking error: ${err.message}`);
+        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+      }
+    });
+
+    // /kimi_novo — creates new chat for user
+    this.bot.onText(/^\/kimi_novo/, async (msg) => {
+      const userId = msg.from.id;
+      const chatId = msg.chat.id;
+      try {
+        const bridge = await this.getKimiBridge();
+        await bridge.newChat(userId);
+        await this.bot.sendMessage(chatId, '🆕 *Novo chat criado!*\n\nSeu histórico anterior foi preservado em outra aba.', {
+          parse_mode: 'Markdown',
+          reply_to_message_id: msg.message_id,
+        });
+      } catch (err) {
+        log('error', `Kimi novo error: ${err.message}`);
+        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+      }
+    });
+
+    // /kimi_status — shows bridge status
+    this.bot.onText(/^\/kimi_status/, async (msg) => {
+      const userId = msg.from.id;
+      const chatId = msg.chat.id;
+      try {
+        const bridge = await this.getKimiBridge();
+        const globalStatus = await bridge.getGlobalStatus();
+        const userStatus = await bridge.getStatus(userId);
+        const lines = [
+          '📊 *Kimi Bridge Status*',
+          '',
+          `🔗 CDP: \`${globalStatus.cdpUrl}\``,
+          `📄 Páginas ativas: ${globalStatus.activePages}/${globalStatus.maxPages}`,
+          `🔒 Semáforo: ${globalStatus.semaphore.current}/${globalStatus.semaphore.max}`,
+          '',
+          `👤 *Sua sessão:*`,
+          userStatus.active
+            ? `• Modo: ${userStatus.mode === 'instant' ? '⚡ Instant' : '🧠 Thinking'}\n• URL: [link](${userStatus.chatUrl})\n• Processando: ${userStatus.processing ? 'sim' : 'não'}`
+            : `• Sem sessão ativa (será criada no primeiro /kimi)`,
+        ];
+        await this.bot.sendMessage(chatId, lines.join('\n'), {
+          parse_mode: 'Markdown',
+          reply_to_message_id: msg.message_id,
+          disable_web_page_preview: true,
+        });
+      } catch (err) {
+        log('error', `Kimi status error: ${err.message}`);
+        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+      }
     });
   }
 
@@ -681,6 +824,9 @@ class TelegramLunaAgent {
     const text = msg.text || msg.caption || '';
     if (!text.trim()) return;
     const chatId = msg.chat.id;
+
+    // Kimi commands are handled by onText — skip here to avoid double processing
+    if (/^\/kimi/.test(text)) return;
 
     // Wizard ativo?
     if (this.hasActiveWizard(chatId)) {
