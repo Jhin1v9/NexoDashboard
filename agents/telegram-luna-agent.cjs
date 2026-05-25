@@ -13,6 +13,10 @@ const path = require('path');
 // ── KIMI BRIDGE v2 ──
 const { KimiBridge } = require('./kimi-bridge.cjs');
 
+// ── COMPUTER USE ENGINE ──
+const { ComputerUseEngine } = require('./computer-use-engine.cjs');
+const { ComputerUseReAct } = require('./computer-use-react.cjs');
+
 // Remote bridge API config (for Render → local Chrome via tunnel)
 const KIMI_BRIDGE_URL = process.env.KIMI_BRIDGE_URL || null;
 const KIMI_BRIDGE_API_KEY = process.env.KIMI_BRIDGE_API_KEY || 'nexo-kimi-local-2026';
@@ -699,9 +703,18 @@ class TelegramLunaAgent {
       try {
         const context = await buildDashboardContext(question, userName);
         const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+
+        // If user replied to a message, include the replied message as context
+        let replyContext = '';
+        if (msg.reply_to_message && msg.reply_to_message.text) {
+          const replyText = msg.reply_to_message.text.trim();
+          const replyAuthor = msg.reply_to_message.from?.first_name || msg.reply_to_message.from?.username || 'Usuário';
+          replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
+        }
+
         const enrichedQuestion = context
-          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${replyContext}${namePrefix}${question}`;
 
         const result = await askBridge(userId, enrichedQuestion, null, null);
 
@@ -742,9 +755,18 @@ class TelegramLunaAgent {
       try {
         const context = await buildDashboardContext(question, userName);
         const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+
+        // If user replied to a message, include the replied message as context
+        let replyContext = '';
+        if (msg.reply_to_message && msg.reply_to_message.text) {
+          const replyText = msg.reply_to_message.text.trim();
+          const replyAuthor = msg.reply_to_message.from?.first_name || msg.reply_to_message.from?.username || 'Usuário';
+          replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
+        }
+
         const enrichedQuestion = context
-          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${replyContext}${namePrefix}${question}`;
         const result = await askBridge(userId, enrichedQuestion, 'instant', null);
         await finalize(result.response, 'instant');
       } catch (err) {
@@ -783,9 +805,18 @@ class TelegramLunaAgent {
       try {
         const context = await buildDashboardContext(question, userName);
         const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+
+        // If user replied to a message, include the replied message as context
+        let replyContext = '';
+        if (msg.reply_to_message && msg.reply_to_message.text) {
+          const replyText = msg.reply_to_message.text.trim();
+          const replyAuthor = msg.reply_to_message.from?.first_name || msg.reply_to_message.from?.username || 'Usuário';
+          replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
+        }
+
         const enrichedQuestion = context
-          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${replyContext}${namePrefix}${question}`;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', null);
         await finalize(result.response, 'thinking');
       } catch (err) {
@@ -862,6 +893,148 @@ class TelegramLunaAgent {
       }
     });
 
+    // ── COMPUTER USE HANDLERS ──
+    const pcActiveUsers = new Set();
+    let pcCurrentTask = null;
+    const pcEngine = new ComputerUseEngine();
+
+    // /pc <command> — Headless shell execution
+    this.bot.onText(/^\/pc(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const command = match[1]?.trim();
+
+      if (!command) {
+        await this.bot.sendMessage(chatId,
+          '🖥️ *Computer Use Agent*\n\n' +
+          '`/pc <comando>` — Executa comando shell\n' +
+          '`/pc_screenshot` — Tira screenshot do PC\n' +
+          '`/pc_interactive <comando>` — Modo interativo (mouse/teclado)\n' +
+          '`/pc_assisted <tarefa>` — Kimi raciocina e executa passo a passo\n' +
+          '`/pc_stop` — Cancela tarefa em andamento',
+          { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      const statusMsg = await this.bot.sendMessage(chatId, '💻 Executando...', { reply_to_message_id: msg.message_id });
+
+      try {
+        const result = await pcEngine.executeSingle({ type: 'shell', params: { command } });
+        const emoji = result.success ? '✅' : '❌';
+        const output = result.stdout || result.stderr || 'Sem saída';
+        const text = `${emoji} *Comando:* \`${command}\`\n\n\`\`\`\n${output.slice(0, 3500)}\n\`\`\``;
+        await this.bot.editMessageText(text, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'Markdown' });
+      } catch (err) {
+        await this.bot.editMessageText(`❌ Erro: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+      }
+    });
+
+    // /pc_screenshot — Take and send screenshot
+    this.bot.onText(/^\/pc_screenshot/, async (msg) => {
+      const chatId = msg.chat.id;
+      const statusMsg = await this.bot.sendMessage(chatId, '📸 Tirando screenshot...', { reply_to_message_id: msg.message_id });
+
+      try {
+        const result = await pcEngine.executeSingle({ type: 'screenshot' });
+        if (result.success && result.screenshot) {
+          await this.bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+          await this.bot.sendPhoto(chatId, result.screenshot, { caption: '📸 Screenshot do PC', reply_to_message_id: msg.message_id });
+        } else {
+          await this.bot.editMessageText('❌ Falha ao tirar screenshot', { chat_id: chatId, message_id: statusMsg.message_id });
+        }
+      } catch (err) {
+        await this.bot.editMessageText(`❌ Erro: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+      }
+    });
+
+    // /pc_interactive <command> — Interactive mode (mouse/keyboard)
+    this.bot.onText(/^\/pc_interactive(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const command = match[1]?.trim();
+
+      if (!command) {
+        await this.bot.sendMessage(chatId, '⚡ Use: `/pc_interactive <comando>`\nEx: `/pc_interactive abre o Chrome`', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      await this.bot.sendMessage(chatId, `🖱️ Modo interativo: "${command}"\n\n⚠️ Isso vai controlar o mouse e teclado do seu PC.`, { reply_to_message_id: msg.message_id });
+      // For now, just inform user that full interactive mode needs /pc_assisted
+      await this.bot.sendMessage(chatId, '💡 Use `/pc_assisted ' + command + '` para que a Kimi execute passo a passo.', { reply_to_message_id: msg.message_id });
+    });
+
+    // /pc_assisted <task> — Full ReAct loop with Kimi
+    this.bot.onText(/^\/pc_assisted(?:\s+(.+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const task = match[1]?.trim();
+
+      if (!task) {
+        await this.bot.sendMessage(chatId, '🧠 Use: `/pc_assisted <tarefa>`\nEx: `/pc_assisted Abre o Chrome e vai pro Gmail`', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        return;
+      }
+
+      if (pcActiveUsers.has(userId)) {
+        await this.bot.sendMessage(chatId, '⏳ Já há uma tarefa em andamento. Use `/pc_stop` para cancelar.', { reply_to_message_id: msg.message_id });
+        return;
+      }
+      pcActiveUsers.add(userId);
+
+      const statusMsg = await this.bot.sendMessage(chatId, '🤖 [Computer Use]\n📝 ' + task + '\n\n① Iniciando...', { reply_to_message_id: msg.message_id });
+      let messageText = '🤖 [Computer Use]\n📝 ' + task + '\n';
+
+      try {
+        const bridge = await this.getKimiBridge();
+        const self = this;
+        const react = new ComputerUseReAct({
+          kimiBridge: bridge,
+          userId: String(userId),
+          mode: 'thinking',
+          maxIterations: 15,
+          async onStep(step) {
+            messageText += '\n' + step.message;
+            try {
+              await self.bot.editMessageText(messageText.slice(0, 4000), {
+                chat_id: chatId,
+                message_id: statusMsg.message_id,
+              });
+            } catch {}
+          },
+        });
+
+        pcCurrentTask = react;
+        const result = await react.runTask(task);
+        pcCurrentTask = null;
+
+        if (result.success) {
+          messageText += '\n\n✅ *Tarefa concluída!*';
+        } else {
+          messageText += '\n\n❌ *Erro:* ' + result.error;
+        }
+
+        await this.bot.editMessageText(messageText.slice(0, 4000), {
+          chat_id: chatId,
+          message_id: statusMsg.message_id,
+          parse_mode: 'Markdown',
+        });
+      } catch (err) {
+        await this.bot.editMessageText(`❌ Erro: ${err.message}`, { chat_id: chatId, message_id: statusMsg.message_id });
+      } finally {
+        pcActiveUsers.delete(userId);
+        pcCurrentTask = null;
+      }
+    });
+
+    // /pc_stop — Cancel current task
+    this.bot.onText(/^\/pc_stop/, async (msg) => {
+      const chatId = msg.chat.id;
+      if (pcCurrentTask) {
+        pcCurrentTask.cancel();
+        await this.bot.sendMessage(chatId, '🛑 Tarefa cancelada.', { reply_to_message_id: msg.message_id });
+      } else {
+        await this.bot.sendMessage(chatId, 'ℹ️ Nenhuma tarefa em andamento.', { reply_to_message_id: msg.message_id });
+      }
+    });
+
     // /help — shows complete command guide
     this.bot.onText(/^\/help/, async (msg) => {
       const chatId = msg.chat.id;
@@ -874,6 +1047,13 @@ class TelegramLunaAgent {
         '`/kimi_thinking [pergunta]` — Raciocínio passo a passo',
         '`/kimi_novo` — Cria novo chat na Kimi',
         '`/kimi_status` — Status do bridge e sua sessão',
+        '',
+        '*🖥️ Computer Use Agent (Controle do PC)*',
+        '`/pc <comando>` — Executa comando shell no PC',
+        '`/pc_screenshot` — Tira screenshot do PC',
+        '`/pc_interactive <comando>` — Modo interativo (mouse/teclado)',
+        '`/pc_assisted <tarefa>` — Kimi raciocina e executa passo a passo',
+        '`/pc_stop` — Cancela tarefa em andamento',
         '',
         '*💬 Luna Agent (Dashboard)*',
         'Mencione `@lunanexobot` ou `@luna` para criar tarefas, leads, ideias, registrar financeiro, etc.',
@@ -1144,8 +1324,9 @@ class TelegramLunaAgent {
     if (!text.trim()) return;
     const chatId = msg.chat.id;
 
-    // Kimi commands are handled by onText — skip here to avoid double processing
+    // Kimi and PC commands are handled by onText — skip here to avoid double processing
     if (/^\/kimi/.test(text)) return;
+    if (/^\/pc/.test(text)) return;
 
     // Wizard ativo?
     if (this.hasActiveWizard(chatId)) {

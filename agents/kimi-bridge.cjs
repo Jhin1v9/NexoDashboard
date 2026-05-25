@@ -493,10 +493,33 @@ class KimiBridge {
    *
    * Throws on timeout.
    */
-  async _waitForResponse(page, mode = 'instant', onPartial = null) {
+  async _waitForResponse(page, mode = 'instant', onPartial = null, initialText = '') {
     // Generous timeouts: Kimi often pauses, re-reasons, and continues.
     const maxTimeout = mode === 'instant' ? 300000 : 600000;
     const startTime = Date.now();
+
+    // Phase 0: Wait for text to CHANGE from initialText — this ensures we don't
+    // detect the previous response as "done" when buttons are still visible.
+    log.info('Waiting for new response text to appear...');
+    let textHasChanged = false;
+    const changeTimeout = 30000; // wait up to 30s for text to start changing
+    const changeStart = Date.now();
+    while (Date.now() - changeStart < changeTimeout) {
+      try {
+        const currentText = await page.locator('.markdown-container .markdown').last().innerText({ timeout: 2000 }).catch(() => '');
+        if (currentText !== initialText && currentText.trim().length > 0) {
+          textHasChanged = true;
+          log.success('New response text detected');
+          break;
+        }
+      } catch (e) {
+        // Element might not exist yet
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    if (!textHasChanged) {
+      log.warn('Text did not change from initial — response may already be present or failed to start');
+    }
 
     // Phase 1: Wait for action buttons (they appear when response is done)
     log.info('Waiting for assistant action buttons...');
@@ -632,6 +655,148 @@ class KimiBridge {
   }
 
   /**
+   * Send an image (screenshot, file, etc.) to Kimi Web.
+   * Supports optional text to accompany the image.
+   *
+   * Strategy:
+   * 1. Decode base64 to temp PNG file
+   * 2. Inject a hidden file input into the Kimi DOM
+   * 3. Use Playwright setInputFiles to upload
+   * 4. Trigger change event so Kimi processes the upload
+   * 5. Optionally send accompanying text
+   * 6. Wait for response normally
+   */
+  async sendImage(userId, imageBase64, text = '', options = {}) {
+    if (!imageBase64 || !imageBase64.trim()) {
+      throw new Error('Image base64 is required');
+    }
+
+    // Rate limiting
+    this._checkCooldown(userId);
+
+    const page = await this._getOrCreateUserPage(userId);
+    const session = this.userSessions.get(userId);
+
+    if (session.processing) {
+      log.warn(`User ${hashUserId(userId)} is already processing — queueing image upload`);
+      const startWait = Date.now();
+      while (session.processing) {
+        if (Date.now() - startWait > 60000) {
+          throw new Error('Timeout waiting for previous message to complete');
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    session.processing = true;
+    session.lastActivity = Date.now();
+
+    try {
+      await this._verifySession(page);
+
+      if (options.newChat) {
+        await page.goto('https://kimi.com/?chat_enter_method=new_chat', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2000);
+        session.chatUrl = page.url();
+        this.store.setUser(userId, { chatUrl: session.chatUrl });
+      }
+
+      if (options.mode) {
+        await this.setMode(userId, options.mode);
+      }
+
+      const actualMode = await this._detectActualMode(page) || session.mode || 'instant';
+      log.info(`User ${hashUserId(userId)} sending image (text=${text ? 'yes' : 'no'}, mode=${actualMode})`);
+
+      await page.bringToFront();
+
+      // Step 1: Save base64 to temp file
+      const tmpDir = path.join(ARTIFACTS_DIR, 'tmp-uploads');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const tmpFile = path.join(tmpDir, `kimi-upload-${hashUserId(userId)}-${Date.now()}.png`);
+      const buffer = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      fs.writeFileSync(tmpFile, buffer);
+      log.info(`Image saved to temp file: ${tmpFile} (${buffer.length} bytes)`);
+
+      // Step 2: Inject hidden file input and upload
+      const fileInputSelector = await page.evaluate(() => {
+        // Try to find existing file input
+        let input = document.querySelector('input[type="file"]');
+        if (!input) {
+          // Create one if not exists
+          input = document.createElement('input');
+          input.type = 'file';
+          input.style.display = 'none';
+          input.id = '_luna_bridge_file_input_' + Date.now();
+          document.body.appendChild(input);
+        }
+        return input.id || '_luna_bridge_file_input';
+      });
+
+      const fileInput = page.locator(`#${fileInputSelector}, input[type="file"]`).first();
+      await fileInput.setInputFiles(tmpFile);
+      log.info(`File input populated: ${tmpFile}`);
+
+      // Step 3: Trigger change event and wait for upload UI to appear
+      await page.evaluate((selector) => {
+        const input = document.querySelector(`#${selector}`) || document.querySelector('input[type="file"]');
+        if (input) {
+          const event = new Event('change', { bubbles: true });
+          input.dispatchEvent(event);
+        }
+      }, fileInputSelector);
+
+      // Wait for image to be processed by Kimi UI (thumbnail/preview appears)
+      log.info('Waiting for image upload to be processed by Kimi...');
+      await page.waitForTimeout(2000);
+
+      // Step 4: Send optional text
+      if (text && text.trim()) {
+        const inputLocator = page.locator('textarea, [contenteditable="true"]').first();
+        await inputLocator.fill('');
+        await page.waitForTimeout(300);
+        if (text.length <= MAX_TEXT_TYPE_LENGTH) {
+          await inputLocator.type(text, { delay: 50 });
+        } else {
+          await inputLocator.fill(text);
+        }
+        await page.waitForTimeout(500);
+      }
+
+      // Step 5: Press Enter to send
+      const sendLocator = page.locator('textarea, [contenteditable="true"]').first();
+      await sendLocator.press('Enter');
+      log.info(`Image (+text) sent for user ${hashUserId(userId)}`);
+
+      // Step 6: Wait for response
+      await this._waitForResponse(page, actualMode, options.onPartialResponse || null);
+      const response = await this._extractResponse(page);
+
+      session.chatUrl = page.url();
+      this.store.setUser(userId, { chatUrl: session.chatUrl });
+
+      log.success(`Response ready for user ${hashUserId(userId)} (len=${response.length})`);
+
+      // Cleanup temp file
+      try { fs.unlinkSync(tmpFile); } catch {}
+
+      return {
+        response,
+        chatUrl: session.chatUrl,
+        mode: session.mode,
+      };
+    } catch (err) {
+      try {
+        await page.locator('textarea, [contenteditable="true"]').first().fill('');
+      } catch {}
+      throw err;
+    } finally {
+      session.processing = false;
+      session.lastActivity = Date.now();
+    }
+  }
+
+  /**
    * Send a message and wait for response
    */
   async sendMessage(userId, text, options = {}) {
@@ -708,8 +873,13 @@ class KimiBridge {
       await inputLocator.press('Enter');
       log.info(`Message sent for user ${hashUserId(userId)}`);
 
+      // Capture current text BEFORE waiting for response — this prevents
+      // detecting the previous response as "done" if buttons are still visible
+      const initialText = await page.locator('.markdown-container .markdown').last().innerText({ timeout: 2000 }).catch(() => '');
+      log.info(`Initial text captured (len=${initialText.length}), waiting for new response...`);
+
       // Wait for response with combined signal + streaming
-      await this._waitForResponse(page, actualMode, options.onPartialResponse || null);
+      await this._waitForResponse(page, actualMode, options.onPartialResponse || null, initialText);
 
       // Extract response
       const response = await this._extractResponse(page);
