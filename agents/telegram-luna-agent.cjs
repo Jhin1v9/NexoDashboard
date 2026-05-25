@@ -18,7 +18,8 @@ const KIMI_BRIDGE_URL = process.env.KIMI_BRIDGE_URL || null;
 const KIMI_BRIDGE_API_KEY = process.env.KIMI_BRIDGE_API_KEY || 'nexo-kimi-local-2026';
 
 // ── DASHBOARD CONTEXT BUILDER ──
-// Auto-fetches dashboard data to enrich Kimi prompts
+// Auto-fetches dashboard data IN REAL-TIME from local API to enrich Kimi prompts
+const http = require('http');
 const DASHBOARD_DATA_DIR = path.join(__dirname, '../backend/data');
 
 function loadJson(file) {
@@ -29,53 +30,69 @@ function loadJson(file) {
   } catch { return null; }
 }
 
-function buildDashboardContext(userQuery = '') {
+// Helper: fetch JSON from local backend API
+function fetchLocalApi(endpoint) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:3456${endpoint}`, { timeout: 3000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+async function buildDashboardContext(userQuery = '') {
   const q = userQuery.toLowerCase();
   const isDashboardQuery = /tarefa|lead|ideia|orçamento|projeto|cliente|financeiro|pagamento|despesa|status|dashboard|nexo/i.test(q);
   if (!isDashboardQuery) return null;
 
-  const buffer = loadJson('luna-buffer.json') || {};
-  const tasks = buffer.newTasks || [];
-  const leads = buffer.newLeads || [];
-  const ideas = buffer.newIdeas || [];
-  const decisions = buffer.newDecisions || [];
-  const finance = buffer.newFinance || [];
+  // Fetch data in parallel from local API
+  const [tasksData, leadsData, ideasData, financeData] = await Promise.all([
+    fetchLocalApi('/api/tasks'),
+    fetchLocalApi('/api/leads'),
+    fetchLocalApi('/api/ideas'),
+    fetchLocalApi('/api/finance/summary'),
+  ]);
 
-  const lines = ['📋 *CONTEXTO NEXO DASHBOARD* (dados reais do sistema):'];
+  const tasks = Array.isArray(tasksData) ? tasksData : (tasksData || []);
+  const leads = leadsData?.data?.leads || leadsData?.leads || [];
+  const ideas = ideasData?.data?.ideas || ideasData?.ideas || [];
+  const finance = financeData || {};
+
+  const lines = ['📋 *CONTEXTO NEXO DASHBOARD* (dados em tempo real):'];
 
   if (tasks.length) {
-    lines.push(`\n📝 *Tarefas recentes (${tasks.length}):*`);
-    tasks.slice(-10).forEach((t, i) => {
-      lines.push(`${i + 1}. ${t.body || t.text || 'Sem título'} — ${t.author || 'N/A'}${t.priority ? ` [${t.priority}]` : ''}`);
+    lines.push(`\n📝 *Tarefas ativas (${tasks.length}):*`);
+    tasks.slice(0, 10).forEach((t, i) => {
+      const title = t.title || t.body || t.text || 'Sem título';
+      const status = t.status || 'pending';
+      const priority = t.priority ? ` [${t.priority}]` : '';
+      lines.push(`${i + 1}. ${title} — ${status}${priority}`);
     });
   }
 
   if (leads.length) {
-    lines.push(`\n👤 *Leads recentes (${leads.length}):*`);
-    leads.slice(-10).forEach((l, i) => {
+    lines.push(`\n👤 *Leads (${leads.length}):*`);
+    leads.slice(0, 10).forEach((l, i) => {
       lines.push(`${i + 1}. ${l.name || l.context || 'Sem nome'} — ${l.status || 'novo'}`);
     });
   }
 
   if (ideas.length) {
-    lines.push(`\n💡 *Ideias recentes (${ideas.length}):*`);
-    ideas.slice(-5).forEach((idea, i) => {
+    lines.push(`\n💡 *Ideias (${ideas.length}):*`);
+    ideas.slice(0, 5).forEach((idea, i) => {
       lines.push(`${i + 1}. ${idea.title || idea.body || 'Sem título'}`);
     });
   }
 
-  if (finance.length) {
-    lines.push(`\n💰 *Movimentações financeiras recentes (${finance.length}):*`);
-    finance.slice(-5).forEach((f, i) => {
-      lines.push(`${i + 1}. ${f.body || f.text || f.context || 'Sem descrição'}`);
-    });
-  }
-
-  if (decisions.length) {
-    lines.push(`\n📌 *Decisões recentes (${decisions.length}):*`);
-    decisions.slice(-5).forEach((d, i) => {
-      lines.push(`${i + 1}. ${d.body || d.text || 'Sem descrição'}`);
-    });
+  if (finance && (finance.totalExpected || finance.totalReceived || finance.cashBoxBalance)) {
+    lines.push(`\n💰 *Financeiro:*`);
+    lines.push(`- Esperado: €${finance.totalExpected || 0} | Recebido: €${finance.totalReceived || 0} | Pendente: €${finance.totalPending || 0}`);
+    lines.push(`- Caixa: €${finance.cashBoxBalance || 0}`);
   }
 
   lines.push('\n---\nResponda usando os dados acima quando relevante. Se não souber algo específico, diga que vai verificar no dashboard.');
@@ -676,7 +693,7 @@ class TelegramLunaAgent {
       await stream.init();
 
       try {
-        const context = buildDashboardContext(question);
+        const context = await buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
 
         // Streaming only works in local mode (remote API is request/response)
@@ -710,7 +727,7 @@ class TelegramLunaAgent {
       await stream.init();
 
       try {
-        const context = buildDashboardContext(question);
+        const context = await buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
         const useStreaming = !KIMI_BRIDGE_URL;
         const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
@@ -741,7 +758,7 @@ class TelegramLunaAgent {
       await stream.init();
 
       try {
-        const context = buildDashboardContext(question);
+        const context = await buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
         const useStreaming = !KIMI_BRIDGE_URL;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);

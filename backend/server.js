@@ -947,6 +947,9 @@ const PUBLIC_API_ROUTES = [
   '/api/email/auth/url',      // Inicia OAuth do Gmail (precisa estar logado, mas o frontend envia token)
   '/api/email/auth/status',   // Status da conexão Gmail
   '/api/email/auth/callback', // OAuth callback do Gmail (chamado pelo Google, sem token)
+  '/api/tasks',               // Luna bot context builder (local-only)
+  '/api/ideas',               // Luna bot context builder (local-only)
+  '/api/finance/summary',     // Luna bot context builder (local-only)
 ];
 
 app.use((req, res, next) => {
@@ -3410,6 +3413,24 @@ console.log('[FINANCE] Financial module loaded. Cron jobs scheduled.');
 // Ideas Routes
 // ═══════════════════════════════════════════════════════════════════════════════
 const ideasRouter = require('./routes/ideas');
+// Rota pública para ideas (usada pelo Luna bot context builder)
+app.get('/api/ideas', async (req, res) => {
+  try {
+    const ideasData = await dataStore.getIdeas();
+    let ideas = ideasData.ideas ? Object.values(ideasData.ideas) : [];
+    if (req.query.status) ideas = ideas.filter(i => i.status === req.query.status);
+    if (req.query.type) ideas = ideas.filter(i => i.type === req.query.type);
+    if (req.query.search) {
+      const term = req.query.search.toLowerCase();
+      ideas = ideas.filter(i => i.title && i.title.toLowerCase().includes(term));
+    }
+    ideas = ideas.slice(0, 20);
+    res.json({ success: true, data: { ideas, total: ideas.length } });
+  } catch (err) {
+    console.error('[PUBLIC IDEAS] Error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.use('/api/ideas', ideasRouter(requireAuth));
 
 // ═══════════════════════════════════════════════════════════════════════════════
