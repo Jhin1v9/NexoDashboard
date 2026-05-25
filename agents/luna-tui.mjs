@@ -1004,12 +1004,45 @@ function App({ luna, sessionManager, initialSession }) {
             break;
           }
 
-          case 'error':
-            setMessages(prev => [...prev, {
-              type: 'system', content: `❌ ${ev.error}`,
-              timestamp: new Date().toISOString(), id: nextId(),
-            }]);
+          case 'error': {
+            const errMsg = ev.error || '';
+            const isConnErr = errMsg.includes('ECONNREFUSED') || errMsg.includes('ETIMEDOUT') || errMsg.includes('connectOverCDP') || errMsg.includes('disconnected');
+            if (isConnErr) {
+              setMessages(prev => [...prev, {
+                type: 'system', content: '🔌 Chrome não detectado. Iniciando automaticamente...',
+                timestamp: new Date().toISOString(), id: nextId(),
+              }]);
+              // Fire-and-forget auto-heal
+              (async () => {
+                try {
+                  const st = await luna.kimiBridge?.checkChrome?.();
+                  if (st && st.running) {
+                    const pmsg = st.port ? ` (porta ${st.port})` : '';
+                    setMessages(prev => [...prev, {
+                      type: 'system', content: `🚀 Chrome iniciado${pmsg}. Pode enviar sua mensagem.`,
+                      timestamp: new Date().toISOString(), id: nextId(),
+                    }]);
+                  } else {
+                    setMessages(prev => [...prev, {
+                      type: 'system', content: `⚠️ Não consegui iniciar Chrome: ${st?.error || errMsg}. Tente /login.`,
+                      timestamp: new Date().toISOString(), id: nextId(),
+                    }]);
+                  }
+                } catch (e) {
+                  setMessages(prev => [...prev, {
+                    type: 'system', content: `❌ Auto-heal falhou: ${e.message}. Tente /login.`,
+                    timestamp: new Date().toISOString(), id: nextId(),
+                  }]);
+                }
+              })();
+            } else {
+              setMessages(prev => [...prev, {
+                type: 'system', content: `❌ ${errMsg}`,
+                timestamp: new Date().toISOString(), id: nextId(),
+              }]);
+            }
             break;
+          }
 
           case 'warning':
             setMessages(prev => [...prev, {
