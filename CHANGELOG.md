@@ -1,5 +1,97 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-25 — Fase 2: Computer Use + Luna CLI + Tool Registry
+
+### Added
+- **Computer Use Agent v1.0** (`agents/computer-use-agent.cjs`)
+  - Agente de controle de desktop guiado pela Kimi Web via Playwright
+  - Loop: plano → ação → screenshot → verificação
+  - Máximo 20 iterações por tarefa, timeout 5 minutos
+  - Confirmação obrigatória para ações destrutivas
+  - Segurança: blacklist de comandos (rm -rf, format, etc.)
+- **Computer Use Engine v2.0** (`agents/computer-use-engine.cjs`)
+  - Reescrita em Node.js puro — sem Python child_process
+  - Backends: grim/gnome-screenshot (screenshot), tesseract (OCR),
+    xdotool/ydotool (input), spawn direto (shell), xdotool/dbus-send
+    (window management). Shell-quote parser seguro.
+- **Computer Use React** (`agents/computer-use-react.cjs`)
+  - Componente React para UI do agente de desktop
+- **venv-computer-use/**: ambiente Python isolado para dependências do agente
+- **Luna CLI v3.0** (`agents/luna-cli.cjs`)
+  - Terminal-native AI assistant powered by Kimi Web
+  - Interface inspirada em Kimi CLI / Claude Code
+  - Comandos slash: /new, /models, /compact, /clear, /history, /export,
+    /skills, /personas
+  - Modo META: Kimi Web pode criar ferramentas, skills, scripts, personas
+- **LunaSoul v3.0** (`agents/luna-soul.cjs`)
+  - Engine orquestrador unificado (CLI-first, multi-channel, self-improving)
+  - Loop: recebe msg → contexto → Kimi Web → parse → executa → responde
+  - Context building: histórico + desktop + skills + memórias + personas
+  - Tool execution com progress events
+  - Event emitter para adapters (CLI, Telegram)
+  - System prompt orquestrador v3 com META mode
+- **SessionManager** (`agents/session-manager.cjs`)
+  - Gerenciamento de sessões persistentes em JSONL (append-only, crash-safe)
+  - Cada linha = evento (user, assistant, tool_call, tool_result)
+  - Indexação rápida, current session link, compactação automática
+- **Tool Registry API v1.0** (`backend/routes/tool-registry.js`)
+  - Expõe ações do NEXO Dashboard como "tools" para a Kimi Central
+  - 15+ tools: tarefas, leads, caixa, links, ideias, notificações,
+    WhatsApp, financeiro, usuários, sistema
+  - Todas consomem datastore-pg.js (PostgreSQL) como source of truth
+  - Retornam JSON estruturado para consumo pela Kimi
+- **Documentação Futura**
+  - `docs/FUTURO-kimi-code-telegram.md`: Kimi Code no Telegram — IDE
+    inteligente via chat privado
+  - `docs/FUTURO-kimi-orquestradora-unificada.md`: Kimi Web como
+    orquestradora única (sem separação /pc, /kimi)
+- **Testes E2E novos**
+  - `test-luna-chat.spec.js`: E2E para chat Luna no dashboard (Render)
+  - `test-luna-debug.spec.js`: debug do frontend (console logs + errors)
+  - `test-luna-fab.spec.js`: teste do FAB (Floating Action Button)
+- **Testes de Engine**
+  - `test-engine.cjs`: teste isolado do Computer Use Engine
+  - `test-input.cjs`: teste de input (xdotool/ydotool)
+  - `test-react-real.cjs`: teste do componente React do Computer Use
+
+### Changed
+- `agents/package.json`: adiciona `ink` (^7.0.4) e `react` (^19.2.6)
+  para a interface TUI do Luna CLI
+- `backend/routes/ideas.js`: remove `requireAuth` do GET /api/ideas
+  (listagem pública, não-sensível)
+
+### Fixed (Telegram Bot — Kimi Integration)
+- **Stale response bug**: bot respondia com resposta da mensagem anterior
+  - Causa: `_waitForResponse` via botões da resposta anterior já visíveis
+  - Fix: captura `initialText` antes de enviar → Phase 0 espera texto
+    MUDAR antes de verificar botões/estabilidade (`kimi-bridge.cjs`)
+- **Reply context**: quando usuário marcava mensagem com `/kimi`, o bot
+  ignorava o conteúdo da mensagem marcada
+  - Fix: detecta `msg.reply_to_message` e inclui texto + autor como
+    contexto nos 3 handlers (`/kimi`, `/kimi_instant`, `/kimi_thinking`)
+- **Greeting spam**: Kimi dizia "Oi Jhino!" em CADA mensagem
+  - Fix: adiciona diretriz no final do prompt para respostas diretas,
+    sem saudações e sem nomear o usuário no início
+- **Streaming updater removido**: sistema complexo de streaming com
+  `createStreamUpdater`, `onPartial`, `editTimer`, `lastQueuedText`
+  causava race conditions entre mensagens
+  - Fix: substituído por `sendThinkingThenEdit` simples — envia
+    "Pensando..." e edita uma única vez com resposta completa
+
+### Commits
+- `a2d7c24` chore(deps): adiciona ink + react aos agents; remove auth de GET /api/ideas — Abner
+- `8901ebf` test(e2e): novos testes Playwright para Luna + testes de engine — Abner
+- `e1eacba` docs(futuro): arquiteturas futuras — Kimi Code Telegram + Orquestradora Única — Abner
+- `c8db9d2` feat(api): Tool Registry API v1.0 — Abner
+- `54931c6` feat(luna-cli): Luna CLI v3.0 + LunaSoul v3.0 + SessionManager — Abner
+- `ba5510d` feat(computer-use): Luna Computer Use Agent v1.0 + Engine v2.0 + React — Abner
+- `e9f114a` fix(telegram): move no-greeting directive to end of prompt — Abner
+- `34d5b34` fix(telegram): add no-greeting instruction to /kimi prompts — Abner
+- `7238aa2` fix(telegram+kimi): resolve stale response bug + add reply context — Abner
+- `0d06390` fix(telegram): remove streaming updater to fix stale response bug — Abner
+
+---
+
 ## [Unreleased] — 2026-05-25 — Luna-Kimi Bridge v2.1 + Telegram Bot Remoto
 
 ### Added
