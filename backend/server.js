@@ -9149,7 +9149,24 @@ async function startServer() {
         console.log('🔄 PostgreSQL is the source of truth. Skipping JSON restore.');
       }
     } catch (err) {
-      console.error('❌ Database setup failed:', err.message);
+      const msg = err.message || '';
+      const isQuotaError = msg.includes('exceeded the data transfer quota') || msg.includes('quota');
+      
+      if (isQuotaError) {
+        console.error('\n❌❌❌ NEON QUOTA EXCEDIDA ❌❌❌');
+        console.error('   Seu banco PostgreSQL (Neon) atingiu o limite de 5GB/mês de data transfer.');
+        console.error('   Isso BLOQUEIA todo acesso ao banco.\n');
+        console.error('   💡 SOLUÇÕES RÁPIDAS:');
+        console.error('   1. PostgreSQL LOCAL (recomendado para dev):');
+        console.error('      ./setup-local-pg.sh');
+        console.error('      DATABASE_URL=postgres://nexo:nexo123@localhost:5432/nexodb node server.js');
+        console.error('   2. Migrar para Render PostgreSQL (produção, nunca expira):');
+        console.error('      https://dashboard.render.com → New → PostgreSQL → Free');
+        console.error('   3. Ver todas as alternativas:');
+        console.error('      cat ALTERNATIVAS-BANCO-GRATIS.md\n');
+      } else {
+        console.error('❌ Database setup failed:', err.message);
+      }
     }
   }
   server.listen(PORT, BIND_IP, async () => {
