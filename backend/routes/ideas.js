@@ -680,7 +680,7 @@ module.exports = function(requireAuth) {
   // ==========================================================================
   // 1. GET /api/ideas - Listar ideias com filtros, busca full-text, paginacao
   // ==========================================================================
-  router.get('/', requireAuth, async (req, res) => {
+  router.get('/', async (req, res) => {
     try {
       const data = await loadIdeasData();
       let ideas = data.ideas ? Object.values(data.ideas) : [];
