@@ -752,7 +752,8 @@ function App({ luna, sessionManager, initialSession }) {
             setMessages(prev => [...prev, { type: 'system', content: '⚠️ Chrome headless detectado e reiniciado em modo visível. Uma janela do Chrome deve aparecer.', id: nextId(), timestamp: new Date().toISOString() }]);
           }
           if (chromeStatus.started) {
-            setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome visível iniciado (PID: ${chromeStatus.pid})`, id: nextId(), timestamp: new Date().toISOString() }]);
+            const profileMsg = chromeStatus.profileDir ? ` (perfil: ${chromeStatus.profileDir.slice(-30)})` : '';
+            setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome visível iniciado (PID: ${chromeStatus.pid})${profileMsg}`, id: nextId(), timestamp: new Date().toISOString() }]);
           } else if (chromeStatus.running) {
             setMessages(prev => [...prev, { type: 'system', content: '✅ Chrome já está rodando (modo visível)', id: nextId(), timestamp: new Date().toISOString() }]);
           } else if (chromeStatus.error) {

@@ -43,7 +43,7 @@ process.on('unhandledRejection', (reason) => {
 // ============================================================
 // CONFIG
 // ============================================================
-const DEFAULT_CDP_URL = process.env.KIMI_CDP_URL || 'http://localhost:9222';
+const DEFAULT_CDP_URL = process.env.KIMI_CDP_URL || 'http://127.0.0.1:9222';
 const DEFAULT_TIMEOUT = parseInt(process.env.KIMI_TIMEOUT, 10) || 120000;
 const MAX_CONCURRENT_PAGES = parseInt(process.env.KIMI_MAX_PAGES, 10) || 5;
 const IDLE_TIMEOUT_MS = parseInt(process.env.KIMI_IDLE_TIMEOUT, 10) || 10 * 60 * 1000;
@@ -977,11 +977,11 @@ class KimiBridge {
     const os = require('os');
     const userDataDir = path.join(os.homedir(), '.luna', 'chrome-profile');
 
-    // Check if Chrome is already listening on CDP port
+    // Check if Chrome is already listening on CDP port (use IPv4 explicitly)
     let existingChrome = null;
     try {
       await new Promise((resolve, reject) => {
-        const req = http.get('http://localhost:9222/json/version', (res) => {
+        const req = http.get('http://127.0.0.1:9222/json/version', (res) => {
           if (res.statusCode === 200) resolve(true);
           else reject(new Error('Status ' + res.statusCode));
         });
@@ -993,17 +993,22 @@ class KimiBridge {
       existingChrome = false;
     }
 
-    // If running, check if it's headless
+    // If running, check if it's headless and capture its user-data-dir
     let wasHeadless = false;
+    let existingProfileDir = null;
     if (existingChrome) {
       try {
         const psOutput = execSync("ps aux | grep 'chrome.*remote-debugging-port=9222' | grep -v grep", { encoding: 'utf8' });
+        // Extract user-data-dir from existing Chrome
+        const dataDirMatch = psOutput.match(/--user-data-dir=([^\s]+)/);
+        if (dataDirMatch) existingProfileDir = dataDirMatch[1];
+
         if (psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless')) {
           wasHeadless = true;
           log.warn('Chrome headless detectado. Matando para iniciar visível...');
           // Kill headless chrome
           execSync("pkill -f 'chrome.*remote-debugging-port=9222'");
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 3000));
           existingChrome = false;
         } else {
           return { running: true, started: false, wasHeadless: false };
@@ -1032,34 +1037,40 @@ class KimiBridge {
     }
 
     try {
+      // Reuse the existing profile dir if we found one, otherwise use default
+      const profileDir = existingProfileDir || userDataDir;
+      if (existingProfileDir) {
+        log.info(`Reutilizando perfil existente: ${existingProfileDir}`);
+      }
+
       const proc = spawn(chromePath, [
         '--remote-debugging-port=9222',
         '--no-first-run',
         '--no-default-browser-check',
-        '--user-data-dir=' + userDataDir,
+        '--user-data-dir=' + profileDir,
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
         // NO --headless — we need a visible window for login
-      ], { detached: true, stdio: 'ignore' });
+      ], { detached: true, stdio: 'ignore', env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0' } });
       proc.unref();
 
       // Wait for Chrome to start
-      await new Promise(r => setTimeout(r, 4000));
+      await new Promise(r => setTimeout(r, 5000));
 
-      // Verify it started
+      // Verify it started (use IPv4)
       try {
         await new Promise((resolve, reject) => {
-          const req = http.get('http://localhost:9222/json/version', (res) => {
+          const req = http.get('http://127.0.0.1:9222/json/version', (res) => {
             if (res.statusCode === 200) resolve(true);
             else reject(new Error('Status ' + res.statusCode));
           });
           req.on('error', reject);
           req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
         });
-        return { running: true, started: true, pid: proc.pid, wasHeadless };
+        return { running: true, started: true, pid: proc.pid, wasHeadless, profileDir };
       } catch {
-        return { running: false, started: true, pid: proc.pid, wasHeadless, error: 'Chrome iniciou mas não respondeu em 5s' };
+        return { running: false, started: true, pid: proc.pid, wasHeadless, profileDir, error: 'Chrome iniciou mas não respondeu em 5s' };
       }
     } catch (e) {
       return { running: false, started: false, error: e.message };
