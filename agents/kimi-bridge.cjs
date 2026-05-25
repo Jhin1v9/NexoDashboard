@@ -340,8 +340,17 @@ class KimiBridge {
 
     const existing = this.userSessions.get(userId);
     if (existing && existing.page && !existing.page.isClosed()) {
-      existing.lastActivity = Date.now();
-      return existing.page;
+      // Health-check: verify the page still responds via CDP
+      try {
+        await existing.page.evaluate(() => true);
+        existing.lastActivity = Date.now();
+        return existing.page;
+      } catch (e) {
+        log.warn(`Stale page for user ${hashUserId(userId)}, recreating: ${e.message}`);
+        try { await existing.page.close(); } catch {}
+        this.userSessions.delete(userId);
+        this.semaphore.current = Math.max(0, this.semaphore.current - 1);
+      }
     }
 
     // Acquire semaphore slot
@@ -1078,31 +1087,122 @@ class KimiBridge {
   }
 
   /**
-   * Ensure user is logged into Kimi Web. Opens login page if not.
+   * Check login state on a page using browser-native selectors (no :has-text()).
+   */
+  async _checkLoginState(page) {
+    try {
+      return await page.evaluate(() => {
+        const bodyText = document.body?.innerText?.toLowerCase() || '';
+        // Look for actual login indicators
+        const hasLoginBtn = !!(
+          document.querySelector('a[href*="login"], a[href*="signin"], button[class*="login"], button[class*="signin"]') ||
+          document.querySelector('input[type="password"]')
+        );
+        const hasChatInput = !!(
+          document.querySelector('textarea[placeholder], [contenteditable="true"]') ||
+          document.querySelector('div[role="textbox"]')
+        );
+        const hasLoginText = bodyText.includes('log in') || bodyText.includes('sign in') || bodyText.includes('登录') || bodyText.includes('entrar');
+        const hasWelcome = bodyText.includes('welcome') || bodyText.includes('kimi');
+        // Consider logged in if we see chat input AND no login text/button
+        const loggedIn = hasChatInput && !hasLoginText && !hasLoginBtn;
+        return { loggedIn, hasLoginBtn, hasChatInput, hasLoginText, hasWelcome, url: location.href };
+      });
+    } catch (e) {
+      return { loggedIn: false, error: e.message };
+    }
+  }
+
+  /**
+   * Ensure user is logged into Kimi Web. Opens page and brings to front.
+   * If not logged in, navigates to kimi.com and starts polling.
    */
   async ensureLogin(userId) {
-    const page = await this._getOrCreateUserPage(userId);
-    const isLoggedIn = await page.evaluate(() => {
-      // Multiple login indicators
-      const hasLoginBtn = !!document.querySelector('button:has-text("Log In"), a:has-text("Log In"), [class*="login"]');
-      const hasUserAvatar = !!document.querySelector('[class*="avatar"], [class*="user"]');
-      const hasChatInput = !!document.querySelector('textarea, [contenteditable="true"]');
-      const bodyText = document.body?.innerText || '';
-      const hasLoginText = bodyText.includes('Log In') || bodyText.includes('Sign In') || bodyText.includes('登录');
-      return { loggedIn: !hasLoginText && hasChatInput, hasLoginText, hasChatInput };
-    }).catch(() => ({ loggedIn: false, error: 'Page evaluation failed' }));
-
-    if (!isLoggedIn.loggedIn) {
-      log.info(`User not logged in, navigating to Kimi login page`);
-      await page.goto('https://kimi.com/', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
-      return {
-        loggedIn: false,
-        message: 'Naveguei para kimi.com. Por favor, faça login manualmente no navegador que abriu.',
-        action: 'login_required',
-      };
+    let page;
+    try {
+      page = await this._getOrCreateUserPage(userId);
+      await page.bringToFront().catch(() => {});
+    } catch (e) {
+      return { loggedIn: false, error: `Failed to get page: ${e.message}`, action: 'login_required' };
     }
-    return { loggedIn: true, message: 'Já está logado no Kimi Web' };
+
+    // Check current state
+    const state = await this._checkLoginState(page);
+    if (state.loggedIn) {
+      return { loggedIn: true, message: 'Já está logado no Kimi Web', url: state.url };
+    }
+
+    // Not logged in — navigate to kimi.com and bring to front
+    log.info(`User not logged in, navigating to Kimi login page`);
+    try {
+      await page.goto('https://kimi.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForTimeout(1500);
+      await page.bringToFront().catch(() => {});
+    } catch (e) {
+      log.warn(`Navigation to kimi.com failed: ${e.message}`);
+      // Try again with a fresh page
+      try {
+        const session = this.userSessions.get(userId);
+        if (session && session.page && !session.page.isClosed()) {
+          await session.page.close().catch(() => {});
+          this.userSessions.delete(userId);
+          this.semaphore.current = Math.max(0, this.semaphore.current - 1);
+        }
+        page = await this._getOrCreateUserPage(userId);
+        await page.bringToFront().catch(() => {});
+      } catch (e2) {
+        return { loggedIn: false, error: `Failed to navigate: ${e2.message}`, action: 'login_required' };
+      }
+    }
+
+    // Quick re-check after navigation
+    const state2 = await this._checkLoginState(page);
+    if (state2.loggedIn) {
+      return { loggedIn: true, message: 'Já está logado no Kimi Web', url: state2.url };
+    }
+
+    return {
+      loggedIn: false,
+      message: 'Naveguei para kimi.com. Por favor, faça login manualmente no navegador que abriu.',
+      action: 'login_required',
+      url: state2.url,
+    };
+  }
+
+  /**
+   * Poll the page until login is detected or timeout.
+   * @returns {Promise<{loggedIn: boolean, message: string}>}
+   */
+  async waitForLogin(userId, maxWaitMs = 60000, intervalMs = 2500) {
+    const session = this.userSessions.get(userId);
+    if (!session || !session.page || session.page.isClosed()) {
+      return { loggedIn: false, message: 'Página não encontrada. Use /login primeiro.' };
+    }
+    const page = session.page;
+    const start = Date.now();
+    let lastState = null;
+
+    while (Date.now() - start < maxWaitMs) {
+      const state = await this._checkLoginState(page);
+      lastState = state;
+      if (state.loggedIn) {
+        // Update stored chat URL
+        try {
+          const url = await page.evaluate(() => location.href);
+          session.chatUrl = url;
+          this.store.setUser(userId, { chatUrl: url, mode: session.mode });
+        } catch {}
+        return { loggedIn: true, message: 'Login detectado! Pronto para usar.', url: state.url };
+      }
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    return {
+      loggedIn: false,
+      message: 'Tempo esgotado aguardando login. Faça login manualmente no Chrome.',
+      lastState,
+      action: 'login_timeout',
+    };
   }
 
   /**

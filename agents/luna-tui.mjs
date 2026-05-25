@@ -573,6 +573,7 @@ function App({ luna, sessionManager, initialSession }) {
   const [showSteerInput, setShowSteerInput] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState({ active: false });
   const [sessionStartTime, setSessionStartTime] = useState(Date.now());
+  const [awaitingLogin, setAwaitingLogin] = useState(false);
 
   // Message queue: when AI is processing, user input queues here
   const messageQueue = useRef([]);
@@ -613,6 +614,49 @@ function App({ luna, sessionManager, initialSession }) {
     const interval = setInterval(checkBridge, 10000); // every 10s
     return () => clearInterval(interval);
   }, [luna]);
+
+  // Polling de detecção de login automático
+  useEffect(() => {
+    if (!awaitingLogin) return;
+    let cancelled = false;
+    const poll = async () => {
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: '⏳ Aguardando login no Chrome... (monitorando a cada 3s)',
+        id: nextId(), timestamp: new Date().toISOString()
+      }]);
+      try {
+        const result = await luna.kimiBridge?.waitForLogin?.('luna-cli', 60000, 3000);
+        if (cancelled) return;
+        if (result?.loggedIn) {
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: `✅ ${result.message}`,
+            id: nextId(), timestamp: new Date().toISOString()
+          }]);
+          setBridgeStatus(prev => ({ ...prev, active: true }));
+        } else {
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: `⏱️ ${result?.message || 'Tempo esgotado aguardando login.'}`,
+            id: nextId(), timestamp: new Date().toISOString()
+          }]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: `❌ Erro no monitoramento: ${e.message}`,
+            id: nextId(), timestamp: new Date().toISOString()
+          }]);
+        }
+      } finally {
+        if (!cancelled) setAwaitingLogin(false);
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [awaitingLogin, luna]);
 
   // Process message queue after response completes
   const processQueue = useCallback(async () => {
@@ -773,10 +817,17 @@ function App({ luna, sessionManager, initialSession }) {
           }
         }
         // Check Kimi login
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1500));
         const loginStatus = await luna.kimiBridge?.ensureLogin?.('luna-cli');
         if (loginStatus) {
-          setMessages(prev => [...prev, { type: 'system', content: loginStatus.loggedIn ? '✅ ' + loginStatus.message : '⚠️ ' + loginStatus.message, id: nextId(), timestamp: new Date().toISOString() }]);
+          if (loginStatus.loggedIn) {
+            setMessages(prev => [...prev, { type: 'system', content: '✅ ' + loginStatus.message, id: nextId(), timestamp: new Date().toISOString() }]);
+            setBridgeStatus(prev => ({ ...prev, active: true }));
+          } else {
+            setMessages(prev => [...prev, { type: 'system', content: '⚠️ ' + loginStatus.message, id: nextId(), timestamp: new Date().toISOString() }]);
+            // Start background polling to detect when user logs in
+            setAwaitingLogin(true);
+          }
         }
       } catch (e) {
         setMessages(prev => [...prev, { type: 'system', content: `❌ Erro no login: ${e.message}`, id: nextId(), timestamp: new Date().toISOString() }]);
