@@ -602,12 +602,21 @@ class TelegramLunaAgent {
     //   2. When Kimi writes then pauses → edit with partial text
     //   3. If Kimi is still thinking → append "🧠 Pensando..." to partial text
     //   4. When done → edit with clean final text
+    //
+    // RATE-LIMITED QUEUE: prevents Telegram API deadlock by ensuring
+    // at most 1 edit per EDIT_INTERVAL_MS. Fire-and-forget onPartial.
     const createStreamUpdater = (chatId, replyToId, modeEmoji) => {
-      let lastEdit = 0;
-      let lastText = '';
-      let lastStatus = '';
       let messageId = null;
-      const DEBOUNCE_MS = 1500; // max 1 edit per 1.5s
+      const EDIT_INTERVAL_MS = 2000; // max 1 edit per 2s (safe for Telegram)
+      const MAX_EDIT_LEN = 3500;
+
+      // Queue system
+      let lastQueuedText = '';
+      let lastQueuedStatus = '';
+      let editPending = false;
+      let editTimer = null;
+      let lastEditTime = 0;
+      let destroyed = false;
 
       const init = async () => {
         const msg = await this.bot.sendMessage(chatId, `${modeEmoji} *Pensando...*`, {
@@ -618,32 +627,25 @@ class TelegramLunaAgent {
         return messageId;
       };
 
-      const onPartial = async (text, status) => {
-        if (!messageId) return;
+      // Internal: actually perform the edit (no await from caller)
+      const _doEdit = async (text, status) => {
+        if (!messageId || destroyed) return;
         const now = Date.now();
-        if (now - lastEdit < DEBOUNCE_MS && status !== 'done') return;
-        if (text === lastText && status === lastStatus) return;
-        lastText = text;
-        lastStatus = status;
-        lastEdit = now;
+        lastEditTime = now;
 
         let editText;
-        const MAX_EDIT = 3500;
         const safeText = sanitizeTelegramMarkdown(text);
 
         if (status === 'done') {
-          // Final clean text
           editText = `${modeEmoji} ⭐Kimi⭐\n\n${safeText}`;
         } else if (status === 'thinking') {
-          // Kimi paused — show what we have + "thinking" indicator
           let body = safeText;
-          if (body.length > MAX_EDIT) body = body.slice(0, MAX_EDIT);
+          if (body.length > MAX_EDIT_LEN) body = body.slice(0, MAX_EDIT_LEN);
           editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}\n\n\_🧠 Pensando...\_`;
         } else {
-          // writing — show partial text without indicator
           let body = safeText;
-          if (body.length > MAX_EDIT) {
-            body = body.slice(0, MAX_EDIT) + '\n\n\_✍️ Continuando...\_';
+          if (body.length > MAX_EDIT_LEN) {
+            body = body.slice(0, MAX_EDIT_LEN) + '\n\n\_✍️ Continuando...\_';
           }
           editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}`;
         }
@@ -667,7 +669,46 @@ class TelegramLunaAgent {
         }
       };
 
+      // Queue an edit — fire-and-forget, never blocks caller
+      const _scheduleEdit = (text, status) => {
+        if (destroyed) return;
+        lastQueuedText = text;
+        lastQueuedStatus = status;
+
+        if (editPending) return; // already scheduled
+
+        const now = Date.now();
+        const timeSinceLast = now - lastEditTime;
+        const delay = Math.max(0, EDIT_INTERVAL_MS - timeSinceLast);
+
+        editPending = true;
+        editTimer = setTimeout(() => {
+          editPending = false;
+          editTimer = null;
+          // Capture current queued state and clear
+          const txt = lastQueuedText;
+          const st = lastQueuedStatus;
+          _doEdit(txt, st).catch(() => {});
+        }, delay);
+      };
+
+      // Public: called by bridge onPartial — NEVER await
+      const onPartial = (text, status) => {
+        if (!messageId || destroyed) return;
+        // Skip if same content and not final
+        if (status !== 'done' && text === lastQueuedText && status === lastQueuedStatus) return;
+        _scheduleEdit(text, status);
+      };
+
       const finalize = async (finalText, mode) => {
+        // Cancel any pending timer
+        if (editTimer) {
+          clearTimeout(editTimer);
+          editTimer = null;
+          editPending = false;
+        }
+        destroyed = true;
+
         if (!messageId) return;
         const emoji = mode === 'instant' ? '⚡' : '🧠';
         const safeText = sanitizeTelegramMarkdown(finalText);
@@ -681,7 +722,6 @@ class TelegramLunaAgent {
             });
             return messageId;
           } catch {
-            // Fallback without parse_mode
             try {
               await this.bot.editMessageText(fullText.replace(/⭐/g, '*').replace(/\_/g, '_'), {
                 chat_id: chatId,
@@ -748,8 +788,8 @@ class TelegramLunaAgent {
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
 
-        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
-        const useStreaming = false;
+        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
+        const useStreaming = true;
         const result = await askBridge(userId, enrichedQuestion, null, useStreaming ? stream.onPartial : null);
 
         await stream.finalize(result.response, result.mode || 'instant');
@@ -793,8 +833,8 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
-        const useStreaming = false;
+        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
+        const useStreaming = true;
         const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'instant');
       } catch (err) {
@@ -837,8 +877,8 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
-        const useStreaming = false;
+        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
+        const useStreaming = true;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'thinking');
       } catch (err) {
