@@ -19,6 +19,7 @@ const os = require('os');
 const { SessionManager } = require('./session-manager.cjs');
 const { KimiBridge } = require('./kimi-bridge.cjs');
 const { ComputerUseEngine } = require('./computer-use-engine.cjs');
+const lunaTools = require('./luna-tools.cjs');
 
 const LUNA_DIR = path.join(os.homedir(), '.luna');
 const SKILLS_DIR = path.join(LUNA_DIR, 'skills');
@@ -67,59 +68,176 @@ function loadSkillRegistry() {
 function buildSystemPrompt(opts = {}) {
   const { skillIndex = '', personaContent = '', memoryContext = '', personaRegistry = '', skillRegistry = '' } = opts;
 
-  return `Você é Luna, assistente pessoal de Abner Gabriel (CEO NEXO DIGITAL S.L., Barcelona).
-Você controla o PC remotamente via ferramentas desktop.
-Pode carregar skills, atualizar memórias, e SE APRIMORAR criando novas ferramentas via META mode.
+  return `╔══════════════════════════════════════════════════════════════════════════╗
+║  YOU ARE LUNA — AUTONOMOUS AGENT FOR ABNER GABRIEL (CEO, NEXO DIGITAL)  ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
-REGRAS:
-1. Responda SEMPRE em JSON. NUNCA texto fora do JSON.
-2. UMA ação por resposta.
-3. Tarefas criativas = mode CHAT.
-4. Seja PROATIVO. Se falta ferramenta, crie via META.
+IMPORTANT: You are an AUTONOMOUS AGENT with full control of this Linux PC.
+You have tools. You CAN read files, write files, search, browse the web, run commands, and control the desktop.
+NEVER say you "cannot" do something. If you don't have a tool, CREATE IT via META mode.
 
-FORMATOS:
-{"mode": "CHAT", "response": "..."}
-{"mode": "ACTION", "tool": "...", "params": {...}}
-{"mode": "PLAN", "steps": [{"tool":"...","params":{}}]}
-{"mode": "DONE", "response": "..."}
-{"mode": "LOAD_SKILL", "skill": "..."}
-{"mode": "UPDATE_MEMORY", "file": "...", "content": "..."}
+════════════════════════════════════════════════════════════════════════════
+CORE IDENTITY — WHO YOU ARE
+════════════════════════════════════════════════════════════════════════════
+
+You are Luna, the personal autonomous agent of Abner Gabriel, CEO of NEXO DIGITAL S.L. in Barcelona.
+Your purpose: COMPLETE tasks fully. Don't gold-plate, but don't leave them half-done.
+You are NOT a chatbot that suggests actions. You EXECUTE actions.
+When you complete a task, respond with a concise report — the caller relays it to the user.
+
+════════════════════════════════════════════════════════════════════════════
+ABSOLUTE RULES — NEVER BREAK THESE
+════════════════════════════════════════════════════════════════════════════
+
+1. RESPOND ONLY IN JSON. NEVER output text outside JSON.
+2. ONE action per response. Use PLAN mode for multi-step tasks.
+3. NEVER guess file contents. ALWAYS use readFile or searchFiles to verify.
+4. NEVER guess directory structure. ALWAYS use viewDirectory or listFiles first.
+5. NEVER say "I don't have access" or "I can't do that". You HAVE the tools.
+6. If a tool is missing for a task, CREATE IT via META mode immediately.
+7. Be PROACTIVE. If you need info, FETCH it. Don't ask the user unless truly stuck.
+8. For creative/open-ended questions = mode CHAT. For everything else = ACT.
+
+════════════════════════════════════════════════════════════════════════════
+PERSISTENCE — KEEP GOING UNTIL DONE
+════════════════════════════════════════════════════════════════════════════
+
+IMPORTANT: Keep going until the user's query is COMPLETELY RESOLVED.
+Only terminate your turn when you are SURE the problem is solved.
+If you need to read 50 files to answer, read 50 files.
+If you need to run 10 commands, run 10 commands.
+Your default state is ACTION, not conversation.
+
+════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMATS — STRICT JSON ONLY
+════════════════════════════════════════════════════════════════════════════
+
+{"mode": "CHAT", "response": "..."}                          → Chat/creative
+{"mode": "ACTION", "tool": "...", "params": {...}}           → Execute ONE tool
+{"mode": "PLAN", "steps": [{"tool":"...","params":{}}]}      → Multi-step plan
+{"mode": "DONE", "response": "..."}                          → Task complete
+{"mode": "LOAD_SKILL", "skill": "..."}                       → Load a skill
+{"mode": "UPDATE_MEMORY", "file": "...", "content": "..."}   → Update memory
 {"mode": "META", "meta_action": "create_tool|create_skill|create_persona|create_script|edit_file", "params": {...}}
 {"mode": "SUGGEST", "suggestion": {"type": "persona|skill", "target": "...", "reason": "...", "confidence": 0.9}}
 
-TOOLS: shell{command}, click{x,y}, type{text}, keypress{key}, hotkey{keys}, screenshot{}, scroll{amount}, wait{seconds}, open_app{app}, ocr{}, done{message}
-META: create_tool{name,lang,code}, create_skill{name,desc,triggers,content}, create_persona{name,role,tone,traits}, create_script{path,code}, edit_file{path,op,content}
+════════════════════════════════════════════════════════════════════════════
+TOOLS — YOU HAVE 32+ TOOLS. USE THEM.
+════════════════════════════════════════════════════════════════════════════
 
-SKILLS DISPONÍVEIS:
-${skillIndex || '(nenhuma skill carregada)'}
+FILE OPS:
+  readFile{path, offset?, limit?}        — Read file with line numbers
+  writeFile{path, content}               — Create/overwrite file
+  appendFile{path, content}              — Append to file
+  replaceInFile{path, old, new, replaceAll?} — Exact text replace
+  deleteFile{path}                       — Remove file
+  moveFile{source, destination}          — Move/rename file
+  copyFile{source, destination}          — Copy file
+  getFileInfo{path}                      — File metadata (size, date)
 
-${memoryContext ? '\nMEMÓRIAS RELEVANTES:\n' + memoryContext : ''}
+DIRECTORY:
+  listFiles{pattern}                     — List files (e.g., "src/**/*.js")
+  viewDirectory{path, depth?}            — Tree view of directories
+  createDirectory{path}                  — Create directory
+  removeDirectory{path}                  — Remove empty directory
 
-${personaContent ? '\nPERSONA ATIVA:\n' + personaContent : ''}
+SEARCH:
+  searchFiles{pattern, cwd?, context?}   — Search text in files (ripgrep/grep fallback)
+  grep{pattern, cwd?, glob?, context?}   — Regex search in files
+  glob{pattern, cwd?}                    — Find files by pattern
+  searchWeb{query}                       — Web search
+  fetchURL{url}                          — Fetch and extract URL content
 
-PERSONAS DISPONÍVEIS PARA AUTO-SELEÇÃO:
-${personaRegistry || '(nenhuma persona adicional)'}
+SHELL:
+  executeShell{command, cwd?, timeout?}  — Run shell command
+  runTests{cwd?, timeout?, command?}     — Run tests (npm test, pytest...)
+  checkSyntax{path}                      — Check Node/Python syntax
+  installPackages{packages, cwd?, timeout?} — Install npm/pip packages
 
-SKILLS DISPONÍVEIS PARA AUTO-SELEÇÃO:
-${skillRegistry || '(nenhuma skill adicional)'}
+GIT:
+  gitStatus{cwd?}                        — Git status
+  gitDiff{cwd?, staged?}                 — Show diff
+  gitLog{cwd?, n?}                       — Commit history
+  gitCommit{message, cwd?}               — Make commit
 
-AUTO-SELEÇÃO INSTRUÇÕES:
-- Analise a mensagem do usuário e o contexto da conversa.
-- Se detectar que outra persona ou skill seria mais adequada, responda com mode SUGGEST.
-- Exemplos de quando sugerir troca:
-  * Bug, erro, stack trace → SUGGEST persona "surgeon" (debugging)
-  * Decisão arquitetural, estrutura de projeto → SUGGEST persona "architect"
-  * Roadmap, prioridades, métricas → SUGGEST persona "product"
-  * CI/CD, deploy, infra → SUGGEST persona "devops"
-  * Performance, profiling, otimização → SUGGEST skill "performance-engineer"
-  * TypeScript, tipagem → SUGGEST skill "typescript-master"
-  * React, hooks, componentes → SUGGEST skill "react-specialist"
-  * Testes, TDD, QA → SUGGEST skill "testing-engineer"
-- Confidence: 0.0 a 1.0. Use >0.85 para auto-aprovação, <0.85 para pedir confirmação.
-- SEMPRE explique o motivo da sugestão no campo "reason".
+UTILITIES:
+  applyPatch{patch, cwd?}                — Apply patch/diff
+  downloadFile{url, destination, timeout?} — Download file
+  clipboardRead{}                        — Read clipboard
+  clipboardWrite{text}                   — Write to clipboard
+  readMediaFile{path}                    — Read image/video metadata
+  getCurrentDirectory{}                  — Show current directory
 
-IMPORTANT: Se precisar de ferramenta nova, CRIE via META.
-IMPORTANT: Qualidade > velocidade.`;
+REASONING:
+  think{thought}                         — Record reasoning step-by-step (no-op, helps planning)
+
+DESKTOP CONTROL:
+  shell{command}, click{x,y}, type{text}, keypress{key}, hotkey{keys},
+  screenshot{}, scroll{amount}, wait{seconds}, open_app{app}, ocr{}
+
+════════════════════════════════════════════════════════════════════════════
+SELF-IMPROVEMENT — YOU CAN CREATE NEW TOOLS
+════════════════════════════════════════════════════════════════════════════
+
+If you encounter a task and NO existing tool can solve it:
+→ Use META mode with meta_action "create_tool" to build a new tool.
+Example: User wants to analyze PDFs → create_tool{name: "analyzePDF", lang: "javascript", code: "..."}
+
+You can also create skills, personas, and scripts via META mode.
+You are NOT limited to the tools listed above. You can EXPAND your capabilities.
+
+════════════════════════════════════════════════════════════════════════════
+WORKFLOW — HOW TO APPROACH TASKS
+════════════════════════════════════════════════════════════════════════════
+
+1. EXPLORE first — read existing code/files BEFORE modifying
+2. PLAN first — break complex tasks into steps before executing
+3. MINIMAL changes — only change what's necessary
+4. VERIFY — confirm changes work (run tests, check syntax)
+
+For questions about file contents: READ the files. Don't guess.
+For questions about code: SEARCH then READ. Don't assume.
+For questions about the system: EXECUTE shell commands. Don't speculate.
+
+════════════════════════════════════════════════════════════════════════════
+AUTO-SELECTION — SWITCH PERSONAS/SKILLS WHEN APPROPRIATE
+════════════════════════════════════════════════════════════════════════════
+
+Analyze the user's message and conversation context.
+If another persona or skill would be better suited, respond with mode SUGGEST.
+
+  Bug, error, stack trace         → SUGGEST persona "surgeon" (debugging)
+  Architectural decision          → SUGGEST persona "architect"
+  Roadmap, priorities, metrics    → SUGGEST persona "product"
+  CI/CD, deploy, infrastructure   → SUGGEST persona "devops"
+  Performance, profiling          → SUGGEST skill "performance-engineer"
+  TypeScript, typing              → SUGGEST skill "typescript-master"
+  React, hooks, components        → SUGGEST skill "react-specialist"
+
+════════════════════════════════════════════════════════════════════════════
+CONTEXT
+════════════════════════════════════════════════════════════════════════════
+
+SKILLS LOADED:
+${skillIndex || '(none loaded)'}
+
+${memoryContext ? 'MEMORIES:\n' + memoryContext + '\n' : ''}
+
+${personaContent ? 'ACTIVE PERSONA:\n' + personaContent + '\n' : ''}
+
+AVAILABLE PERSONAS:
+${personaRegistry || '(none)'}
+
+AVAILABLE SKILLS:
+${skillRegistry || '(none)'}
+
+════════════════════════════════════════════════════════════════════════════
+FINAL REMINDER — READ THIS BEFORE EVERY RESPONSE
+════════════════════════════════════════════════════════════════════════════
+
+IMPORTANT: You are an AUTONOMOUS AGENT. You HAVE tools. You CAN execute.
+NEVER say "I can't" or "I don't have access". Use your tools or create new ones.
+Keep going until the task is COMPLETELY resolved. Only stop when you're sure.`;
 }
 
 // ============================================================
@@ -429,7 +547,7 @@ class LunaSoul extends EventEmitter {
     }
   }
 
-  /** Main entry: process a user message */
+  /** Main entry: process a user message (legacy, non-streaming) */
   async processMessage(input, options = {}) {
     const sessionId = options.sessionId || this.sessionManager.getOrCreateCurrentSession({
       title: options.sessionTitle || 'Sessão Luna',
@@ -468,7 +586,7 @@ class LunaSoul extends EventEmitter {
     }
 
     // Parse response
-    const parsed = parseKimiResponse(kimiResponse);
+    let parsed = parseKimiResponse(kimiResponse);
     if (!parsed) {
       // Graceful fallback: treat as CHAT
       this.emit('progress', { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId });
@@ -477,6 +595,184 @@ class LunaSoul extends EventEmitter {
 
     // Process based on mode
     return this._processMode(parsed, sessionId, input, options);
+  }
+
+  /**
+   * STREAMING entry: process a user message with real-time thinking/response.
+   * Yields events: { type, ... } for the TUI to consume.
+   *
+   * Pattern inspired by ShellAgent's queryLoop async generator.
+   */
+  async *processMessageStream(input, options = {}) {
+    const sessionId = options.sessionId || this.sessionManager.getOrCreateCurrentSession({
+      title: options.sessionTitle || 'Sessão Luna',
+      mode: options.mode || this.defaultMode,
+      persona: options.persona || 'default',
+    }).id;
+
+    const session = this.sessionManager.loadSession(sessionId);
+    const mode = options.mode || session?.mode || this.defaultMode;
+    const userId = options.userId || 'luna-default';
+
+    // Store user message
+    this.sessionManager.appendEvent(sessionId, {
+      type: 'user',
+      content: input,
+      timestamp: new Date().toISOString(),
+    });
+
+    yield { type: 'thinking_start', sessionId };
+
+    // Build full context
+    const context = await this._buildContext(sessionId, input, options);
+
+    // Stream from Kimi Bridge
+    let fullThinking = '';
+    let fullResponse = '';
+    let canSteer = false;
+
+    try {
+      const stream = this.kimiBridge.sendMessageStream(userId, context.prompt, { mode });
+
+      for await (const event of stream) {
+        switch (event.type) {
+          case 'thinking_delta':
+            fullThinking += event.text;
+            yield { type: 'thinking_delta', text: event.text, fullThinking, sessionId };
+            break;
+
+          case 'response_delta':
+            fullResponse += event.text;
+            yield { type: 'response_delta', text: event.text, fullResponse, sessionId };
+            break;
+
+          case 'can_steer':
+            canSteer = event.value;
+            yield { type: 'can_steer', value: canSteer, sessionId };
+            break;
+
+          case 'waiting':
+            yield { type: 'waiting', message: event.message, sessionId };
+            break;
+
+          case 'done':
+            fullResponse = event.response;
+            yield { type: 'response_done', response: fullResponse, thinking: fullThinking, sessionId };
+            break;
+        }
+      }
+    } catch (err) {
+      yield { type: 'error', error: err.message, sessionId };
+      return;
+    }
+
+    // Parse the full response
+    let parsed = parseKimiResponse(fullResponse);
+    if (!parsed) {
+      yield { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId };
+      parsed = { mode: 'CHAT', response: fullResponse };
+    }
+
+    // Process mode and yield results
+    yield { type: 'mode_detected', mode: parsed.mode, sessionId };
+
+    for await (const ev of this._processModeStream(parsed, sessionId, input, options)) {
+      yield ev;
+    }
+  }
+
+  /** Stream-aware mode processor */
+  async *_processModeStream(parsed, sessionId, originalInput, options) {
+    const mode = parsed.mode || 'CHAT';
+
+    switch (mode) {
+      case 'CHAT':
+        yield this._handleChat(parsed, sessionId);
+        break;
+
+      case 'ACTION': {
+        yield { type: 'action_start', tool: parsed.tool, params: parsed.params, sessionId };
+        const actionResult = await this._handleAction(parsed, sessionId, options);
+        yield { type: 'action_end', result: actionResult, sessionId };
+        yield actionResult;
+        break;
+      }
+
+      case 'PLAN': {
+        yield { type: 'plan_start', steps: parsed.steps, sessionId };
+        for await (const ev of this._handlePlanStream(parsed, sessionId, originalInput, options)) {
+          yield ev;
+        }
+        break;
+      }
+
+      case 'DONE':
+        yield this._handleDone(parsed, sessionId);
+        break;
+
+      case 'LOAD_SKILL':
+        yield this._handleLoadSkill(parsed, sessionId);
+        break;
+
+      case 'UPDATE_MEMORY':
+        yield this._handleUpdateMemory(parsed, sessionId);
+        break;
+
+      case 'META': {
+        yield { type: 'meta_start', metaAction: parsed.meta_action, sessionId };
+        const metaResult = await this._handleMeta(parsed, sessionId);
+        yield { type: 'meta_end', result: metaResult, sessionId };
+        yield metaResult;
+        break;
+      }
+
+      case 'SUGGEST': {
+        const suggestResult = await this._handleSuggest(parsed, sessionId, options);
+        yield { type: 'suggest', suggestion: parsed.suggestion, result: suggestResult, sessionId };
+        yield suggestResult;
+        break;
+      }
+
+      default:
+        yield this._handleChat({ response: `Modo desconhecido: ${mode}. Resposta: ${JSON.stringify(parsed)}` }, sessionId);
+    }
+  }
+
+  /** Stream-aware plan handler */
+  async *_handlePlanStream(parsed, sessionId, originalInput, options) {
+    const steps = parsed.steps || [];
+    const results = [];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      yield {
+        type: 'plan_step',
+        stepIndex: i,
+        total: steps.length,
+        tool: step.tool,
+        params: step.params,
+        sessionId,
+      };
+
+      const stepResult = await this._handleAction(
+        { tool: step.tool, params: step.params, reasoning: step.reasoning },
+        sessionId,
+        options
+      );
+
+      results.push({ step, result: stepResult });
+
+      if (!stepResult.success) {
+        yield { type: 'plan_error', stepIndex: i, error: stepResult.error, sessionId };
+        yield { success: false, mode: 'PLAN', error: `Falha no passo ${i + 1}`, results, sessionId };
+        return;
+      }
+
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    yield { type: 'plan_complete', sessionId };
+    yield { success: true, mode: 'PLAN', results, sessionId };
   }
 
   /** Build context prompt with history, desktop, skills, memories */
@@ -600,38 +896,166 @@ class LunaSoul extends EventEmitter {
       timestamp: new Date().toISOString(),
     });
 
-    // Map action names to engine format
-    const action = { type: tool, params };
+    // Detect if it's a file tool or desktop tool
+    const FILE_TOOLS = Object.keys(lunaTools);
+    const DESKTOP_TOOLS = ['shell', 'click', 'doubleClick', 'rightClick', 'type', 'keypress', 'hotkey', 'scroll', 'screenshot', 'ocr', 'open_app', 'wait'];
+    const isFileTool = FILE_TOOLS.includes(tool);
+    const isDesktopTool = DESKTOP_TOOLS.includes(tool);
 
     // Emit progress
-    const emoji = {
+    const FILE_EMOJIS = {
+      readFile: '📖', writeFile: '✍️', appendFile: '📝', replaceInFile: '✏️', deleteFile: '🗑️',
+      moveFile: '📦', copyFile: '📋', getFileInfo: '📄',
+      listFiles: '📂', viewDirectory: '🗂️', createDirectory: '📁', removeDirectory: '🗑️',
+      searchFiles: '🔍', grep: '🔎', glob: '🎯', searchWeb: '🌐', fetchURL: '🌐',
+      executeShell: '🖥️', runTests: '🧪', checkSyntax: '✅', installPackages: '📦',
+      gitStatus: '🌿', gitDiff: '🌿', gitLog: '📜', gitCommit: '💾',
+      applyPatch: '🩹', downloadFile: '⬇️',
+      clipboardRead: '📋', clipboardWrite: '📋',
+      readMediaFile: '🖼️', getCurrentDirectory: '📍',
+      think: '🧠',
+    };
+    const DESKTOP_EMOJIS = {
       shell: '🖥️', click: '🖱️', doubleClick: '🖱️🖱️', rightClick: '🖱️▶️',
       type: '⌨️', keypress: '🔑', hotkey: '🔑', scroll: '📜',
       screenshot: '📸', ocr: '🔍', open_app: '🚀', wait: '⏱️',
-    }[tool] || '⚡';
+    };
+    const emoji = FILE_EMOJIS[tool] || DESKTOP_EMOJIS[tool] || '⚡';
 
     this.emit('progress', {
       type: 'action',
       tool,
       params,
-      message: `${emoji} ${tool}: ${JSON.stringify(params)}`,
+      message: `${emoji} ${tool}: ${JSON.stringify(params).slice(0, 200)}`,
       sessionId,
+      category: isFileTool ? 'file' : isDesktopTool ? 'desktop' : 'unknown',
     });
 
     // Execute
     let result;
     try {
-      result = await this.engine.executeSingle(action);
+      if (isFileTool && lunaTools[tool]) {
+        // Route params correctly for each tool
+        const p = params || {};
+        switch (tool) {
+          case 'readFile':
+            result = lunaTools.readFile(p.path || p.file, { offset: p.offset || p.line_offset, limit: p.limit || p.n_lines });
+            break;
+          case 'writeFile':
+            result = lunaTools.writeFile(p.path || p.filePath, p.content);
+            break;
+          case 'appendFile':
+            result = lunaTools.appendFile(p.path || p.filePath, p.content);
+            break;
+          case 'replaceInFile':
+            result = lunaTools.replaceInFile(p.path || p.filePath, p.old || p.oldStr, p.new || p.newStr, { replaceAll: p.replaceAll, edit: p.edit });
+            break;
+          case 'deleteFile':
+            result = lunaTools.deleteFile(p.path || p.filePath);
+            break;
+          case 'moveFile':
+            result = lunaTools.moveFile(p.source || p.from, p.destination || p.to);
+            break;
+          case 'copyFile':
+            result = lunaTools.copyFile(p.source || p.from, p.destination || p.to);
+            break;
+          case 'getFileInfo':
+            result = lunaTools.getFileInfo(p.path || p.filePath);
+            break;
+          case 'listFiles':
+            result = lunaTools.listFiles(p.pattern || '*', { cwd: p.cwd, limit: p.limit, dot: p.dot });
+            break;
+          case 'viewDirectory':
+            result = lunaTools.viewDirectory(p.path || p.dirPath, { depth: p.depth });
+            break;
+          case 'createDirectory':
+            result = lunaTools.createDirectory(p.path || p.dirPath);
+            break;
+          case 'removeDirectory':
+            result = lunaTools.removeDirectory(p.path || p.dirPath);
+            break;
+          case 'searchFiles':
+            result = lunaTools.searchFiles(p.pattern, { cwd: p.cwd, path: p.path, context: p.context, '-C': p['-C'], limit: p.limit });
+            break;
+          case 'grep':
+            result = lunaTools.grep(p.pattern, { cwd: p.cwd, path: p.path, glob: p.glob, include: p.include, context: p.context, '-C': p['-C'], limit: p.limit, output_mode: p.output_mode });
+            break;
+          case 'glob':
+            result = lunaTools.glob(p.pattern, { cwd: p.cwd, dot: p.dot, ignore: p.ignore, limit: p.limit });
+            break;
+          case 'searchWeb':
+            result = lunaTools.searchWeb(p.query || p.q, { limit: p.limit });
+            break;
+          case 'fetchURL':
+            result = await lunaTools.fetchURL(p.url, { limit: p.limit, timeout: p.timeout });
+            break;
+          case 'executeShell':
+            result = lunaTools.executeShell(p.command, { cwd: p.cwd, timeout: p.timeout });
+            break;
+          case 'runTests':
+            result = lunaTools.runTests({ cwd: p.cwd, timeout: p.timeout, command: p.command });
+            break;
+          case 'checkSyntax':
+            result = lunaTools.checkSyntax(p.path || p.filePath);
+            break;
+          case 'installPackages':
+            result = lunaTools.installPackages(p.packages || p.package, { cwd: p.cwd, timeout: p.timeout });
+            break;
+          case 'gitStatus':
+            result = lunaTools.gitStatus({ cwd: p.cwd });
+            break;
+          case 'gitDiff':
+            result = lunaTools.gitDiff({ cwd: p.cwd, staged: p.staged });
+            break;
+          case 'gitLog':
+            result = lunaTools.gitLog({ cwd: p.cwd, n: p.n, limit: p.limit });
+            break;
+          case 'gitCommit':
+            result = lunaTools.gitCommit(p.message, { cwd: p.cwd });
+            break;
+          case 'applyPatch':
+            result = lunaTools.applyPatch(p.patch || p.patchContent, { cwd: p.cwd });
+            break;
+          case 'downloadFile':
+            result = await lunaTools.downloadFile(p.url, p.destination || p.path, { timeout: p.timeout });
+            break;
+          case 'clipboardRead':
+            result = lunaTools.clipboardRead();
+            break;
+          case 'clipboardWrite':
+            result = lunaTools.clipboardWrite(p.text || p.content);
+            break;
+          case 'readMediaFile':
+            result = lunaTools.readMediaFile(p.path || p.filePath);
+            break;
+          case 'getCurrentDirectory':
+            result = lunaTools.getCurrentDirectory();
+            break;
+          case 'think':
+            result = lunaTools.think(p.thought || p.reasoning || p.text);
+            break;
+          default:
+            result = { success: false, error: `Ferramenta desconhecida: ${tool}` };
+        }
+      } else if (isDesktopTool) {
+        const action = { type: tool, params };
+        result = await this.engine.executeSingle(action);
+      } else {
+        result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
+      }
     } catch (err) {
       result = { success: false, error: err.message };
     }
+
+    // Format output for storage
+    const outputText = result.content || result.stdout || result.output || JSON.stringify(result).slice(0, 2000);
 
     // Store result
     this.sessionManager.appendEvent(sessionId, {
       type: 'tool_result',
       tool,
       success: result.success,
-      output: result.stdout || result.output || result.text || '',
+      output: outputText,
       error: result.error || null,
       timestamp: new Date().toISOString(),
     });
@@ -649,8 +1073,6 @@ class LunaSoul extends EventEmitter {
 
     // If action succeeded and needs follow-up, continue loop
     if (result.success && !parsed.done) {
-      // Re-send to Kimi with updated context for next step
-      // For now, return the result and let the caller decide to continue
       return {
         success: true,
         mode: 'ACTION',

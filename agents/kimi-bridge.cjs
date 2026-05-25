@@ -967,6 +967,102 @@ class KimiBridge {
   }
 
   /**
+   * Check if Chrome is running with CDP and start if needed.
+   * Returns { running: bool, started: bool, pid?: number, error?: string }
+   */
+  async checkChrome() {
+    const { execSync, spawn } = require('child_process');
+    // Check if Chrome is already listening on CDP port
+    try {
+      const http = require('http');
+      await new Promise((resolve, reject) => {
+        const req = http.get('http://localhost:9222/json/version', (res) => {
+          if (res.statusCode === 200) resolve(true);
+          else reject(new Error('Status ' + res.statusCode));
+        });
+        req.on('error', reject);
+        req.setTimeout(3000, () => { req.destroy(); reject(new Error('Timeout')); });
+      });
+      return { running: true, started: false };
+    } catch {
+      // Not running — try to start
+      const chromeCmds = [
+        'google-chrome',
+        'google-chrome-stable',
+        'chromium',
+        'chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium',
+      ];
+      let chromePath = null;
+      for (const cmd of chromeCmds) {
+        try { execSync(`which ${cmd}`, { stdio: 'ignore' }); chromePath = cmd; break; } catch {}
+      }
+      if (!chromePath) {
+        return { running: false, started: false, error: 'Chrome não encontrado. Instale google-chrome-stable ou chromium.' };
+      }
+      try {
+        const proc = spawn(chromePath, [
+          '--remote-debugging-port=9222',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--user-data-dir=' + path.join(require('os').homedir(), '.luna', 'chrome-profile'),
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+        ], { detached: true, stdio: 'ignore' });
+        proc.unref();
+        // Wait a bit for Chrome to start
+        await new Promise(r => setTimeout(r, 3000));
+        // Verify it started
+        try {
+          await new Promise((resolve, reject) => {
+            const req = http.get('http://localhost:9222/json/version', (res) => {
+              if (res.statusCode === 200) resolve(true);
+              else reject(new Error('Status ' + res.statusCode));
+            });
+            req.on('error', reject);
+            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
+          });
+          return { running: true, started: true, pid: proc.pid };
+        } catch {
+          return { running: false, started: true, pid: proc.pid, error: 'Chrome iniciou mas não respondeu em 5s' };
+        }
+      } catch (e) {
+        return { running: false, started: false, error: e.message };
+      }
+    }
+  }
+
+  /**
+   * Ensure user is logged into Kimi Web. Opens login page if not.
+   */
+  async ensureLogin(userId) {
+    const page = await this._getOrCreateUserPage(userId);
+    const isLoggedIn = await page.evaluate(() => {
+      // Multiple login indicators
+      const hasLoginBtn = !!document.querySelector('button:has-text("Log In"), a:has-text("Log In"), [class*="login"]');
+      const hasUserAvatar = !!document.querySelector('[class*="avatar"], [class*="user"]');
+      const hasChatInput = !!document.querySelector('textarea, [contenteditable="true"]');
+      const bodyText = document.body?.innerText || '';
+      const hasLoginText = bodyText.includes('Log In') || bodyText.includes('Sign In') || bodyText.includes('登录');
+      return { loggedIn: !hasLoginText && hasChatInput, hasLoginText, hasChatInput };
+    }).catch(() => ({ loggedIn: false, error: 'Page evaluation failed' }));
+
+    if (!isLoggedIn.loggedIn) {
+      log.info(`User not logged in, navigating to Kimi login page`);
+      await page.goto('https://kimi.com/', { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      return {
+        loggedIn: false,
+        message: 'Naveguei para kimi.com. Por favor, faça login manualmente no navegador que abriu.',
+        action: 'login_required',
+      };
+    }
+    return { loggedIn: true, message: 'Já está logado no Kimi Web' };
+  }
+
+  /**
    * Screenshot a user's page
    */
   async screenshot(userId, ssPath = null) {
@@ -1008,6 +1104,348 @@ class KimiBridge {
         }
       }
     }, 60000); // Check every minute
+  }
+
+  // ============================================================
+  // STREAMING + STEER (v2.2)
+  // ============================================================
+
+  /**
+   * Poll the DOM for current thinking and response text.
+   * Returns { thinking, response, canSteer } in real-time.
+   */
+  async _pollThinkingAndResponse(page) {
+    try {
+      return await page.evaluate(() => {
+        // Thinking: try multiple selectors (Kimi Web UI changes frequently)
+        const thinkingSelectors = [
+          '.thinking-container',
+          '.toolcall-container.thinking-container',
+          '[class*="thinking"]',
+          '[class*="reasoning"]',
+        ];
+        let thinking = '';
+        for (const sel of thinkingSelectors) {
+          const els = document.querySelectorAll(sel);
+          const text = Array.from(els).map(el => el.innerText?.trim()).filter(Boolean).join('\n');
+          if (text) { thinking = text; break; }
+        }
+
+        // Response: try multiple selectors aligned with _extractResponse
+        const responseSelectors = [
+          '.markdown-container .markdown',
+          '.markdown-container .paragraph',
+          '.markdown-container .markdown p',
+          '[class*="markdown"]',
+          '[class*="message-content"]',
+        ];
+        let response = '';
+        for (const sel of responseSelectors) {
+          const els = document.querySelectorAll(sel);
+          const text = Array.from(els).map(el => el.innerText?.trim()).filter(Boolean).join('\n\n');
+          if (text) { response = text; break; }
+        }
+
+        // Can we steer? (send button is active, not disabled)
+        const sendBtnSelectors = ['.send-button-container', '[class*="send"]', 'button[type="submit"]', '[aria-label*="send" i]'];
+        let canSteer = false;
+        for (const sel of sendBtnSelectors) {
+          const btn = document.querySelector(sel);
+          if (btn) {
+            canSteer = !btn.disabled && !btn.className.includes('disabled') && btn.offsetParent !== null;
+            if (canSteer) break;
+          }
+        }
+
+        // Is still generating? (stop button visible OR no send button = generating)
+        const stopBtnSelectors = ['.stop-button-container', '[class*="stop"]', '[class*="cancel"]', '[aria-label*="stop" i]'];
+        let isGenerating = false;
+        for (const sel of stopBtnSelectors) {
+          const btn = document.querySelector(sel);
+          if (btn && btn.offsetParent !== null) {
+            isGenerating = true;
+            break;
+          }
+        }
+        // Fallback: if no send button is visible, we're probably generating
+        if (!isGenerating && !canSteer) {
+          const anySend = document.querySelector('.send-button-container, [class*="send"]');
+          if (!anySend || anySend.offsetParent === null) {
+            isGenerating = true;
+          }
+        }
+
+        return { thinking, response, canSteer, isGenerating };
+      });
+    } catch (e) {
+      return { thinking: '', response: '', canSteer: false, isGenerating: false };
+    }
+  }
+
+  /**
+   * Check if we can inject a steer message mid-response.
+   */
+  async canSteer(userId) {
+    const session = this.userSessions.get(userId);
+    if (!session || !session.page || session.page.isClosed()) return false;
+    const { canSteer } = await this._pollThinkingAndResponse(session.page);
+    return canSteer;
+  }
+
+  /**
+   * Inject a steer message while Kimi is generating.
+   * This sends new text into the conversation mid-flight.
+   */
+  async injectSteer(userId, text) {
+    if (!text || !text.trim()) {
+      throw new Error('Steer text is required');
+    }
+
+    const page = await this._getOrCreateUserPage(userId);
+    const session = this.userSessions.get(userId);
+
+    log.info(`Injecting steer for user ${hashUserId(userId)}: "${text.slice(0, 60)}..."`);
+
+    try {
+      // Check if send button is active
+      const canSteer = await this.canSteer(userId);
+      if (!canSteer) {
+        log.warn(`Cannot steer — send button is disabled (Kimi may be finalizing)`);
+        return { success: false, error: 'Send button disabled — cannot steer right now' };
+      }
+
+      // Find input and inject text
+      const inputLocator = page.locator('textarea, [contenteditable="true"]').first();
+      await inputLocator.fill(text);
+      await page.waitForTimeout(300);
+
+      // Click send or press Enter
+      const sendBtn = page.locator('.send-button-container').first();
+      const hasSendBtn = await sendBtn.count() > 0;
+
+      if (hasSendBtn) {
+        await sendBtn.click({ timeout: 3000 });
+      } else {
+        await inputLocator.press('Enter');
+      }
+
+      log.success(`Steer injected for user ${hashUserId(userId)}`);
+      return { success: true };
+    } catch (err) {
+      log.error(`Steer injection failed: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Send message with REAL-TIME STREAMING.
+   * Yields: { type: 'thinking_delta'|'response_delta'|'can_steer'|'done', text?, value? }
+   *
+   * Pattern inspired by ShellAgent's Provider.chat() async generator.
+   */
+  async *sendMessageStream(userId, text, options = {}) {
+    if (!text || !text.trim()) {
+      throw new Error('Message text is required');
+    }
+
+    // Rate limiting
+    this._checkCooldown(userId);
+
+    const page = await this._getOrCreateUserPage(userId);
+    const session = this.userSessions.get(userId);
+
+    // Wait for any ongoing processing
+    if (session.processing) {
+      log.warn(`User ${hashUserId(userId)} already processing — waiting`);
+      const startWait = Date.now();
+      while (session.processing) {
+        if (Date.now() - startWait > 60000) {
+          throw new Error('Timeout waiting for previous message');
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    session.processing = true;
+    session.lastActivity = Date.now();
+
+    try {
+      await this._verifySession(page);
+
+      if (options.newChat) {
+        await page.goto('https://kimi.com/?chat_enter_method=new_chat', { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2000);
+        session.chatUrl = page.url();
+        this.store.setUser(userId, { chatUrl: session.chatUrl });
+      }
+
+      if (options.mode) {
+        await this.setMode(userId, options.mode);
+      }
+
+      const actualMode = await this._detectActualMode(page) || session.mode || 'instant';
+      log.info(`User ${hashUserId(userId)} streaming message (mode=${actualMode})`);
+
+      // Verify input exists
+      const inputLocator = page.locator('textarea, [contenteditable="true"]').first();
+      const inputCount = await inputLocator.count();
+      if (inputCount === 0) {
+        throw new Error('Input field not found on Kimi Web');
+      }
+
+      // Bring page to front (Chrome throttles inactive tabs)
+      await page.bringToFront();
+
+      // Send message
+      await inputLocator.fill('');
+      await page.waitForTimeout(300);
+
+      if (text.length <= MAX_TEXT_TYPE_LENGTH) {
+        await inputLocator.type(text, { delay: 50 });
+      } else {
+        // For large texts in contenteditable, use fill but also dispatch input events
+        log.info(`Text too long (${text.length} chars), using fill with event dispatch`);
+        await inputLocator.fill(text);
+        await page.waitForTimeout(200);
+        // Dispatch input event to ensure Kimi detects the text
+        await page.evaluate(() => {
+          const el = document.querySelector('textarea, [contenteditable="true"]');
+          if (el) {
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, data: el.value || el.innerText }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      }
+      await page.waitForTimeout(500);
+      await inputLocator.press('Enter');
+      log.info(`Message sent, starting stream poll`);
+
+      // Capture initial text to detect changes
+      const initialText = await page.locator('.markdown-container .markdown').last().innerText({ timeout: 2000 }).catch(() => '');
+
+      // Stream polling loop
+      const maxTimeout = actualMode === 'instant' ? 300000 : 600000;
+      const startTime = Date.now();
+      const pollInterval = 800; // Poll every 800ms for responsiveness
+
+      let lastThinking = '';
+      let lastResponse = '';
+      let lastCanSteer = false;
+      let isComplete = false;
+      let buttonsVisible = false;
+
+      // Phase 0: Wait for text to start changing
+      let textHasChanged = false;
+      const changeDeadline = Date.now() + 30000;
+      let pollCount = 0;
+      while (Date.now() < changeDeadline) {
+        const { thinking, response } = await this._pollThinkingAndResponse(page);
+        const combined = thinking + response;
+        if (combined !== initialText && combined.length > 0) {
+          textHasChanged = true;
+          break;
+        }
+        // Heartbeat: yield waiting status every 5 polls so TUI knows we're alive
+        if (++pollCount % 5 === 0) {
+          yield { type: 'waiting', message: 'Aguardando resposta do Kimi...' };
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (!textHasChanged) {
+        throw new Error('Kimi não iniciou resposta em 30s — possível erro de envio ou seletores desatualizados');
+      }
+
+      // Phase 1: Stream until complete
+      let lastActivity = Date.now();
+      const INACTIVITY_TIMEOUT = 60000; // 60s without any change = error
+
+      while (Date.now() - startTime < maxTimeout && !isComplete) {
+        const poll = await this._pollThinkingAndResponse(page);
+
+        // Track activity
+        const hadChange = poll.thinking !== lastThinking || poll.response !== lastResponse || poll.canSteer !== lastCanSteer;
+        if (hadChange || poll.thinking || poll.response) {
+          lastActivity = Date.now();
+        }
+
+        // Yield thinking deltas
+        if (poll.thinking && poll.thinking !== lastThinking) {
+          const delta = poll.thinking.slice(lastThinking.length);
+          if (delta) {
+            yield { type: 'thinking_delta', text: delta };
+          } else if (poll.thinking.length < lastThinking.length) {
+            yield { type: 'thinking_delta', text: poll.thinking };
+          }
+          lastThinking = poll.thinking;
+        }
+
+        // Yield response deltas
+        if (poll.response && poll.response !== lastResponse) {
+          const delta = poll.response.slice(lastResponse.length);
+          if (delta) {
+            yield { type: 'response_delta', text: delta };
+          } else if (poll.response.length < lastResponse.length) {
+            yield { type: 'response_delta', text: poll.response };
+          }
+          lastResponse = poll.response;
+        }
+
+        // Yield steer availability
+        if (poll.canSteer !== lastCanSteer) {
+          yield { type: 'can_steer', value: poll.canSteer };
+          lastCanSteer = poll.canSteer;
+        }
+
+        // Check completion: buttons visible + text stable
+        try {
+          const hasButtons = await page.locator('.segment-assistant-actions .icon-button').count() > 0;
+          if (hasButtons) buttonsVisible = true;
+        } catch {}
+
+        // Complete if: buttons visible AND not generating AND text stable
+        if (buttonsVisible && !poll.isGenerating) {
+          await new Promise(r => setTimeout(r, 1500));
+          const finalPoll = await this._pollThinkingAndResponse(page);
+          if (!finalPoll.isGenerating && finalPoll.response === lastResponse) {
+            isComplete = true;
+            break;
+          }
+        }
+
+        // Also complete if no generation for a while after text appeared
+        if (textHasChanged && !poll.isGenerating && lastResponse.length > 0 && buttonsVisible) {
+          isComplete = true;
+          break;
+        }
+
+        // Inactivity timeout: if nothing changed for 60s, something is wrong
+        if (Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
+          throw new Error('Nenhuma atividade detectada por 60s — possível travamento ou erro de conexão');
+        }
+
+        // Heartbeat every ~10 polls
+        if (++pollCount % 10 === 0) {
+          yield { type: 'waiting', message: 'Processando...' };
+        }
+
+        await new Promise(r => setTimeout(r, pollInterval));
+      }
+
+      // Final extraction for clean response
+      const finalResponse = await this._extractResponse(page);
+      session.chatUrl = page.url();
+      this.store.setUser(userId, { chatUrl: session.chatUrl });
+
+      yield { type: 'done', response: finalResponse, thinking: lastThinking };
+
+    } catch (err) {
+      try { await page.locator('textarea, [contenteditable="true"]').first().fill(''); } catch {}
+      throw err;
+    } finally {
+      session.processing = false;
+      session.lastActivity = Date.now();
+    }
   }
 
   /**
