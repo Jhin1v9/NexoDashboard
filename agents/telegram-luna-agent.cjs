@@ -31,9 +31,23 @@ function loadJson(file) {
 }
 
 // Helper: fetch JSON from local backend API
+// Uses INTERNAL_API_TOKEN for authenticated endpoints
 function fetchLocalApi(endpoint) {
   return new Promise((resolve) => {
-    const req = http.get(`http://localhost:3456${endpoint}`, { timeout: 3000 }, (res) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3456,
+      path: endpoint,
+      method: 'GET',
+      timeout: 3000,
+      headers: {}
+    };
+    // Add auth header if INTERNAL_API_TOKEN is set
+    const internalToken = process.env.INTERNAL_API_TOKEN;
+    if (internalToken) {
+      options.headers['Authorization'] = `Bearer ${internalToken}`;
+    }
+    const req = http.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -42,6 +56,7 @@ function fetchLocalApi(endpoint) {
     });
     req.on('error', () => resolve(null));
     req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.end();
   });
 }
 
@@ -602,114 +617,15 @@ class TelegramLunaAgent {
     //   2. When Kimi writes then pauses → edit with partial text
     //   3. If Kimi is still thinking → append "🧠 Pensando..." to partial text
     //   4. When done → edit with clean final text
-    //
-    // RATE-LIMITED QUEUE: prevents Telegram API deadlock by ensuring
-    // at most 1 edit per EDIT_INTERVAL_MS. Fire-and-forget onPartial.
-    const createStreamUpdater = (chatId, replyToId, modeEmoji) => {
-      let messageId = null;
-      const EDIT_INTERVAL_MS = 2000; // max 1 edit per 2s (safe for Telegram)
-      const MAX_EDIT_LEN = 3500;
-
-      // Queue system
-      let lastQueuedText = '';
-      let lastQueuedStatus = '';
-      let editPending = false;
-      let editTimer = null;
-      let lastEditTime = 0;
-      let destroyed = false;
-
-      const init = async () => {
-        const msg = await this.bot.sendMessage(chatId, `${modeEmoji} *Pensando...*`, {
-          parse_mode: 'Markdown',
-          reply_to_message_id: replyToId,
-        });
-        messageId = msg.message_id;
-        return messageId;
-      };
-
-      // Internal: actually perform the edit (no await from caller)
-      const _doEdit = async (text, status) => {
-        if (!messageId || destroyed) return;
-        const now = Date.now();
-        lastEditTime = now;
-
-        let editText;
-        const safeText = sanitizeTelegramMarkdown(text);
-
-        if (status === 'done') {
-          editText = `${modeEmoji} ⭐Kimi⭐\n\n${safeText}`;
-        } else if (status === 'thinking') {
-          let body = safeText;
-          if (body.length > MAX_EDIT_LEN) body = body.slice(0, MAX_EDIT_LEN);
-          editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}\n\n\_🧠 Pensando...\_`;
-        } else {
-          let body = safeText;
-          if (body.length > MAX_EDIT_LEN) {
-            body = body.slice(0, MAX_EDIT_LEN) + '\n\n\_✍️ Continuando...\_';
-          }
-          editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}`;
-        }
-
-        try {
-          await this.bot.editMessageText(editText, {
-            chat_id: chatId,
-            message_id: messageId,
-            parse_mode: 'Markdown',
-          });
-        } catch (e) {
-          // Fallback: send without parse_mode if Markdown fails
-          try {
-            await this.bot.editMessageText(editText.replace(/⭐/g, '*').replace(/\_/g, '_'), {
-              chat_id: chatId,
-              message_id: messageId,
-            });
-          } catch (e2) {
-            this._log?.('debug', `Edit failed: ${e2.message}`);
-          }
-        }
-      };
-
-      // Queue an edit — fire-and-forget, never blocks caller
-      const _scheduleEdit = (text, status) => {
-        if (destroyed) return;
-        lastQueuedText = text;
-        lastQueuedStatus = status;
-
-        if (editPending) return; // already scheduled
-
-        const now = Date.now();
-        const timeSinceLast = now - lastEditTime;
-        const delay = Math.max(0, EDIT_INTERVAL_MS - timeSinceLast);
-
-        editPending = true;
-        editTimer = setTimeout(() => {
-          editPending = false;
-          editTimer = null;
-          // Capture current queued state and clear
-          const txt = lastQueuedText;
-          const st = lastQueuedStatus;
-          _doEdit(txt, st).catch(() => {});
-        }, delay);
-      };
-
-      // Public: called by bridge onPartial — NEVER await
-      const onPartial = (text, status) => {
-        if (!messageId || destroyed) return;
-        // Skip if same content and not final
-        if (status !== 'done' && text === lastQueuedText && status === lastQueuedStatus) return;
-        _scheduleEdit(text, status);
-      };
+    // Simple helper: sends "Pensando..." and later edits with final response
+    const sendThinkingThenEdit = async (chatId, replyToId, modeEmoji) => {
+      const msg = await this.bot.sendMessage(chatId, `${modeEmoji} *Pensando...*`, {
+        parse_mode: 'Markdown',
+        reply_to_message_id: replyToId,
+      });
+      const messageId = msg.message_id;
 
       const finalize = async (finalText, mode) => {
-        // Cancel any pending timer
-        if (editTimer) {
-          clearTimeout(editTimer);
-          editTimer = null;
-          editPending = false;
-        }
-        destroyed = true;
-
-        if (!messageId) return;
         const emoji = mode === 'instant' ? '⚡' : '🧠';
         const safeText = sanitizeTelegramMarkdown(finalText);
         const fullText = `${emoji} ⭐Kimi⭐\n\n${safeText}`;
@@ -735,7 +651,7 @@ class TelegramLunaAgent {
         return sendLongMessage(chatId, fullText, { parse_mode: 'Markdown', reply_to_message_id: replyToId });
       };
 
-      return { init, onPartial, finalize, get messageId() { return messageId; } };
+      return { messageId, finalize };
     };
 
     // Helper: split long messages for Telegram (4096 char limit)
@@ -778,8 +694,7 @@ class TelegramLunaAgent {
       }
       activeUsers.add(userId);
 
-      const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
-      await stream.init();
+      const { messageId, finalize } = await sendThinkingThenEdit(chatId, msg.message_id, '⚡');
 
       try {
         const context = await buildDashboardContext(question, userName);
@@ -788,17 +703,15 @@ class TelegramLunaAgent {
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
 
-        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
-        const useStreaming = true;
-        const result = await askBridge(userId, enrichedQuestion, null, useStreaming ? stream.onPartial : null);
+        const result = await askBridge(userId, enrichedQuestion, null, null);
 
-        await stream.finalize(result.response, result.mode || 'instant');
+        await finalize(result.response, result.mode || 'instant');
       } catch (err) {
         log('error', `Kimi error: ${err.message}`);
         try {
           await this.bot.editMessageText(`❌ Erro no Kimi: ${err.message}`, {
             chat_id: chatId,
-            message_id: stream.messageId,
+            message_id: messageId,
           });
         } catch {}
       } finally {
@@ -824,8 +737,7 @@ class TelegramLunaAgent {
       }
       activeUsers.add(userId);
 
-      const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
-      await stream.init();
+      const { messageId, finalize } = await sendThinkingThenEdit(chatId, msg.message_id, '⚡');
 
       try {
         const context = await buildDashboardContext(question, userName);
@@ -833,16 +745,14 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
-        const useStreaming = true;
-        const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
-        await stream.finalize(result.response, 'instant');
+        const result = await askBridge(userId, enrichedQuestion, 'instant', null);
+        await finalize(result.response, 'instant');
       } catch (err) {
         log('error', `Kimi instant error: ${err.message}`);
         try {
           await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
             chat_id: chatId,
-            message_id: stream.messageId,
+            message_id: messageId,
           });
         } catch {}
       } finally {
@@ -868,8 +778,7 @@ class TelegramLunaAgent {
       }
       activeUsers.add(userId);
 
-      const stream = createStreamUpdater(chatId, msg.message_id, '🧠');
-      await stream.init();
+      const { messageId, finalize } = await sendThinkingThenEdit(chatId, msg.message_id, '🧠');
 
       try {
         const context = await buildDashboardContext(question, userName);
@@ -877,16 +786,14 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        // Streaming ENABLED with rate-limited queue (prevents Telegram API deadlock)
-        const useStreaming = true;
-        const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);
-        await stream.finalize(result.response, 'thinking');
+        const result = await askBridge(userId, enrichedQuestion, 'thinking', null);
+        await finalize(result.response, 'thinking');
       } catch (err) {
         log('error', `Kimi thinking error: ${err.message}`);
         try {
           await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
             chat_id: chatId,
-            message_id: stream.messageId,
+            message_id: messageId,
           });
         } catch {}
       } finally {
