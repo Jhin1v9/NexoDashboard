@@ -434,6 +434,9 @@ class KimiBridge {
         this.semaphore.release();
       });
 
+      // Inject stream interceptor BEFORE navigation so it captures the chat API calls
+      await this._injectStreamInterceptor(page);
+
       await page.goto(chatUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2000);
     } catch (e) {
@@ -486,11 +489,116 @@ class KimiBridge {
   }
 
   /**
-   * Extract response using multi-strategy fallback
+   * Extract response using multi-strategy fallback.
+   * Prioritizes stream interceptor, then React Fiber, then DOM selectors.
    */
   async _extractResponse(page) {
+    // Strategy 0: Stream interceptor — most reliable
+    try {
+      const intercepted = await page.evaluate(() => {
+        const s = window.__lunaStream;
+        if (s && s.active && s.content) return s.content;
+        return null;
+      });
+      if (intercepted && intercepted.trim()) {
+        log.success(`Extracted via stream-intercept: ${intercepted.slice(0, 80)}...`);
+        return intercepted.trim();
+      }
+    } catch (e) {
+      this._log(`Stream intercept extraction failed: ${e.message}`);
+    }
+
+    // Strategy 1: Browser-evaluate — React Fiber + smart DOM
     const strategies = [
-      // Strategy 1: Plain text from paragraph elements (avoids turndown markdown escaping)
+      {
+        type: 'evaluate',
+        selector: null,
+        fn: async () => {
+          return await page.evaluate(() => {
+            try {
+              // ── Helpers ──
+              function getReactFiber(dom) {
+                const key = Object.keys(dom).find(k =>
+                  k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+                );
+                return key ? dom[key] : null;
+              }
+              function findMessageFiber(fiber) {
+                let node = fiber;
+                while (node) {
+                  const props = node.memoizedProps || node.pendingProps;
+                  if (props && (props.message || props.msg || props.data?.message)) return node;
+                  node = node.return;
+                }
+                return null;
+              }
+              function isInsideThink(el, boundary) {
+                let parent = el.parentElement;
+                while (parent && parent !== boundary) {
+                  const pc = (parent.className || '').toLowerCase();
+                  if (pc.includes('think') || pc.includes('thinking') || pc.includes('reasoning')) return true;
+                  parent = parent.parentElement;
+                }
+                return false;
+              }
+
+              // ── Find last assistant ──
+              const assistantSelectors = [
+                '.segment-assistant', '.message-assistant',
+                '[data-testid="assistant-message"]', '[data-testid="message-assistant"]',
+                '.chat-message--assistant',
+                '[class*="assistant"][class*="segment"]',
+                '[class*="assistant"][class*="message"]',
+              ];
+              let lastAssistant = null;
+              for (const sel of assistantSelectors) {
+                const els = document.querySelectorAll(sel);
+                if (els.length) { lastAssistant = els[els.length - 1]; break; }
+              }
+              if (!lastAssistant) {
+                const allMsg = document.querySelectorAll('.chat-message, .message-item, [data-testid="message-container"]');
+                if (allMsg.length) lastAssistant = allMsg[allMsg.length - 1];
+              }
+              if (!lastAssistant) return '';
+
+              // ── React Fiber inspection ──
+              const fiber = getReactFiber(lastAssistant);
+              const msgFiber = fiber ? findMessageFiber(fiber) : null;
+              if (msgFiber) {
+                const props = msgFiber.memoizedProps || msgFiber.pendingProps;
+                const msg = props?.message || props?.msg || props?.data;
+                if (msg) {
+                  const content = msg.content || msg.text || msg.response || '';
+                  if (content) return String(content).trim();
+                }
+              }
+
+              // ── DOM: markdown containers excluding thinking ──
+              const mdContainers = lastAssistant.querySelectorAll('.markdown-container, [class*="markdown"]');
+              for (let i = mdContainers.length - 1; i >= 0; i--) {
+                const md = mdContainers[i];
+                if (!isInsideThink(md, lastAssistant)) {
+                  const text = md.innerText?.trim();
+                  if (text && text.length > 0) return text;
+                }
+              }
+
+              // ── Fallback: assistant text minus think blocks ──
+              let fullText = lastAssistant.innerText?.trim() || '';
+              const thinkBlocks = lastAssistant.querySelectorAll(
+                '.thinking-container, .think-block, [class*="thinking"], [class*="reasoning"]'
+              );
+              for (const tb of thinkBlocks) {
+                fullText = fullText.replace(tb.innerText?.trim() || '', '');
+              }
+              return fullText.trim();
+            } catch (e) {
+              return '';
+            }
+          });
+        },
+      },
+      // Strategy 2: Plain text from paragraph elements
       {
         type: 'paragraph',
         selector: '.markdown-container .paragraph',
@@ -499,7 +607,7 @@ class KimiBridge {
           return texts.join('\n\n');
         },
       },
-      // Strategy 2: Direct innerText from markdown container
+      // Strategy 3: Direct innerText from markdown container
       {
         type: 'innerText',
         selector: '.markdown-container .markdown',
@@ -507,7 +615,7 @@ class KimiBridge {
           return await el.innerText();
         },
       },
-      // Strategy 3: Turndown (markdown conversion — may escape chars like _)
+      // Strategy 4: Turndown (markdown conversion)
       {
         type: 'turndown',
         selector: '.markdown-container .markdown',
@@ -517,7 +625,7 @@ class KimiBridge {
           return this.turndown.turndown(html);
         },
       },
-      // Strategy 4: Fallback to body text
+      // Strategy 5: Fallback to body text
       {
         type: 'plaintext',
         selector: 'body',
@@ -530,13 +638,18 @@ class KimiBridge {
 
     for (const strategy of strategies) {
       try {
-        const locator = page.locator(strategy.selector).last();
-        const exists = await locator.count();
-        if (exists === 0) {
-          this._log(`Strategy ${strategy.type}: element not found`);
-          continue;
+        let result;
+        if (strategy.type === 'evaluate') {
+          result = await strategy.fn();
+        } else {
+          const locator = page.locator(strategy.selector).last();
+          const exists = await locator.count();
+          if (exists === 0) {
+            this._log(`Strategy ${strategy.type}: element not found`);
+            continue;
+          }
+          result = await strategy.fn(locator);
         }
-        const result = await strategy.fn(locator);
         if (result && result.trim()) {
           log.success(`Extracted via ${strategy.type}: ${result.slice(0, 80)}...`);
           return result.trim();
@@ -688,7 +801,7 @@ class KimiBridge {
     const session = this.userSessions.get(userId);
 
     // Check if already in desired mode
-    const currentLabel = await page.locator('.chat-editor-action .model-name').textContent({ timeout: 5000 }).catch(() => '');
+    const currentLabel = await page.locator('.chat-editor-action .model-name').textContent({ timeout: 3000 }).catch(() => '');
     const targetLabel = mode === 'instant' ? 'K2.6 Instant' : 'K2.6 Thinking';
 
     if (currentLabel.includes(targetLabel)) {
@@ -700,21 +813,33 @@ class KimiBridge {
 
     log.info(`Switching user ${hashUserId(userId)} to ${mode} mode...`);
 
-    // Click mode selector with short timeout
-    await page.click('.chat-editor-action .model-name', { timeout: 5000 });
-    await page.waitForTimeout(500);
+    try {
+      // Try to dismiss any overlay first (Escape key or click on body)
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(200);
 
-    // Scope to dropdown to avoid clicking wrong element
-    const dropdown = page.locator('[role=listbox], .dropdown-menu, .model-dropdown').last();
-    const option = dropdown.locator('text=' + targetLabel).or(page.getByText(targetLabel)).first();
-    await option.click({ timeout: 5000 });
-    await page.waitForTimeout(1000);
+      // Click mode selector — use JS click to bypass overlay intercept
+      await page.evaluate(() => {
+        const el = document.querySelector('.chat-editor-action .model-name');
+        if (el) el.click();
+      });
+      await page.waitForTimeout(500);
 
-    session.mode = mode;
-    this.store.setUser(userId, { mode });
+      // Scope to dropdown to avoid clicking wrong element
+      const dropdown = page.locator('[role=listbox], .dropdown-menu, .model-dropdown').last();
+      const option = dropdown.locator('text=' + targetLabel).or(page.getByText(targetLabel)).first();
+      await option.click({ timeout: 3000 });
+      await page.waitForTimeout(800);
 
-    log.success(`Mode switched to ${mode} for user ${hashUserId(userId)}`);
-    return mode;
+      session.mode = mode;
+      this.store.setUser(userId, { mode });
+      log.success(`Mode switched to ${mode} for user ${hashUserId(userId)}`);
+      return mode;
+    } catch (e) {
+      log.warn(`Mode switch failed (overlay or element not found): ${e.message}. Continuing with current mode.`);
+      // Don't throw — mode switch is not critical
+      return session.mode || 'instant';
+    }
   }
 
   /**
@@ -1396,41 +1521,415 @@ class KimiBridge {
   // ============================================================
 
   /**
+   * Inject a stream interceptor script into the page to capture raw API responses.
+   * This is the MOST reliable way to separate thinking from response because
+   * the Kimi API returns them as separate fields (reasoning_content vs content).
+   */
+  async _injectStreamInterceptor(page) {
+    try {
+      await page.addInitScript(() => {
+        if (window.__lunaInterceptorInstalled) return;
+        window.__lunaInterceptorInstalled = true;
+        window.__lunaStream = {
+          reasoning: '', content: '', events: [], active: false, startTime: Date.now(), error: null
+        };
+
+        function isChatUrl(url) {
+          if (typeof url !== 'string') return false;
+          return url.includes('/chat/completions') ||
+                 url.includes('/api/chat') ||
+                 url.includes('/api/conversation') ||
+                 url.includes('/v1/chat') ||
+                 url.includes('/api/v1/chat') ||
+                 url.includes('/stream');
+        }
+
+        function parseSseChunk(chunk) {
+          const lines = chunk.split('\n');
+          const results = [];
+          let currentData = '';
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (data === '[DONE]') {
+                results.push({ done: true });
+                continue;
+              }
+              currentData = data;
+              try {
+                const json = JSON.parse(data);
+                const choice = json.choices?.[0];
+                if (choice?.delta) {
+                  results.push({
+                    reasoning: choice.delta.reasoning_content || choice.delta.reasoning || '',
+                    content: choice.delta.content || '',
+                  });
+                } else if (choice?.message) {
+                  results.push({
+                    reasoning: choice.message.reasoning_content || choice.message.reasoning || '',
+                    content: choice.message.content || '',
+                  });
+                }
+              } catch (e) { /* ignore parse errors */ }
+            }
+          }
+          return results;
+        }
+
+        function accumulate(results) {
+          if (!results || !results.length) return;
+          window.__lunaStream.active = true;
+          for (const r of results) {
+            if (r.done) continue;
+            if (r.reasoning) window.__lunaStream.reasoning += r.reasoning;
+            if (r.content) window.__lunaStream.content += r.content;
+            window.__lunaStream.events.push(r);
+          }
+        }
+
+        // ── Intercept fetch ──
+        const origFetch = window.fetch;
+        window.fetch = async function(...args) {
+          const url = args[0]?.url || args[0];
+          const isChat = isChatUrl(url);
+          if (!isChat) return origFetch.apply(this, args);
+
+          window.__lunaStream.active = true;
+          const response = await origFetch.apply(this, args);
+
+          // Clone response to read body without breaking the original consumer
+          try {
+            const cloned = response.clone();
+            const text = await cloned.text();
+            const results = parseSseChunk(text);
+            accumulate(results);
+          } catch (e) {
+            window.__lunaStream.error = e.message;
+          }
+          return response;
+        };
+
+        // ── Intercept XMLHttpRequest ──
+        const origOpen = XMLHttpRequest.prototype.open;
+        const origSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+          this._lunaIsChat = isChatUrl(url);
+          return origOpen.call(this, method, url, ...rest);
+        };
+        XMLHttpRequest.prototype.send = function(...args) {
+          if (this._lunaIsChat) {
+            window.__lunaStream.active = true;
+            const origOnReady = this.onreadystatechange;
+            this.onreadystatechange = function() {
+              if (this.readyState >= 3 && this.responseText) {
+                const newText = this.responseText.slice(this._lunaLastLen || 0);
+                this._lunaLastLen = this.responseText.length;
+                const results = parseSseChunk(newText);
+                accumulate(results);
+              }
+              if (origOnReady) origOnReady.apply(this, arguments);
+            };
+          }
+          return origSend.apply(this, args);
+        };
+
+        // ── Intercept EventSource ──
+        const origEventSource = window.EventSource;
+        if (origEventSource) {
+          window.EventSource = function(url, options) {
+            const es = new origEventSource(url, options);
+            if (isChatUrl(url)) {
+              window.__lunaStream.active = true;
+              es.addEventListener('message', (event) => {
+                const results = parseSseChunk(event.data);
+                accumulate(results);
+              });
+            }
+            return es;
+          };
+          Object.setPrototypeOf(window.EventSource, origEventSource);
+          window.EventSource.prototype = origEventSource.prototype;
+        }
+
+        // ── Intercept WebSocket ──
+        const origWebSocket = window.WebSocket;
+        if (origWebSocket) {
+          window.WebSocket = function(url, protocols) {
+            const ws = new origWebSocket(url, protocols);
+            // Mark as chat if URL contains chat-related patterns or if messages look like chat deltas
+            ws._lunaIsChat = isChatUrl(url) || /chat|stream|completion/i.test(url);
+            ws.addEventListener('message', (event) => {
+              if (!ws._lunaIsChat) return;
+              window.__lunaStream.active = true;
+              let data = event.data;
+              if (typeof data === 'string') {
+                // Try to parse as JSON or newline-delimited JSON
+                const lines = data.split('\n');
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed) continue;
+                  // SSE-style data: prefix
+                  const payload = trimmed.startsWith('data:') ? trimmed.slice(5).trim() : trimmed;
+                  if (payload === '[DONE]') continue;
+                  try {
+                    const json = JSON.parse(payload);
+                    const choices = json.choices || json.messages || json.data;
+                    if (Array.isArray(choices)) {
+                      for (const choice of choices) {
+                        const delta = choice.delta || choice.message || choice;
+                        if (delta) {
+                          accumulate([{
+                            reasoning: delta.reasoning_content || delta.reasoning || '',
+                            content: delta.content || delta.text || '',
+                          }]);
+                        }
+                      }
+                    } else if (json.reasoning_content || json.content || json.text) {
+                      accumulate([{
+                        reasoning: json.reasoning_content || json.reasoning || '',
+                        content: json.content || json.text || '',
+                      }]);
+                    }
+                  } catch (e) {
+                    // Not JSON — could be plain text stream
+                    accumulate([{ content: payload }]);
+                  }
+                }
+              }
+            });
+            return ws;
+          };
+          Object.setPrototypeOf(window.WebSocket, origWebSocket);
+          window.WebSocket.prototype = origWebSocket.prototype;
+        }
+      });
+    } catch (e) {
+      log.warn(`Stream interceptor injection failed: ${e.message}`);
+    }
+  }
+
+  /**
    * Poll the DOM for current thinking and response text.
-   * Returns { thinking, response, canSteer } in real-time.
+   * Uses MULTI-LAYER strategy:
+   *   1. Stream interceptor (most reliable — reads raw API deltas)
+   *   2. React Fiber inspection (finds component props)
+   *   3. Computed-style heuristic (grey/italic = thinking)
+   *   4. CSS selector fallback
+   *
+   * Returns { thinking, response, canSteer, isGenerating, source }
    */
   async _pollThinkingAndResponse(page) {
     try {
-      return await page.evaluate(() => {
-        // Thinking: try multiple selectors (Kimi Web UI changes frequently)
-        const thinkingSelectors = [
-          '.thinking-container',
-          '.toolcall-container.thinking-container',
-          '[class*="thinking"]',
-          '[class*="reasoning"]',
+      // Layer 1: Stream interceptor (reads raw API data injected by _injectStreamInterceptor)
+      const intercepted = await page.evaluate(() => {
+        const s = window.__lunaStream;
+        if (s && s.active) {
+          return {
+            thinking: s.reasoning,
+            response: s.content,
+            source: 'intercept',
+            hasData: s.reasoning.length > 0 || s.content.length > 0,
+          };
+        }
+        return null;
+      });
+      // CRITICAL: When interceptor is active, trust it EXCLUSIVELY.
+      // Do NOT fallback to DOM scraping because the DOM may render
+      // thinking text in containers that look like response containers.
+      if (intercepted) {
+        const { canSteer, isGenerating } = await this._detectUiState(page);
+        this._log(`[_poll] interceptor: thinking=${intercepted.thinking.length}, response=${intercepted.response.length}, source=${intercepted.source}`);
+        return { ...intercepted, canSteer, isGenerating };
+      }
+
+      // Layer 2–4: DOM-based extraction
+      const domResult = await page.evaluate(() => {
+        // ── Helpers ──
+        function getReactFiber(dom) {
+          const key = Object.keys(dom).find(k =>
+            k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+          );
+          return key ? dom[key] : null;
+        }
+
+        function findMessageFiber(fiber) {
+          let node = fiber;
+          while (node) {
+            const props = node.memoizedProps || node.pendingProps;
+            if (props && (props.message || props.msg || props.data?.message || props.conversation)) {
+              return node;
+            }
+            node = node.return;
+          }
+          return null;
+        }
+
+        function isThinkingByStyle(el) {
+          const style = window.getComputedStyle(el);
+          const color = style.color;
+          const fontStyle = style.fontStyle;
+          // Thinking blocks are often grey-ish and italic
+          const isGrey = color.includes('128') || color.includes('grey') || color.includes('gray') ||
+                         color.includes('150') || color.includes('169') || color.includes('rgb(156') ||
+                         color.includes('rgb(107');
+          return isGrey && fontStyle === 'italic';
+        }
+
+        function isInsideThinkContainer(el, boundary) {
+          let parent = el.parentElement;
+          while (parent && parent !== boundary) {
+            const pc = (parent.className || '').toLowerCase();
+            if (pc.includes('think') || pc.includes('thinking') || pc.includes('reasoning')) return true;
+            if (isThinkingByStyle(parent)) return true;
+            parent = parent.parentElement;
+          }
+          return false;
+        }
+
+        // 1. Find last assistant message
+        const assistantSelectors = [
+          '.segment-assistant',
+          '.message-assistant',
+          '[data-testid="assistant-message"]',
+          '[data-testid="message-assistant"]',
+          '.chat-message--assistant',
+          '[class*="assistant"][class*="segment"]',
+          '[class*="assistant"][class*="message"]',
         ];
+        let lastAssistant = null;
+        for (const sel of assistantSelectors) {
+          const els = document.querySelectorAll(sel);
+          if (els.length) { lastAssistant = els[els.length - 1]; break; }
+        }
+        if (!lastAssistant) {
+          // Fallback: last message-like container
+          const allMsg = document.querySelectorAll('.chat-message, .message-item, [data-testid="message-container"]');
+          if (allMsg.length) lastAssistant = allMsg[allMsg.length - 1];
+        }
+        if (!lastAssistant) return { thinking: '', response: '', source: 'none' };
+
+        // 2. React Fiber deep inspection
+        const fiber = getReactFiber(lastAssistant);
+        const msgFiber = fiber ? findMessageFiber(fiber) : null;
+        if (msgFiber) {
+          const props = msgFiber.memoizedProps || msgFiber.pendingProps;
+          const msg = props?.message || props?.msg || props?.data;
+          if (msg) {
+            const reasoning = msg.reasoning_content || msg.reasoning || msg.think || '';
+            const content = msg.content || msg.text || msg.response || '';
+            if (reasoning || content) {
+              return {
+                thinking: String(reasoning).trim(),
+                response: String(content).trim(),
+                source: 'react-fiber',
+              };
+            }
+          }
+        }
+
+        // 3. Walk all text containers inside assistant and classify
+        const textBlocks = [];
+        const walker = document.createTreeWalker(lastAssistant, NodeFilter.SHOW_ELEMENT, null);
+        let node;
+        while ((node = walker.nextNode())) {
+          const tag = node.tagName.toLowerCase();
+          if (tag === 'p' || tag === 'div' || tag === 'span' || tag === 'pre') {
+            const text = node.innerText?.trim();
+            if (text && text.length > 2) {
+              const isThink = isInsideThinkContainer(node, lastAssistant) || isThinkingByStyle(node);
+              textBlocks.push({ text, isThink, el: node });
+            }
+          }
+        }
+
+        // Separate thinking and response
         let thinking = '';
-        for (const sel of thinkingSelectors) {
-          const els = document.querySelectorAll(sel);
-          const text = Array.from(els).map(el => el.innerText?.trim()).filter(Boolean).join('\n');
-          if (text) { thinking = text; break; }
-        }
-
-        // Response: try multiple selectors aligned with _extractResponse
-        const responseSelectors = [
-          '.markdown-container .markdown',
-          '.markdown-container .paragraph',
-          '.markdown-container .markdown p',
-          '[class*="markdown"]',
-          '[class*="message-content"]',
-        ];
         let response = '';
-        for (const sel of responseSelectors) {
-          const els = document.querySelectorAll(sel);
-          const text = Array.from(els).map(el => el.innerText?.trim()).filter(Boolean).join('\n\n');
-          if (text) { response = text; break; }
+
+        // Strategy A: if we have classified blocks
+        const thinkBlocks = textBlocks.filter(b => b.isThink);
+        const respBlocks = textBlocks.filter(b => !b.isThink);
+
+        if (thinkBlocks.length && respBlocks.length) {
+          thinking = thinkBlocks.map(b => b.text).join('\n\n');
+          response = respBlocks.map(b => b.text).join('\n\n');
+          return { thinking, response, source: 'style-heuristic' };
         }
 
+        // Strategy B: look for explicit thinking containers by class
+        const thinkSelectors = [
+          '.thinking-container', '.think-block', '.thinking-block',
+          '.segment-thinking', '.assistant-thinking',
+          '[data-testid="thinking"]', '[data-testid="think-block"]',
+          '[class*="thinking"]', '[class*="reasoning"]',
+        ];
+        for (const sel of thinkSelectors) {
+          const els = lastAssistant.querySelectorAll(sel);
+          if (els.length) {
+            const lastThink = els[els.length - 1];
+            const text = lastThink.innerText?.trim();
+            if (text && text.length > 5) {
+              thinking = text;
+              break;
+            }
+          }
+        }
+
+        // Strategy C: extract response — last markdown NOT inside think
+        const mdContainers = lastAssistant.querySelectorAll('.markdown-container, [class*="markdown"]');
+        for (let i = mdContainers.length - 1; i >= 0; i--) {
+          const md = mdContainers[i];
+          if (!isInsideThinkContainer(md, lastAssistant)) {
+            const text = md.innerText?.trim();
+            if (text) { response = text; break; }
+          }
+        }
+
+        // Strategy D: if no markdown found, use all text minus thinking
+        if (!response) {
+          const allText = lastAssistant.innerText?.trim() || '';
+          if (thinking && allText.includes(thinking)) {
+            response = allText.replace(thinking, '').trim();
+          } else {
+            response = allText;
+          }
+        }
+
+        // ── Heuristic: if we still have everything in response and nothing in thinking,
+        // try to detect thinking vs response by content patterns ──
+        if (!thinking && response.length > 500) {
+          // Common thinking starters (PT/EN/ES)
+          const thinkStarters = /^(O usuário|Vou |Agora |Preciso |Primeiro |Vamos |Então |Deixa |Hmm |Ok |Okay |Let me |I need |I'll |First |Now |So |The user |Hmm |Okay )/i;
+          // Look for transition to structured response: code block, JSON, or markdown headers
+          const codeBlockIdx = response.indexOf('```');
+          const jsonStartIdx = response.search(/\{\s*"/);
+          const mdHeaderIdx = response.search(/\n#{1,3}\s/);
+          const transitionIdx = codeBlockIdx > 50 ? codeBlockIdx
+            : (jsonStartIdx > 50 ? jsonStartIdx
+            : (mdHeaderIdx > 50 ? mdHeaderIdx : -1));
+          if (transitionIdx > 100 && thinkStarters.test(response)) {
+            thinking = response.slice(0, transitionIdx).trim();
+            response = response.slice(transitionIdx).trim();
+          }
+        }
+
+        return { thinking, response, source: 'dom-fallback' };
+      });
+
+      const { canSteer, isGenerating } = await this._detectUiState(page);
+      this._log(`[_poll] dom-fallback: source=${domResult.source}, think=${domResult.thinking.length}, resp=${domResult.response.length}`);
+      return { ...domResult, canSteer, isGenerating };
+    } catch (e) {
+      return { thinking: '', response: '', canSteer: false, isGenerating: false, source: 'error' };
+    }
+  }
+
+  /**
+   * Detect UI state: canSteer and isGenerating from DOM buttons.
+   */
+  async _detectUiState(page) {
+    try {
+      return await page.evaluate(() => {
         // Can we steer? (send button is active, not disabled)
         const sendBtnSelectors = ['.send-button-container', '[class*="send"]', 'button[type="submit"]', '[aria-label*="send" i]'];
         let canSteer = false;
@@ -1452,18 +1951,14 @@ class KimiBridge {
             break;
           }
         }
-        // Fallback: if no send button is visible, we're probably generating
         if (!isGenerating && !canSteer) {
           const anySend = document.querySelector('.send-button-container, [class*="send"]');
-          if (!anySend || anySend.offsetParent === null) {
-            isGenerating = true;
-          }
+          if (!anySend || anySend.offsetParent === null) isGenerating = true;
         }
-
-        return { thinking, response, canSteer, isGenerating };
+        return { canSteer, isGenerating };
       });
     } catch (e) {
-      return { thinking: '', response: '', canSteer: false, isGenerating: false };
+      return { canSteer: false, isGenerating: false };
     }
   }
 
@@ -1718,7 +2213,27 @@ class KimiBridge {
       }
 
       // Final extraction for clean response
-      const finalResponse = await this._extractResponse(page);
+      // _extractResponse uses React Fiber + DOM filtering to separate thinking from response.
+      // lastResponse accumulated during polling may be polluted with thinking text when
+      // the stream interceptor is not active and DOM fallback cannot separate them.
+      // Therefore: ALWAYS prefer _extractResponse when it returns meaningful text.
+      // Only fall back to lastResponse if _extractResponse fails or returns nothing.
+      let finalResponse = lastResponse;
+      try {
+        const extracted = await this._extractResponse(page);
+        if (extracted && extracted.trim().length > 50) {
+          // Heuristic: if extracted is much shorter, it likely successfully removed thinking.
+          // If it's longer or similar, it's the full response. Either way, prefer it.
+          finalResponse = extracted.trim();
+          if (extracted.length < lastResponse.length * 0.5) {
+            log.info(`_extractResponse returned clean text (${extracted.length} vs polluted ${lastResponse.length}) — using clean extraction`);
+          }
+        } else if (extracted) {
+          log.warn(`_extractResponse returned very short text (${extracted.length}), using lastResponse as fallback`);
+        }
+      } catch (e) {
+        log.warn(`_extractResponse failed: ${e.message}, using lastResponse as fallback`);
+      }
       session.chatUrl = page.url();
       this.store.setUser(userId, { chatUrl: session.chatUrl });
 
