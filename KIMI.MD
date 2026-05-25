@@ -64,6 +64,20 @@ last_updated: 2026-05-25T00:30:00+02:00
 4. ✅ Syntax error por comentário de bloco desbalanceado corrigido
 5. ✅ Testes E2E simplificados e passando (nomes reais, não esquisitos)
 
+### ⚡ Fase 1.5 — Performance: Eliminar chamada HTTP interna
+
+**Status:** ✅ Concluído — `processLunaChatRequest()` extrada como função pura
+
+**Problema:** `/api/luna/threads/:id/messages` fazia `fetch()` para `localhost:${PORT}/api/luna/chat`, atravessando o stack Express inteiro. Isso adicionava ~6-8s de delay em CADA mensagem.
+
+**Solução:**
+- Extraiu `processLunaChatRequest(body, authHeader)` de `app.post('/api/luna/chat', ...)`
+- Função retorna objetos puros (`return {...}`) em vez de `res.json()`
+- Endpoint de threads chama `processLunaChatRequest()` diretamente (zero HTTP)
+- Endpoint `/api/luna/chat` virou wrapper que chama a função e envia `res.json()`
+
+**Impacto:** Cada mensagem no chat agora economiza 1 round-trip HTTP completo (~6-8s → ~0ms de overhead).
+
 ### 🗄️ Fase 0.1 — Reverse Schema Engineering + Migração PG
 
 **Status:** ✅ Concluído — 19/19 entidades migradas (100%)

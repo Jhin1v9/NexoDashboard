@@ -2,9 +2,38 @@
 
 > **Regra de ouro:** SEMPRE leia este arquivo no início de uma nova sessão. Ele contém o estado de trabalho que não cabe no KIMI.MD.
 > 
-> **Sessão ativa:** `kimi-fase1-fix` 🔥 — última atualização: 2026-05-25 00:30
+> **Sessão ativa:** `kimi-fase1-fix` 🔥 — última atualização: 2026-05-25 04:45
 > 
 > **Último commit:** `a8b66be` — fix: corrige bug confirmPendingActions + warmup NLU + remove Ollama
+> 
+> **Em progresso:** Fase 1.5 — Eliminar chamada HTTP interna no backend (`processLunaChatRequest()` extraída como função pura)
+
+---
+
+---
+
+## ⚡ Fase 1.5 — Performance: Eliminar chamada HTTP interna
+
+**Data:** 2026-05-25 04:45
+**Branch:** `main` (não commitado ainda)
+**Arquivo modificado:** `backend/server.js`
+
+### Problema
+O endpoint `/api/luna/threads/:id/messages` fazia `fetch()` para `http://localhost:${PORT}/api/luna/chat`, atravessando o stack Express inteiro. Isso adicionava ~6-8s de delay em CADA mensagem no chat.
+
+### Solução implementada
+1. **Extração da função pura:** `processLunaChatRequest(body, authHeader = null)` — toda a lógica do `/api/luna/chat` movida para função que retorna objetos puros (`return {...}`) em vez de chamar `res.json()`.
+2. **Endpoint de threads atualizado:** `/api/luna/threads/:id/messages` agora chama `processLunaChatRequest(chatPayload, req.headers.authorization)` diretamente — zero HTTP, zero delay.
+3. **Endpoint `/api/luna/chat` preservado:** Virou um wrapper que chama `processLunaChatRequest()` e envia o resultado com `res.json()`. Compatível com clientes existentes.
+
+### Impacto
+- **~6-8s de delay eliminados** por mensagem no chat com threads
+- Código mais testável (função pura, sem dependência de `req`/`res`)
+- Zero breaking changes na API pública
+
+### Próximo passo
+- Commitar as mudanças (`git add backend/server.js && git commit -m "perf(backend): elimina chamada HTTP interna no chat"`)
+- Rodar testes E2E quando o banco Neon voltar (quota excedida temporariamente)
 
 ---
 
@@ -774,3 +803,71 @@ Ver seção "Bugs Observados" acima.
 - O bug `saveIdeasData` em `ideas.js` foi corrigido — **NÃO reverter** a linha 102 (deve ser `_writeJSON`, não `saveIdeasData`)
 - A rota GET `/api/ideas/:id/comments` está **depois** do POST e **antes** do DELETE — manter essa ordem
 - As ideias idea-008 e idea-009 têm `createdByName: "Luna"` — manter essa marcação
+
+---
+
+## 🌙 Sessão Atual — Luna-Kimi Bridge: Mapeamento UI + Código (Maio 2026)
+
+> **Instância:** `kimi-atual` 🟢 — 2026-05-25 03:45
+> **Foco:** Mapear seletores CSS da Kimi Web via Playwright + Chrome logado do Abner, criar módulo KimiBridge, testar E2E
+
+### ✅ Entregas
+
+| # | Entrega | Arquivo | Detalhe |
+|---|---|---|---|
+| 1 | **Chrome com perfil logado** | Processo em background | `google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-user-profile --headless=new`. Perfil copiado de `~/.config/google-chrome/Default` (458MB) |
+| 2 | **Mapeamento UI completo** | `ideas-registry.json` (idea-009) | 14 novos blocos documentando TODOS os seletores CSS: botoes de acao (Copy, Refresh, Share, Like, Dislike), header export, mode selector, input/send, resposta texto, exemplo de codigo |
+| 3 | **Módulo KimiBridge** | `agents/kimi-bridge.cjs` (261 linhas) | Classe `KimiBridge` com métodos: `connect()`, `disconnect()`, `newChat()`, `sendMessage()`, `extractResponse()`, `copyLastResponse()`, `regenerateLastResponse()`, `openExportMenu()`, `getCurrentMode()`, `screenshot()`, `getStatus()` |
+| 4 | **Teste E2E do bridge** | Script temporário | Conectou ao Chrome, criou chat, enviou "Diga oi em uma palavra", extraiu resposta "Oi.", clicou em Copy (toast "Copied successfully" visível na screenshot), screenshot salvo |
+
+### 🔍 Descobertas Técnicas (Mapeamento UI)
+
+**Ações na resposta do assistente:**
+```
+.segment-assistant-actions > .segment-assistant-actions-content
+  .icon-button [svg name=Copy]     → copiar resposta
+  .icon-button [svg name=Refresh]   → regenerar
+  .icon-button [svg name=Share_a]   → compartilhar resposta
+  .icon-button [svg name=Like]      → thumbs up
+  .icon-button [svg name=Dislike]   → thumbs down
+```
+
+**Exportar chat inteiro (header):**
+```
+.chat-header-actions [svg name=Share_a] → menu exportacao (PDF/Word/Clipboard)
+```
+
+**Modo atual:**
+```
+.chat-editor-action > .left-area > .current-model > .model-name
+  Texto: "K2.6 Thinking" (varia conforme selecao)
+```
+
+**Enviar mensagem:**
+```
+.send-button-container (classe .disabled quando vazio)
+  SVG name=Send dentro de .iconify.send-icon
+```
+
+**Resposta texto (extração DOM):**
+```
+.markdown-container .paragraph → innerText
+```
+
+### ⚠️ Limitações Descobertas
+
+- **Clipboard read falha** em headless: `navigator.clipboard.readText()` retorna `NotAllowedError`. Solução: extrair texto direto do DOM (`.markdown-container .paragraph`) — funciona perfeitamente
+- **Modo dropdown** não mapeado completamente: o clique em `.current-model` não abriu o dropdown no teste. Requer investigação futura
+- **Dependência:** Requer Chrome rodando com `--remote-debugging-port=9222` e perfil logado no Kimi
+
+### 📁 Arquivos Criados/Modificados
+- `agents/kimi-bridge.cjs` — Módulo bridge novo (261 linhas)
+- `backend/data/ideas-registry.json` — idea-009 atualizada com mapeamento UI + comentário + versionHistory v3
+- `.kimi-context/handoff.md` — esta seção
+
+### 🚀 Próximos Passos Sugeridos
+- [ ] Integrar `KimiBridge` no `telegram-luna-agent.cjs` — adicionar comandos `/kimi`, `/kimi_novo`, `/kimi_modo`
+- [ ] Criar script de startup `start-kimi-chrome.sh` para lançar Chrome com perfil logado
+- [ ] Investigar dropdown de modos (Instant/Thinking/Agent/Swarm) — como trocar via Playwright
+- [ ] Adicionar fila de mensagens para evitar sobrecarga no Kimi Web
+- [ ] Tratar sessão expirada (re-login automático ou notificação)

@@ -5473,32 +5473,37 @@ app.get('/api/luna/undo/stack', async (req, res) => {
 // IntentParser (regex/LLM) → ActionExecutor → resposta humanizada
 // LLM usado APENAS como fallback para conversas sociais
 // ============================================================
-app.post('/api/luna/chat', async (req, res) => {
+
+/**
+ * Processa uma mensagem do chat da Luna de forma síncrona (sem HTTP interno).
+ * Usado tanto pelo endpoint /api/luna/chat quanto por /api/luna/threads/:id/messages.
+ */
+async function processLunaChatRequest(body, authHeader = null) {
+  const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext, threadId } = body;
+  if (!message || !message.trim()) {
+    return { success: false, error: 'Mensagem vazia' };
+  }
+
+  const authorName = await resolveDashboardAuthor(rawAuthor);
+  const msg = message.trim();
+
   try {
-    const { message, context = [], authorName: rawAuthor, confirmActions, pendingActions, editedFields, contextModule, contextId, contextFile, dashboardContext, threadId } = req.body;
-    if (!message || !message.trim()) {
-      return res.status(400).json({ success: false, error: 'Mensagem vazia' });
-    }
-
-    const authorName = await resolveDashboardAuthor(rawAuthor);
-    const msg = message.trim();
-
-    // ── 1A. DETECTAR CONFIRMAÇÃO/NEGAÇÃO POR TEXTO NO CONTEXTO DE CONFIRMAÇÃO ──
-    // ⚠️ Só executa se o frontend NÃO enviou confirmActions explícito.
-    //    Se confirmActions veio do frontend (clique no botão), pula para o bloco 1.
-    const pendingConfirmMsg = !confirmActions && Array.isArray(context) ? [...context].reverse().find(
-      m => (m.role === 'luna' || m.role === 'assistant') && m.needsConfirmation === true
-    ) : null;
+  // ── 1A. DETECTAR CONFIRMAÇÃO/NEGAÇÃO POR TEXTO NO CONTEXTO DE CONFIRMAÇÃO ──
+  // ⚠️ Só executa se o frontend NÃO enviou confirmActions explícito.
+  //    Se confirmActions veio do frontend (clique no botão), pula para o bloco 1.
+  const pendingConfirmMsg = !confirmActions && Array.isArray(context) ? [...context].reverse().find(
+    m => (m.role === 'luna' || m.role === 'assistant') && m.needsConfirmation === true
+  ) : null;
     const isNegation = /^(n[ãa]o|cancela|cancelar|esquece|desiste|nope|nao|n)/i.test(msg);
     const isAffirmation = /^(sim|yes|claro|confirmo|ok|beleza|pode|vai|execute)/i.test(msg);
     if (pendingConfirmMsg && msg.length < 20) {
       if (isNegation) {
-        return res.json({
+        return {
           success: true,
           reply: 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔',
           cancelled: true,
           timestamp: new Date().toISOString()
-        });
+        };
       }
       if (isAffirmation) {
         // Recupera as ações pendentes do previewData com mapeamento completo de intents
@@ -5530,7 +5535,7 @@ app.post('/api/luna/chat', async (req, res) => {
           const result = await lunaActionExecutor.execute(pendingActions, { authorName, threadId });
           const reply = buildConciergeReply(result, authorName);
           const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
-          return res.json({
+          return {
             success: true,
             reply,
             executed: true,
@@ -5539,7 +5544,7 @@ app.post('/api/luna/chat', async (req, res) => {
             undoExpiresAt: lastUndo?.expiresAt || null,
             undoDescription: lastUndo?.description || null,
             timestamp: new Date().toISOString()
-          });
+          };
         }
       }
     }
@@ -5564,7 +5569,7 @@ app.post('/api/luna/chat', async (req, res) => {
       const result = await lunaActionExecutor.execute(pendingActions, { authorName, threadId });
       const reply = buildConciergeReply(result, authorName);
       const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
-      return res.json({
+      return {
         success: true,
         reply,
         executed: true,
@@ -5573,7 +5578,7 @@ app.post('/api/luna/chat', async (req, res) => {
         undoExpiresAt: lastUndo?.expiresAt || null,
         undoDescription: lastUndo?.description || null,
         timestamp: new Date().toISOString()
-      });
+      };
     }
 
     // ── 2. PARSE DA INTENÇÃO (NLU primeiro → regex → LLM fallback) ──
@@ -5687,14 +5692,14 @@ app.post('/api/luna/chat', async (req, res) => {
       const reply = parsed.intent === 'confirmacao.sim'
         ? 'Beleza! ✅ Só me lembra o que você queria confirmar — às vezes eu perco o fio 😅'
         : 'Entendido, não vou executar. Me conta o que você queria fazer — posso ter entendido errado? 🤔';
-      return res.json({ success: true, reply, intent: parsed.intent, timestamp: new Date().toISOString() });
+      return { success: true, reply, intent: parsed.intent, timestamp: new Date().toISOString() };
     }
 
     // ── 3A. UNDO / REDO ──
     if (parsed.intent === 'desfazer') {
       const undoResult = lunaUndoService.undo(threadId);
       if (!undoResult.success) {
-        return res.json({ success: true, reply: `Não consegui desfazer: ${undoResult.error} 😕`, intent: 'desfazer', timestamp: new Date().toISOString() });
+        return { success: true, reply: `Não consegui desfazer: ${undoResult.error} 😕`, intent: 'desfazer', timestamp: new Date().toISOString() };
       }
       const entry = undoResult.entry;
       let restored = false;
@@ -5705,7 +5710,7 @@ app.post('/api/luna/chat', async (req, res) => {
           delete payload.id; delete payload._id; delete payload.deletedAt;
           const response = await fetch(`http://localhost:${PORT}${entry.module}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': req.headers.authorization || `Bearer ${SERVICE_TOKEN}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': authHeader || `Bearer ${SERVICE_TOKEN}` },
             body: JSON.stringify(payload)
           });
           restored = response.ok;
@@ -5715,15 +5720,15 @@ app.post('/api/luna/chat', async (req, res) => {
       const reply = restored
         ? `✅ Desfeito! ${entry.description} foi restaurado.`
         : `⚠️ Não consegui restaurar completamente. ${restoreError ? `Erro: ${restoreError.slice(0, 100)}` : 'O item pode ter sido recriado manualmente.'}`;
-      return res.json({ success: true, reply, intent: 'desfazer', restored, timestamp: new Date().toISOString() });
+      return { success: true, reply, intent: 'desfazer', restored, timestamp: new Date().toISOString() };
     }
 
     if (parsed.intent === 'refazer') {
       const redoResult = lunaUndoService.redo(threadId);
       if (!redoResult.success) {
-        return res.json({ success: true, reply: `Não consegui refazer: ${redoResult.error} 😕`, intent: 'refazer', timestamp: new Date().toISOString() });
+        return { success: true, reply: `Não consegui refazer: ${redoResult.error} 😕`, intent: 'refazer', timestamp: new Date().toISOString() };
       }
-      return res.json({ success: true, reply: `🔄 Refeito! ${redoResult.entry.description}.`, intent: 'refazer', timestamp: new Date().toISOString() });
+      return { success: true, reply: `🔄 Refeito! ${redoResult.entry.description}.`, intent: 'refazer', timestamp: new Date().toISOString() };
     }
 
     // ── 4. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
@@ -5737,7 +5742,7 @@ app.post('/api/luna/chat', async (req, res) => {
         `Oi! 👋 Tava esperando teu sinal. O que posso fazer?`
       ];
       const reply = greetings[Math.floor(Math.random() * greetings.length)];
-      return res.json({ success: true, reply, intent: 'social', timestamp: new Date().toISOString() });
+      return { success: true, reply, intent: 'social', timestamp: new Date().toISOString() };
     }
 
     // ── 5. CONSULTA DE STATUS → dados reais do sistema ──
@@ -5745,7 +5750,7 @@ app.post('/api/luna/chat', async (req, res) => {
       const statusAction = parsed.actions.find(a => a.type === 'consultar_status') || { params: {} };
       const status = await lunaActionExecutor.getStatus(statusAction.params);
       const reply = formatConciergeStatus(status, authorName);
-      return res.json({ success: true, reply, intent: 'consultar_status', timestamp: new Date().toISOString() });
+      return { success: true, reply, intent: 'consultar_status', timestamp: new Date().toISOString() };
     }
 
     // ── 6. AÇÕES PARA EXECUTAR ──
@@ -5755,7 +5760,7 @@ app.post('/api/luna/chat', async (req, res) => {
         const taskAction = parsed.actions.find(a => a.type === 'criar_tarefa');
         if (taskAction) {
           const fields = buildEditableTaskFields(taskAction.params);
-          return res.json({
+          return {
             success: true,
             reply: `Vou criar essa tarefa. Confere se tá certo e clique em "Criar tarefa" 👇`,
             needsConfirmation: true,
@@ -5765,13 +5770,13 @@ app.post('/api/luna/chat', async (req, res) => {
             actions: parsed.actions,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
         const paymentAction = parsed.actions.find(a => a.type === 'registrar_pagamento' || a.type === 'registrar_pagamento_com_split');
         if (paymentAction) {
           const fields = buildEditablePaymentFields(paymentAction.params);
-          return res.json({
+          return {
             success: true,
             reply: `Vou registrar esse pagamento. Confere os dados 👇`,
             needsConfirmation: true,
@@ -5781,13 +5786,13 @@ app.post('/api/luna/chat', async (req, res) => {
             actions: parsed.actions,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
         const expenseAction = parsed.actions.find(a => a.type === 'registrar_despesa' || a.type === 'registrar_despesa_com_split');
         if (expenseAction) {
           const fields = buildEditableExpenseFields(expenseAction.params);
-          return res.json({
+          return {
             success: true,
             reply: `Vou registrar essa despesa. Confere os dados 👇`,
             needsConfirmation: true,
@@ -5797,13 +5802,13 @@ app.post('/api/luna/chat', async (req, res) => {
             actions: parsed.actions,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
         const leadAction = parsed.actions.find(a => a.type === 'criar_lead');
         if (leadAction) {
           const fields = buildEditableLeadFields(leadAction.params);
-          return res.json({
+          return {
             success: true,
             reply: `Vou registrar esse lead. Confere os dados 👇`,
             needsConfirmation: true,
@@ -5813,7 +5818,7 @@ app.post('/api/luna/chat', async (req, res) => {
             actions: parsed.actions,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
         const deleteAction = parsed.actions.find(a => a.type?.startsWith('excluir_'));
@@ -5824,17 +5829,17 @@ app.post('/api/luna/chat', async (req, res) => {
           const previewData = await buildPreviewForActions(parsed.actions, userRole, dataStore);
 
           if (!previewData.allowed) {
-            return res.json({
+            return {
               success: true,
               reply: `⚠️ ${previewData.reasons.join('\n')}`,
               needsConfirmation: false,
               executed: false,
               intent: parsed.intent,
               timestamp: new Date().toISOString()
-            });
+            };
           }
 
-          return res.json({
+          return {
             success: true,
             reply: `⚠️ Tem certeza que quer excluir essa ${typeNames[deleteAction.type] || 'item'}?\n\nEssa ação não pode ser desfeita.`,
             needsConfirmation: true,
@@ -5845,7 +5850,7 @@ app.post('/api/luna/chat', async (req, res) => {
             actions: parsed.actions,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
         // Para outras ações críticas: confirmação com preview contextual
@@ -5854,17 +5859,17 @@ app.post('/api/luna/chat', async (req, res) => {
 
         // Se alguma ação é bloqueada por permissão
         if (!previewData.allowed) {
-          return res.json({
+          return {
             success: true,
             reply: `⚠️ ${previewData.reasons.join('\n')}`,
             needsConfirmation: false,
             executed: false,
             intent: parsed.intent,
             timestamp: new Date().toISOString()
-          });
+          };
         }
 
-        return res.json({
+        return {
           success: true,
           reply: `Confirmo isso?\n\n${preview}\n\nResponde "sim" ou clica em confirmar pra eu executar 👍`,
           needsConfirmation: true,
@@ -5873,7 +5878,7 @@ app.post('/api/luna/chat', async (req, res) => {
           actions: parsed.actions,
           intent: parsed.intent,
           timestamp: new Date().toISOString()
-        });
+        };
       }
 
       // Se veio com editedFields, aplica as correções antes de executar
@@ -5917,20 +5922,20 @@ app.post('/api/luna/chat', async (req, res) => {
         r.status === 'success' && r.result?.type === 'prompt_missing_params'
       );
       if (smartFormResult) {
-        return res.json({
+        return {
           success: true,
           reply: 'Preciso de mais alguns dados para isso. Preenche aqui embaixo 👇',
           executed: false,
           smartForm: smartFormResult.result,
           intent: parsed.intent,
           timestamp: new Date().toISOString()
-        });
+        };
       }
 
       const reply = buildConciergeReply(result, authorName);
       const lastUndo = result.undoable && threadId ? lunaUndoService.getLastAction(threadId) : null;
 
-      return res.json({
+      return {
         success: true,
         reply,
         executed: true,
@@ -5940,7 +5945,7 @@ app.post('/api/luna/chat', async (req, res) => {
         undoExpiresAt: lastUndo?.expiresAt || null,
         undoDescription: lastUndo?.description || null,
         timestamp: new Date().toISOString()
-      });
+      };
     }
 
     // ── 7. FALLBACK: conversa via LLM (Ollama local → Gemini cloud) ──
@@ -5998,11 +6003,11 @@ ${dataContext}`;
     isFallback = true;
     reply = await buildChatFallbackReply(msg.trim());
 
-    res.json({ success: true, reply, model: usedModel, intent: parsed?.intent || 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
+    return { success: true, reply, model: usedModel, intent: parsed?.intent || 'chat', fallback: isFallback, timestamp: new Date().toISOString() };
 
   } catch (e) {
     console.error('[CONCIERGE] Erro no chat:', e.message, e.code || '');
-    const msgText = req.body?.message || 'comando';
+    const msgText = message || 'comando';
 
     // Se todas as API keys estão esgotadas, mostra mensagem humanizada com horário de reset
     if (e.code === 'GEMINI_ALL_KEYS_EXHAUSTED') {
@@ -6013,11 +6018,22 @@ ${dataContext}`;
         `🔄 **A quota reseta às ${resetInfo.time} (${resetInfo.tz})** — daqui a pouco estou de volta!\n\n` +
         `Enquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) ` +
         `sem precisar do Gemini — só me perguntar! 📊`;
-      return res.json({ success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() });
+      return { success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() };
     }
 
     const fallbackReply = await buildChatFallbackReply(msgText.trim());
-    return res.json({ success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() });
+    return { success: true, reply: fallbackReply, fallback: true, model: 'fallback', timestamp: new Date().toISOString() };
+  }
+}
+
+// ── ENDPOINT /api/luna/chat (wrapper para processLunaChatRequest) ──
+app.post('/api/luna/chat', async (req, res) => {
+  try {
+    const result = await processLunaChatRequest(req.body, req.headers.authorization);
+    return res.json(result);
+  } catch (e) {
+    console.error('[LunaChat] Erro no endpoint /api/luna/chat:', e.message);
+    return res.status(500).json({ success: false, error: 'Erro interno no processamento do chat' });
   }
 });
 
@@ -6182,7 +6198,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
     // 2. Carrega contexto da thread (últimas 20 msgs)
     const threadContext = await buildThreadContext(threadId, 20);
 
-    // 3. Chama o endpoint interno /api/luna/chat para processar a mensagem
+    // 3. Processa mensagem diretamente (sem HTTP interno — elimina ~6-8s de delay)
     const chatPayload = {
       message: text.trim(),
       context: threadContext,
@@ -6197,20 +6213,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       threadId
     };
 
-    const chatResponse = await fetch(`http://localhost:${PORT}/api/luna/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.authorization || ''
-      },
-      body: JSON.stringify(chatPayload)
-    });
-
-    if (!chatResponse.ok) {
-      throw new Error(`Chat internal error: ${chatResponse.status}`);
-    }
-
-    const chatResult = await chatResponse.json();
+    const chatResult = await processLunaChatRequest(chatPayload, req.headers.authorization);
 
     // 4. Salva resposta da Luna no thread
     const lunaMessage = {
