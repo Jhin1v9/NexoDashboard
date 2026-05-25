@@ -3,7 +3,7 @@
 # AGENTS.md — NEXO COMMAND CENTER v4.0
 # Documento de contexto para agentes de IA
 # Data: 2026-05-12
-# Última atualização: 2026-05-23 19:15
+# Última atualização: 2026-05-26 01:00
 # Último commit: e1e7e4e (main)
 # ═══════════════════════════════════════════════════════════════════
 
@@ -62,6 +62,16 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 | 31 | **Modo Voz completo** | ✅ IMPLEMENTADO | STT (SpeechRecognition) + TTS (speechSynthesis), waveform visual, toggle no chat |
 | 32 | **E2E Playwright** | 🟡 EM PROGRESSO | Auth 3/3 passando, notifications 1/2, leads 0/2 |
 | 33 | **Email Fallback SMTP** | ✅ IMPLEMENTADO | Fallback de Gmail OAuth para Nodemailer quando OAuth indisponível |
+
+#### Luna Workspace Agent v1.0 (2026-05-26)
+| # | Feature | Status | Evidência |
+|---|---------|--------|-----------|
+| 1 | **Workspace Bootstrap** | ✅ IMPLEMENTADO | `luna-workspace.cjs` — escaneia árvore, detecta stack, lê arquivos-chave |
+| 2 | **Context Injection** | ✅ IMPLEMENTADO | Workspace Manifest + Active Files cache injetados no prompt do Kimi Web |
+| 3 | **Git-Native Safety** | ✅ IMPLEMENTADO | `luna-git.cjs` — branch por sessão, atomic commits, /undo /diff /reset |
+| 4 | **ToolGuard** | ✅ IMPLEMENTADO | 7 padrões de resiliência: retry, circuit breaker, idempotency, schema validation, timeout, checksum, checkpoints |
+| 5 | **TUI Commands** | ✅ IMPLEMENTADO | /workspace, /add, /drop, /undo, /diff, /reset |
+| 6 | **Testes** | ✅ 14/14 PASSANDO | 8 unitários + 6 E2E |
 
 #### Agente Luna (luna-cto-agent.cjs + SmartClassifier)
 | # | Feature | Status | Evidência |
