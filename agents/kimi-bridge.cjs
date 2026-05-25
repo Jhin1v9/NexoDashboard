@@ -483,52 +483,84 @@ class KimiBridge {
   }
 
   /**
-   * Wait for response completion using Combined Signal:
-   * 1. Wait for assistant action buttons to appear
-   * 2. Poll text stability for 2 seconds
+   * Wait for response completion using Combined Signal with streaming support.
+   * Calls onPartial(text, status) periodically so callers can show live updates.
+   *
+   * Status values:
+   *   'writing'  — text changed since last poll (Kimi is generating)
+   *   'thinking' — text stable for >5s but not yet complete (Kimi paused/re-reasoning)
+   *   'done'     — action buttons visible + text stable for 2s (complete)
+   *
    * Throws on timeout.
    */
-  async _waitForResponse(page, mode = 'instant') {
+  async _waitForResponse(page, mode = 'instant', onPartial = null) {
     // Generous timeouts: Kimi often pauses, re-reasons, and continues.
-    // We detect completion via action buttons + text stability, so we only
-    // hit timeout if Kimi truly hangs. Instant can take 5min+, Thinking 10min+.
     const maxTimeout = mode === 'instant' ? 300000 : 600000;
     const startTime = Date.now();
 
     // Phase 1: Wait for action buttons (they appear when response is done)
     log.info('Waiting for assistant action buttons...');
+    let buttonsVisible = false;
     try {
       await page.waitForSelector('.segment-assistant-actions .icon-button', {
         timeout: maxTimeout,
         state: 'visible',
       });
+      buttonsVisible = true;
       log.success('Action buttons detected — response likely complete');
     } catch (e) {
       log.warn(`Timeout waiting for action buttons: ${e.message}`);
-      // Continue to phase 2 anyway
     }
 
-    // Phase 2: Poll text stability for 2 seconds
-    log.info('Polling text stability...');
+    // Phase 2: Poll text with streaming callbacks
+    log.info('Polling text with streaming...');
     const stabilityWindow = 2000;
-    const pollInterval = 500;
+    const thinkingWindow = 5000; // if stable >5s and buttons not visible = thinking
+    const pollInterval = 1500;   // poll every 1.5s for partial updates
     let lastText = '';
     let stableSince = null;
+    let thinkingNotified = false;
 
     while (Date.now() - startTime < maxTimeout) {
       try {
         const currentText = await page.locator('.markdown-container .markdown').last().innerText({ timeout: 2000 }).catch(() => '');
 
-        if (currentText === lastText && currentText.trim().length > 0) {
+        // Notify partial update when text changes
+        if (currentText !== lastText && currentText.trim().length > 0) {
+          stableSince = null;
+          thinkingNotified = false;
+          lastText = currentText;
+          if (onPartial) {
+            try { onPartial(currentText, 'writing'); } catch {}
+          }
+          continue; // skip stability check this iteration
+        }
+
+        // Text is stable
+        if (currentText.trim().length > 0) {
           if (!stableSince) {
             stableSince = Date.now();
-          } else if (Date.now() - stableSince >= stabilityWindow) {
-            log.success(`Text stable for ${stabilityWindow}ms — response complete`);
-            return;
+          } else {
+            const stableFor = Date.now() - stableSince;
+
+            // If buttons visible and stable >2s = DONE
+            if (buttonsVisible && stableFor >= stabilityWindow) {
+              log.success(`Text stable for ${stableFor}ms + buttons visible — response complete`);
+              if (onPartial) {
+                try { onPartial(currentText, 'done'); } catch {}
+              }
+              return;
+            }
+
+            // If stable >5s but no buttons yet = THINKING (Kimi paused)
+            if (!thinkingNotified && stableFor >= thinkingWindow) {
+              thinkingNotified = true;
+              log.info(`Text stable for ${stableFor}ms — Kimi may be re-reasoning`);
+              if (onPartial) {
+                try { onPartial(currentText, 'thinking'); } catch {}
+              }
+            }
           }
-        } else {
-          stableSince = null;
-          lastText = currentText;
         }
       } catch (e) {
         // Element might not exist yet
@@ -676,8 +708,8 @@ class KimiBridge {
       await input.press('Enter');
       log.info(`Message sent for user ${hashUserId(userId)}`);
 
-      // Wait for response with combined signal
-      await this._waitForResponse(page, actualMode);
+      // Wait for response with combined signal + streaming
+      await this._waitForResponse(page, actualMode, options.onPartialResponse || null);
 
       // Extract response
       const response = await this._extractResponse(page);

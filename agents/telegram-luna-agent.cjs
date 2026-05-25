@@ -551,12 +551,96 @@ class TelegramLunaAgent {
   // ── KIMI BRIDGE HANDLERS ──
   _setupKimiHandlers() {
     // Helper: local or remote bridge
-    const askBridge = async (userId, text, mode) => {
+    const askBridge = async (userId, text, mode, onPartial = null) => {
       if (KIMI_BRIDGE_URL) {
+        // Remote API does not support streaming callbacks (HTTP request/response)
         return this._callBridgeApi('/ask', { userId, text, mode });
       }
       const bridge = await this.getKimiBridge();
-      return bridge.sendMessage(userId, text, { mode });
+      return bridge.sendMessage(userId, text, { mode, onPartialResponse: onPartial });
+    };
+
+    // Helper: create a Telegram message updater for streaming
+    // Flow:
+    //   1. "🧠 Pensando..." (initial)
+    //   2. When Kimi writes then pauses → edit with partial text
+    //   3. If Kimi is still thinking → append "🧠 Pensando..." to partial text
+    //   4. When done → edit with clean final text
+    const createStreamUpdater = (chatId, replyToId, modeEmoji) => {
+      let lastEdit = 0;
+      let lastText = '';
+      let lastStatus = '';
+      let messageId = null;
+      const DEBOUNCE_MS = 1500; // max 1 edit per 1.5s
+
+      const init = async () => {
+        const msg = await this.bot.sendMessage(chatId, `${modeEmoji} *Pensando...*`, {
+          parse_mode: 'Markdown',
+          reply_to_message_id: replyToId,
+        });
+        messageId = msg.message_id;
+        return messageId;
+      };
+
+      const onPartial = async (text, status) => {
+        if (!messageId) return;
+        const now = Date.now();
+        if (now - lastEdit < DEBOUNCE_MS && status !== 'done') return;
+        if (text === lastText && status === lastStatus) return;
+        lastText = text;
+        lastStatus = status;
+        lastEdit = now;
+
+        let editText;
+        const MAX_EDIT = 3500;
+
+        if (status === 'done') {
+          // Final clean text
+          editText = `${modeEmoji} *Kimi*\n\n${text}`;
+        } else if (status === 'thinking') {
+          // Kimi paused — show what we have + "thinking" indicator
+          let body = text;
+          if (body.length > MAX_EDIT) body = body.slice(0, MAX_EDIT);
+          editText = `${modeEmoji} *Kimi*\n\n${body}\n\n_🧠 Pensando..._`;
+        } else {
+          // writing — show partial text without indicator
+          let body = text;
+          if (body.length > MAX_EDIT) {
+            body = body.slice(0, MAX_EDIT) + '\n\n_✍️ Continuando..._';
+          }
+          editText = `${modeEmoji} *Kimi*\n\n${body}`;
+        }
+
+        try {
+          await this.bot.editMessageText(editText, {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'Markdown',
+          });
+        } catch (e) {
+          this._log?.('debug', `Edit failed: ${e.message}`);
+        }
+      };
+
+      const finalize = async (finalText, mode) => {
+        if (!messageId) return;
+        const emoji = mode === 'instant' ? '⚡' : '🧠';
+        const fullText = `${emoji} *Kimi*\n\n${finalText}`;
+        if (fullText.length <= 4000) {
+          try {
+            await this.bot.editMessageText(fullText, {
+              chat_id: chatId,
+              message_id: messageId,
+              parse_mode: 'Markdown',
+            });
+            return messageId;
+          } catch {}
+        }
+        await this.bot.deleteMessage(chatId, messageId).catch(() => {});
+        return sendLongMessage(chatId, fullText, { parse_mode: 'Markdown', reply_to_message_id: replyToId });
+      };
+
+      return { init, onPartial, finalize, get messageId() { return messageId; } };
     };
 
     // Helper: split long messages for Telegram (4096 char limit)
@@ -588,43 +672,26 @@ class TelegramLunaAgent {
         return;
       }
 
-      // Send "Processing..." message that we'll edit later
-      const processingMsg = await this.bot.sendMessage(chatId, '⚡ *Processando...*', {
-        parse_mode: 'Markdown',
-        reply_to_message_id: msg.message_id,
-      });
+      const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
+      await stream.init();
 
       try {
-        // Build dashboard context if query is about dashboard
         const context = buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
 
-        const result = await askBridge(userId, enrichedQuestion);
-        const mode = result.mode || 'instant';
-        const modeEmoji = mode === 'instant' ? '⚡' : '🧠';
-        const responseText = `${modeEmoji} *Kimi*\n\n${result.response}`;
+        // Streaming only works in local mode (remote API is request/response)
+        const useStreaming = !KIMI_BRIDGE_URL;
+        const result = await askBridge(userId, enrichedQuestion, null, useStreaming ? stream.onPartial : null);
 
-        // Edit the processing message with the result (or send new if too long)
-        if (responseText.length <= 4000) {
-          await this.bot.editMessageText(responseText, {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            parse_mode: 'Markdown',
-          });
-        } else {
-          // Delete processing message and send full response in parts
-          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
-          await sendLongMessage(chatId, responseText, {
-            parse_mode: 'Markdown',
-            reply_to_message_id: msg.message_id,
-          });
-        }
+        await stream.finalize(result.response, result.mode || 'instant');
       } catch (err) {
         log('error', `Kimi error: ${err.message}`);
-        await this.bot.editMessageText(`❌ Erro no Kimi: ${err.message}`, {
-          chat_id: chatId,
-          message_id: processingMsg.message_id,
-        });
+        try {
+          await this.bot.editMessageText(`❌ Erro no Kimi: ${err.message}`, {
+            chat_id: chatId,
+            message_id: stream.messageId,
+          });
+        } catch {}
       }
     });
 
@@ -639,33 +706,23 @@ class TelegramLunaAgent {
         return;
       }
 
-      const processingMsg = await this.bot.sendMessage(chatId, '⚡ *Processando...*', {
-        parse_mode: 'Markdown',
-        reply_to_message_id: msg.message_id,
-      });
+      const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
+      await stream.init();
 
       try {
         const context = buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
-        const result = await askBridge(userId, enrichedQuestion, 'instant');
-        const responseText = `⚡ *Kimi Instant*\n\n${result.response}`;
-
-        if (responseText.length <= 4000) {
-          await this.bot.editMessageText(responseText, {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            parse_mode: 'Markdown',
-          });
-        } else {
-          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
-          await sendLongMessage(chatId, responseText, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
-        }
+        const useStreaming = !KIMI_BRIDGE_URL;
+        const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
+        await stream.finalize(result.response, 'instant');
       } catch (err) {
         log('error', `Kimi instant error: ${err.message}`);
-        await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
-          chat_id: chatId,
-          message_id: processingMsg.message_id,
-        });
+        try {
+          await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
+            chat_id: chatId,
+            message_id: stream.messageId,
+          });
+        } catch {}
       }
     });
 
@@ -680,33 +737,23 @@ class TelegramLunaAgent {
         return;
       }
 
-      const processingMsg = await this.bot.sendMessage(chatId, '🧠 *Pensando...* (pode levar alguns segundos)', {
-        parse_mode: 'Markdown',
-        reply_to_message_id: msg.message_id,
-      });
+      const stream = createStreamUpdater(chatId, msg.message_id, '🧠');
+      await stream.init();
 
       try {
         const context = buildDashboardContext(question);
         const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
-        const result = await askBridge(userId, enrichedQuestion, 'thinking');
-        const responseText = `🧠 *Kimi Thinking*\n\n${result.response}`;
-
-        if (responseText.length <= 4000) {
-          await this.bot.editMessageText(responseText, {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            parse_mode: 'Markdown',
-          });
-        } else {
-          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
-          await sendLongMessage(chatId, responseText, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
-        }
+        const useStreaming = !KIMI_BRIDGE_URL;
+        const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);
+        await stream.finalize(result.response, 'thinking');
       } catch (err) {
         log('error', `Kimi thinking error: ${err.message}`);
-        await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
-          chat_id: chatId,
-          message_id: processingMsg.message_id,
-        });
+        try {
+          await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
+            chat_id: chatId,
+            message_id: stream.messageId,
+          });
+        } catch {}
       }
     });
 
