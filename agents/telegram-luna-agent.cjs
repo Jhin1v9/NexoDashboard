@@ -17,6 +17,77 @@ const { KimiBridge } = require('./kimi-bridge.cjs');
 const KIMI_BRIDGE_URL = process.env.KIMI_BRIDGE_URL || null;
 const KIMI_BRIDGE_API_KEY = process.env.KIMI_BRIDGE_API_KEY || 'nexo-kimi-local-2026';
 
+// ── DASHBOARD CONTEXT BUILDER ──
+// Auto-fetches dashboard data to enrich Kimi prompts
+const DASHBOARD_DATA_DIR = path.join(__dirname, '../backend/data');
+
+function loadJson(file) {
+  try {
+    const p = path.join(DASHBOARD_DATA_DIR, file);
+    if (!fs.existsSync(p)) return null;
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch { return null; }
+}
+
+function buildDashboardContext(userQuery = '') {
+  const q = userQuery.toLowerCase();
+  const isDashboardQuery = /tarefa|lead|ideia|orçamento|projeto|cliente|financeiro|pagamento|despesa|status|dashboard|nexo/i.test(q);
+  if (!isDashboardQuery) return null;
+
+  const buffer = loadJson('luna-buffer.json') || {};
+  const tasks = buffer.newTasks || [];
+  const leads = buffer.newLeads || [];
+  const ideas = buffer.newIdeas || [];
+  const decisions = buffer.newDecisions || [];
+  const finance = buffer.newFinance || [];
+
+  const lines = ['📋 *CONTEXTO NEXO DASHBOARD* (dados reais do sistema):'];
+
+  if (tasks.length) {
+    lines.push(`\n📝 *Tarefas recentes (${tasks.length}):*`);
+    tasks.slice(-10).forEach((t, i) => {
+      lines.push(`${i + 1}. ${t.body || t.text || 'Sem título'} — ${t.author || 'N/A'}${t.priority ? ` [${t.priority}]` : ''}`);
+    });
+  }
+
+  if (leads.length) {
+    lines.push(`\n👤 *Leads recentes (${leads.length}):*`);
+    leads.slice(-10).forEach((l, i) => {
+      lines.push(`${i + 1}. ${l.name || l.context || 'Sem nome'} — ${l.status || 'novo'}`);
+    });
+  }
+
+  if (ideas.length) {
+    lines.push(`\n💡 *Ideias recentes (${ideas.length}):*`);
+    ideas.slice(-5).forEach((idea, i) => {
+      lines.push(`${i + 1}. ${idea.title || idea.body || 'Sem título'}`);
+    });
+  }
+
+  if (finance.length) {
+    lines.push(`\n💰 *Movimentações financeiras recentes (${finance.length}):*`);
+    finance.slice(-5).forEach((f, i) => {
+      lines.push(`${i + 1}. ${f.body || f.text || f.context || 'Sem descrição'}`);
+    });
+  }
+
+  if (decisions.length) {
+    lines.push(`\n📌 *Decisões recentes (${decisions.length}):*`);
+    decisions.slice(-5).forEach((d, i) => {
+      lines.push(`${i + 1}. ${d.body || d.text || 'Sem descrição'}`);
+    });
+  }
+
+  lines.push('\n---\nResponda usando os dados acima quando relevante. Se não souber algo específico, diga que vai verificar no dashboard.');
+
+  const result = lines.join('\n');
+  // Limit context size to avoid overloading Kimi input (max ~3000 chars)
+  if (result.length > 3000) {
+    return result.slice(0, 3000) + '\n\n...[contexto truncado por tamanho]';
+  }
+  return result;
+}
+
 // ── CONFIG ──
 const CONFIG = {
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
@@ -488,6 +559,24 @@ class TelegramLunaAgent {
       return bridge.sendMessage(userId, text, { mode });
     };
 
+    // Helper: split long messages for Telegram (4096 char limit)
+    const sendLongMessage = async (chatId, text, opts) => {
+      const MAX = 4000;
+      if (text.length <= MAX) {
+        return await this.bot.sendMessage(chatId, text, opts);
+      }
+      const parts = [];
+      for (let i = 0; i < text.length; i += MAX) {
+        parts.push(text.slice(i, i + MAX));
+      }
+      let lastMsg;
+      for (let i = 0; i < parts.length; i++) {
+        const partOpts = i === 0 ? opts : { parse_mode: opts.parse_mode };
+        lastMsg = await this.bot.sendMessage(chatId, parts[i], partOpts);
+      }
+      return lastMsg;
+    };
+
     // /kimi [pergunta] — default Instant mode
     this.bot.onText(/^\/kimi(?:\s+(.+))?/, async (msg, match) => {
       const userId = msg.from.id;
@@ -499,18 +588,43 @@ class TelegramLunaAgent {
         return;
       }
 
-      await this.bot.sendChatAction(chatId, 'typing');
+      // Send "Processing..." message that we'll edit later
+      const processingMsg = await this.bot.sendMessage(chatId, '⚡ *Processando...*', {
+        parse_mode: 'Markdown',
+        reply_to_message_id: msg.message_id,
+      });
+
       try {
-        const result = await askBridge(userId, question);
+        // Build dashboard context if query is about dashboard
+        const context = buildDashboardContext(question);
+        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+
+        const result = await askBridge(userId, enrichedQuestion);
         const mode = result.mode || 'instant';
         const modeEmoji = mode === 'instant' ? '⚡' : '🧠';
-        await this.bot.sendMessage(chatId, `${modeEmoji} *Kimi*\n\n${result.response}`, {
-          parse_mode: 'Markdown',
-          reply_to_message_id: msg.message_id,
-        });
+        const responseText = `${modeEmoji} *Kimi*\n\n${result.response}`;
+
+        // Edit the processing message with the result (or send new if too long)
+        if (responseText.length <= 4000) {
+          await this.bot.editMessageText(responseText, {
+            chat_id: chatId,
+            message_id: processingMsg.message_id,
+            parse_mode: 'Markdown',
+          });
+        } else {
+          // Delete processing message and send full response in parts
+          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+          await sendLongMessage(chatId, responseText, {
+            parse_mode: 'Markdown',
+            reply_to_message_id: msg.message_id,
+          });
+        }
       } catch (err) {
         log('error', `Kimi error: ${err.message}`);
-        await this.bot.sendMessage(chatId, `❌ Erro no Kimi: ${err.message}`, { reply_to_message_id: msg.message_id });
+        await this.bot.editMessageText(`❌ Erro no Kimi: ${err.message}`, {
+          chat_id: chatId,
+          message_id: processingMsg.message_id,
+        });
       }
     });
 
@@ -525,16 +639,33 @@ class TelegramLunaAgent {
         return;
       }
 
-      await this.bot.sendChatAction(chatId, 'typing');
+      const processingMsg = await this.bot.sendMessage(chatId, '⚡ *Processando...*', {
+        parse_mode: 'Markdown',
+        reply_to_message_id: msg.message_id,
+      });
+
       try {
-        const result = await askBridge(userId, question, 'instant');
-        await this.bot.sendMessage(chatId, `⚡ *Kimi Instant*\n\n${result.response}`, {
-          parse_mode: 'Markdown',
-          reply_to_message_id: msg.message_id,
-        });
+        const context = buildDashboardContext(question);
+        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+        const result = await askBridge(userId, enrichedQuestion, 'instant');
+        const responseText = `⚡ *Kimi Instant*\n\n${result.response}`;
+
+        if (responseText.length <= 4000) {
+          await this.bot.editMessageText(responseText, {
+            chat_id: chatId,
+            message_id: processingMsg.message_id,
+            parse_mode: 'Markdown',
+          });
+        } else {
+          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+          await sendLongMessage(chatId, responseText, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        }
       } catch (err) {
         log('error', `Kimi instant error: ${err.message}`);
-        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+        await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
+          chat_id: chatId,
+          message_id: processingMsg.message_id,
+        });
       }
     });
 
@@ -549,16 +680,33 @@ class TelegramLunaAgent {
         return;
       }
 
-      await this.bot.sendChatAction(chatId, 'typing');
+      const processingMsg = await this.bot.sendMessage(chatId, '🧠 *Pensando...* (pode levar alguns segundos)', {
+        parse_mode: 'Markdown',
+        reply_to_message_id: msg.message_id,
+      });
+
       try {
-        const result = await askBridge(userId, question, 'thinking');
-        await this.bot.sendMessage(chatId, `🧠 *Kimi Thinking*\n\n${result.response}`, {
-          parse_mode: 'Markdown',
-          reply_to_message_id: msg.message_id,
-        });
+        const context = buildDashboardContext(question);
+        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+        const result = await askBridge(userId, enrichedQuestion, 'thinking');
+        const responseText = `🧠 *Kimi Thinking*\n\n${result.response}`;
+
+        if (responseText.length <= 4000) {
+          await this.bot.editMessageText(responseText, {
+            chat_id: chatId,
+            message_id: processingMsg.message_id,
+            parse_mode: 'Markdown',
+          });
+        } else {
+          await this.bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+          await sendLongMessage(chatId, responseText, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        }
       } catch (err) {
         log('error', `Kimi thinking error: ${err.message}`);
-        await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
+        await this.bot.editMessageText(`❌ Erro: ${err.message}`, {
+          chat_id: chatId,
+          message_id: processingMsg.message_id,
+        });
       }
     });
 

@@ -489,7 +489,7 @@ class KimiBridge {
    * Throws on timeout.
    */
   async _waitForResponse(page, mode = 'instant') {
-    const maxTimeout = mode === 'instant' ? 45000 : 120000;
+    const maxTimeout = mode === 'instant' ? 90000 : 180000;
     const startTime = Date.now();
 
     // Phase 1: Wait for action buttons (they appear when response is done)
