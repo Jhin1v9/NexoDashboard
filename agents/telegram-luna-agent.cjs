@@ -712,11 +712,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
-        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+        const noGreeting = '\n\n(Responda de forma direta e objetiva, sem saudações como "Oi" ou "Olá", e sem nomear o usuário no início.)';
 
         const enrichedQuestion = context
-          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${noGreeting}${replyContext}${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}${noGreeting}`
+          : `${replyContext}${namePrefix}${question}${noGreeting}`;
 
         const result = await askBridge(userId, enrichedQuestion, null, null);
 
@@ -766,11 +766,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
-        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+        const noGreeting = '\n\n(Responda de forma direta e objetiva, sem saudações como "Oi" ou "Olá", e sem nomear o usuário no início.)';
 
         const enrichedQuestion = context
-          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${noGreeting}${replyContext}${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}${noGreeting}`
+          : `${replyContext}${namePrefix}${question}${noGreeting}`;
         const result = await askBridge(userId, enrichedQuestion, 'instant', null);
         await finalize(result.response, 'instant');
       } catch (err) {
@@ -818,11 +818,11 @@ class TelegramLunaAgent {
           replyContext = `--- MENSAGEM MARCADA (contexto) ---\nDe: ${replyAuthor}\n${replyText}\n--- FIM DO CONTEXTO ---\n\n`;
         }
 
-        const noGreeting = '[INSTRUÇÃO: Não saúde o usuário a cada mensagem. Use saudação apenas na PRIMEIRA mensagem da conversa. Nas mensagens seguintes, vá direto ao assunto sem dizer "Oi", "Olá", "E aí", ou nomear o usuário no início.]\n\n';
+        const noGreeting = '\n\n(Responda de forma direta e objetiva, sem saudações como "Oi" ou "Olá", e sem nomear o usuário no início.)';
 
         const enrichedQuestion = context
-          ? `${noGreeting}${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
-          : `${noGreeting}${replyContext}${namePrefix}${question}`;
+          ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}${noGreeting}`
+          : `${replyContext}${namePrefix}${question}${noGreeting}`;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', null);
         await finalize(result.response, 'thinking');
       } catch (err) {
