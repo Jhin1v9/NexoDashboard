@@ -1106,6 +1106,55 @@ class KimiBridge {
   }
 
   /**
+   * Logout user: close page, clear session, optionally kill Chrome.
+   */
+  async logout(userId, opts = {}) {
+    const session = this.userSessions.get(userId);
+    if (session) {
+      // Close page
+      if (session.page && !session.page.isClosed()) {
+        try { await session.page.close(); } catch {}
+      }
+      this.userSessions.delete(userId);
+      this.semaphore.current = Math.max(0, this.semaphore.current - 1);
+    }
+
+    if (opts.killChrome) {
+      try {
+        const { execSync } = require('child_process');
+        execSync("pkill -f 'chrome.*remote-debugging-port=9222'");
+        log.info('Chrome killed');
+        return { success: true, message: 'Logout completo. Chrome fechado.' };
+      } catch (e) {
+        return { success: true, message: 'Sessão encerrada. Chrome já estava fechado.' };
+      }
+    }
+
+    return { success: true, message: 'Logout completo. Sessão encerrada.' };
+  }
+
+  /**
+   * Check if there's already a visible Chrome running and return details.
+   */
+  async getChromeStatus() {
+    const { execSync } = require('child_process');
+    try {
+      const psOutput = execSync("ps aux | grep 'chrome.*remote-debugging-port=9222' | grep -v grep", { encoding: 'utf8' });
+      const isHeadless = psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless');
+      const profileMatch = psOutput.match(/--user-data-dir=([^\s]+)/);
+      const pidMatch = psOutput.match(/^\S+\s+(\d+)/);
+      return {
+        running: true,
+        isHeadless: !!isHeadless,
+        profileDir: profileMatch ? profileMatch[1] : null,
+        pid: pidMatch ? parseInt(pidMatch[1]) : null,
+      };
+    } catch {
+      return { running: false };
+    }
+  }
+
+  /**
    * Screenshot a user's page
    */
   async screenshot(userId, ssPath = null) {

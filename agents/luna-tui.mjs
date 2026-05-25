@@ -518,6 +518,7 @@ function HelpOverlay({ onClose }) {
     ['/sim /nao', 'Confirma/rejeita sugestão'],
     ['/status', 'Status do sistema'],
     ['/login', 'Login no Kimi Web (inicia Chrome se necessário)'],
+    ['/logout', 'Desloga e fecha Chrome'],
     ['/yolo', 'Toggle YOLO'],
     ['/help', 'Ajuda'],
     ['Ctrl+H', 'Toggle ajuda'],
@@ -745,23 +746,33 @@ function App({ luna, sessionManager, initialSession }) {
     if (text === '/login') {
       setMessages(prev => [...prev, { type: 'system', content: '🔐 Verificando Chrome + Kimi login...', id: nextId(), timestamp: new Date().toISOString() }]);
       try {
-        // Step 1: Check/start Chrome
-        const chromeStatus = await luna.kimiBridge?.checkChrome?.();
-        if (chromeStatus) {
-          if (chromeStatus.wasHeadless) {
-            setMessages(prev => [...prev, { type: 'system', content: '⚠️ Chrome headless detectado e reiniciado em modo visível. Uma janela do Chrome deve aparecer.', id: nextId(), timestamp: new Date().toISOString() }]);
-          }
-          if (chromeStatus.started) {
-            const profileMsg = chromeStatus.profileDir ? ` (perfil: ${chromeStatus.profileDir.slice(-30)})` : '';
-            setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome visível iniciado (PID: ${chromeStatus.pid})${profileMsg}`, id: nextId(), timestamp: new Date().toISOString() }]);
-          } else if (chromeStatus.running) {
-            setMessages(prev => [...prev, { type: 'system', content: '✅ Chrome já está rodando (modo visível)', id: nextId(), timestamp: new Date().toISOString() }]);
-          } else if (chromeStatus.error) {
-            setMessages(prev => [...prev, { type: 'system', content: `❌ Chrome: ${chromeStatus.error}`, id: nextId(), timestamp: new Date().toISOString() }]);
-            return;
+        // Check if Chrome is already running
+        const existingChrome = await luna.kimiBridge?.getChromeStatus?.();
+        if (existingChrome && existingChrome.running && !existingChrome.isHeadless) {
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: `ℹ️ Chrome já está aberto (PID: ${existingChrome.pid}). Reutilizando... Digite /logout para fechar.`,
+            id: nextId(), timestamp: new Date().toISOString()
+          }]);
+        } else {
+          // Start Chrome
+          const chromeStatus = await luna.kimiBridge?.checkChrome?.();
+          if (chromeStatus) {
+            if (chromeStatus.wasHeadless) {
+              setMessages(prev => [...prev, { type: 'system', content: '⚠️ Chrome headless detectado e reiniciado em modo visível.', id: nextId(), timestamp: new Date().toISOString() }]);
+            }
+            if (chromeStatus.started) {
+              const profileMsg = chromeStatus.profileDir ? ` (perfil: ${chromeStatus.profileDir.slice(-30)})` : '';
+              setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome visível iniciado (PID: ${chromeStatus.pid})${profileMsg}`, id: nextId(), timestamp: new Date().toISOString() }]);
+            } else if (chromeStatus.running) {
+              setMessages(prev => [...prev, { type: 'system', content: '✅ Chrome já está rodando (modo visível)', id: nextId(), timestamp: new Date().toISOString() }]);
+            } else if (chromeStatus.error) {
+              setMessages(prev => [...prev, { type: 'system', content: `❌ Chrome: ${chromeStatus.error}`, id: nextId(), timestamp: new Date().toISOString() }]);
+              return;
+            }
           }
         }
-        // Step 2: Check Kimi login
+        // Check Kimi login
         await new Promise(r => setTimeout(r, 2000));
         const loginStatus = await luna.kimiBridge?.ensureLogin?.('luna-cli');
         if (loginStatus) {
@@ -769,6 +780,21 @@ function App({ luna, sessionManager, initialSession }) {
         }
       } catch (e) {
         setMessages(prev => [...prev, { type: 'system', content: `❌ Erro no login: ${e.message}`, id: nextId(), timestamp: new Date().toISOString() }]);
+      }
+      return;
+    }
+
+    // /logout
+    if (text === '/logout') {
+      setMessages(prev => [...prev, { type: 'system', content: '🚪 Encerrando sessão...', id: nextId(), timestamp: new Date().toISOString() }]);
+      try {
+        const result = await luna.kimiBridge?.logout?.('luna-cli', { killChrome: true });
+        if (result) {
+          setMessages(prev => [...prev, { type: 'system', content: result.message, id: nextId(), timestamp: new Date().toISOString() }]);
+          setBridgeStatus({ active: false });
+        }
+      } catch (e) {
+        setMessages(prev => [...prev, { type: 'system', content: `❌ Erro: ${e.message}`, id: nextId(), timestamp: new Date().toISOString() }]);
       }
       return;
     }
