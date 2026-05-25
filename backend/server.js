@@ -9185,24 +9185,10 @@ async function startServer() {
 
     // Ollama REMOVIDO — será substituído por API externa
 
-    // ── Iniciar Telegram Bot automaticamente (se token configurado e não desabilitado) ──
-    try {
-      if (process.env.AUTO_START_TELEGRAM_BOT !== 'false' && process.env.TELEGRAM_BOT_TOKEN) {
-        const started = await startTelegramAgent();
-        if (started) {
-          const status = getTelegramStatus();
-          console.log(`🤖 Bot do Telegram iniciado automaticamente: @${status.botUsername}`);
-        } else {
-          console.warn('⚠️ Bot do Telegram falhou ao iniciar (verifique TELEGRAM_BOT_TOKEN)');
-        }
-      } else if (process.env.AUTO_START_TELEGRAM_BOT === 'false') {
-        console.log('ℹ️ AUTO_START_TELEGRAM_BOT=false — bot do Telegram não será iniciado pelo server.js (modo standalone)');
-      } else {
-        console.log('ℹ️ TELEGRAM_BOT_TOKEN não configurado — bot do Telegram não será iniciado');
-      }
-    } catch (err) {
-      console.error('❌ Erro ao iniciar bot do Telegram:', err.message);
-    }
+    // ── Telegram Bot: NÃO inicia automaticamente no Render ──
+    // Bot roda exclusivamente via luna-local-mode.sh no PC local
+    // Use POST /api/telegram/start para iniciar manualmente se necessário
+    console.log('ℹ️ Bot do Telegram: modo local-only — não inicia automaticamente no server.js');
   });
 }
 
