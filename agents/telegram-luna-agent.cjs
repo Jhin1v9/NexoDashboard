@@ -547,6 +547,7 @@ class TelegramLunaAgent {
     if (this.running) return true;
     const TelegramBot = require('node-telegram-bot-api');
     this.bot = new TelegramBot(this.token, { polling: true });
+    log("info", "Telegram polling started");
     try {
       this.me = await this.bot.getMe();
       log('success', `Bot conectado: @${this.me.username} (id: ${this.me.id})`);
@@ -747,8 +748,8 @@ class TelegramLunaAgent {
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
 
-        // Streaming only works in local mode (remote API is request/response)
-        const useStreaming = !KIMI_BRIDGE_URL;
+        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
+        const useStreaming = false;
         const result = await askBridge(userId, enrichedQuestion, null, useStreaming ? stream.onPartial : null);
 
         await stream.finalize(result.response, result.mode || 'instant');
@@ -792,7 +793,8 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        const useStreaming = !KIMI_BRIDGE_URL;
+        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
+        const useStreaming = false;
         const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'instant');
       } catch (err) {
@@ -835,7 +837,8 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
           : `${namePrefix}${question}`;
-        const useStreaming = !KIMI_BRIDGE_URL;
+        // Streaming DISABLED: causes deadlocks with Telegram API. Using simple mode.
+        const useStreaming = false;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'thinking');
       } catch (err) {
