@@ -968,13 +968,18 @@ class KimiBridge {
 
   /**
    * Check if Chrome is running with CDP and start if needed.
-   * Returns { running: bool, started: bool, pid?: number, error?: string }
+   * Kills headless Chrome and starts visible Chrome for login.
+   * Returns { running: bool, started: bool, pid?: number, error?: string, wasHeadless?: bool }
    */
   async checkChrome() {
     const { execSync, spawn } = require('child_process');
+    const http = require('http');
+    const os = require('os');
+    const userDataDir = path.join(os.homedir(), '.luna', 'chrome-profile');
+
     // Check if Chrome is already listening on CDP port
+    let existingChrome = null;
     try {
-      const http = require('http');
       await new Promise((resolve, reject) => {
         const req = http.get('http://localhost:9222/json/version', (res) => {
           if (res.statusCode === 200) resolve(true);
@@ -983,54 +988,81 @@ class KimiBridge {
         req.on('error', reject);
         req.setTimeout(3000, () => { req.destroy(); reject(new Error('Timeout')); });
       });
-      return { running: true, started: false };
+      existingChrome = true;
     } catch {
-      // Not running — try to start
-      const chromeCmds = [
-        'google-chrome',
-        'google-chrome-stable',
-        'chromium',
-        'chromium-browser',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium',
-      ];
-      let chromePath = null;
-      for (const cmd of chromeCmds) {
-        try { execSync(`which ${cmd}`, { stdio: 'ignore' }); chromePath = cmd; break; } catch {}
-      }
-      if (!chromePath) {
-        return { running: false, started: false, error: 'Chrome não encontrado. Instale google-chrome-stable ou chromium.' };
-      }
+      existingChrome = false;
+    }
+
+    // If running, check if it's headless
+    let wasHeadless = false;
+    if (existingChrome) {
       try {
-        const proc = spawn(chromePath, [
-          '--remote-debugging-port=9222',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--user-data-dir=' + path.join(require('os').homedir(), '.luna', 'chrome-profile'),
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-        ], { detached: true, stdio: 'ignore' });
-        proc.unref();
-        // Wait a bit for Chrome to start
-        await new Promise(r => setTimeout(r, 3000));
-        // Verify it started
-        try {
-          await new Promise((resolve, reject) => {
-            const req = http.get('http://localhost:9222/json/version', (res) => {
-              if (res.statusCode === 200) resolve(true);
-              else reject(new Error('Status ' + res.statusCode));
-            });
-            req.on('error', reject);
-            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
-          });
-          return { running: true, started: true, pid: proc.pid };
-        } catch {
-          return { running: false, started: true, pid: proc.pid, error: 'Chrome iniciou mas não respondeu em 5s' };
+        const psOutput = execSync("ps aux | grep 'chrome.*remote-debugging-port=9222' | grep -v grep", { encoding: 'utf8' });
+        if (psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless')) {
+          wasHeadless = true;
+          log.warn('Chrome headless detectado. Matando para iniciar visível...');
+          // Kill headless chrome
+          execSync("pkill -f 'chrome.*remote-debugging-port=9222'");
+          await new Promise(r => setTimeout(r, 2000));
+          existingChrome = false;
+        } else {
+          return { running: true, started: false, wasHeadless: false };
         }
-      } catch (e) {
-        return { running: false, started: false, error: e.message };
+      } catch {
+        // Could not determine, assume it's ok
+        return { running: true, started: false, wasHeadless: false };
       }
+    }
+
+    // Not running or was headless — start visible Chrome
+    const chromeCmds = [
+      'google-chrome',
+      'google-chrome-stable',
+      'chromium',
+      'chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium',
+    ];
+    let chromePath = null;
+    for (const cmd of chromeCmds) {
+      try { execSync(`which ${cmd}`, { stdio: 'ignore' }); chromePath = cmd; break; } catch {}
+    }
+    if (!chromePath) {
+      return { running: false, started: false, error: 'Chrome não encontrado. Instale google-chrome-stable ou chromium.' };
+    }
+
+    try {
+      const proc = spawn(chromePath, [
+        '--remote-debugging-port=9222',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--user-data-dir=' + userDataDir,
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        // NO --headless — we need a visible window for login
+      ], { detached: true, stdio: 'ignore' });
+      proc.unref();
+
+      // Wait for Chrome to start
+      await new Promise(r => setTimeout(r, 4000));
+
+      // Verify it started
+      try {
+        await new Promise((resolve, reject) => {
+          const req = http.get('http://localhost:9222/json/version', (res) => {
+            if (res.statusCode === 200) resolve(true);
+            else reject(new Error('Status ' + res.statusCode));
+          });
+          req.on('error', reject);
+          req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
+        });
+        return { running: true, started: true, pid: proc.pid, wasHeadless };
+      } catch {
+        return { running: false, started: true, pid: proc.pid, wasHeadless, error: 'Chrome iniciou mas não respondeu em 5s' };
+      }
+    } catch (e) {
+      return { running: false, started: false, error: e.message };
     }
   }
 

@@ -745,10 +745,13 @@ function App({ luna, sessionManager, initialSession }) {
         // Step 1: Check/start Chrome
         const chromeStatus = await luna.kimiBridge?.checkChrome?.();
         if (chromeStatus) {
+          if (chromeStatus.wasHeadless) {
+            setMessages(prev => [...prev, { type: 'system', content: '⚠️ Chrome headless detectado e reiniciado em modo visível. Uma janela do Chrome deve aparecer.', id: nextId(), timestamp: new Date().toISOString() }]);
+          }
           if (chromeStatus.started) {
-            setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome iniciado (PID: ${chromeStatus.pid})`, id: nextId(), timestamp: new Date().toISOString() }]);
+            setMessages(prev => [...prev, { type: 'system', content: `🚀 Chrome visível iniciado (PID: ${chromeStatus.pid})`, id: nextId(), timestamp: new Date().toISOString() }]);
           } else if (chromeStatus.running) {
-            setMessages(prev => [...prev, { type: 'system', content: '✅ Chrome já está rodando', id: nextId(), timestamp: new Date().toISOString() }]);
+            setMessages(prev => [...prev, { type: 'system', content: '✅ Chrome já está rodando (modo visível)', id: nextId(), timestamp: new Date().toISOString() }]);
           } else if (chromeStatus.error) {
             setMessages(prev => [...prev, { type: 'system', content: `❌ Chrome: ${chromeStatus.error}`, id: nextId(), timestamp: new Date().toISOString() }]);
             return;
