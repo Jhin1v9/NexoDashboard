@@ -24,27 +24,6 @@ async function withPool(connectionString, fn) {
   }
 }
 
-async function applyMigration(pool, filePath) {
-  const sql = fs.readFileSync(filePath, 'utf8');
-  const statements = sql
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('--'));
-
-  let applied = 0;
-  for (const stmt of statements) {
-    try {
-      await pool.query(stmt);
-      applied++;
-    } catch (e) {
-      if (!/already exists|duplicate key|constraint|does not exist/.test(e.message)) {
-        // ignora erros comuns de idempotência
-      }
-    }
-  }
-  return applied;
-}
-
 async function main() {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('  🔧 Configurando Render PostgreSQL');
@@ -65,8 +44,13 @@ async function main() {
   await withPool(RENDER_URL, async (pool) => {
     for (const file of files) {
       const filePath = path.join(MIGRATIONS_DIR, file);
-      const applied = await applyMigration(pool, filePath);
-      console.log(`   ✅ ${file} (${applied} statements)`);
+      const sql = fs.readFileSync(filePath, 'utf8');
+      try {
+        await pool.query(sql);
+        console.log(`   ✅ ${file}`);
+      } catch (e) {
+        console.warn(`   ⚠️  ${file}: ${e.message.slice(0, 80)}`);
+      }
     }
   });
 

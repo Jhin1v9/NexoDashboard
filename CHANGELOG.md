@@ -1,5 +1,55 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-25 — Luna-Kimi Bridge v2.1 + Telegram Bot Remoto
+
+### Added
+- **Luna-Kimi Bridge v2.1** (`agents/kimi-bridge.cjs`)
+  - Multi-user: uma aba por usuário do Telegram (context[0] do Chrome)
+  - Extração completa via Turndown (Markdown com código, listas, tabelas)
+  - Detecção de fim de streaming por sinal combinado (botões + estabilidade de texto)
+  - Modos Instant (⚡) e Thinking (🧠) com troca dinâmica
+  - Semaphore limita 5 páginas simultâneas; idle cleanup após 10min
+  - Rate limiting por usuário (cooldown 5s)
+  - Logger persistente com rotação (10MB)
+  - SessionStore com save debounced (JSON persistente)
+  - Crash/disconnect detection com auto-reconnect
+  - 29 correções de bugs da revisão crítica (race conditions, memory leaks, timeouts)
+- **Kimi Bridge API** (`agents/kimi-bridge-api.cjs`)
+  - Express API que encapsula o KimiBridge com auth via X-API-Key
+  - Endpoints: POST /ask, POST /new-chat, GET /status, GET /health
+  - Permite bot no Render se conectar ao Chrome local via Cloudflare Tunnel
+- **Cloudflare Tunnel integration** (`scripts/start-kimi-bridge-api.sh`)
+  - Script que inicia API local + tunnel automático
+  - Testado e funcionando: resposta "Oi." em modo Instant via tunnel remoto
+- **Comandos Telegram** (`agents/telegram-luna-agent.cjs`)
+  - `/kimi [pergunta]` — pergunta no modo atual (Instant padrão)
+  - `/kimi_instant [pergunta]` — modo rápido
+  - `/kimi_thinking [pergunta]` — modo raciocínio profundo
+  - `/kimi_novo` — cria novo chat
+  - `/kimi_status` — mostra status do bridge
+  - `/help` — guia completo de comandos
+- **Documentação** (`docs/TELEGRAM-BOT-GUIDE.md`)
+  - Tutorial completo do bot: comandos, arquitetura, troubleshooting
+
+### Changed
+- Modo padrão do Kimi Bridge: **Instant** (era Thinking)
+- `telegram-luna-agent.cjs` suporta modo remoto via `KIMI_BRIDGE_URL`
+- `render.yaml` adiciona env vars `KIMI_BRIDGE_URL` e `KIMI_BRIDGE_API_KEY`
+
+### Fixed
+- Comandos `/kimi` não eram interceptados pelo handler onText (caiam no handleMessage como menção genérica)
+- newChat() falhava ao chamar sendMessage com texto vazio
+- _waitForResponse retornava texto incompleto silenciosamente em timeout
+- Idle cleanup sem await causava unhandled rejection
+- page.close() sem await liberava semaphore prematuramente
+- Turndown regra custom 'pre' usava API inexistente (node.querySelector)
+- SessionStore fazia I/O síncrona bloqueante a cada atualização
+
+### Infrastructure
+- `package.json` + `package-lock.json`: dependências `turndown` e `express` adicionadas
+
+---
+
 ## [Unreleased] — 2026-05-25 — Fase 1C: Luna FAB + Proactive Fixes + Voice Integration
 
 ### Added

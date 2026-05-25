@@ -1,7 +1,30 @@
 {
   "version": "1.2",
-  "lastUpdated": "2026-05-23T18:30:42.000Z",
+  "lastUpdated": "2026-05-25T07:30:00.000Z",
   "entries": [
+    {
+      "id": "changelog-luna-kimi-bridge-v21",
+      "version": "3.9.0",
+      "title": "Luna-Kimi Bridge v2.1 — Telegram Bot com IA Multi-User",
+      "description": "Integração completa do Kimi AI (kimi.com) ao bot do Telegram via browser automation. Bridge v2.1 com multi-tab (uma aba por usuário), extração Markdown via Turndown, detecção de streaming combinada, modos Instant/Thinking, Semaphore (5 páginas), idle cleanup (10min), SessionStore persistente, crash detection, rate limiting e 29 correções de bugs. Bridge API Express com auth via X-API-Key permite bot no Render se conectar ao Chrome local via Cloudflare Tunnel. Novos comandos: /kimi, /kimi_instant, /kimi_thinking, /kimi_novo, /kimi_status, /help. Tutorial completo em docs/TELEGRAM-BOT-GUIDE.md.",
+      "category": "feature",
+      "emoji": "🌙",
+      "author": "NEXO Team",
+      "tier": 1,
+      "date": "2026-05-25T07:30:00.000Z",
+      "tags": [
+        "kimi",
+        "telegram",
+        "bridge",
+        "playwright",
+        "ai",
+        "automation",
+        "cloudflare-tunnel"
+      ],
+      "readBy": [],
+      "status": "✅ 100% PRONTO",
+      "statusDetail": "Bridge v2.1 testado localmente. Tunnel Cloudflare funcionando. API respondendo. Aguardando deploy no Render."
+    },
     {
       "id": "changelog-dashboard-100-percent",
       "version": "3.8.1",

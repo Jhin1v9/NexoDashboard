@@ -622,6 +622,35 @@ class TelegramLunaAgent {
         await this.bot.sendMessage(chatId, `❌ Erro: ${err.message}`, { reply_to_message_id: msg.message_id });
       }
     });
+
+    // /help — shows complete command guide
+    this.bot.onText(/^\/help/, async (msg) => {
+      const chatId = msg.chat.id;
+      const helpText = [
+        '🤖 *Guia do @lunanexobot*',
+        '',
+        '*🌙 Kimi Bridge (IA)*',
+        '`/kimi [pergunta]` — Pergunta no modo atual (⚡ Instant)',
+        '`/kimi_instant [pergunta]` — Resposta rápida, sem reasoning',
+        '`/kimi_thinking [pergunta]` — Raciocínio passo a passo',
+        '`/kimi_novo` — Cria novo chat na Kimi',
+        '`/kimi_status` — Status do bridge e sua sessão',
+        '',
+        '*💬 Luna Agent (Dashboard)*',
+        'Mencione `@lunanexobot` ou `@luna` para criar tarefas, leads, ideias, registrar financeiro, etc.',
+        'Exemplo: `@luna Criar tarefa: revisar contrato XYZ`',
+        '',
+        '*📁 Outros*',
+        '`/help` — Mostra este guia',
+        '',
+        'ℹ️ Tutorial completo: `docs/TELEGRAM-BOT-GUIDE.md`',
+      ].join('\n');
+      await this.bot.sendMessage(chatId, helpText, {
+        parse_mode: 'Markdown',
+        reply_to_message_id: msg.message_id,
+        disable_web_page_preview: true,
+      });
+    });
   }
 
   isMention(msg) {
