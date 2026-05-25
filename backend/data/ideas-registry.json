@@ -23,10 +23,10 @@
   },
   "_meta": {
     "company": "NEXO DIGITAL",
-    "totalIdeas": 7,
+    "totalIdeas": 9,
     "totalTemplates": 4,
     "totalCategories": 6,
-    "lastIdeaId": "idea-007",
+    "lastIdeaId": "idea-009",
     "idPadding": 3,
     "idPrefix": "idea-",
     "currency": "EUR",
@@ -3444,6 +3444,582 @@
           "changedBy": "abner",
           "changedAt": "2026-05-18T09:13:10.102Z",
           "changeSummary": "Ideia arquivada via IA"
+        }
+      ]
+    },
+    "idea-008": {
+      "id": "idea-008",
+      "title": "Luna Mobile App - Assistente IA Nativo",
+      "status": "rascunho",
+      "type": "feature",
+      "priority": "alta",
+      "linkedTo": {
+        "clientId": null,
+        "clientName": null,
+        "leadId": null,
+        "projectId": null
+      },
+      "content": {
+        "blocks": [
+          {
+            "id": "blk-1779668944459-kn5zn",
+            "type": "heading",
+            "level": 1,
+            "content": "Conceito"
+          },
+          {
+            "id": "blk-1779668944459-x0x68",
+            "type": "paragraph",
+            "content": "App mobile nativo da Luna usando React Native + Expo."
+          },
+          {
+            "id": "blk-1779668944459-2ersx",
+            "type": "heading",
+            "level": 1,
+            "content": "Stack Tecnico"
+          },
+          {
+            "id": "blk-1779668944459-7gnhg",
+            "type": "paragraph",
+            "content": "• React Native (Expo) para build multiplataforma (iOS/Android)"
+          },
+          {
+            "id": "blk-1779668944459-ld8my",
+            "type": "paragraph",
+            "content": "• STT/TTS nativo do dispositivo (SpeechRecognition + TTS API)"
+          },
+          {
+            "id": "blk-1779668944459-tg2ff",
+            "type": "paragraph",
+            "content": "• Modelo: Gemini 2.5 Flash via API (rapido e barato)"
+          },
+          {
+            "id": "blk-1779668944459-b2xnq",
+            "type": "paragraph",
+            "content": "• Backend existente do NEXO Dashboard (Node.js/Express)"
+          },
+          {
+            "id": "blk-1779668944459-73ywa",
+            "type": "heading",
+            "level": 1,
+            "content": "Funcionalidades"
+          },
+          {
+            "id": "blk-1779668944459-85lw8",
+            "type": "paragraph",
+            "content": "• Interface por voz como padrao (tipo Alexa/Siri)"
+          },
+          {
+            "id": "blk-1779668944459-ghw0s",
+            "type": "paragraph",
+            "content": "• Notificacoes push para alertas proativos"
+          },
+          {
+            "id": "blk-1779668944459-93t2z",
+            "type": "paragraph",
+            "content": "• Acesso ao dashboard: tarefas, leads, ideias, financeiro"
+          },
+          {
+            "id": "blk-1779668944460-y26zi",
+            "type": "paragraph",
+            "content": "• Manter CDP WhatsApp existente (nao quebrar o que ja funciona)"
+          },
+          {
+            "id": "blk-1779668944460-whrh5",
+            "type": "paragraph",
+            "content": "• Modo offline com sync quando voltar online"
+          },
+          {
+            "id": "blk-1779668944460-gb4fh",
+            "type": "paragraph",
+            "content": "• Biometria/FaceID para login rapido"
+          },
+          {
+            "id": "blk-1779668944460-j8c0m",
+            "type": "heading",
+            "level": 1,
+            "content": "Proximos Passos"
+          },
+          {
+            "id": "blk-1779668944460-hw4bt",
+            "type": "paragraph",
+            "content": "• Definir MVP (tela inicial + voz + tarefas)"
+          },
+          {
+            "id": "blk-1779668944460-06tpy",
+            "type": "paragraph",
+            "content": "• Prototipo no Figma"
+          },
+          {
+            "id": "blk-1779668944460-ussmo",
+            "type": "paragraph",
+            "content": "• Setup Expo + primeiro build"
+          },
+          {
+            "id": "blk-1779668944460-1m52q",
+            "type": "heading",
+            "level": 1,
+            "content": "Riscos"
+          },
+          {
+            "id": "blk-1779668944460-873oc",
+            "type": "paragraph",
+            "content": "• TTS em portugues espanhol pode nao ser perfeito"
+          },
+          {
+            "id": "blk-1779668944460-onzzc",
+            "type": "paragraph",
+            "content": "• Performance em dispositivos antigos"
+          }
+        ]
+      },
+      "aiContext": {
+        "brainstormHistory": [],
+        "aiSuggestions": [],
+        "aiInsights": []
+      },
+      "tags": [
+        "luna",
+        "mobile",
+        "react-native",
+        "expo",
+        "ia",
+        "app",
+        "voz"
+      ],
+      "createdBy": "luna-agent",
+      "createdByName": "Luna",
+      "createdAt": "2026-05-25T00:29:04.457Z",
+      "updatedAt": "2026-05-25T00:29:04.457Z",
+      "collaborators": [],
+      "comments": [
+        {
+          "id": "cmt-1779668944460-a1",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Ideia registrada por solicitacao do Abner. Stack definido: React Native + Expo + Gemini 2.5 Flash. Voz sera a interface principal.",
+          "timestamp": "2026-05-25T00:29:04.457Z",
+          "reactions": [],
+          "mentions": []
+        },
+        {
+          "id": "cmt-1779668944460-a2",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Referencia util: Expo Router para navegacao, React Native Voice para STT, e @react-native-community/voice. Para TTS usar expo-speech.",
+          "timestamp": "2026-05-25T00:29:04.457Z",
+          "reactions": [],
+          "mentions": []
+        }
+      ],
+      "attachments": [],
+      "versionHistory": [
+        {
+          "version": 1,
+          "snapshot": {
+            "title": "Luna Mobile App - Assistente IA Nativo",
+            "status": "rascunho",
+            "content": {
+              "blocks": []
+            }
+          },
+          "changedBy": "luna-agent",
+          "changedAt": "2026-05-25T00:29:04.457Z",
+          "changeSummary": "Ideia criada pela Luna"
+        }
+      ]
+    },
+    "idea-009": {
+      "id": "idea-009",
+      "title": "Luna-Kimi Bridge: Agente Telegram para Chat Multi-IA via Browser",
+      "status": "rascunho",
+      "type": "brainstorm",
+      "priority": "media",
+      "linkedTo": {
+        "clientId": null,
+        "clientName": null,
+        "leadId": null,
+        "projectId": null
+      },
+      "content": {
+        "blocks": [
+          {
+            "id": "blk-1779668944460-sihfb",
+            "type": "heading",
+            "level": 1,
+            "content": "Conceito"
+          },
+          {
+            "id": "blk-1779668944460-jefl3",
+            "type": "paragraph",
+            "content": "Agente Telegram que automatiza a Kimi Web (interface web gratuita) sem usar API paga. O usuario pergunta no Telegram, o agente vai na Kimi Web, pega a resposta e devolve."
+          },
+          {
+            "id": "blk-1779668944460-feo9f",
+            "type": "heading",
+            "level": 1,
+            "content": "Arquitetura"
+          },
+          {
+            "id": "blk-1779668944460-p35im",
+            "type": "paragraph",
+            "content": "Usuario -> Telegram Bot -> Luna Bridge Agent (Node.js)"
+          },
+          {
+            "id": "blk-1779668944460-ck4ml",
+            "type": "paragraph",
+            "content": "|"
+          },
+          {
+            "id": "blk-1779668944460-0vzyr",
+            "type": "paragraph",
+            "content": "v"
+          },
+          {
+            "id": "blk-1779668944460-yj55g",
+            "type": "paragraph",
+            "content": "Playwright (Chromium headless)"
+          },
+          {
+            "id": "blk-1779668944460-2bxg9",
+            "type": "paragraph",
+            "content": "|"
+          },
+          {
+            "id": "blk-1779668944460-3kqiz",
+            "type": "paragraph",
+            "content": "v"
+          },
+          {
+            "id": "blk-1779668944460-g1y1p",
+            "type": "paragraph",
+            "content": "kimi.com/chat (sessao logada do Abner)"
+          },
+          {
+            "id": "blk-1779668944460-wp8n3",
+            "type": "paragraph",
+            "content": "|"
+          },
+          {
+            "id": "blk-1779668944460-kksw2",
+            "type": "paragraph",
+            "content": "v"
+          },
+          {
+            "id": "blk-1779668944460-6zff6",
+            "type": "paragraph",
+            "content": "Resposta -> Telegram Bot -> Usuario"
+          },
+          {
+            "id": "blk-1779668944460-yo54b",
+            "type": "heading",
+            "level": 1,
+            "content": "Como Funciona"
+          },
+          {
+            "id": "blk-1779668944460-91dlp",
+            "type": "paragraph",
+            "content": "• Sessao persistente: Playwright mantem cookies/localStorage com userDataDir"
+          },
+          {
+            "id": "blk-1779668944460-s9g7j",
+            "type": "paragraph",
+            "content": "• O usuario envia pergunta via Telegram (/kimi [pergunta])"
+          },
+          {
+            "id": "blk-1779668944460-uhq0m",
+            "type": "paragraph",
+            "content": "• O agente digita a pergunta na caixa de texto da Kimi Web"
+          },
+          {
+            "id": "blk-1779668944460-i4kn7",
+            "type": "paragraph",
+            "content": "• Espera a resposta completar (streaming)"
+          },
+          {
+            "id": "blk-1779668944460-wctcl",
+            "type": "paragraph",
+            "content": "• Clica no botao \"Copiar\" que copia o bloco todo de texto"
+          },
+          {
+            "id": "blk-1779668944460-jo67x",
+            "type": "paragraph",
+            "content": "• Le o clipboard do sistema via xclip/wl-clipboard"
+          },
+          {
+            "id": "blk-1779668944460-gqk4e",
+            "type": "paragraph",
+            "content": "• Envia a resposta de volta no Telegram"
+          },
+          {
+            "id": "blk-1779668944460-6sg7h",
+            "type": "heading",
+            "level": 1,
+            "content": "Comandos do Bot"
+          },
+          {
+            "id": "blk-1779668944460-ty7z6",
+            "type": "paragraph",
+            "content": "• /kimi [pergunta] - envia pergunta e retorna resposta"
+          },
+          {
+            "id": "blk-1779668944460-5gb4a",
+            "type": "paragraph",
+            "content": "• /kimi_chats - lista conversas ativas na Kimi Web"
+          },
+          {
+            "id": "blk-1779668944460-bl7br",
+            "type": "paragraph",
+            "content": "• /kimi_novo - cria novo chat"
+          },
+          {
+            "id": "blk-1779668944460-pl86x",
+            "type": "paragraph",
+            "content": "• /kimi_trocar [id] - troca para chat especifico"
+          },
+          {
+            "id": "blk-1779668944460-rse6q",
+            "type": "heading",
+            "level": 1,
+            "content": "Stack Tecnico"
+          },
+          {
+            "id": "blk-1779668944460-5w8ip",
+            "type": "paragraph",
+            "content": "• Node.js + Express (API interna)"
+          },
+          {
+            "id": "blk-1779668944460-mbjxv",
+            "type": "paragraph",
+            "content": "• Playwright (browser automation)"
+          },
+          {
+            "id": "blk-1779668944460-897ok",
+            "type": "paragraph",
+            "content": "• node-telegram-bot-api (Telegram Bot)"
+          },
+          {
+            "id": "blk-1779668944460-kqw27",
+            "type": "paragraph",
+            "content": "• xclip (Linux) para ler clipboard do sistema"
+          },
+          {
+            "id": "blk-1779668944460-7w31r",
+            "type": "heading",
+            "level": 1,
+            "content": "Riscos e Limitacoes"
+          },
+          {
+            "id": "blk-1779668944460-h2qwk",
+            "type": "paragraph",
+            "content": "• Automação da interface web pode violar ToS da Kimi"
+          },
+          {
+            "id": "blk-1779668944460-1gpfp",
+            "type": "paragraph",
+            "content": "• Sessao pode expirar (requer re-login)"
+          },
+          {
+            "id": "blk-1779668944460-kzcta",
+            "type": "paragraph",
+            "content": "• Anti-bot pode bloquear apos muitas requisicoes"
+          },
+          {
+            "id": "blk-1779668944460-2a9bj",
+            "type": "paragraph",
+            "content": "• Depende do botao \"Copiar\" existir e funcionar"
+          },
+          {
+            "id": "blk-1779668944460-0did1",
+            "type": "paragraph",
+            "content": "• Performance: abrir browser eh lento (solucao: manter sempre aberto)"
+          },
+          {
+            "id": "blk-1779668944460-aln4q",
+            "type": "heading",
+            "level": 1,
+            "content": "Alternativas Documentadas"
+          },
+          {
+            "id": "blk-1779668944460-6h7sz",
+            "type": "paragraph",
+            "content": "• API Moonshot paga: https://api.moonshot.cn/v1 (OpenAI-compatible, modelos kimi-k2.5/kimi-k2.6)"
+          },
+          {
+            "id": "blk-1779668944460-h0tzt",
+            "type": "paragraph",
+            "content": "• Ollama local: rodar modelo local no servidor (sem custo, mas menos potente)"
+          },
+          {
+            "id": "blk-1779668944460-p26kb",
+            "type": "paragraph",
+            "content": "• App desktop da Kimi (Electron): possivel automatizar mas mais complexo que a web"
+          },
+          {
+            "id": "blk-1779668944460-yh2fj",
+            "type": "heading",
+            "level": 1,
+            "content": "Proximos Passos"
+          },
+          {
+            "id": "blk-1779668944460-qd4wz",
+            "type": "paragraph",
+            "content": "• PoC com Playwright + Kimi Web em ambiente local"
+          },
+          {
+            "id": "blk-1779668944460-alh7f",
+            "type": "paragraph",
+            "content": "• Testar leitura do clipboard apos clicar em \"Copiar\""
+          },
+          {
+            "id": "blk-1779668944460-9od89",
+            "type": "paragraph",
+            "content": "• Integrar com bot do Telegram existente da Luna"
+          },
+          {
+            "id": "blk-1779668944460-vkr57",
+            "type": "paragraph",
+            "content": "• Criar sistema de fila para evitar rate limit"
+          },
+          {
+            "id": "blk-update1-1779669254883",
+            "type": "heading",
+            "level": 2,
+            "content": "Modos e Features da Kimi (Atualizado Maio 2026)"
+          },
+          {
+            "id": "blk-update2-1779669254883",
+            "type": "heading",
+            "level": 3,
+            "content": "Instant vs Thinking"
+          },
+          {
+            "id": "blk-update3-1779669254883",
+            "type": "paragraph",
+            "content": "Instant: respostas rapidas (3-8s), sem reasoning, 60-75% menos tokens. Thinking: raciocinio passo a passo visivel, melhor pra problemas complexos, usa 2-4x mais tokens. A bridge pode ter flag /kimi_thinking ou /kimi_fast."
+          },
+          {
+            "id": "blk-update4-1779669254883",
+            "type": "heading",
+            "level": 3,
+            "content": "Agent Mode"
+          },
+          {
+            "id": "blk-update5-1779669254883",
+            "type": "paragraph",
+            "content": "Agente unico com ferramentas (web browse, code run, file handle). Faz 200-300 tool calls em sequencia. Cria sites web completos com UM PROMPT. Video-to-code: grava a tela de um site e ele clona. Ideal pra NEXO."
+          },
+          {
+            "id": "blk-update6-1779669254883",
+            "type": "heading",
+            "level": 3,
+            "content": "Agent Swarm"
+          },
+          {
+            "id": "blk-update7-1779669254883",
+            "type": "paragraph",
+            "content": "Ate 100 sub-agentes especializados trabalhando em PARALELO. 4.5x mais rapido que agente unico. 1500 tool calls paralelos em beta. Ideal pra projetos grandes, refatoracao multi-arquivo, pesquisa profunda."
+          },
+          {
+            "id": "blk-update8-1779669254883",
+            "type": "heading",
+            "level": 3,
+            "content": "Kimi K2.6 (novo)"
+          },
+          {
+            "id": "blk-update9-1779669254883",
+            "type": "paragraph",
+            "content": "Sucessor do K2.5. Ate 300 sub-agentes no Swarm. Image-to-code nativo, full-stack output (frontend + backend), melhor integracao com Next.js/React. Open-source MIT."
+          }
+        ]
+      },
+      "aiContext": {
+        "brainstormHistory": [],
+        "aiSuggestions": [],
+        "aiInsights": []
+      },
+      "tags": [
+        "luna",
+        "telegram-bot",
+        "kimi",
+        "agente",
+        "bridge",
+        "playwright",
+        "browser-automation",
+        "ia",
+        "kimi-k2.6",
+        "agent-swarm"
+      ],
+      "createdBy": "luna-agent",
+      "createdByName": "Luna",
+      "createdAt": "2026-05-25T00:29:04.457Z",
+      "updatedAt": "2026-05-25T00:34:14.882Z",
+      "collaborators": [],
+      "comments": [
+        {
+          "id": "cmt-1779668944460-b1",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Ideia registrada por solicitacao do Abner. Conceito: usar a Kimi Web gratuita (nao API paga) via automacao de browser. O botao \"Copiar\" da Kimi Web eh a chave para extrair respostas completas.",
+          "timestamp": "2026-05-25T00:29:04.457Z",
+          "reactions": [],
+          "mentions": []
+        },
+        {
+          "id": "cmt-1779668944460-b2",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Pesquisa tecnica: Playwright suporta clipboard via page.evaluate(() => navigator.clipboard.readText()) com permissao clipboard-read. No Linux servidor, usar xclip ou wl-clipboard para ler clipboard do sistema apos o botao Copiar ser clicado.",
+          "timestamp": "2026-05-25T00:29:04.457Z",
+          "reactions": [],
+          "mentions": []
+        },
+        {
+          "id": "cmt-1779668944460-b3",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "Referencia externa: VibeCoder (github.com/dongsheng123132/vibecoder) faz algo similar - app Electron que detecta janela ativa, copia texto, e interage com apps via clipboard + atalhos de teclado.",
+          "timestamp": "2026-05-25T00:29:04.457Z",
+          "reactions": [],
+          "mentions": []
+        },
+        {
+          "id": "cmt-1779669254883-up1",
+          "author": "luna-agent",
+          "authorName": "Luna",
+          "text": "✅ NOTA DE ATUALIZACAO — Novos modos/features descobertos na Kimi Web (maio 2026):\n\n• INSTANT vs THINKING: A Kimi tem modo 'Instant' (rapido, 3-8s, sem reasoning, 60-75% menos tokens) e modo 'Thinking' (mostra raciocinio passo a passo, melhor pra problemas complexos, usa 2-4x mais tokens). A bridge podia ter um parametro /kimi_thinking ou /kimi_fast pra escolher.\n\n• AGENT MODE: Agente unico com ferramentas (web browse, code run, file handle). Faz 200-300 tool calls em sequencia. Cria sites web completos com UM PROMPT — grava a tela de um site e ele clona (video-to-code). Isso eh MUITO util pra NEXO.\n\n• AGENT SWARM: Ate 100 sub-agentes especializados trabalhando em PARALELO. 4.5x mais rapido que agente unico. 1500 tool calls paralelos em beta. Ideal pra projetos grandes, refatoracao multi-arquivo, pesquisa profunda.\n\n• KIMI K2.6 (novo): Sucessor do K2.5. Ate 300 sub-agentes no Swarm. Image-to-code nativo, full-stack output (frontend + backend), melhor integracao com Next.js/React.\n\n• PRECOS: API oficial $0.60 por milhao de tokens input, $2.50 output. Gratuito via kimi.com web. Modelo open-source (MIT) disponivel no Hugging Face (~595GB).\n\n• ACESSO: kimi.com (web), Kimi Code CLI, API (platform.moonshot.ai), Hugging Face, OpenRouter, NVIDIA NIM.\n\nA bridge podia evoluir pra suportar esses modos: /kimi_agent [prompt] pra criar sites, /kimi_swarm [tarefa] pra projetos grandes.",
+          "timestamp": "2026-05-25T00:34:14.882Z",
+          "reactions": [],
+          "mentions": []
+        }
+      ],
+      "attachments": [],
+      "versionHistory": [
+        {
+          "version": 1,
+          "snapshot": {
+            "title": "Luna-Kimi Bridge: Agente Telegram para Chat Multi-IA via Browser",
+            "status": "rascunho",
+            "content": {
+              "blocks": []
+            }
+          },
+          "changedBy": "luna-agent",
+          "changedAt": "2026-05-25T00:29:04.457Z",
+          "changeSummary": "Ideia criada pela Luna"
+        },
+        {
+          "version": 2,
+          "snapshot": {
+            "title": "Luna-Kimi Bridge: Agente Telegram para Chat Multi-IA via Browser",
+            "status": "rascunho",
+            "content": {
+              "blocks": []
+            }
+          },
+          "changedBy": "luna-agent",
+          "changedAt": "2026-05-25T00:34:14.882Z",
+          "changeSummary": "Nota de atualizacao: modos Instant/Thinking, Agent, Agent Swarm, K2.6"
         }
       ]
     }

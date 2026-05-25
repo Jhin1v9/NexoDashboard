@@ -686,8 +686,52 @@ Ver seção "Bugs Observados" acima.
 - **Backend start:** ✅ Porta 3456 respondendo
 - **API health:** ✅ `{"status":"ok"}`
 
+---
+
+## 🌙 Sessão Atual — Sistema de Ideias + Ideias Luna (Maio 2026)
+
+> **Instância:** `hawkman-supergirl-mantis` 🟢 — 2026-05-25
+> **Foco:** Corrigir bug crítico em ideas.js, adicionar rota GET de comentários, criar 2 ideias via API com marca "Luna", pesquisar modos da Kimi
+
+### ✅ Entregas
+
+| # | Entrega | Arquivo | Detalhe |
+|---|---|---|---|
+| 1 | **Bug saveIdeasData corrigido** | `backend/routes/ideas.js:102` | `await saveIdeasData(data)` → `await _writeJSON(IDEAS_FILE, jsonData)`. Recursão infinita quebrava qualquer save de ideia |
+| 2 | **Rota GET /api/ideas/:id/comments** | `backend/routes/ideas.js:1481` | Nova rota `router.get('/:id/comments')` — lista comentários isolados. Antes só vinham embutidos no objeto da ideia |
+| 3 | **Ideia 008 criada** | `backend/data/ideas-registry.json` | "Luna Mobile App — Assistente IA Nativo". React Native + Expo + Gemini 2.5 Flash. Criada por **Luna** |
+| 4 | **Ideia 009 criada** | `backend/data/ideas-registry.json` | "Luna-Kimi Bridge: Agente Telegram para Chat Multi-IA via Browser". Playwright + Kimi Web (não API paga) + Telegram Bot. Criada por **Luna** |
+| 5 | **Comentários iniciais** | `ideas-registry.json` | 2 comentários na 008, 4 na 009 (incluindo nota de atualização com modos da Kimi) |
+| 6 | **Pesquisa Kimi modos** | Documentada nos comentários | Instant vs Thinking, Agent Mode, Agent Swarm, K2.6 |
+
+### 🆕 Ideia 009 — Luna-Kimi Bridge (Detalhes)
+**Conceito:** Bot Telegram que automatiza a **Kimi Web gratuita** via Playwright (não API paga). Usuário pergunta no Telegram → agente vai na Kimi Web → clica no botão "Copiar" → lê clipboard → devolve no Telegram.
+
+**Comandos propostos:**
+- `/kimi [pergunta]` — pergunta e resposta
+- `/kimi_chats` — lista conversas ativas
+- `/kimi_novo` — novo chat
+- `/kimi_trocar [id]` — troca de chat
+
+**Nota de atualização (modos da Kimi descobertos):**
+- **Instant:** Rápido (3-8s), sem reasoning, 60-75% menos tokens
+- **Thinking:** Raciocínio passo a passo visível, 2-4x mais tokens, melhor pra problemas complexos
+- **Agent Mode:** Agente único com ferramentas (web browse, code run, file handle). 200-300 tool calls. Cria sites com UM PROMPT. Video-to-code (grava tela → clona site)
+- **Agent Swarm:** Até 100 sub-agentes em paralelo. 4.5x mais rápido. 1500 tool calls paralelos em beta. Ideal pra projetos grandes
+- **Kimi K2.6:** Novo modelo. Até 300 sub-agentes. Image-to-code, full-stack output, Next.js/React melhorado. Open-source MIT
+
+**Preços API:** $0.60/M input tokens, $2.50/M output. Gratuito via kimi.com web.
+
+### 📁 Arquivos Modificados
+- `backend/routes/ideas.js` — bug saveIdeasData corrigido (linha 102), rota GET /:id/comments adicionada (linha 1481)
+- `backend/data/ideas-registry.json` — idea-008 e idea-009 criadas com marca Luna
+- `.kimi-context/handoff.md` — esta seção adicionada
+
 ### ⚠️ NOTA PARA OUTRA INSTÂNCIA KIMI
 - **NÃO alterar** a lógica de `clampPos` no `LunaFloatingButton.jsx` — está calibrada para manter o botão visível
 - **NÃO alterar** a lógica de IDs no `LunaProactiveToast.jsx` — `buildToastFromData` usa IDs estáveis por design
 - **NÃO remover** o listener `luna:voiceMessage` do `LunaChatPanel.jsx` — é o canal de comunicação FAB → Chat
 - Se for trabalhar no **ActionCenter**: a navegação agora é via `lunaEventBus.emit('luna:actionCompleted')` — manter esse padrão
+- O bug `saveIdeasData` em `ideas.js` foi corrigido — **NÃO reverter** a linha 102 (deve ser `_writeJSON`, não `saveIdeasData`)
+- A rota GET `/api/ideas/:id/comments` está **depois** do POST e **antes** do DELETE — manter essa ordem
+- As ideias idea-008 e idea-009 têm `createdByName: "Luna"` — manter essa marcação
