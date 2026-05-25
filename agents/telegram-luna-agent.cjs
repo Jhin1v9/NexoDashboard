@@ -13,6 +13,10 @@ const path = require('path');
 // ── KIMI BRIDGE v2 ──
 const { KimiBridge } = require('./kimi-bridge.cjs');
 
+// Remote bridge API config (for Render → local Chrome via tunnel)
+const KIMI_BRIDGE_URL = process.env.KIMI_BRIDGE_URL || null;
+const KIMI_BRIDGE_API_KEY = process.env.KIMI_BRIDGE_API_KEY || 'nexo-kimi-local-2026';
+
 // ── CONFIG ──
 const CONFIG = {
   BUFFER_FILE: path.join(__dirname, '../backend/data/luna-buffer.json'),
@@ -408,9 +412,28 @@ class TelegramLunaAgent {
     if (!this.kimiBridge) {
       this.kimiBridge = new KimiBridge({ debug: true });
       await this.kimiBridge.connect();
-      log('success', 'Kimi Bridge v2 connected');
+      log('success', 'Kimi Bridge v2 connected locally');
     }
     return this.kimiBridge;
+  }
+
+  /**
+   * Call remote bridge API when KIMI_BRIDGE_URL is set (Render → local tunnel)
+   */
+  async _callBridgeApi(endpoint, body) {
+    const res = await fetch(`${KIMI_BRIDGE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': KIMI_BRIDGE_API_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Bridge API ${res.status}`);
+    }
+    return res.json();
   }
 
   async start() {
@@ -456,7 +479,16 @@ class TelegramLunaAgent {
 
   // ── KIMI BRIDGE HANDLERS ──
   _setupKimiHandlers() {
-    // /kimi [pergunta] — default Thinking mode
+    // Helper: local or remote bridge
+    const askBridge = async (userId, text, mode) => {
+      if (KIMI_BRIDGE_URL) {
+        return this._callBridgeApi('/ask', { userId, text, mode });
+      }
+      const bridge = await this.getKimiBridge();
+      return bridge.sendMessage(userId, text, { mode });
+    };
+
+    // /kimi [pergunta] — default Instant mode
     this.bot.onText(/^\/kimi(?:\s+(.+))?/, async (msg, match) => {
       const userId = msg.from.id;
       const question = match[1]?.trim();
@@ -469,10 +501,10 @@ class TelegramLunaAgent {
 
       await this.bot.sendChatAction(chatId, 'typing');
       try {
-        const bridge = await this.getKimiBridge();
-        const { response, mode } = await bridge.sendMessage(userId, question);
+        const result = await askBridge(userId, question);
+        const mode = result.mode || 'instant';
         const modeEmoji = mode === 'instant' ? '⚡' : '🧠';
-        await this.bot.sendMessage(chatId, `${modeEmoji} *Kimi*\n\n${response}`, {
+        await this.bot.sendMessage(chatId, `${modeEmoji} *Kimi*\n\n${result.response}`, {
           parse_mode: 'Markdown',
           reply_to_message_id: msg.message_id,
         });
@@ -495,9 +527,8 @@ class TelegramLunaAgent {
 
       await this.bot.sendChatAction(chatId, 'typing');
       try {
-        const bridge = await this.getKimiBridge();
-        const { response } = await bridge.sendMessage(userId, question, { mode: 'instant' });
-        await this.bot.sendMessage(chatId, `⚡ *Kimi Instant*\n\n${response}`, {
+        const result = await askBridge(userId, question, 'instant');
+        await this.bot.sendMessage(chatId, `⚡ *Kimi Instant*\n\n${result.response}`, {
           parse_mode: 'Markdown',
           reply_to_message_id: msg.message_id,
         });
@@ -520,9 +551,8 @@ class TelegramLunaAgent {
 
       await this.bot.sendChatAction(chatId, 'typing');
       try {
-        const bridge = await this.getKimiBridge();
-        const { response } = await bridge.sendMessage(userId, question, { mode: 'thinking' });
-        await this.bot.sendMessage(chatId, `🧠 *Kimi Thinking*\n\n${response}`, {
+        const result = await askBridge(userId, question, 'thinking');
+        await this.bot.sendMessage(chatId, `🧠 *Kimi Thinking*\n\n${result.response}`, {
           parse_mode: 'Markdown',
           reply_to_message_id: msg.message_id,
         });
@@ -537,8 +567,12 @@ class TelegramLunaAgent {
       const userId = msg.from.id;
       const chatId = msg.chat.id;
       try {
-        const bridge = await this.getKimiBridge();
-        await bridge.newChat(userId);
+        if (KIMI_BRIDGE_URL) {
+          await this._callBridgeApi('/new-chat', { userId });
+        } else {
+          const bridge = await this.getKimiBridge();
+          await bridge.newChat(userId);
+        }
         await this.bot.sendMessage(chatId, '🆕 *Novo chat criado!*\n\nSeu histórico anterior foi preservado em outra aba.', {
           parse_mode: 'Markdown',
           reply_to_message_id: msg.message_id,
@@ -554,19 +588,28 @@ class TelegramLunaAgent {
       const userId = msg.from.id;
       const chatId = msg.chat.id;
       try {
-        const bridge = await this.getKimiBridge();
-        const globalStatus = await bridge.getGlobalStatus();
-        const userStatus = await bridge.getStatus(userId);
+        let globalStatus, userStatus;
+        if (KIMI_BRIDGE_URL) {
+          const res = await fetch(`${KIMI_BRIDGE_URL}/status?userId=${userId}`, {
+            headers: { 'X-API-Key': KIMI_BRIDGE_API_KEY },
+          });
+          const data = await res.json();
+          globalStatus = data;
+          userStatus = data;
+        } else {
+          const bridge = await this.getKimiBridge();
+          globalStatus = await bridge.getGlobalStatus();
+          userStatus = await bridge.getStatus(userId);
+        }
         const lines = [
           '📊 *Kimi Bridge Status*',
           '',
-          `🔗 CDP: \`${globalStatus.cdpUrl}\``,
-          `📄 Páginas ativas: ${globalStatus.activePages}/${globalStatus.maxPages}`,
-          `🔒 Semáforo: ${globalStatus.semaphore.current}/${globalStatus.semaphore.max}`,
+          `🔗 ${KIMI_BRIDGE_URL ? 'Bridge API (remoto)' : 'CDP local'}`,
+          `📄 Páginas ativas: ${globalStatus.activePages || 0}/${globalStatus.maxPages || 5}`,
           '',
           `👤 *Sua sessão:*`,
           userStatus.active
-            ? `• Modo: ${userStatus.mode === 'instant' ? '⚡ Instant' : '🧠 Thinking'}\n• URL: [link](${userStatus.chatUrl})\n• Processando: ${userStatus.processing ? 'sim' : 'não'}`
+            ? `• Modo: ${userStatus.mode === 'instant' ? '⚡ Instant' : '🧠 Thinking'}\n• Processando: ${userStatus.processing ? 'sim' : 'não'}`
             : `• Sem sessão ativa (será criada no primeiro /kimi)`,
         ];
         await this.bot.sendMessage(chatId, lines.join('\n'), {

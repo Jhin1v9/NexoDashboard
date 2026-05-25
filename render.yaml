@@ -21,3 +21,7 @@ services:
         value: /opt/render/project/src
       - key: DATABASE_URL
         sync: false  # Set this in Render dashboard after creating Neon DB
+      - key: KIMI_BRIDGE_URL
+        sync: false  # Set after creating Cloudflare Tunnel: https://your-tunnel.trycloudflare.com
+      - key: KIMI_BRIDGE_API_KEY
+        generateValue: true  # Auto-generated API key for bridge API auth

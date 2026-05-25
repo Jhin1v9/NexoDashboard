@@ -1,24 +1,26 @@
 /**
- * Luna-Kimi Bridge v2.0
+ * Luna-Kimi Bridge v2.1
  * Multi-user Playwright automation for Kimi Web (kimi.com) via CDP
  *
  * Patterns borrowed from luna-cto-agent.cjs (Luna v15.1–v19.0):
- * - Persistent Logger with circular buffer
+ * - Persistent Logger with circular buffer + rotation
  * - Keep-alive (uncaughtException / unhandledRejection)
- * - SessionStore (CheckpointManager pattern)
+ * - SessionStore (CheckpointManager pattern) with debounced save
  * - Multi-strategy selector fallback
- * - processedMessageIds circular Set
  *
  * Architecture:
  * - Single BrowserContext (contexts()[0]) — the ONLY one with logged-in cookies
  * - One Page per Telegram userId
  * - Semaphore limits max concurrent pages (default 5)
- * - Idle cleanup closes pages after 10min inactivity
+ * - Idle cleanup closes inactive pages after 10min
+ * - Crash/disconnect detection with auto-reconnect
+ * - Rate limiting per userId
  */
 
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Lazy-load turndown — fail gracefully if not installed
 let TurndownService = null;
@@ -44,8 +46,10 @@ process.on('unhandledRejection', (reason) => {
 const DEFAULT_CDP_URL = process.env.KIMI_CDP_URL || 'http://localhost:9222';
 const DEFAULT_TIMEOUT = parseInt(process.env.KIMI_TIMEOUT, 10) || 120000;
 const MAX_CONCURRENT_PAGES = parseInt(process.env.KIMI_MAX_PAGES, 10) || 5;
-const IDLE_TIMEOUT_MS = parseInt(process.env.KIMI_IDLE_TIMEOUT, 10) || 10 * 60 * 1000; // 10min
-const COOLDOWN_MS = 5000;
+const IDLE_TIMEOUT_MS = parseInt(process.env.KIMI_IDLE_TIMEOUT, 10) || 10 * 60 * 1000;
+const COOLDOWN_MS = parseInt(process.env.KIMI_COOLDOWN_MS, 10) || 5000;
+const MAX_TEXT_TYPE_LENGTH = parseInt(process.env.KIMI_MAX_TYPE_LENGTH, 10) || 500;
+const LOG_MAX_SIZE_MB = parseInt(process.env.KIMI_LOG_MAX_MB, 10) || 10;
 const ARTIFACTS_DIR = path.join(__dirname, '..', 'ARTIFACTS');
 const SESSION_STORE_PATH = path.join(ARTIFACTS_DIR, 'kimi-sessions.json');
 
@@ -54,25 +58,49 @@ if (!fs.existsSync(ARTIFACTS_DIR)) {
 }
 
 // ============================================================
-// LOGGER — persistent with circular buffer
+// UTILS
+// ============================================================
+function hashUserId(userId) {
+  return crypto.createHash('sha256').update(String(userId)).digest('hex').slice(0, 8);
+}
+
+// ============================================================
+// LOGGER — persistent with circular buffer + rotation
 // ============================================================
 class KimiLogger {
   constructor() {
     this.logFile = path.join(ARTIFACTS_DIR, 'kimi-bridge.log');
     this.events = [];
   }
+
   _h() {
     return new Date().toISOString();
   }
+
+  _rotateIfNeeded() {
+    try {
+      if (fs.existsSync(this.logFile)) {
+        const stats = fs.statSync(this.logFile);
+        if (stats.size > LOG_MAX_SIZE_MB * 1024 * 1024) {
+          const rotated = this.logFile + '.1';
+          if (fs.existsSync(rotated)) fs.unlinkSync(rotated);
+          fs.renameSync(this.logFile, rotated);
+        }
+      }
+    } catch (e) { /* ignore rotation errors */ }
+  }
+
   _w(level, msg) {
     const line = `[${level}] [${this._h()}] ${msg}`;
     console.log(line);
     try {
+      this._rotateIfNeeded();
       fs.appendFileSync(this.logFile, line + '\n');
     } catch (e) { /* ignore log write errors */ }
     this.events.push({ type: level, msg, time: this._h() });
     if (this.events.length > 200) this.events.shift();
   }
+
   info(m) { this._w('INFO', m); }
   success(m) { this._w('SUCCESS', m); }
   error(m) { this._w('ERROR', m); }
@@ -89,6 +117,7 @@ class KimiSessionStore {
   constructor(filePath) {
     this.filePath = filePath;
     this.data = this._load();
+    this._saveTimer = null;
   }
 
   _load() {
@@ -105,12 +134,18 @@ class KimiSessionStore {
     return defaults;
   }
 
-  save() {
+  _saveImmediate() {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
     } catch (err) {
       log.warn(`SessionStore save failed: ${err.message}`);
     }
+  }
+
+  save() {
+    // Debounced save: batch rapid updates
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._saveImmediate(), 500);
   }
 
   getUser(userId) {
@@ -133,7 +168,7 @@ class KimiSessionStore {
 }
 
 // ============================================================
-// SEMAPHORE — limits concurrent pages
+// SEMAPHORE — limits concurrent pages with ownership tracking
 // ============================================================
 class Semaphore {
   constructor(max) {
@@ -161,14 +196,14 @@ class Semaphore {
 }
 
 // ============================================================
-// KIMI BRIDGE v2.0
+// KIMI BRIDGE v2.1
 // ============================================================
 class KimiBridge {
   constructor(options = {}) {
     this.cdpUrl = options.cdpUrl || DEFAULT_CDP_URL;
-    this.timeout = options.timeout || DEFAULT_TIMEOUT;
-    this.maxPages = options.maxPages || MAX_CONCURRENT_PAGES;
-    this.idleTimeout = options.idleTimeout || IDLE_TIMEOUT_MS;
+    this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    this.maxPages = options.maxPages ?? MAX_CONCURRENT_PAGES;
+    this.idleTimeout = options.idleTimeout ?? IDLE_TIMEOUT_MS;
     this.debug = options.debug || false;
 
     this.browser = null;
@@ -176,7 +211,7 @@ class KimiBridge {
     this.userSessions = new Map(); // userId -> { page, chatUrl, lastActivity, processing, mode }
     this.semaphore = new Semaphore(this.maxPages);
     this.store = new KimiSessionStore(SESSION_STORE_PATH);
-    this.processedMessageIds = new Set();
+    this.lastRequestTime = new Map(); // userId -> timestamp (rate limiting)
     this.idleTimer = null;
 
     // Initialize turndown if available
@@ -186,15 +221,6 @@ class KimiBridge {
         codeBlockStyle: 'fenced',
         headingStyle: 'atx',
         bulletListMarker: '-',
-      });
-      // Preserve line breaks in code blocks
-      this.turndown.addRule('pre', {
-        filter: 'pre',
-        replacement: (content, node) => {
-          const code = node.querySelector('code');
-          const lang = code ? (code.className.match(/language-(\w+)/)?.[1] || '') : '';
-          return '\n```' + lang + '\n' + content + '\n```\n';
-        },
       });
     }
   }
@@ -225,6 +251,13 @@ class KimiBridge {
     this.context = contexts[0];
     log.success(`Connected! Using context[0] with ${this.context.pages().length} existing page(s)`);
 
+    // Register crash/disconnect listeners
+    this.browser.on('disconnected', () => {
+      log.warn('Browser disconnected via CDP');
+      this.browser = null;
+      this.context = null;
+    });
+
     // Start idle cleanup timer
     this._startIdleCleanup();
 
@@ -246,11 +279,13 @@ class KimiBridge {
     for (const [userId, session] of this.userSessions) {
       try {
         if (session.page && !session.page.isClosed()) {
+          // Remove listeners before closing
+          session.page.removeAllListeners('crash');
           await session.page.close();
-          log.info(`Closed page for user ${userId}`);
+          log.info(`Closed page for user ${hashUserId(userId)}`);
         }
       } catch (e) {
-        log.warn(`Error closing page for ${userId}: ${e.message}`);
+        log.warn(`Error closing page for ${hashUserId(userId)}: ${e.message}`);
       }
       this.semaphore.release();
     }
@@ -275,12 +310,25 @@ class KimiBridge {
   }
 
   /**
-   * Ensure connected to CDP
+   * Ensure connected to CDP with auto-reconnect on disconnect
    */
   async _ensureConnected() {
     if (!this.browser || !this.context) {
+      log.info('Reconnecting to Chrome...');
       await this.connect();
     }
+  }
+
+  /**
+   * Rate limiting: check if user is within cooldown
+   */
+  _checkCooldown(userId) {
+    const last = this.lastRequestTime.get(userId);
+    if (last && Date.now() - last < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 1000);
+      throw new Error(`Aguarde ${remaining}s antes de enviar outra mensagem`);
+    }
+    this.lastRequestTime.set(userId, Date.now());
   }
 
   /**
@@ -297,21 +345,34 @@ class KimiBridge {
     }
 
     // Acquire semaphore slot
-    log.info(`Acquiring semaphore slot for user ${userId} (${this.semaphore.current}/${this.maxPages})`);
+    log.info(`Acquiring semaphore slot for user ${hashUserId(userId)} (${this.semaphore.current}/${this.maxPages})`);
     await this.semaphore.acquire();
 
     // Restore previous chat URL from store if available
     const stored = this.store.getUser(userId);
     const chatUrl = stored?.chatUrl || 'https://kimi.com/?chat_enter_method=new_chat';
 
-    log.info(`Creating new page for user ${userId}`);
-    const page = await this.context.newPage();
-
+    let page = null;
     try {
+      log.info(`Creating new page for user ${hashUserId(userId)}`);
+      page = await this.context.newPage();
+
+      // Register crash listener
+      page.on('crash', () => {
+        log.error(`Page crashed for user ${hashUserId(userId)}`);
+        this.userSessions.delete(userId);
+        this.semaphore.release();
+      });
+
       await page.goto(chatUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2000);
     } catch (e) {
-      log.warn(`Navigation warning for ${userId}: ${e.message}`);
+      log.warn(`Navigation failed for ${hashUserId(userId)}: ${e.message}`);
+      if (page && !page.isClosed()) {
+        try { await page.close(); } catch {}
+      }
+      this.semaphore.release();
+      throw e;
     }
 
     const session = {
@@ -325,19 +386,28 @@ class KimiBridge {
     this.userSessions.set(userId, session);
     this.store.setUser(userId, { chatUrl: session.chatUrl, mode: session.mode });
 
-    log.success(`Page ready for user ${userId}: ${session.chatUrl}`);
+    log.success(`Page ready for user ${hashUserId(userId)}: ${session.chatUrl}`);
     return page;
   }
 
   /**
    * Verify the user session is not expired (not showing Log In screen)
+   * Uses specific login selectors, not free text matching.
    */
   async _verifySession(page) {
     const isLoggedIn = await page.evaluate(() => {
-      return !document.body.innerText.includes('Log In') &&
-             !document.body.innerText.includes('登录') &&
-             !document.body.innerText.includes('Sign in');
-    });
+      // Check for actual login form elements, not just text presence
+      const hasLoginForm = !!(
+        document.querySelector('form[action*="login"], form[action*="auth"]') ||
+        document.querySelector('input[type="password"]') ||
+        document.querySelector('button[type="submit"]') &&
+        document.querySelector('input[name="email"], input[name="username"], input[type="email"]')
+      );
+      const hasAppContent = !!(
+        document.querySelector('.chat-editor, .markdown-container, .segment-assistant-actions')
+      );
+      return !hasLoginForm && hasAppContent;
+    }).catch(() => false);
 
     if (!isLoggedIn) {
       throw new Error('Kimi session expired — please log in again in Chrome');
@@ -372,9 +442,6 @@ class KimiBridge {
         selector: 'body',
         fn: async (el) => {
           const text = await el.innerText();
-          // Try to find the assistant response area
-          const lines = text.split('\n').filter(l => l.trim());
-          // Heuristic: look for a block after a known prompt marker
           return text.trim();
         },
       },
@@ -398,13 +465,28 @@ class KimiBridge {
       }
     }
 
-    return 'Nenhuma resposta encontrada';
+    throw new Error('EXTRACTION_FAILED: Nenhuma resposta encontrada');
+  }
+
+  /**
+   * Detect the actual mode currently selected in the Kimi UI
+   */
+  async _detectActualMode(page) {
+    try {
+      const label = await page.locator('.chat-editor-action .model-name').textContent({ timeout: 5000 });
+      if (label.includes('Instant')) return 'instant';
+      if (label.includes('Thinking')) return 'thinking';
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 
   /**
    * Wait for response completion using Combined Signal:
    * 1. Wait for assistant action buttons to appear
    * 2. Poll text stability for 2 seconds
+   * Throws on timeout.
    */
   async _waitForResponse(page, mode = 'instant') {
     const maxTimeout = mode === 'instant' ? 45000 : 120000;
@@ -432,7 +514,7 @@ class KimiBridge {
 
     while (Date.now() - startTime < maxTimeout) {
       try {
-        const currentText = await page.locator('.markdown-container .markdown').last().innerText().catch(() => '');
+        const currentText = await page.locator('.markdown-container .markdown').last().innerText({ timeout: 2000 }).catch(() => '');
 
         if (currentText === lastText && currentText.trim().length > 0) {
           if (!stableSince) {
@@ -452,7 +534,7 @@ class KimiBridge {
       await new Promise(r => setTimeout(r, pollInterval));
     }
 
-    log.warn('Max timeout reached while waiting for response');
+    throw new Error(`Response timeout after ${maxTimeout}ms (mode: ${mode})`);
   }
 
   /**
@@ -467,7 +549,7 @@ class KimiBridge {
     const session = this.userSessions.get(userId);
 
     // Check if already in desired mode
-    const currentLabel = await page.locator('.chat-editor-action .model-name').textContent().catch(() => '');
+    const currentLabel = await page.locator('.chat-editor-action .model-name').textContent({ timeout: 5000 }).catch(() => '');
     const targetLabel = mode === 'instant' ? 'K2.6 Instant' : 'K2.6 Thinking';
 
     if (currentLabel.includes(targetLabel)) {
@@ -477,21 +559,41 @@ class KimiBridge {
       return mode;
     }
 
-    log.info(`Switching user ${userId} to ${mode} mode...`);
+    log.info(`Switching user ${hashUserId(userId)} to ${mode} mode...`);
 
-    // Click mode selector
-    await page.click('.chat-editor-action .model-name');
+    // Click mode selector with short timeout
+    await page.click('.chat-editor-action .model-name', { timeout: 5000 });
     await page.waitForTimeout(500);
 
-    // Click the desired option
-    await page.getByText(targetLabel).click();
+    // Scope to dropdown to avoid clicking wrong element
+    const dropdown = page.locator('[role=listbox], .dropdown-menu, .model-dropdown').last();
+    const option = dropdown.locator('text=' + targetLabel).or(page.getByText(targetLabel)).first();
+    await option.click({ timeout: 5000 });
     await page.waitForTimeout(1000);
 
     session.mode = mode;
     this.store.setUser(userId, { mode });
 
-    log.success(`Mode switched to ${mode} for user ${userId}`);
+    log.success(`Mode switched to ${mode} for user ${hashUserId(userId)}`);
     return mode;
+  }
+
+  /**
+   * Create a new chat for a user (does NOT use sendMessage)
+   */
+  async newChat(userId) {
+    const page = await this._getOrCreateUserPage(userId);
+    const session = this.userSessions.get(userId);
+
+    log.info(`Creating new chat for user ${hashUserId(userId)}`);
+    await page.goto('https://kimi.com/?chat_enter_method=new_chat', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000);
+
+    session.chatUrl = page.url();
+    this.store.setUser(userId, { chatUrl: session.chatUrl });
+
+    log.success(`New chat created for user ${hashUserId(userId)}: ${session.chatUrl}`);
+    return { chatUrl: session.chatUrl, mode: session.mode };
   }
 
   /**
@@ -502,14 +604,20 @@ class KimiBridge {
       throw new Error('Message text is required');
     }
 
+    // Rate limiting
+    this._checkCooldown(userId);
+
     const page = await this._getOrCreateUserPage(userId);
     const session = this.userSessions.get(userId);
 
-    // Cooldown check
+    // Cooldown check: wait for current processing to finish
     if (session.processing) {
-      log.warn(`User ${userId} is already processing a message — queueing`);
-      // Wait for current processing to finish
+      log.warn(`User ${hashUserId(userId)} is already processing — queueing`);
+      const startWait = Date.now();
       while (session.processing) {
+        if (Date.now() - startWait > 60000) {
+          throw new Error('Timeout waiting for previous message to complete');
+        }
         await new Promise(r => setTimeout(r, 500));
       }
     }
@@ -534,9 +642,11 @@ class KimiBridge {
         await this.setMode(userId, options.mode);
       }
 
-      log.info(`User ${userId} sending: ${text.slice(0, 60)}`);
+      // Detect actual mode from UI for correct timeout
+      const actualMode = await this._detectActualMode(page) || session.mode || 'instant';
+      log.info(`User ${hashUserId(userId)} sending message (len=${text.length}, mode=${actualMode})`);
 
-      // Find input and type with human-like delay
+      // Find input
       const input = await page.$('textarea, [contenteditable="true"]');
       if (!input) {
         throw new Error('Input field not found on Kimi Web');
@@ -546,17 +656,25 @@ class KimiBridge {
       await input.fill('');
       await page.waitForTimeout(300);
 
-      // Type with human-like delay
-      await input.type(text, { delay: 50 });
+      // Bring page to front (Chrome may throttle inactive tabs)
+      await page.bringToFront();
+
+      // Type with human-like delay, but use fill for long texts
+      if (text.length <= MAX_TEXT_TYPE_LENGTH) {
+        await input.type(text, { delay: 50 });
+      } else {
+        log.info(`Text too long (${text.length} chars), using fill instead of type`);
+        await input.fill(text);
+      }
       await page.waitForTimeout(500 + Math.floor(Math.random() * 1000));
 
-      // Press Enter to send
+      // Ensure focus before pressing Enter
+      await input.focus();
       await input.press('Enter');
-      log.info(`Message sent for user ${userId}`);
+      log.info(`Message sent for user ${hashUserId(userId)}`);
 
       // Wait for response with combined signal
-      const mode = session.mode || 'instant';
-      await this._waitForResponse(page, mode);
+      await this._waitForResponse(page, actualMode);
 
       // Extract response
       const response = await this._extractResponse(page);
@@ -565,24 +683,24 @@ class KimiBridge {
       session.chatUrl = page.url();
       this.store.setUser(userId, { chatUrl: session.chatUrl });
 
-      log.success(`Response extracted for user ${userId}: ${response.slice(0, 80)}...`);
+      log.success(`Response ready for user ${hashUserId(userId)} (len=${response.length})`);
 
       return {
         response,
         chatUrl: session.chatUrl,
         mode: session.mode,
       };
+    } catch (err) {
+      // Try to clear input on error so next message doesn't have leftover text
+      try {
+        const input = await page.$('textarea, [contenteditable="true"]');
+        if (input) await input.fill('');
+      } catch {}
+      throw err;
     } finally {
       session.processing = false;
       session.lastActivity = Date.now();
     }
-  }
-
-  /**
-   * Create a new chat for a user
-   */
-  async newChat(userId) {
-    return this.sendMessage(userId, '', { newChat: true });
   }
 
   /**
@@ -595,7 +713,7 @@ class KimiBridge {
     }
 
     const page = session.page;
-    if (page.isClosed()) {
+    if (!page || page.isClosed()) {
       return { active: false, message: 'Page was closed' };
     }
 
@@ -605,11 +723,11 @@ class KimiBridge {
       loggedIn: !document.body.innerText.includes('Log In'),
       hasResponse: !!document.querySelector('.markdown-container .paragraph'),
       mode: document.querySelector('.chat-editor-action .model-name')?.innerText?.trim() || null,
-    }));
+    })).catch(() => ({ error: 'Page evaluation failed' }));
 
     return {
       active: true,
-      userId,
+      userId: hashUserId(userId),
       chatUrl: session.chatUrl,
       mode: session.mode,
       lastActivity: new Date(session.lastActivity).toISOString(),
@@ -626,12 +744,12 @@ class KimiBridge {
     const users = [];
     for (const [userId, session] of this.userSessions) {
       users.push({
-        userId,
+        userId: hashUserId(userId),
         chatUrl: session.chatUrl,
         mode: session.mode,
         lastActivity: new Date(session.lastActivity).toISOString(),
         processing: session.processing,
-        pageClosed: session.page.isClosed(),
+        pageClosed: !session.page || session.page.isClosed(),
       });
     }
     return {
@@ -649,7 +767,14 @@ class KimiBridge {
    */
   async screenshot(userId, ssPath = null) {
     const page = await this._getOrCreateUserPage(userId);
-    const filePath = ssPath || path.join(ARTIFACTS_DIR, `kimi-screenshot-${userId}-${Date.now()}.png`);
+    const filePath = ssPath || path.join(ARTIFACTS_DIR, `kimi-screenshot-${hashUserId(userId)}-${Date.now()}.png`);
+
+    // Ensure directory exists
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
     await page.screenshot({ path: filePath, fullPage: true });
     log.info(`Screenshot saved: ${filePath}`);
     return filePath;
@@ -665,13 +790,14 @@ class KimiBridge {
       for (const [userId, session] of this.userSessions) {
         if (session.processing) continue;
         if (now - session.lastActivity > this.idleTimeout) {
-          log.info(`Idle cleanup: closing page for user ${userId}`);
+          log.info(`Idle cleanup: closing page for user ${hashUserId(userId)}`);
           try {
-            if (!session.page.isClosed()) {
-              session.page.close();
+            if (session.page && !session.page.isClosed()) {
+              session.page.removeAllListeners('crash');
+              session.page.close().catch(e => log.warn(`Idle close error: ${e.message}`));
             }
           } catch (e) {
-            log.warn(`Idle cleanup error for ${userId}: ${e.message}`);
+            log.warn(`Idle cleanup error for ${hashUserId(userId)}: ${e.message}`);
           }
           this.userSessions.delete(userId);
           this.semaphore.release();
@@ -682,15 +808,23 @@ class KimiBridge {
 
   /**
    * Copy last response (clicks copy button on Kimi UI)
+   * Uses aria-label/title instead of hardcoded indices.
    */
   async copyLastResponse(userId) {
     const page = await this._getOrCreateUserPage(userId);
-    log.info(`Clicking copy button for user ${userId}`);
+    log.info(`Clicking copy button for user ${hashUserId(userId)}`);
 
     await page.evaluate(() => {
-      const buttons = document.querySelectorAll('.segment-assistant-actions .icon-button');
-      if (buttons.length > 0) buttons[0].click(); // Copy is index 0
-    });
+      const container = document.querySelector('.segment-assistant-actions');
+      if (!container) return false;
+      // Find by aria-label or SVG name
+      const btn = container.querySelector('[aria-label="Copy"], button[title="Copy"], .icon-button');
+      if (btn) { btn.click(); return true; }
+      // Fallback: first icon-button
+      const fallback = container.querySelector('.icon-button');
+      if (fallback) { fallback.click(); return true; }
+      return false;
+    }).catch(() => false);
 
     await page.waitForTimeout(500);
     return true;
@@ -701,15 +835,22 @@ class KimiBridge {
    */
   async regenerateLastResponse(userId) {
     const page = await this._getOrCreateUserPage(userId);
-    log.info(`Clicking regenerate for user ${userId}`);
+    log.info(`Clicking regenerate for user ${hashUserId(userId)}`);
 
     await page.evaluate(() => {
-      const buttons = document.querySelectorAll('.segment-assistant-actions .icon-button');
-      if (buttons.length > 1) buttons[1].click(); // Refresh is index 1
-    });
+      const container = document.querySelector('.segment-assistant-actions');
+      if (!container) return false;
+      const btn = container.querySelector('[aria-label="Regenerate"], button[title="Regenerate"], [aria-label="Refresh"]');
+      if (btn) { btn.click(); return true; }
+      // Fallback: second icon-button
+      const buttons = container.querySelectorAll('.icon-button');
+      if (buttons.length > 1) { buttons[1].click(); return true; }
+      return false;
+    }).catch(() => false);
 
     const session = this.userSessions.get(userId);
-    await this._waitForResponse(page, session.mode);
+    const actualMode = await this._detectActualMode(page) || session.mode || 'instant';
+    await this._waitForResponse(page, actualMode);
     return this._extractResponse(page);
   }
 }
