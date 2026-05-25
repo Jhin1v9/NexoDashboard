@@ -720,6 +720,7 @@ class TelegramLunaAgent {
 
     // /kimi [pergunta] — default Instant mode
     this.bot.onText(/^\/kimi(?:\s+(.+))?/, async (msg, match) => {
+      log('info', `[KIMI] /kimi from ${msg.from?.first_name || 'unknown'}: ${msg.text?.slice(0, 60)}`);
       const userId = msg.from.id;
       const userName = msg.from.first_name || msg.from.username || '';
       const question = match[1]?.trim();
@@ -1188,6 +1189,7 @@ class TelegramLunaAgent {
 
   // ── HANDLER PRINCIPAL ──
   async handleMessage(msg) {
+    log('info', `[MSG] from ${msg.from?.first_name || 'unknown'}: ${(msg.text || '').slice(0, 60)}`);
     const text = msg.text || msg.caption || '';
     if (!text.trim()) return;
     const chatId = msg.chat.id;
