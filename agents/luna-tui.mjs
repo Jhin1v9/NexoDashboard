@@ -179,10 +179,13 @@ function MessageItem({ msg }) {
   return null;
 }
 
-function MessageList({ messages, streamingText, thinkingText, isStreaming }) {
-  // Show all messages — Ink handles overflow naturally
+function MessageList({ messages, streamingText, thinkingText, isStreaming, maxRows }) {
+  // Limit visible messages to prevent layout overflow in small terminals
+  const visibleCount = maxRows ? Math.max(1, Math.floor(maxRows / 2)) : messages.length;
+  const visibleMessages = messages.slice(-visibleCount);
+
   return h(Box, { flexDirection: 'column', width: '100%' },
-    messages.map(msg => h(MessageItem, { key: msg.id, msg })),
+    visibleMessages.map(msg => h(MessageItem, { key: msg.id, msg })),
 
     // Thinking mode: dimmed, lower opacity reasoning text
     isStreaming && thinkingText && h(Box, { flexDirection: 'column', marginY: 1 },
@@ -1064,7 +1067,7 @@ function App({ luna, sessionManager, initialSession }) {
   // ─── RENDER ─────────────────────────────────────────────────────────────
 
   if (showPicker) {
-    return h(Box, { flexDirection: 'column', height: rows, width: columns, padding: 1 },
+    return h(Box, { flexDirection: 'column', height: '100%', width: '100%', padding: 1 },
       h(SessionPicker, {
         sessions: sessionsList,
         onSelect: handleSelectSession,
@@ -1079,18 +1082,19 @@ function App({ luna, sessionManager, initialSession }) {
     );
   }
 
-  return h(Box, { flexDirection: 'column', height: rows, width: columns },
+  return h(Box, { flexDirection: 'column', height: '100%', width: '100%' },
     // Header
     h(Header, { session, msgCount: messages.length }),
 
-    // Chat area — flexGrow takes remaining space
+    // Chat area — flexGrow takes remaining space, flexShrink prevents overflow
     h(Box, {
       flexDirection: 'column',
       flexGrow: 1,
+      flexShrink: 1,
       width: '100%',
-      overflow: 'hidden',
+      minHeight: 2,
     },
-      h(MessageList, { messages, streamingText, thinkingText, isProcessing }),
+      h(MessageList, { messages, streamingText, thinkingText, isProcessing, maxRows: Math.max(3, rows - 8) }),
     ),
 
     // Status
@@ -1099,19 +1103,17 @@ function App({ luna, sessionManager, initialSession }) {
     // Suggestion
     h(SuggestionBar, { suggestion: pendingSuggestion }),
 
-
-
     // Steer input overlay
     showSteerInput && h(SteerInput, {
       onSubmit: handleSteerSubmit,
       onCancel: () => setShowSteerInput(false),
     }),
 
-    // Help overlay
+    // Help overlay — centered but clamps to available space
     showHelp && h(Box, {
       position: 'absolute',
-      marginTop: Math.max(1, Math.floor((rows - 20) / 2)),
-      marginLeft: Math.max(1, Math.floor((columns - 62) / 2)),
+      marginTop: Math.max(0, Math.floor((rows - 20) / 2)),
+      marginLeft: Math.max(0, Math.floor((columns - 62) / 2)),
     },
       h(HelpOverlay, { onClose: () => setShowHelp(false) })
     ),
