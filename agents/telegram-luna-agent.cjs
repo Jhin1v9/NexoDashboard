@@ -45,7 +45,21 @@ function fetchLocalApi(endpoint) {
   });
 }
 
-async function buildDashboardContext(userQuery = '') {
+// Helper: escape Telegram Markdown characters that could break parse_mode: 'Markdown'
+function sanitizeTelegramMarkdown(text) {
+  if (!text) return '';
+  // Escape unpaired markdown characters that Telegram can't parse
+  // We replace problematic patterns while preserving intentional formatting
+  let sanitized = text
+    .replace(/\*/g, '⭐')     // asterisks → star emoji
+    .replace(/_/g, '\_')      // underscores → escaped
+    .replace(/`/g, '\`')      // backticks → escaped
+    .replace(/\[/g, '\[')     // brackets → escaped
+    .replace(/\]/g, '\]');    // brackets → escaped
+  return sanitized;
+}
+
+async function buildDashboardContext(userQuery = '', userName = '') {
   const q = userQuery.toLowerCase();
   const isDashboardQuery = /tarefa|lead|ideia|orçamento|projeto|cliente|financeiro|pagamento|despesa|status|dashboard|nexo/i.test(q);
   if (!isDashboardQuery) return null;
@@ -63,7 +77,11 @@ async function buildDashboardContext(userQuery = '') {
   const ideas = ideasData?.data?.ideas || ideasData?.ideas || [];
   const finance = financeData || {};
 
-  const lines = ['📋 *CONTEXTO NEXO DASHBOARD* (dados em tempo real):'];
+  const nameLine = userName ? `\n👤 *Usuário atual:* ${userName}` : '';
+  const nameInstruction = userName
+    ? `\n⚠️ IMPORTANTE: O usuário que está fazendo esta pergunta é **${userName}**. Não confunda ${userName} com outros nomes (Abner, Nonoke, Elias) que aparecem como autores de tarefas/leads no sistema.`
+    : '';
+  const lines = [`📋 *CONTEXTO NEXO DASHBOARD* (dados em tempo real):${nameLine}${nameInstruction}`];
 
   if (tasks.length) {
     lines.push(`\n📝 *Tarefas ativas (${tasks.length}):*`);
@@ -610,22 +628,23 @@ class TelegramLunaAgent {
 
         let editText;
         const MAX_EDIT = 3500;
+        const safeText = sanitizeTelegramMarkdown(text);
 
         if (status === 'done') {
           // Final clean text
-          editText = `${modeEmoji} *Kimi*\n\n${text}`;
+          editText = `${modeEmoji} ⭐Kimi⭐\n\n${safeText}`;
         } else if (status === 'thinking') {
           // Kimi paused — show what we have + "thinking" indicator
-          let body = text;
+          let body = safeText;
           if (body.length > MAX_EDIT) body = body.slice(0, MAX_EDIT);
-          editText = `${modeEmoji} *Kimi*\n\n${body}\n\n_🧠 Pensando..._`;
+          editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}\n\n\_🧠 Pensando...\_`;
         } else {
           // writing — show partial text without indicator
-          let body = text;
+          let body = safeText;
           if (body.length > MAX_EDIT) {
-            body = body.slice(0, MAX_EDIT) + '\n\n_✍️ Continuando..._';
+            body = body.slice(0, MAX_EDIT) + '\n\n\_✍️ Continuando...\_';
           }
-          editText = `${modeEmoji} *Kimi*\n\n${body}`;
+          editText = `${modeEmoji} ⭐Kimi⭐\n\n${body}`;
         }
 
         try {
@@ -635,14 +654,23 @@ class TelegramLunaAgent {
             parse_mode: 'Markdown',
           });
         } catch (e) {
-          this._log?.('debug', `Edit failed: ${e.message}`);
+          // Fallback: send without parse_mode if Markdown fails
+          try {
+            await this.bot.editMessageText(editText.replace(/⭐/g, '*').replace(/\_/g, '_'), {
+              chat_id: chatId,
+              message_id: messageId,
+            });
+          } catch (e2) {
+            this._log?.('debug', `Edit failed: ${e2.message}`);
+          }
         }
       };
 
       const finalize = async (finalText, mode) => {
         if (!messageId) return;
         const emoji = mode === 'instant' ? '⚡' : '🧠';
-        const fullText = `${emoji} *Kimi*\n\n${finalText}`;
+        const safeText = sanitizeTelegramMarkdown(finalText);
+        const fullText = `${emoji} ⭐Kimi⭐\n\n${safeText}`;
         if (fullText.length <= 4000) {
           try {
             await this.bot.editMessageText(fullText, {
@@ -651,7 +679,16 @@ class TelegramLunaAgent {
               parse_mode: 'Markdown',
             });
             return messageId;
-          } catch {}
+          } catch {
+            // Fallback without parse_mode
+            try {
+              await this.bot.editMessageText(fullText.replace(/⭐/g, '*').replace(/\_/g, '_'), {
+                chat_id: chatId,
+                message_id: messageId,
+              });
+              return messageId;
+            } catch {}
+          }
         }
         await this.bot.deleteMessage(chatId, messageId).catch(() => {});
         return sendLongMessage(chatId, fullText, { parse_mode: 'Markdown', reply_to_message_id: replyToId });
@@ -678,9 +715,13 @@ class TelegramLunaAgent {
       return lastMsg;
     };
 
+    // Track users with active requests to prevent overlapping
+    const activeUsers = new Set();
+
     // /kimi [pergunta] — default Instant mode
     this.bot.onText(/^\/kimi(?:\s+(.+))?/, async (msg, match) => {
       const userId = msg.from.id;
+      const userName = msg.from.first_name || msg.from.username || '';
       const question = match[1]?.trim();
       const chatId = msg.chat.id;
 
@@ -689,12 +730,21 @@ class TelegramLunaAgent {
         return;
       }
 
+      if (activeUsers.has(userId)) {
+        await this.bot.sendMessage(chatId, '⏳ Aguarde a resposta anterior terminar...', { reply_to_message_id: msg.message_id });
+        return;
+      }
+      activeUsers.add(userId);
+
       const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
       await stream.init();
 
       try {
-        const context = await buildDashboardContext(question);
-        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+        const context = await buildDashboardContext(question, userName);
+        const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+        const enrichedQuestion = context
+          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${namePrefix}${question}`;
 
         // Streaming only works in local mode (remote API is request/response)
         const useStreaming = !KIMI_BRIDGE_URL;
@@ -709,12 +759,15 @@ class TelegramLunaAgent {
             message_id: stream.messageId,
           });
         } catch {}
+      } finally {
+        activeUsers.delete(userId);
       }
     });
 
     // /kimi_instant [pergunta]
     this.bot.onText(/^\/kimi_instant(?:\s+(.+))?/, async (msg, match) => {
       const userId = msg.from.id;
+      const userName = msg.from.first_name || msg.from.username || '';
       const question = match[1]?.trim();
       const chatId = msg.chat.id;
 
@@ -723,12 +776,21 @@ class TelegramLunaAgent {
         return;
       }
 
+      if (activeUsers.has(userId)) {
+        await this.bot.sendMessage(chatId, '⏳ Aguarde a resposta anterior terminar...', { reply_to_message_id: msg.message_id });
+        return;
+      }
+      activeUsers.add(userId);
+
       const stream = createStreamUpdater(chatId, msg.message_id, '⚡');
       await stream.init();
 
       try {
-        const context = await buildDashboardContext(question);
-        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+        const context = await buildDashboardContext(question, userName);
+        const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+        const enrichedQuestion = context
+          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${namePrefix}${question}`;
         const useStreaming = !KIMI_BRIDGE_URL;
         const result = await askBridge(userId, enrichedQuestion, 'instant', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'instant');
@@ -740,12 +802,15 @@ class TelegramLunaAgent {
             message_id: stream.messageId,
           });
         } catch {}
+      } finally {
+        activeUsers.delete(userId);
       }
     });
 
     // /kimi_thinking [pergunta]
     this.bot.onText(/^\/kimi_thinking(?:\s+(.+))?/, async (msg, match) => {
       const userId = msg.from.id;
+      const userName = msg.from.first_name || msg.from.username || '';
       const question = match[1]?.trim();
       const chatId = msg.chat.id;
 
@@ -754,12 +819,21 @@ class TelegramLunaAgent {
         return;
       }
 
+      if (activeUsers.has(userId)) {
+        await this.bot.sendMessage(chatId, '⏳ Aguarde a resposta anterior terminar...', { reply_to_message_id: msg.message_id });
+        return;
+      }
+      activeUsers.add(userId);
+
       const stream = createStreamUpdater(chatId, msg.message_id, '🧠');
       await stream.init();
 
       try {
-        const context = await buildDashboardContext(question);
-        const enrichedQuestion = context ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${question}` : question;
+        const context = await buildDashboardContext(question, userName);
+        const namePrefix = userName ? `[Usuário: ${userName}] ` : '';
+        const enrichedQuestion = context
+          ? `${context}\n\n--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}`
+          : `${namePrefix}${question}`;
         const useStreaming = !KIMI_BRIDGE_URL;
         const result = await askBridge(userId, enrichedQuestion, 'thinking', useStreaming ? stream.onPartial : null);
         await stream.finalize(result.response, 'thinking');
@@ -771,6 +845,8 @@ class TelegramLunaAgent {
             message_id: stream.messageId,
           });
         } catch {}
+      } finally {
+        activeUsers.delete(userId);
       }
     });
 

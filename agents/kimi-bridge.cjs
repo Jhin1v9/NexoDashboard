@@ -681,31 +681,31 @@ class KimiBridge {
       const actualMode = await this._detectActualMode(page) || session.mode || 'instant';
       log.info(`User ${hashUserId(userId)} sending message (len=${text.length}, mode=${actualMode})`);
 
-      // Find input
-      const input = await page.$('textarea, [contenteditable="true"]');
-      if (!input) {
+      // Use locator (auto-resolves at action time, never stale)
+      const inputLocator = page.locator('textarea, [contenteditable="true"]').first();
+      const inputCount = await inputLocator.count();
+      if (inputCount === 0) {
         throw new Error('Input field not found on Kimi Web');
       }
-
-      // Clear any existing text first
-      await input.fill('');
-      await page.waitForTimeout(300);
 
       // Bring page to front (Chrome may throttle inactive tabs)
       await page.bringToFront();
 
+      // Clear any existing text first
+      await inputLocator.fill('');
+      await page.waitForTimeout(300);
+
       // Type with human-like delay, but use fill for long texts
       if (text.length <= MAX_TEXT_TYPE_LENGTH) {
-        await input.type(text, { delay: 50 });
+        await inputLocator.type(text, { delay: 50 });
       } else {
         log.info(`Text too long (${text.length} chars), using fill instead of type`);
-        await input.fill(text);
+        await inputLocator.fill(text);
       }
       await page.waitForTimeout(500 + Math.floor(Math.random() * 1000));
 
-      // Ensure focus before pressing Enter
-      await input.focus();
-      await input.press('Enter');
+      // Press Enter to send
+      await inputLocator.press('Enter');
       log.info(`Message sent for user ${hashUserId(userId)}`);
 
       // Wait for response with combined signal + streaming
@@ -728,8 +728,7 @@ class KimiBridge {
     } catch (err) {
       // Try to clear input on error so next message doesn't have leftover text
       try {
-        const input = await page.$('textarea, [contenteditable="true"]');
-        if (input) await input.fill('');
+        await page.locator('textarea, [contenteditable="true"]').first().fill('');
       } catch {}
       throw err;
     } finally {
