@@ -661,14 +661,16 @@ function App({ luna, sessionManager, initialSession }) {
   // Process message queue after response completes
   const processQueue = useCallback(async () => {
     if (messageQueue.current.length === 0) return;
-    const nextMsg = messageQueue.current.shift();
+    const next = messageQueue.current.shift();
+    const text = typeof next === 'string' ? next : next?.text;
+    const retries = typeof next === 'object' ? (next.retries || 0) : 0;
     // Small delay to let UI settle
     await new Promise(r => setTimeout(r, 300));
-    await handleCommand(nextMsg);
+    await handleCommand(text, retries);
   }, []);
 
   // Core: handle a message with streaming
-  const handleCommand = useCallback(async (text) => {
+  const handleCommand = useCallback(async (text, retries = 0) => {
     if (!session) return;
 
     // /sair
@@ -1074,10 +1076,44 @@ function App({ luna, sessionManager, initialSession }) {
       await processQueue();
 
     } catch (err) {
-      setMessages(prev => [...prev, {
-        type: 'system', content: `❌ Erro: ${err.message}`,
-        timestamp: new Date().toISOString(), id: nextId(),
-      }]);
+      const msg = err.message || '';
+      const isConnectionError = msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT') || msg.includes('connectOverCDP') || msg.includes('disconnected');
+
+      if (isConnectionError && !text.startsWith('/') && retries < 1) {
+        // Auto-heal: try to start Chrome and retry the message (max 1 retry)
+        setMessages(prev => [...prev, {
+          type: 'system', content: '🔌 Chrome não detectado. Iniciando automaticamente...',
+          timestamp: new Date().toISOString(), id: nextId(),
+        }]);
+        try {
+          const chromeStatus = await luna.kimiBridge?.checkChrome?.();
+          if (chromeStatus && chromeStatus.running) {
+            const portMsg = chromeStatus.port ? ` (porta ${chromeStatus.port})` : '';
+            setMessages(prev => [...prev, {
+              type: 'system', content: `🚀 Chrome iniciado${portMsg}. Reenviando mensagem...`,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+            // Queue the message for retry with incremented retry count
+            messageQueue.current.unshift({ text, retries: retries + 1 });
+          } else {
+            setMessages(prev => [...prev, {
+              type: 'system', content: `⚠️ Não consegui iniciar Chrome: ${chromeStatus?.error || msg}. Tente /login manualmente.`,
+              timestamp: new Date().toISOString(), id: nextId(),
+            }]);
+          }
+        } catch (e) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `❌ Auto-heal falhou: ${e.message}. Tente /login.`,
+            timestamp: new Date().toISOString(), id: nextId(),
+          }]);
+        }
+      } else {
+        setMessages(prev => [...prev, {
+          type: 'system', content: `❌ Erro: ${err.message}`,
+          timestamp: new Date().toISOString(), id: nextId(),
+        }]);
+      }
+
       setIsProcessing(false);
       setStreamingText('');
       setThinkingText('');

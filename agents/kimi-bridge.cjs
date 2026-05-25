@@ -43,7 +43,7 @@ process.on('unhandledRejection', (reason) => {
 // ============================================================
 // CONFIG
 // ============================================================
-const DEFAULT_CDP_URL = process.env.KIMI_CDP_URL || 'http://127.0.0.1:9222';
+const CDP_PORTS = [9222, 9223, 9224, 9225];
 const DEFAULT_TIMEOUT = parseInt(process.env.KIMI_TIMEOUT, 10) || 120000;
 const MAX_CONCURRENT_PAGES = parseInt(process.env.KIMI_MAX_PAGES, 10) || 5;
 const IDLE_TIMEOUT_MS = parseInt(process.env.KIMI_IDLE_TIMEOUT, 10) || 10 * 60 * 1000;
@@ -52,6 +52,11 @@ const MAX_TEXT_TYPE_LENGTH = parseInt(process.env.KIMI_MAX_TYPE_LENGTH, 10) || 5
 const LOG_MAX_SIZE_MB = parseInt(process.env.KIMI_LOG_MAX_MB, 10) || 10;
 const ARTIFACTS_DIR = path.join(__dirname, '..', 'ARTIFACTS');
 const SESSION_STORE_PATH = path.join(ARTIFACTS_DIR, 'kimi-sessions.json');
+
+function makeCdpUrl(port) { return `http://127.0.0.1:${port}`; }
+function getPortFromUrl(url) {
+  try { return parseInt(new URL(url).port, 10); } catch { return 9222; }
+}
 
 if (!fs.existsSync(ARTIFACTS_DIR)) {
   fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
@@ -200,7 +205,7 @@ class Semaphore {
 // ============================================================
 class KimiBridge {
   constructor(options = {}) {
-    this.cdpUrl = options.cdpUrl || DEFAULT_CDP_URL;
+    this.cdpUrl = options.cdpUrl || null; // discovered dynamically
     this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
     this.maxPages = options.maxPages ?? MAX_CONCURRENT_PAGES;
     this.idleTimeout = options.idleTimeout ?? IDLE_TIMEOUT_MS;
@@ -225,6 +230,54 @@ class KimiBridge {
     }
   }
 
+  /**
+   * Probe a single CDP port to see if Chrome is listening.
+   */
+  async _probePort(port) {
+    const http = require('http');
+    return new Promise((resolve) => {
+      const req = http.get(`${makeCdpUrl(port)}/json/version`, (res) => {
+        resolve(res.statusCode === 200 ? port : 0);
+      });
+      req.on('error', () => resolve(0));
+      req.setTimeout(2000, () => { req.destroy(); resolve(0); });
+    });
+  }
+
+  /**
+   * Find first working CDP port among CDP_PORTS.
+   * Returns 0 if none respond.
+   */
+  async _findWorkingPort() {
+    for (const port of CDP_PORTS) {
+      const ok = await this._probePort(port);
+      if (ok) return port;
+    }
+    return 0;
+  }
+
+  /**
+   * Get current CDP URL. Discovers dynamically on first use.
+   */
+  async _getCdpUrl() {
+    if (this.cdpUrl) return this.cdpUrl;
+    const port = await this._findWorkingPort();
+    if (port) {
+      this.cdpUrl = makeCdpUrl(port);
+      log.info(`Auto-discovered Chrome on ${this.cdpUrl}`);
+      return this.cdpUrl;
+    }
+    // Fallback to default for error messages
+    return makeCdpUrl(CDP_PORTS[0]);
+  }
+
+  /**
+   * Reset CDP URL (e.g. after Chrome restart on different port).
+   */
+  _resetCdpUrl() {
+    this.cdpUrl = null;
+  }
+
   _log(...args) {
     const msg = args.join(' ');
     if (this.debug) log.debug(msg);
@@ -240,8 +293,15 @@ class KimiBridge {
       return this;
     }
 
-    log.info(`Connecting to Chrome at ${this.cdpUrl}`);
-    this.browser = await chromium.connectOverCDP(this.cdpUrl);
+    const cdpUrl = await this._getCdpUrl();
+    log.info(`Connecting to Chrome at ${cdpUrl}`);
+    try {
+      this.browser = await chromium.connectOverCDP(cdpUrl);
+    } catch (e) {
+      // Clear cached URL so next attempt re-discovers
+      this._resetCdpUrl();
+      throw e;
+    }
     const contexts = this.browser.contexts();
 
     if (!contexts || contexts.length === 0) {
@@ -256,6 +316,7 @@ class KimiBridge {
       log.warn('Browser disconnected via CDP');
       this.browser = null;
       this.context = null;
+      this._resetCdpUrl();
     });
 
     // Start idle cleanup timer
@@ -977,58 +1038,82 @@ class KimiBridge {
 
   /**
    * Check if Chrome is running with CDP and start if needed.
-   * Kills headless Chrome and starts visible Chrome for login.
-   * Returns { running: bool, started: bool, pid?: number, error?: string, wasHeadless?: bool }
+   * Supports dynamic ports (9222-9225). Kills headless Chrome. Starts visible Chrome.
+   * Returns { running: bool, started: bool, pid?: number, error?: string, wasHeadless?: bool, port?: number }
    */
   async checkChrome() {
     const { execSync, spawn } = require('child_process');
     const http = require('http');
     const os = require('os');
+    const net = require('net');
     const userDataDir = path.join(os.homedir(), '.luna', 'chrome-profile');
 
-    // Check if Chrome is already listening on CDP port (use IPv4 explicitly)
-    let existingChrome = null;
-    try {
-      await new Promise((resolve, reject) => {
-        const req = http.get('http://127.0.0.1:9222/json/version', (res) => {
-          if (res.statusCode === 200) resolve(true);
-          else reject(new Error('Status ' + res.statusCode));
-        });
-        req.on('error', reject);
-        req.setTimeout(3000, () => { req.destroy(); reject(new Error('Timeout')); });
+    // Helper: check if a port has Chrome responding
+    const probePort = (port) => new Promise((resolve) => {
+      const req = http.get(`${makeCdpUrl(port)}/json/version`, (res) => {
+        resolve(res.statusCode === 200 ? port : 0);
       });
-      existingChrome = true;
-    } catch {
-      existingChrome = false;
-    }
+      req.on('error', () => resolve(0));
+      req.setTimeout(2000, () => { req.destroy(); resolve(0); });
+    });
 
-    // If running, check if it's headless and capture its user-data-dir
+    // Helper: check if port is occupied by any process
+    const isPortOccupied = (port) => new Promise((resolve) => {
+      const s = net.createServer();
+      s.once('error', () => resolve(true));
+      s.once('listening', () => { s.close(() => resolve(false)); });
+      s.listen(port, '127.0.0.1');
+    });
+
+    // Phase 1: Scan all ports for existing Chrome
+    let foundPort = 0;
     let wasHeadless = false;
     let existingProfileDir = null;
-    if (existingChrome) {
+    for (const port of CDP_PORTS) {
+      const ok = await probePort(port);
+      if (!ok) continue;
+      foundPort = port;
+      // Check if this Chrome is headless
       try {
-        const psOutput = execSync("ps aux | grep 'chrome.*remote-debugging-port=9222' | grep -v grep", { encoding: 'utf8' });
-        // Extract user-data-dir from existing Chrome
+        const psOutput = execSync(`ps aux | grep 'chrome.*remote-debugging-port=${port}' | grep -v grep`, { encoding: 'utf8' });
         const dataDirMatch = psOutput.match(/--user-data-dir=([^\s]+)/);
         if (dataDirMatch) existingProfileDir = dataDirMatch[1];
-
         if (psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless')) {
           wasHeadless = true;
-          log.warn('Chrome headless detectado. Matando para iniciar visível...');
-          // Kill headless chrome
-          execSync("pkill -f 'chrome.*remote-debugging-port=9222'");
+          log.warn(`Chrome headless detectado na porta ${port}. Matando...`);
+          execSync(`pkill -f 'chrome.*remote-debugging-port=${port}'`);
           await new Promise(r => setTimeout(r, 3000));
-          existingChrome = false;
+          foundPort = 0;
+          wasHeadless = false;
+          existingProfileDir = null;
         } else {
-          return { running: true, started: false, wasHeadless: false };
+          // Valid visible Chrome found
+          this.cdpUrl = makeCdpUrl(port);
+          return { running: true, started: false, wasHeadless: false, port };
         }
       } catch {
         // Could not determine, assume it's ok
-        return { running: true, started: false, wasHeadless: false };
+        this.cdpUrl = makeCdpUrl(port);
+        return { running: true, started: false, wasHeadless: false, port };
       }
     }
 
-    // Not running or was headless — start visible Chrome
+    // Phase 2: Find first free port to start Chrome on
+    let startPort = CDP_PORTS[0];
+    for (const port of CDP_PORTS) {
+      const occupied = await isPortOccupied(port);
+      if (!occupied) { startPort = port; break; }
+    }
+    // If all ports occupied by non-Chrome processes, use the first one and warn
+    if (startPort !== CDP_PORTS[0]) {
+      const allOccupied = await Promise.all(CDP_PORTS.map(p => isPortOccupied(p)));
+      if (allOccupied.every(o => o)) {
+        log.warn('Todas as portas CDP ocupadas por outros processos. Usando porta 9222 mesmo assim.');
+        startPort = CDP_PORTS[0];
+      }
+    }
+
+    // Start visible Chrome
     const chromeCmds = [
       'google-chrome',
       'google-chrome-stable',
@@ -1046,41 +1131,29 @@ class KimiBridge {
     }
 
     try {
-      // Reuse the existing profile dir if we found one, otherwise use default
       const profileDir = existingProfileDir || userDataDir;
-      if (existingProfileDir) {
-        log.info(`Reutilizando perfil existente: ${existingProfileDir}`);
-      }
+      if (existingProfileDir) log.info(`Reutilizando perfil existente: ${existingProfileDir}`);
 
       const proc = spawn(chromePath, [
-        '--remote-debugging-port=9222',
+        `--remote-debugging-port=${startPort}`,
         '--no-first-run',
         '--no-default-browser-check',
         '--user-data-dir=' + profileDir,
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
-        // NO --headless — we need a visible window for login
       ], { detached: true, stdio: 'ignore', env: { ...process.env, DISPLAY: process.env.DISPLAY || ':0' } });
       proc.unref();
 
-      // Wait for Chrome to start
       await new Promise(r => setTimeout(r, 5000));
 
-      // Verify it started (use IPv4)
-      try {
-        await new Promise((resolve, reject) => {
-          const req = http.get('http://127.0.0.1:9222/json/version', (res) => {
-            if (res.statusCode === 200) resolve(true);
-            else reject(new Error('Status ' + res.statusCode));
-          });
-          req.on('error', reject);
-          req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
-        });
-        return { running: true, started: true, pid: proc.pid, wasHeadless, profileDir };
-      } catch {
-        return { running: false, started: true, pid: proc.pid, wasHeadless, profileDir, error: 'Chrome iniciou mas não respondeu em 5s' };
+      // Verify it started
+      const ok = await probePort(startPort);
+      if (ok) {
+        this.cdpUrl = makeCdpUrl(startPort);
+        return { running: true, started: true, pid: proc.pid, wasHeadless, profileDir, port: startPort };
       }
+      return { running: false, started: true, pid: proc.pid, wasHeadless, profileDir, port: startPort, error: 'Chrome iniciou mas não respondeu em 5s' };
     } catch (e) {
       return { running: false, started: false, error: e.message };
     }
@@ -1211,7 +1284,6 @@ class KimiBridge {
   async logout(userId, opts = {}) {
     const session = this.userSessions.get(userId);
     if (session) {
-      // Close page
       if (session.page && !session.page.isClosed()) {
         try { await session.page.close(); } catch {}
       }
@@ -1222,7 +1294,11 @@ class KimiBridge {
     if (opts.killChrome) {
       try {
         const { execSync } = require('child_process');
-        execSync("pkill -f 'chrome.*remote-debugging-port=9222'");
+        // Kill Chrome on ALL possible CDP ports
+        for (const port of CDP_PORTS) {
+          try { execSync(`pkill -f 'chrome.*remote-debugging-port=${port}'`); } catch {}
+        }
+        this._resetCdpUrl();
         log.info('Chrome killed');
         return { success: true, message: 'Logout completo. Chrome fechado.' };
       } catch (e) {
@@ -1234,24 +1310,29 @@ class KimiBridge {
   }
 
   /**
-   * Check if there's already a visible Chrome running and return details.
+   * Check if there's already a visible Chrome running on any CDP port.
+   * Returns details including which port is in use.
    */
   async getChromeStatus() {
     const { execSync } = require('child_process');
-    try {
-      const psOutput = execSync("ps aux | grep 'chrome.*remote-debugging-port=9222' | grep -v grep", { encoding: 'utf8' });
-      const isHeadless = psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless');
-      const profileMatch = psOutput.match(/--user-data-dir=([^\s]+)/);
-      const pidMatch = psOutput.match(/^\S+\s+(\d+)/);
-      return {
-        running: true,
-        isHeadless: !!isHeadless,
-        profileDir: profileMatch ? profileMatch[1] : null,
-        pid: pidMatch ? parseInt(pidMatch[1]) : null,
-      };
-    } catch {
-      return { running: false };
+    for (const port of CDP_PORTS) {
+      try {
+        const psOutput = execSync(`ps aux | grep 'chrome.*remote-debugging-port=${port}' | grep -v grep`, { encoding: 'utf8' });
+        const isHeadless = psOutput.includes('--headless') || psOutput.includes('--ozone-platform=headless');
+        const profileMatch = psOutput.match(/--user-data-dir=([^\s]+)/);
+        const pidMatch = psOutput.match(/^\S+\s+(\d+)/);
+        return {
+          running: true,
+          isHeadless: !!isHeadless,
+          profileDir: profileMatch ? profileMatch[1] : null,
+          pid: pidMatch ? parseInt(pidMatch[1]) : null,
+          port,
+        };
+      } catch {
+        // No Chrome on this port, try next
+      }
     }
+    return { running: false };
   }
 
   /**
