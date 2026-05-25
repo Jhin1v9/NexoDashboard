@@ -99,7 +99,7 @@ async function saveIdeasData(data) {
     _meta: data._meta || {}
   };
   backupJSON(IDEAS_FILE);
-  await saveIdeasData(data);
+  await _writeJSON(IDEAS_FILE, jsonData);
 }
 
 const readJSON = (file, defaultValue = null) => {
@@ -1471,6 +1471,27 @@ module.exports = function(requireAuth) {
 
     } catch (err) {
       console.error('[IDEAS] Add comment error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ==========================================================================
+  // 6b. GET /api/ideas/:id/comments - Listar comentarios
+  // ==========================================================================
+  router.get('/:id/comments', requireAuth, async (req, res) => {
+    try {
+      const ideaId = req.params.id;
+      const ideasData = await loadIdeasData();
+      const idea = ideasData.ideas && ideasData.ideas[ideaId];
+
+      if (!idea) {
+        return res.status(404).json({ success: false, error: 'Ideia nao encontrada' });
+      }
+
+      res.json({ success: true, data: { comments: idea.comments || [] } });
+
+    } catch (err) {
+      console.error('[IDEAS] List comments error:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });

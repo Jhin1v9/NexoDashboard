@@ -64,12 +64,14 @@ module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
 const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
-const { OllamaClient } = require('./services/ollama-client.js');
+// Ollama REMOVIDO — será substituído por API externa
+// const { OllamaClient } = require('./services/ollama-client.js');
 
-const lunaOllama = new OllamaClient({ timeout: 60000, intentModel: 'gemma3:1b', chatModel: 'gemma3:1b' });
+// const lunaOllama = new OllamaClient({ timeout: 60000, intentModel: 'gemma3:1b', chatModel: 'gemma3:1b' });
+const lunaOllama = null; // Desabilitado — será substituído por API
 const lunaIntentParser = new IntentParser({
   genAI,
-  ollama: lunaOllama,
+  ollama: null, // Desabilitado
   geminiModel: 'gemini-2.5-flash-lite',
   timeout: 15000
 });
@@ -93,7 +95,7 @@ async function resolveDashboardAuthor(reqBodyAuthor) {
       return reqBodyAuthor;
     }
     return activeUser.name || activeId;
-  } catch {
+  } catch (e) {
     return reqBodyAuthor || 'Abner';
   }
 }
@@ -104,7 +106,7 @@ const readJSON = (file, defaultValue = null) => {
     let raw = fs.readFileSync(file, 'utf8');
     if (raw.charCodeAt(0) === 0xFEFF) raw = raw.substring(1);
     return JSON.parse(raw);
-  } catch { return defaultValue; }
+  } catch (e) { return defaultValue; }
 };
 const writeJSON = (file, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -145,7 +147,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
-  } catch {
+  } catch (e) {
     // Fallback: aceita INTERNAL_API_TOKEN como token de serviço
     const serviceToken = process.env.INTERNAL_API_TOKEN;
     if (serviceToken && token === serviceToken) {
@@ -966,7 +968,7 @@ app.use((req, res, next) => {
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
-  } catch {
+  } catch (e) {
     return res.status(401).json({ success: false, error: 'Token inválido ou expirado' });
   }
 });
@@ -3811,7 +3813,7 @@ app.get('/api/luna/status', async (req, res) => {
                     agentPid = parseInt(pids[0], 10);
                     break;
                 }
-            } catch { /* não está rodando */ }
+            } catch (e) { /* não está rodando */ }
         }
 
         // Verificar conexão com Chrome CDP
@@ -3819,7 +3821,7 @@ app.get('/api/luna/status', async (req, res) => {
         try {
             execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
             chromeConnected = true;
-        } catch { /* Chrome offline */ }
+        } catch (e) { /* Chrome offline */ }
 
         res.json({
             success: true,
@@ -3871,7 +3873,7 @@ app.post('/api/luna/control', (req, res) => {
             try {
                 execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
                 execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
-            } catch {}
+            } catch (e) {}
             return res.json({ success: true, action: 'stop', message: 'Luna desligada.' });
         }
         
@@ -3879,7 +3881,7 @@ app.post('/api/luna/control', (req, res) => {
             try {
                 execSync('pgrep -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
                 return res.json({ success: true, action: 'start', message: 'Luna ja estava ligada.' });
-            } catch {
+            } catch (e) {
                 const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
                 execSync(script, { stdio: 'ignore' });
                 return res.json({ success: true, action: 'start', message: 'Luna iniciada.' });
@@ -3890,12 +3892,12 @@ app.post('/api/luna/control', (req, res) => {
             try {
                 execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
                 execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
-            } catch {}
+            } catch (e) {}
             setTimeout(() => {
                 try {
                     const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
                     execSync(script, { stdio: 'ignore' });
-                } catch {}
+                } catch (e) {}
             }, 2000);
             return res.json({ success: true, action: 'restart', message: 'Luna reiniciando em 2 segundos...' });
         }
@@ -3990,7 +3992,7 @@ app.get('/api/luna/diagnose', (req, res) => {
             if (!cp.hashes || !Array.isArray(cp.hashes)) {
                 errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint corrompido', severity: 'high' });
             }
-        } catch {
+        } catch (e) {
             errors.push({ type: 'CORRUPT_CHECKPOINT', message: 'Checkpoint não é JSON válido', severity: 'high' });
         }
     }
@@ -4048,7 +4050,7 @@ app.post('/api/luna/stop', (req, res) => {
       if (!line.includes('luna-daemon.mjs') && !line.includes('luna-scheduler.mjs')) continue;
       const pid = Number(line.split(',').pop());
       if (Number.isFinite(pid) && pid > 0) {
-        try { process.kill(pid); killed.push(pid); } catch {}
+        try { process.kill(pid); killed.push(pid); } catch (e) {}
       }
     }
     res.json({ success: true, message: 'Luna parado', killed });
@@ -5133,7 +5135,7 @@ function readDismissed() {
   try {
     const raw = fs.readFileSync(LUNA_DISMISSED_FILE, 'utf8');
     return JSON.parse(raw);
-  } catch { return { version: '1.0', dismissed: [] }; }
+  } catch (e) { return { version: '1.0', dismissed: [] }; }
 }
 
 function writeDismissed(data) {
@@ -5223,7 +5225,7 @@ async function buildActionCenterItems(dataDir) {
           module: 'comunicacao',
           entityId: d.id,
           actions: [
-            { label: 'Aprovar', intent: 'email.enviar', primary: true },
+            { label: 'Enviar', href: `/email?draft=${d.id}&compose=1`, primary: true },
             { label: 'Revisar', href: `/email?draft=${d.id}` },
           ],
           dismissable: true,
@@ -5595,7 +5597,6 @@ app.post('/api/luna/chat', async (req, res) => {
     } catch (nluErr) {
       console.error('[LunaChat] NLU erro:', nluErr.message);
     }
-
     // 2B. SE NLU NÃO RECONHECEU → usa regex fast-path ou LLM
     if (!parsed) {
       const buffer = await readLunaBuffer();
@@ -5991,61 +5992,11 @@ ${dataContext}`;
     let usedModel = 'gemini-2.5-flash-lite';
     let isFallback = false;
 
-    // Try Ollama first for social/knowledge questions (offline, no API key needed)
-    const isSocialQuestion = parsed.intent === 'social' &&
-      !/\b(oi|olá|ola|opa|e aí|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)\b/i.test(msg);
-
-    if (isSocialQuestion && lunaOllama) {
-      try {
-        const ollamaMessages = [
-          { role: 'system', content: 'Você é a Luna, assistente brasileira direta e prestativa. Responda em português de forma natural e concisa. Máximo 100 palavras.' },
-          { role: 'user', content: msg }
-        ];
-        reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 256 });
-        reply = reply.trim();
-        usedModel = 'ollama-gemma3:1b';
-      } catch (ollamaErr) {
-        console.warn('[CONCIERGE] Ollama social chat failed:', ollamaErr.message);
-        // Fall through to Gemini or static fallback
-      }
-    }
-
-    // If Ollama didn't produce a reply, try Gemini
-    if (!reply) {
-      try {
-        const geminiResult = await genAI.models.generateContent({
-          model: usedModel,
-          contents,
-          config: {
-            systemInstruction: systemPrompt,
-            temperature: 0.7,
-            maxOutputTokens: 1024
-          }
-        });
-        reply = (geminiResult.text || '...').trim();
-      } catch (geminiErr) {
-        // LLM indisponível — try Ollama as last resort, then static fallback
-        console.warn('[CONCIERGE] Gemini indisponível, tentando Ollama...', geminiErr.message);
-        if (lunaOllama) {
-          try {
-            const ollamaMessages = [
-              { role: 'system', content: systemPrompt.slice(0, 800) },
-              ...contents.map(c => ({ role: c.role, content: c.parts[0].text }))
-            ];
-            reply = await lunaOllama.chat(ollamaMessages, { temperature: 0.7, maxTokens: 512 });
-            reply = reply.trim();
-            usedModel = 'ollama-gemma3:1b';
-          } catch (ollamaErr2) {
-            console.warn('[CONCIERGE] Ollama também indisponível:', ollamaErr2.message);
-          }
-        }
-        if (!reply) {
-          usedModel = 'fallback';
-          isFallback = true;
-          reply = await buildChatFallbackReply(msg.trim());
-        }
-      }
-    }
+    // LLM desabilitado (Ollama removido, API será integrada depois)
+    // Usa fallback estático para respostas sociais
+    usedModel = 'fallback';
+    isFallback = true;
+    reply = await buildChatFallbackReply(msg.trim());
 
     res.json({ success: true, reply, model: usedModel, intent: parsed?.intent || 'chat', fallback: isFallback, timestamp: new Date().toISOString() });
 
@@ -6113,7 +6064,7 @@ app.post('/api/luna/chat/stream', async (req, res) => {
     const isGreeting = /\b(oi|olá|ola|opa|e aí|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)\b/i.test(msg);
     const isSocial = parsed.intent === 'social' || (parsed.intent === 'unknown' && !isGreeting);
 
-    if (!isSocial || !lunaOllama) {
+    if (!isSocial) {
       // Non-streaming fallback — just return JSON
       return res.json({ success: false, error: 'Not a streaming request', intent: parsed.intent });
     }
@@ -6132,26 +6083,12 @@ app.post('/api/luna/chat/stream', async (req, res) => {
     // Send initial metadata event
     res.write(`event: meta\ndata: ${JSON.stringify({ intent: 'chat', model: 'ollama-gemma3:1b' })}\n\n`);
 
-    let hasContent = false;
-    for await (const chunk of lunaOllama.chatStream(ollamaMessages, { temperature: 0.7, maxTokens: 256 })) {
-      if (chunk.error) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: chunk.error })}\n\n`);
-        break;
-      }
-      if (chunk.text) {
-        hasContent = true;
-        res.write(`data: ${JSON.stringify({ token: chunk.text })}\n\n`);
-      }
-      if (chunk.done) break;
-    }
-
-    res.write(`event: done\ndata: ${JSON.stringify({ complete: true })}\n\n`);
-    res.end();
-
+    // Stream desabilitado — Ollama removido
+    res.json({ success: true, reply: 'Modo stream desabilitado.', timestamp: new Date().toISOString() });
+    return;
   } catch (e) {
     console.error('[LunaStream] Erro:', e.message);
-    res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
-    res.end();
+    res.json({ success: false, error: e.message });
   }
 });
 
@@ -6317,6 +6254,7 @@ app.post('/api/luna/threads/:id/messages', async (req, res) => {
       messages: [userMessage, lunaMessage],
       ...chatResult
     });
+    console.log(`[LUNA_PERF] Total /api/luna/threads/:id/messages: ${Date.now() - t0}ms`);
 
   } catch (err) {
     console.error('[THREADS] Erro ao enviar mensagem:', err.message);
@@ -6667,7 +6605,7 @@ app.post('/api/luna/command', async (req, res) => {
           const lines = (stdout || '').split(/\r?\n/).filter(Boolean);
           for (const line of lines) {
             const pid = Number(line.trim());
-            if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch {} }
+            if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch (e) {} }
           }
         });
         result = { status: 'stopping' };
@@ -6756,7 +6694,7 @@ app.post('/api/luna/command', async (req, res) => {
           try {
             const diagResult = JSON.parse(diagOutput);
             broadcast({ type: 'luna:diagnose', data: diagResult });
-          } catch {}
+          } catch (e) {}
         });
         result = { pid: diagProc.pid, action: 'diagnose running' };
         break;
@@ -8010,10 +7948,10 @@ function getProcessPid(pattern) {
             try {
                 const cmdline = fs.readFileSync('/proc/' + pidStr + '/cmdline', 'utf8').replace(/\0/g, ' ');
                 if (cmdline.includes(pattern)) return parseInt(pidStr, 10);
-            } catch { /* ignore */ }
+            } catch (e) { /* ignore */ }
         }
         return null;
-    } catch { return null; }
+    } catch (e) { return null; }
 }
 
 function isProcessRunning(pattern) {
@@ -8030,7 +7968,7 @@ app.get('/api/system/status', (req, res) => {
         try {
             execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
             chromeConnected = true;
-        } catch {}
+        } catch (e) {}
         res.json({
             success: true,
             timestamp: new Date().toISOString(),
@@ -8086,30 +8024,30 @@ app.post('/api/system/control', (req, res) => {
 
         if (service === 'backend') {
             if (action === 'stop' || action === 'restart') {
-                try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
                 setTimeout(() => {
-                    try { execSync(backendScript, { stdio: 'ignore' }); } catch {}
+                    try { execSync(backendScript, { stdio: 'ignore' }); } catch (e) {}
                 }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'frontend') {
             if (action === 'stop' || action === 'restart') {
-                try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
                 setTimeout(() => {
-                    try { execSync(frontendScript, { stdio: 'ignore' }); } catch {}
+                    try { execSync(frontendScript, { stdio: 'ignore' }); } catch (e) {}
                 }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'luna') {
             if (action === 'stop' || action === 'restart') {
-                try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch {}
-                try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch (e) {}
+                try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
                 setTimeout(() => {
@@ -8122,15 +8060,15 @@ app.post('/api/system/control', (req, res) => {
                             });
                             p.unref();
                         }
-                    } catch {}
+                    } catch (e) {}
                 }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'supervisor') {
             if (action === 'stop' || action === 'restart') {
-                try { execSync('pkill -f "supervisor.sh"', { stdio: 'ignore' }); } catch {}
-                try { execSync('pkill -f "supervisor.js"', { stdio: 'ignore' }); } catch {}
+                try { execSync('pkill -f "supervisor.sh"', { stdio: 'ignore' }); } catch (e) {}
+                try { execSync('pkill -f "supervisor.js"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
                 setTimeout(() => {
@@ -8143,7 +8081,7 @@ app.post('/api/system/control', (req, res) => {
                             });
                             p.unref();
                         }
-                    } catch {}
+                    } catch (e) {}
                 }, action === 'restart' ? 2000 : 0);
             }
         }
@@ -8171,7 +8109,7 @@ app.get('/api/stack-status', (req, res) => {
     const lunaPid = lunaStatus.pid || null;
     
     const isPortOpen = (port) => {
-      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
     };
 
     res.json({
@@ -8235,10 +8173,10 @@ app.post('/api/auto-fix/check-now', (req, res) => {
   try {
     const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {});
     const isPortOpen = (port) => {
-      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
     };
     const hasDaemon = () => {
-      try { execSync('pgrep -f "luna-daemon.mjs"', { stdio: 'ignore' }); return true; } catch { return false; }
+      try { execSync('pgrep -f "luna-daemon.mjs"', { stdio: 'ignore' }); return true; } catch (e) { return false; }
     };
 
     const results = {
@@ -8277,32 +8215,32 @@ app.post('/api/auto-fix/fix/:service', (req, res) => {
     let details = '';
 
     if (service === 'backend') {
-      try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch {}
+      try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch (e) {}
       setTimeout(() => {
         try {
           const script = `cd ${ROOT_DIR}/backend && nohup node server.js > ${ROOT_DIR}/backend.log 2>&1 &`;
           execSync(script, { stdio: 'ignore' });
-        } catch {}
+        } catch (e) {}
       }, 2000);
       success = true;
       details = 'Backend reiniciado';
     }
 
     if (service === 'frontend') {
-      try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch {}
+      try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch (e) {}
       setTimeout(() => {
         try {
           const script = `cd ${ROOT_DIR}/frontend && nohup npm run dev > ${ROOT_DIR}/frontend.log 2>&1 &`;
           execSync(script, { stdio: 'ignore' });
-        } catch {}
+        } catch (e) {}
       }, 2000);
       success = true;
       details = 'Frontend reiniciado';
     }
 
     if (service === 'luna_daemon') {
-      try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch {}
-      try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch {}
+      try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch (e) {}
+      try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch (e) {}
       setTimeout(() => {
         try {
           const daemonPath = path.join(ROOT_DIR, 'agents', 'luna-daemon.mjs');
@@ -8313,7 +8251,7 @@ app.post('/api/auto-fix/fix/:service', (req, res) => {
             });
             p.unref();
           }
-        } catch {}
+        } catch (e) {}
       }, 2000);
       success = true;
       details = 'Luna daemon reiniciado';
@@ -8322,7 +8260,7 @@ app.post('/api/auto-fix/fix/:service', (req, res) => {
     if (service === 'chrome_cdp') {
       // Tentar reconectar ao Chrome CDP — não podemos iniciar o Chrome do nada sem saber o caminho
       const isPortOpen = (port) => {
-        try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch { return false; }
+        try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
       };
       if (isPortOpen(9223)) {
         success = true;
@@ -9214,10 +9152,18 @@ async function startServer() {
   server.listen(PORT, BIND_IP, async () => {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
 
-    // ── Preload Ollama model to avoid cold starts ──
-    if (lunaOllama && typeof lunaOllama.preload === 'function') {
-      lunaOllama.preload().catch(() => {});
+    // ── Preload NLU model (BLOQUEANTE — backend só fica online quando NLU estiver pronto) ──
+    if (lunaNLU && typeof lunaNLU.process === 'function') {
+      try {
+        console.log('[NLU Preload] Aquecendo modelo NLU...');
+        await lunaNLU.process('warmup', 'pt');
+        console.log('[NLU Preload] ✅ NLU pronto para uso');
+      } catch (e) {
+        console.warn('[NLU Preload] ⚠️ Warmup falhou:', e.message);
+      }
     }
+
+    // Ollama REMOVIDO — será substituído por API externa
 
     // ── Iniciar Telegram Bot automaticamente (se token configurado e não desabilitado) ──
     try {

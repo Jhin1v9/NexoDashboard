@@ -45,10 +45,13 @@ function buildToastFromData(data) {
 
   const { breakdown = {} } = data
 
+  // IDs estáveis baseados no tipo + contagem — assim dismissed funciona corretamente
+  // Se a contagem mudar, o ID muda e o toast reaparece (comportamento correto)
+
   // CRITICAL: tarefas P0 ou alerts ativos
   if (breakdown.tasksCritical > 0) {
     return {
-      id: `critical-tasks-${Date.now()}`,
+      id: `critical-tasks-${breakdown.tasksCritical}`,
       type: 'critical',
       icon: Flame,
       title: `${breakdown.tasksCritical} tarefa(s) P0 crítica(s)`,
@@ -58,7 +61,7 @@ function buildToastFromData(data) {
   }
   if (breakdown.alertsActive > 0) {
     return {
-      id: `critical-alerts-${Date.now()}`,
+      id: `critical-alerts-${breakdown.alertsActive}`,
       type: 'critical',
       icon: AlertTriangle,
       title: `${breakdown.alertsActive} alerta(s) ativo(s)`,
@@ -70,7 +73,7 @@ function buildToastFromData(data) {
   // WARNING: tarefas atrasadas
   if (breakdown.tasksOverdue > 0) {
     return {
-      id: `warning-overdue-${Date.now()}`,
+      id: `warning-overdue-${breakdown.tasksOverdue}`,
       type: 'warning',
       icon: ClipboardList,
       title: `${breakdown.tasksOverdue} tarefa(s) atrasada(s)`,
@@ -82,7 +85,7 @@ function buildToastFromData(data) {
   // INFO: emails pendentes
   if (breakdown.emailsPending > 0) {
     return {
-      id: `info-emails-${Date.now()}`,
+      id: `info-emails-${breakdown.emailsPending}`,
       type: 'info',
       icon: Mail,
       title: `${breakdown.emailsPending} rascunho(s) pendente(s)`,
@@ -94,7 +97,7 @@ function buildToastFromData(data) {
   // INFO: leads novos
   if (breakdown.leadsNew > 0) {
     return {
-      id: `info-leads-${Date.now()}`,
+      id: `info-leads-${breakdown.leadsNew}`,
       type: 'info',
       icon: DollarSign,
       title: `${breakdown.leadsNew} lead(s) novo(s)`,

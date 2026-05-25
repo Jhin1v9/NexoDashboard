@@ -8,6 +8,7 @@ import {
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
 import { useLunaContext } from '../../hooks/useLunaContext'
+import { lunaEventBus } from '../../lib/lunaEventBus'
 import EditablePreviewCard from './EditablePreviewCard'
 import LunaInlinePreview from './LunaInlinePreview'
 import LunaMarkdown from './LunaMarkdown'
@@ -207,6 +208,20 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     fetchThreads()
   }, [])
 
+  // Listen for voice messages from FAB
+  useEffect(() => {
+    const handleVoiceMessage = ({ text }) => {
+      setChatInput(text)
+      setTimeout(() => {
+        inputRef.current?.focus()
+        sendChatMessage(text)
+      }, 200)
+    }
+    lunaEventBus.on('luna:voiceMessage', handleVoiceMessage)
+    return () => lunaEventBus.off('luna:voiceMessage', handleVoiceMessage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThreadId])
+
   // Load messages when thread changes
   useEffect(() => {
     if (activeThreadId) fetchThreadMessages(activeThreadId)
@@ -315,9 +330,9 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     }
   }
 
-  const sendChatMessage = async () => {
-    if (!chatInput.trim()) return
-    const text = chatInput.trim()
+  const sendChatMessage = async (overrideText = null) => {
+    const text = overrideText || chatInput.trim()
+    if (!text) return
     setChatInput('')
     setChatLoading(true)
 
@@ -559,7 +574,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
     }))
   }
 
-  const confirmPendingActions = async (confirm, editedFields = null) => {
+  const confirmPendingActions = async (confirm, editedFields = null, actionsOverride = null) => {
     if (!confirm) {
       setPendingConfirmation(null)
       const cancelMsg = {
@@ -578,14 +593,15 @@ export default function LunaChatPanel({ isOpen, onClose }) {
       speak(cancelMsg.text)
       return
     }
-    if (!pendingConfirmation) return
+    const actions = actionsOverride || pendingConfirmation?.actions
+    if (!actions) return
     setChatLoading(true)
     try {
       const payload = {
         text: 'sim',
         authorName: activeUser,
         confirmActions: true,
-        pendingActions: pendingConfirmation.actions
+        pendingActions: actions
       }
       if (editedFields) {
         payload.editedFields = editedFields
@@ -604,7 +620,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
       }
       setPendingConfirmation(null)
     } catch (e) {
-      console.error('[LunaChatPanel] Erro ao confirmar ações:', e.message)
+      console.error('[LunaChatPanel] Erro ao confirmar ações:', e.message, e.response?.data)
     } finally {
       setChatLoading(false)
     }
@@ -678,11 +694,11 @@ export default function LunaChatPanel({ isOpen, onClose }) {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.8 }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[90vw] z-[9981] flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[92vw] z-[9999] flex flex-col overflow-hidden"
             style={{
               background: 'linear-gradient(180deg, rgba(8,8,12,0.98) 0%, rgba(15,15,22,0.96) 100%)',
-              borderLeft: '1px solid rgba(0,240,255,0.15)',
-              boxShadow: '-8px 0 40px rgba(0,240,255,0.05), -2px 0 20px rgba(155,89,182,0.05)'
+              borderLeft: '2px solid rgba(0,240,255,0.25)',
+              boxShadow: '-8px 0 40px rgba(0,240,255,0.1), -2px 0 20px rgba(155,89,182,0.08)'
             }}
           >
             <ScanLines />
@@ -898,8 +914,7 @@ export default function LunaChatPanel({ isOpen, onClose }) {
                             'Confirmar'
                           }
                           onSubmit={(edited) => {
-                            setPendingConfirmation({ actions: msg.actions, messageId: msg.id })
-                            confirmPendingActions(true, edited)
+                            confirmPendingActions(true, edited, msg.actions)
                           }}
                           onCancel={() => confirmPendingActions(false)}
                         />

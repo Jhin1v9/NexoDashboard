@@ -35,10 +35,11 @@ class LunaChatPage {
   }
 
   async getLastLunaMessage() {
-    const messages = this.page.locator('[class*="rounded-2xl"]').filter({ hasText: /./ });
-    const count = await messages.count();
+    // Mensagens da Luna têm rounded-tl-sm (não rounded-tr-sm que é do usuário)
+    const lunaMessages = this.page.locator('[class*="rounded-tl-sm"]').filter({ hasText: /./ });
+    const count = await lunaMessages.count();
     if (count === 0) return null;
-    return messages.nth(count - 1);
+    return lunaMessages.nth(count - 1);
   }
 
   async hasConfirmationCard() {
@@ -78,9 +79,10 @@ class LunaChatPage {
     if (confirmText) {
       await this.fillConfirmText(confirmText);
     }
-    const confirmBtn = this.page.locator('button:has-text("Confirmar"), button:has-text("✅ Confirmar"), button:has-text("Sim, excluir")').first();
+    // Clica no último botão Confirmar (o do card atual)
+    const confirmBtn = this.page.locator('button:has-text("Confirmar"), button:has-text("✅ Confirmar"), button:has-text("Sim, excluir")').last();
     await confirmBtn.click();
-    await this.page.waitForTimeout(3000);
+    await this.page.waitForTimeout(5000);
   }
 
   async clickCancel() {
@@ -95,7 +97,7 @@ class LunaChatPage {
     return lastMsg.innerText();
   }
 
-  async waitForLunaResponse(timeout = 8000) {
+  async waitForLunaResponse(timeout = 12000) {
     // Aguarda o indicador "pensando" desaparecer
     const thinking = this.page.locator('text=Luna está pensando').first();
     try {
@@ -104,7 +106,7 @@ class LunaChatPage {
       // Se não apareceu "pensando", segue em frente
     }
     // Aguarda mais um pouco para renderização
-    await this.page.waitForTimeout(1500);
+    await this.page.waitForTimeout(2000);
   }
 }
 

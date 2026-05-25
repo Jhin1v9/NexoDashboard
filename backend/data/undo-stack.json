@@ -1,1 +1,34 @@
-{}
+{
+  "group": {
+    "undo": [],
+    "redo": [
+      {
+        "id": "undo_1779668697406_mza1ob",
+        "type": "delete_task",
+        "description": "Excluir tarefa \"Ligar para fornecedor\"",
+        "before": {
+          "id": "1779668673009",
+          "title": "Ligar para fornecedor",
+          "description": "tarefa de teste",
+          "status": "pending",
+          "priority": "low",
+          "taskType": "one_time",
+          "dueDate": null,
+          "addedBy": "sistema",
+          "assignedTo": null,
+          "source": "manual",
+          "comments": [],
+          "createdAt": "2026-05-25T00:24:33.009Z",
+          "updatedAt": "2026-05-25T00:24:33.009Z",
+          "startedAt": null,
+          "completedAt": null
+        },
+        "after": null,
+        "restoreFn": null,
+        "module": "/api/tasks",
+        "timestamp": 1779668697406,
+        "expiresAt": 1779668727406
+      }
+    ]
+  }
+}

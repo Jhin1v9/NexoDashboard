@@ -74,8 +74,12 @@ function ActionCard({ item, onDismiss, onActionDone }) {
 
   const handlePrimaryAction = async (action) => {
     if (action.href) {
-      window.location.href = action.href
-      onActionDone?.(item.id)
+      // Navegação SPA via eventBus — evita full reload e unmount prematuro
+      lunaEventBus.emit('luna:actionCompleted', {
+        actions: [{ type: 'navigate', params: { destino: action.href } }]
+      })
+      // Delay pra garantir que o navigate aconteça antes do card sumir
+      setTimeout(() => onActionDone?.(item.id), 300)
       return
     }
     if (action.intent) {

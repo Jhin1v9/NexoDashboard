@@ -654,3 +654,40 @@ Ver seção "Bugs Observados" acima.
 - **Email OAuth:** ✅ Mostra erro real se falhar, rota acessível
 - **Caixa/Outras páginas:** ✅ Fetch global interceptado, todas as páginas com token
 - **Notificações:** ✅ Dropdown abre inline
+
+---
+
+## 🌙 Sessão Atual — Luna FAB + Proactive Fixes + Voice Integration
+
+> **Instância:** `kimi-atual` 🟢 — 2026-05-25  
+> **Foco:** Correções visuais no botão flutuante, integração de voz no FAB, e fixes no sistema proativo  
+
+### ✅ Bugs Corrigidos
+
+| # | Bug | Causa Raiz | Fix |
+|---|---|---|---|
+| 1 | **Botão flutuante some da tela** | `clampPos` permitia valores de `-maxX` até `+maxX`. Com `fixed bottom-6 right-6` + `translate3d`, botão podia ir infinitamente para direita/baixo | `clampPos` corrigido: `x` limitado a `[-maxOffset, 0]`, `y` idem. Botão sempre visível |
+| 2 | **Botão pequeno/difícil de ver** | Tamanho 56px + glow fraco | Tamanho aumentado para **72px**, ícone 28px, glow pulsante mais forte (2.5s loop), anel externo sempre visível |
+| 3 | **Voz só funciona dentro do chat** | `LunaVoiceInput` só existia no input do `LunaChatPanel` | Long-press (600ms) no FAB ativa STT diretamente. Botão fica verde com glow em expansão. Solta → abre chat e envia automaticamente |
+| 4 | **Toast proativo infinito** | `buildToastFromData` usava `Date.now()` no ID (`critical-tasks-1712345678901`). A cada 60s, mesmo item gerava ID novo → dismissed nunca batia | IDs estáveis baseados em **tipo + contagem** (`critical-tasks-3`). Se contagem muda, ID muda e toast reaparece (comportamento correto) |
+| 5 | **Botão "Revisar" não funciona** | `window.location.href` em SPA React causa full reload + `onActionDone` remove card antes do navigate | Navegação via `lunaEventBus` (`luna:actionCompleted` tipo `navigate`) + delay 300ms antes de remover card |
+| 6 | **Botão "Enviar" (Aprovar email) não funciona** | `buildActionCenterItems` gerava `intent: 'email.enviar'` mas `/api/luna/batch` **não suportava** `email.enviar` | Backend: ação alterada de `intent: 'email.enviar'` para `href: '/email?draft=X&compose=1'`. Frontend já suporta href corretamente |
+| 7 | **Chat panel com z-index baixo** | `z-[9981]` podia ser sobreposto por outros elementos | `z-[9999]` + `overflow-hidden` + borda 2px cyan mais visível |
+
+### 📁 Arquivos Modificados
+- `frontend/src/components/luna/LunaFloatingButton.jsx` — clampPos corrigido, tamanho 72px, long-press voz (600ms), glow pulsante, label "Clique · Segure p/ voz"
+- `frontend/src/components/luna/LunaChatPanel.jsx` — z-[9999], overflow-hidden, border 2px, listener `luna:voiceMessage` do FAB
+- `frontend/src/components/luna/LunaProactiveToast.jsx` — IDs estáveis (tipo + contagem) em vez de Date.now()
+- `frontend/src/components/luna/LunaActionCenter.jsx` — Navegação href via eventBus em vez de window.location.href
+- `backend/server.js` — `buildActionCenterItems`: email action de `intent: 'email.enviar'` para `href: '/email?draft=X&compose=1'`
+
+### 🧪 Testes
+- **Build Vite:** ✅ 0 erros (3151 modules)
+- **Backend start:** ✅ Porta 3456 respondendo
+- **API health:** ✅ `{"status":"ok"}`
+
+### ⚠️ NOTA PARA OUTRA INSTÂNCIA KIMI
+- **NÃO alterar** a lógica de `clampPos` no `LunaFloatingButton.jsx` — está calibrada para manter o botão visível
+- **NÃO alterar** a lógica de IDs no `LunaProactiveToast.jsx` — `buildToastFromData` usa IDs estáveis por design
+- **NÃO remover** o listener `luna:voiceMessage` do `LunaChatPanel.jsx` — é o canal de comunicação FAB → Chat
+- Se for trabalhar no **ActionCenter**: a navegação agora é via `lunaEventBus.emit('luna:actionCompleted')` — manter esse padrão

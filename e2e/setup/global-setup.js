@@ -73,7 +73,7 @@ module.exports = async function globalSetup() {
   await waitForUrl('http://localhost:3456/api/health');
   console.log('✅ Backend online (porta 3456)');
 
-  // 3. Sobe o frontend (preview do build)
+  // 3. Sobe o frontend (preview do build estático)
   const frontend = spawn('npx', ['vite', 'preview', '--port', '3457'], {
     cwd: path.join(rootDir, 'frontend'),
     env: process.env,

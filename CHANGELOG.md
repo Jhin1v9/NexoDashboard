@@ -1,5 +1,37 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-25 — Fase 1C: Luna FAB + Proactive Fixes + Voice Integration
+
+### Added
+- **Voz no Botão Flutuante** (`frontend/src/components/luna/LunaFloatingButton.jsx`)
+  - Long-press (600ms) ativa STT diretamente no FAB
+  - Botão fica verde com glow em expansão durante gravação
+  - Solta → chat abre e envia transcrição automaticamente
+  - Label "Clique · Segure p/ voz" aparece ao hover
+  - Transcrição ao vivo em balão à esquerda do botão
+- **Anel pulsante permanente** no FAB — glow cyan visível mesmo sem notificações
+
+### Changed
+- `LunaFloatingButton.jsx` — tamanho aumentado 56px → 72px, ícone 20px → 28px
+- `LunaFloatingButton.jsx` — `clampPos` corrigido: botão nunca mais sai da tela
+- `LunaChatPanel.jsx` — z-[9999], overflow-hidden, border-left 2px cyan
+- `LunaProactiveToast.jsx` — IDs estáveis (tipo + contagem) em vez de Date.now()
+- `LunaActionCenter.jsx` — navegação href via `lunaEventBus` (navigate) em vez de `window.location.href`
+- `backend/server.js` — email action de `intent: 'email.enviar'` para `href: '/email?draft=X&compose=1'`
+
+### Fixed
+- Toast proativo aparecia infinitamente (ID mudava a cada 60s)
+- Botão "Revisar" no ActionCenter dava reload na página (SPA quebrado)
+- Botão "Enviar" (Aprovar email) não fazia nada (`email.enviar` não existia no batch)
+- FAB podia ser arrastado para fora da viewport e sumir
+
+### Testes
+- Build Vite: ✅ 3151 modules, 0 erros
+- Backend start: ✅ Porta 3456 respondendo
+- API health: ✅ `{"status":"ok"}`
+
+---
+
 ## [Unreleased] — 2026-05-23
 
 ### Added

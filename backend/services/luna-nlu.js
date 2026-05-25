@@ -4531,6 +4531,10 @@ async function train() {
       await manager.load(MODEL_PATH);
       isTrained = true;
       console.log('[LunaNLU] ✅ Modelo carregado de', MODEL_PATH);
+      // Warmup: primeira classificação do node-nlp é lenta devido a lazy init interno
+      const tWarmup = Date.now();
+      await manager.process('pt', 'warmup');
+      console.log(`[LunaNLU] 🏃 Warmup completo (${Date.now() - tWarmup}ms) — NLU pronto para uso`);
       return;
     } catch (e) {
       console.warn('[LunaNLU] Falha ao carregar modelo existente, treinando novo...');
