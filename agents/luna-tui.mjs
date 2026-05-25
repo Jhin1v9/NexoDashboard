@@ -104,7 +104,7 @@ function Header({ session, msgCount }) {
   );
 }
 
-function MessageItem({ msg }) {
+const MessageItem = React.memo(function MessageItem({ msg }) {
   if (msg.type === 'user') {
     return h(Box, { flexDirection: 'column', marginY: 1 },
       h(Box, { flexDirection: 'row' },
@@ -177,15 +177,13 @@ function MessageItem({ msg }) {
   }
 
   return null;
-}
+});
 
-function MessageList({ messages, streamingText, thinkingText, isStreaming, maxRows }) {
-  // Limit visible messages to prevent layout overflow in small terminals
-  const visibleCount = maxRows ? Math.max(1, Math.floor(maxRows / 2)) : messages.length;
-  const visibleMessages = messages.slice(-visibleCount);
-
+function MessageList({ messages, streamingText, thinkingText, isStreaming }) {
+  // Show all messages — Ink handles overflow naturally
+  // Using React.memo on MessageItem prevents re-render of old messages during streaming
   return h(Box, { flexDirection: 'column', width: '100%' },
-    visibleMessages.map(msg => h(MessageItem, { key: msg.id, msg })),
+    messages.map(msg => h(MessageItem, { key: msg.id, msg })),
 
     // Thinking mode: dimmed, lower opacity reasoning text
     isStreaming && thinkingText && h(Box, { flexDirection: 'column', marginY: 1 },
@@ -1264,7 +1262,7 @@ function App({ luna, sessionManager, initialSession }) {
       width: '100%',
       minHeight: 2,
     },
-      h(MessageList, { messages, streamingText, thinkingText, isProcessing, maxRows: Math.max(3, rows - 8) }),
+      h(MessageList, { messages, streamingText, thinkingText, isProcessing }),
     ),
 
     // Status
