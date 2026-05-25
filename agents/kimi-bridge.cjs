@@ -489,7 +489,10 @@ class KimiBridge {
    * Throws on timeout.
    */
   async _waitForResponse(page, mode = 'instant') {
-    const maxTimeout = mode === 'instant' ? 90000 : 180000;
+    // Generous timeouts: Kimi often pauses, re-reasons, and continues.
+    // We detect completion via action buttons + text stability, so we only
+    // hit timeout if Kimi truly hangs. Instant can take 5min+, Thinking 10min+.
+    const maxTimeout = mode === 'instant' ? 300000 : 600000;
     const startTime = Date.now();
 
     // Phase 1: Wait for action buttons (they appear when response is done)
