@@ -490,6 +490,24 @@ class KimiBridge {
    */
   async _extractResponse(page) {
     const strategies = [
+      // Strategy 1: Plain text from paragraph elements (avoids turndown markdown escaping)
+      {
+        type: 'paragraph',
+        selector: '.markdown-container .paragraph',
+        fn: async (el) => {
+          const texts = await el.allInnerTexts();
+          return texts.join('\n\n');
+        },
+      },
+      // Strategy 2: Direct innerText from markdown container
+      {
+        type: 'innerText',
+        selector: '.markdown-container .markdown',
+        fn: async (el) => {
+          return await el.innerText();
+        },
+      },
+      // Strategy 3: Turndown (markdown conversion — may escape chars like _)
       {
         type: 'turndown',
         selector: '.markdown-container .markdown',
@@ -499,14 +517,7 @@ class KimiBridge {
           return this.turndown.turndown(html);
         },
       },
-      {
-        type: 'paragraph',
-        selector: '.markdown-container .paragraph',
-        fn: async (el) => {
-          const texts = await el.allInnerTexts();
-          return texts.join('\n\n');
-        },
-      },
+      // Strategy 4: Fallback to body text
       {
         type: 'plaintext',
         selector: 'body',

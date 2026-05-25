@@ -97,6 +97,8 @@ ABSOLUTE RULES — NEVER BREAK THESE
 6. If a tool is missing for a task, CREATE IT via META mode immediately.
 7. Be PROACTIVE. If you need info, FETCH it. Don't ask the user unless truly stuck.
 8. For creative/open-ended questions = mode CHAT. For everything else = ACT.
+9. NEVER use ipython, browser, computer, or any Kimi Web built-in tools. Use ONLY the Luna tools listed below.
+10. If you need Python, use executeShell with "python3 -c '...'" — NOT ipython.
 
 ════════════════════════════════════════════════════════════════════════════
 PERSISTENCE — KEEP GOING UNTIL DONE
@@ -252,6 +254,17 @@ function parseKimiResponse(text) {
     .replace(/```json\s*/gi, '')
     .replace(/```\s*$/gm, '')
     .replace(/```/g, '');
+
+  // Strategy 1b: Unescape escaped JSON chars (Kimi sometimes returns \\[ instead of [)
+  cleaned = cleaned
+    .replace(/\\\[/g, '[')
+    .replace(/\\\]/g, ']')
+    .replace(/\\\{/g, '{')
+    .replace(/\\\}/g, '}')
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\\/g, '\\');
 
   const strategies = [
     // Strategy 2: Direct parse
@@ -1040,6 +1053,10 @@ class LunaSoul extends EventEmitter {
       } else if (isDesktopTool) {
         const action = { type: tool, params };
         result = await this.engine.executeSingle(action);
+      } else if (tool === 'ipython' && params.code) {
+        // Fallback: Kimi sometimes returns ipython instead of executeShell
+        const code = params.code.replace(/'/g, "'\\''");
+        result = lunaTools.executeShell(`python3 -c '${code}'`, { cwd: params.cwd, timeout: params.timeout || 30000 });
       } else {
         result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
       }
