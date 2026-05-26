@@ -850,7 +850,18 @@ class KimiBridge {
     const session = this.userSessions.get(userId);
 
     // Reset stream interceptor state to prevent cross-message contamination
-    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
+    await page.evaluate(() => {
+      if (window.__lunaResetStream) {
+        window.__lunaResetStream();
+      } else if (window.__lunaStream) {
+        // Fallback for pages created before the update
+        window.__lunaStream.reasoning = '';
+        window.__lunaStream.content = '';
+        window.__lunaStream.events = [];
+        window.__lunaStream.active = false;
+        window.__lunaStream.error = null;
+      }
+    });
 
     log.info(`Creating new chat for user ${hashUserId(userId)}`);
     await page.goto('https://kimi.com/?chat_enter_method=new_chat', { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -1019,7 +1030,18 @@ class KimiBridge {
     const page = await this._getOrCreateUserPage(userId);
 
     // Reset stream interceptor state to prevent cross-message contamination
-    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
+    await page.evaluate(() => {
+      if (window.__lunaResetStream) {
+        window.__lunaResetStream();
+      } else if (window.__lunaStream) {
+        // Fallback for pages created before the update
+        window.__lunaStream.reasoning = '';
+        window.__lunaStream.content = '';
+        window.__lunaStream.events = [];
+        window.__lunaStream.active = false;
+        window.__lunaStream.error = null;
+      }
+    });
     const session = this.userSessions.get(userId);
 
     // Cooldown check: wait for current processing to finish
@@ -2071,7 +2093,18 @@ class KimiBridge {
     const session = this.userSessions.get(userId);
 
     // Reset stream interceptor state to prevent cross-message contamination
-    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
+    await page.evaluate(() => {
+      if (window.__lunaResetStream) {
+        window.__lunaResetStream();
+      } else if (window.__lunaStream) {
+        // Fallback for pages created before the update
+        window.__lunaStream.reasoning = '';
+        window.__lunaStream.content = '';
+        window.__lunaStream.events = [];
+        window.__lunaStream.active = false;
+        window.__lunaStream.error = null;
+      }
+    });
 
     // Wait for any ongoing processing
     if (session.processing) {

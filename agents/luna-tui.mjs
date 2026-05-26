@@ -921,8 +921,8 @@ function App({ luna, sessionManager, initialSession }) {
       return;
     }
 
-    // /limpar
-    if (text === '/limpar') {
+    // /limpar (alias: /clear)
+    if (text === '/limpar' || text === '/clear') {
       sessionManager.clearContext(session.id);
       setMessages([]); return;
     }
