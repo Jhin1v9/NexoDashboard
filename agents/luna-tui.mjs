@@ -625,7 +625,7 @@ function HelpOverlay({ onClose }) {
     ['/sair, /exit', 'Encerra'],
     ['/reiniciar', 'Reinicia Luna para carregar atualizações'],
     ['/novo', 'Nova sessão'],
-    ['/newthread', 'Nova thread no Kimi Web (reset contexto)'],
+    ['/newaba', 'Nova aba no Kimi Web (reset contexto)'],
     ['/limpar', 'Limpa contexto'],
     ['/compact', 'Resume contexto e inicia nova thread'],
     ['/modo <nome>', 'Muda persona'],
@@ -874,8 +874,8 @@ function App({ luna, sessionManager, initialSession }) {
       setSession(s); setMessages([]); return;
     }
 
-    // /newthread — force new Kimi Web thread (full system prompt on next msg)
-    if (text === '/newthread') {
+    // /newaba — force new Kimi Web tab (full system prompt on next msg)
+    if (text === '/newaba') {
       setMessages(prev => [...prev, { type: 'system', content: '🔄 Criando nova thread no Kimi Web...', id: nextId(), timestamp: new Date().toISOString() }]);
       try {
         const result = await luna.newThread?.('luna-default');
