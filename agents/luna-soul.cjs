@@ -216,33 +216,32 @@ If you need to run 10 commands, run 10 commands.
 Your default state is ACTION, not conversation.
 
 ════════════════════════════════════════════════════════════════════════════
-OUTPUT FORMATS — USE XML TAGS (NOT RAW JSON)
+OUTPUT FORMATS — USE DOUBLE-BRACKET DELIMITERS (NOT RAW JSON)
 ════════════════════════════════════════════════════════════════════════════
 
-<response>Hello! How can I help?</response>
+[[response]]Hello! How can I help?[[/response]]
 → Chat/creative mode (CHAT / DONE)
 
-<response>Reading the file now...</response>
-<action>{"tool": "readFile", "params": {"path": "..."}}</action>
+[[response]]Reading the file now...[[/response]]
+[[action]]{"tool": "readFile", "params": {"path": "README.md"}}[[/action]]
 → Execute ONE tool (ACTION mode)
 
-<response>I'll do this in 3 steps...</response>
-<action>{"tool": "...", "params": {}}</action>
-<action>{"tool": "...", "params": {}}</action>
+[[response]]I'll do this in 3 steps...[[/response]]
+[[action]]{"tool": "searchFiles", "params": {"pattern": "TODO"}}[[/action]]
+[[action]]{"tool": "readFile", "params": {"path": "src/main.js"}}[[/action]]
 → Multi-step plan (PLAN mode)
 
-<response>Creating a new tool for you...</response>
-<meta>{"action": "create_tool", "params": {"name": "...", "code": "..."}}</meta>
+[[response]]Creating a new tool for you...[[/response]]
+[[meta]]{"action": "create_tool", "params": {"name": "analyzeCSV", "lang": "javascript", "code": "..."}}[[/meta]]
 → META mode
 
-<response>I suggest switching to the 'surgeon' persona...</response>
-<suggest>{"type": "persona", "target": "surgeon", "reason": "..."}</suggest>
+[[response]]I suggest switching to the 'surgeon' persona...[[/response]]
+[[suggest]]{"type": "persona", "target": "surgeon", "reason": "debugging task", "confidence": 0.95}[[/suggest]]
 → SUGGEST mode
 
-RULE: The <response> tag is REQUIRED in every answer. It contains your friendly message to the user.
-RULE: <action>, <meta>, <suggest> are OPTIONAL — only include when you need to execute something.
-RULE: NEVER wrap the entire output in a JSON object. Use tags directly.
-IMPORTANT: Use EXACTLY ONE < character for tags. Write <response> NOT <<response>.
+RULE: The [[response]]...[[/response]] delimiter is REQUIRED in every answer.
+RULE: [[action]], [[meta]], [[suggest]] are OPTIONAL — only include when you need to execute something.
+RULE: NEVER wrap the entire output in a JSON object. Use delimiters directly.
 
 ════════════════════════════════════════════════════════════════════════════
 TOOLS — YOU HAVE 32+ TOOLS. USE THEM.
@@ -374,7 +373,13 @@ Keep going until the task is COMPLETELY resolved. Only stop when you're sure.
 OUTPUT FORMAT REMINDER: Use double-bracket delimiters in EVERY response.
 [[response]]Your message here[[/response]]
 If executing a tool, add: [[action]]{"tool":"...","params":{}}[[/action]]
-NEVER wrap your entire output in a JSON object. Use delimiters directly.`;
+NEVER wrap your entire output in a JSON object. Use delimiters directly.
+
+TOOL REMINDER — NEVER BREAK THIS:
+- NEVER use ipython, browser, computer, or any Kimi Web built-in tools.
+- Use ONLY Luna tools: readFile, writeFile, replaceInFile, executeShell, searchFiles, grep, viewDirectory, gitStatus, gitCommit, searchWeb, fetchURL, downloadFile, clipboardRead, clipboardWrite.
+- If you need Python: use executeShell with "python3 -c '...'" — NOT ipython.
+- If you use ipython/browser/computer, your response will be REJECTED.`;
 }
 
 // ============================================================
@@ -465,7 +470,7 @@ function parseKimiResponse(text) {
 }
 
 // ============================================================
-// TAG-BASED PARSER (v3.1 — XML delimiters instead of raw JSON)
+// TAG-BASED PARSER (v3.1 — double-bracket delimiters instead of raw JSON)
 // ============================================================
 
 function parseTagResponse(text) {
@@ -1424,7 +1429,7 @@ class LunaSoul extends EventEmitter {
       const activeFilesContext = workspaceManager.getActiveFilesContext('luna-cli');
 
       // Build full prompt
-      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}${workspaceContext ? '\n\n--- WORKSPACE ---\n' + workspaceContext : ''}${activeFilesContext ? '\n\n' + activeFilesContext : ''}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando XML tags:`;
+      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}${workspaceContext ? '\n\n--- WORKSPACE ---\n' + workspaceContext : ''}${activeFilesContext ? '\n\n' + activeFilesContext : ''}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando delimitadores double-bracket:`;
 
       // Debug log
       if (process.env.LUNA_DEBUG) {
@@ -1440,8 +1445,9 @@ class LunaSoul extends EventEmitter {
       const miniReminder = `Você é Luna, agente autônomo de Abner Gabriel (CEO, NEXO DIGITAL S.L., Barcelona).
 REGRAS: Use delimitadores [[response]]...[[/response]] para texto. [[action]]{"tool":"...","params":{}}[[/action]] para ferramentas. NUNCA diga que não pode fazer algo — use ferramentas ou crie via META.
 EXEMPLO: [[response]]Oi! Como posso ajudar?[[/response]]
+IMPORTANTE: NUNCA use ipython, browser, computer ou ferramentas built-in do Kimi Web. Use SÓ as ferramentas Luna listadas abaixo.
 FERRAMENTAS: readFile, writeFile, replaceInFile, executeShell, searchFiles, grep, viewDirectory, gitStatus, gitCommit, searchWeb, fetchURL, downloadFile, clipboardRead, clipboardWrite.
-FORMATOS: [[response]]...[[/response]] | [[action]]...[[/action]] | [[meta]]...[[/meta]] | [[suggest]]...[[/suggest]]`;
+FORMATOS: [[response]]...[[/response]] | [[action]]{"tool":"...","params":{}}[[/action]] | [[meta]]{"action":"...","params":{}}[[/meta]] | [[suggest]]{"type":"...","target":"..."}[[/suggest]]`;
 
       // Workspace context (if set) — include in follow-ups too
       const workspaceCtx = workspaceManager.getFormattedManifest('luna-cli');
@@ -1452,9 +1458,9 @@ FORMATOS: [[response]]...[[/response]] | [[action]]...[[/action]] | [[meta]]...[
       const isToolResult = options.isToolResult === true;
       let prompt;
       if (isToolResult) {
-        prompt = `${miniReminder}${workspaceSnippet}\n\nResultado da ferramenta:\n${userInput}\n\nResponda usando XML tags com o próximo passo ou uma mensagem amigável ao usuário:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\nResultado da ferramenta:\n${userInput}\n\nResponda usando delimitadores double-bracket com o próximo passo ou uma mensagem amigável ao usuário:`;
       } else {
-        prompt = `${miniReminder}${workspaceSnippet}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}${activeFilesCtx ? '\n\n' + activeFilesCtx : ''}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando XML tags:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}${activeFilesCtx ? '\n\n' + activeFilesCtx : ''}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando delimitadores double-bracket:`;
       }
 
       // Debug log
@@ -1602,6 +1608,7 @@ FORMATOS: [[response]]...[[/response]] | [[action]]...[[/action]] | [[meta]]...[
     const tool = parsed.tool || parsed.action?.type;
     const params = parsed.params || parsed.action?.params || {};
     const reasoning = parsed.reasoning || '';
+    let result;
 
     // Store tool call
     this.sessionManager.appendEvent(sessionId, {
@@ -1710,9 +1717,8 @@ FORMATOS: [[response]]...[[/response]] | [[action]]...[[/action]] | [[meta]]...[
         } else if (isDesktopTool) {
           const action = { type: tool, params };
           result = await this.engine.executeSingle(action);
-        } else if (tool === 'ipython' && params.code) {
-          const code = params.code.replace(/'/g, "'\\''");
-          result = lunaTools.executeShell(`python3 -c '${code}'`, { cwd: params.cwd, timeout: params.timeout || 30000 });
+        } else if (tool === 'ipython' || tool === 'browser' || tool === 'computer') {
+          result = { success: false, error: `Ferramenta proibida: ${tool}. Use executeShell com "python3 -c '...'" em vez de ipython. Use SÓ ferramentas Luna.` };
         } else {
           result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
         }
