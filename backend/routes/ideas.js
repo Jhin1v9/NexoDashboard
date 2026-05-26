@@ -90,13 +90,14 @@ async function loadIdeasData() {
 }
 
 async function saveIdeasData(data) {
-  for (const idea of Object.values(data.ideas || {})) {
+  const ideasData = data || await loadIdeasData();
+  for (const idea of Object.values(ideasData.ideas || {})) {
     await dataStore.saveIdea(idea);
   }
   const jsonData = {
-    templates: data.templates || {},
-    categories: data.categories || {},
-    _meta: data._meta || {}
+    templates: ideasData.templates || {},
+    categories: ideasData.categories || {},
+    _meta: ideasData._meta || {}
   };
   backupJSON(IDEAS_FILE);
   await _writeJSON(IDEAS_FILE, jsonData);
@@ -486,7 +487,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
         ideasData._meta.lastIdeaId = newId;
       }
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'create_idea', ideaId: newId, message: `Ideia "${newIdea.title}" criada (${newId})` };
     }
 

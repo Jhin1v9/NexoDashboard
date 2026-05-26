@@ -2648,7 +2648,7 @@ app.get('/api/cash-box/statement', async (req, res) => {
         if (pendingAmount > 0) {
           entries.push({
             id: `pending-${p.paymentId}`,
-            date: p.paymentTerms?.splits?.find(s => s.status === 'pending')?.dueDate || p.updatedAt?.slice(0, 10),
+            date: p.paymentTerms?.splits?.find(s => s.status === 'pending')?.dueDate || (p.updatedAt && String(p.updatedAt).slice(0, 10)),
             type: 'expected_income',
             amount: pendingAmount,
             description: `${p.clientShortName} — pendente`,
