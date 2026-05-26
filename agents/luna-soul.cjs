@@ -194,7 +194,7 @@ When you complete a task, respond with a concise report — the caller relays it
 ABSOLUTE RULES — NEVER BREAK THESE
 ════════════════════════════════════════════════════════════════════════════
 
-1. RESPOND ONLY IN JSON. NEVER output text outside JSON.
+1. Use double-bracket delimiters for ALL output. NEVER output raw JSON outside [[action]]/[[meta]]/[[suggest]].
 2. ONE action per response. Use PLAN mode for multi-step tasks.
 3. NEVER guess file contents. ALWAYS use readFile or searchFiles to verify.
 4. NEVER guess directory structure. ALWAYS use viewDirectory or listFiles first.
@@ -216,17 +216,33 @@ If you need to run 10 commands, run 10 commands.
 Your default state is ACTION, not conversation.
 
 ════════════════════════════════════════════════════════════════════════════
-OUTPUT FORMATS — STRICT JSON ONLY
+OUTPUT FORMATS — USE XML TAGS (NOT RAW JSON)
 ════════════════════════════════════════════════════════════════════════════
 
-{"mode": "CHAT", "response": "..."}                          → Chat/creative
-{"mode": "ACTION", "tool": "...", "params": {...}}           → Execute ONE tool
-{"mode": "PLAN", "steps": [{"tool":"...","params":{}}]}      → Multi-step plan
-{"mode": "DONE", "response": "..."}                          → Task complete
-{"mode": "LOAD_SKILL", "skill": "..."}                       → Load a skill
-{"mode": "UPDATE_MEMORY", "file": "...", "content": "..."}   → Update memory
-{"mode": "META", "meta_action": "create_tool|create_skill|create_persona|create_script|edit_file", "params": {...}}
-{"mode": "SUGGEST", "suggestion": {"type": "persona|skill", "target": "...", "reason": "...", "confidence": 0.9}}
+<response>Hello! How can I help?</response>
+→ Chat/creative mode (CHAT / DONE)
+
+<response>Reading the file now...</response>
+<action>{"tool": "readFile", "params": {"path": "..."}}</action>
+→ Execute ONE tool (ACTION mode)
+
+<response>I'll do this in 3 steps...</response>
+<action>{"tool": "...", "params": {}}</action>
+<action>{"tool": "...", "params": {}}</action>
+→ Multi-step plan (PLAN mode)
+
+<response>Creating a new tool for you...</response>
+<meta>{"action": "create_tool", "params": {"name": "...", "code": "..."}}</meta>
+→ META mode
+
+<response>I suggest switching to the 'surgeon' persona...</response>
+<suggest>{"type": "persona", "target": "surgeon", "reason": "..."}</suggest>
+→ SUGGEST mode
+
+RULE: The <response> tag is REQUIRED in every answer. It contains your friendly message to the user.
+RULE: <action>, <meta>, <suggest> are OPTIONAL — only include when you need to execute something.
+RULE: NEVER wrap the entire output in a JSON object. Use tags directly.
+IMPORTANT: Use EXACTLY ONE < character for tags. Write <response> NOT <<response>.
 
 ════════════════════════════════════════════════════════════════════════════
 TOOLS — YOU HAVE 32+ TOOLS. USE THEM.
@@ -353,7 +369,12 @@ FINAL REMINDER — READ THIS BEFORE EVERY RESPONSE
 
 IMPORTANT: You are an AUTONOMOUS AGENT. You HAVE tools. You CAN execute.
 NEVER say "I can't" or "I don't have access". Use your tools or create new ones.
-Keep going until the task is COMPLETELY resolved. Only stop when you're sure.`;
+Keep going until the task is COMPLETELY resolved. Only stop when you're sure.
+
+OUTPUT FORMAT REMINDER: Use double-bracket delimiters in EVERY response.
+[[response]]Your message here[[/response]]
+If executing a tool, add: [[action]]{"tool":"...","params":{}}[[/action]]
+NEVER wrap your entire output in a JSON object. Use delimiters directly.`;
 }
 
 // ============================================================
@@ -369,20 +390,33 @@ function parseKimiResponse(text) {
     .replace(/```\s*$/gm, '')
     .replace(/```/g, '');
 
-  // Strategy 1b: Unescape escaped JSON chars (Kimi sometimes returns \\[ instead of [)
+  // Strategy 1b: Unescape double-escaped JSON chars
+  // ONLY convert \\n → \n (preserving the escape for JSON.parse), NOT \n → newline
   cleaned = cleaned
     .replace(/\\\[/g, '[')
     .replace(/\\\]/g, ']')
     .replace(/\\\{/g, '{')
     .replace(/\\\}/g, '}')
     .replace(/\\"/g, '"')
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
     .replace(/\\\\/g, '\\');
 
   const strategies = [
-    // Strategy 2: Direct parse
+    // Strategy 2: Direct parse (text already has proper JSON escapes)
     () => JSON.parse(cleaned),
+    // Strategy 2b: Direct parse with real newlines escaped (DOM returns real newlines inside strings)
+    () => {
+      // When DOM extracts text, \n escapes become real newlines. Re-escape them for JSON.parse.
+      const reescaped = cleaned.replace(/("response"\s*:\s*")([\s\S]*?)("\s*[,}])/g, (match, prefix, value, suffix) => {
+        const escaped = value
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+        return prefix + escaped + suffix;
+      });
+      return JSON.parse(reescaped);
+    },
     // Strategy 3: Extract first JSON object
     () => {
       const firstBrace = cleaned.indexOf('{');
@@ -392,18 +426,26 @@ function parseKimiResponse(text) {
       }
       throw new Error('No JSON object');
     },
-    // Strategy 4: Fix trailing commas
+    // Strategy 4: Extract field 'response' with regex (handles real newlines)
+    () => {
+      const match = cleaned.match(/"response"\s*:\s*"([\s\S]*?)"\s*[,}]/);
+      if (match) {
+        return { mode: 'CHAT', response: match[1].trim() };
+      }
+      throw new Error('No response field');
+    },
+    // Strategy 5: Fix trailing commas
     () => {
       const noTrailing = cleaned.replace(/,\s*([}\]])/g, '$1');
       return JSON.parse(noTrailing);
     },
-    // Strategy 5: Extract JSON with regex (non-greedy)
+    // Strategy 6: Extract JSON with regex (non-greedy)
     () => {
       const match = cleaned.match(/\{[\s\S]*?\}/);
       if (match) return JSON.parse(match[0]);
       throw new Error('Regex no match');
     },
-    // Strategy 6: Try parsing line by line
+    // Strategy 7: Try parsing line by line
     () => {
       const lines = cleaned.split('\n');
       for (const line of lines) {
@@ -420,6 +462,109 @@ function parseKimiResponse(text) {
   }
 
   return null;
+}
+
+// ============================================================
+// TAG-BASED PARSER (v3.1 — XML delimiters instead of raw JSON)
+// ============================================================
+
+function parseTagResponse(text) {
+  if (!text) return null;
+
+  const trimmed = text.trim();
+
+  // Strategy F: Backward compatibility — if text looks like old JSON, try parseKimiResponse first
+  if (trimmed.startsWith('{')) {
+    const jsonParsed = parseKimiResponse(trimmed);
+    if (jsonParsed && jsonParsed.mode) return jsonParsed;
+  }
+
+  // ── DOUBLE-BRACKET DELIMITER EXTRACTION ──
+  // Uses [[response]]...[[/response]] instead of XML tags to avoid
+  // Kimi Web front-end filtering/escaping of HTML-like syntax.
+
+  // Strategy A: Proper [[response]]...[[/response]] (non-greedy)
+  let responseMatch = trimmed.match(/\[\[response\]\]([\s\S]*?)\[\[\/response\]\]/);
+  let response = responseMatch ? responseMatch[1] : '';
+
+  // Strategy B: Unclosed [[response]]text (no closing tag)
+  if (!responseMatch) {
+    const unclosedMatch = trimmed.match(/\[\[response\]\]([\s\S]*)/);
+    if (unclosedMatch) {
+      response = unclosedMatch[1];
+      responseMatch = unclosedMatch;
+    }
+  }
+
+  // Extract all properly closed [[action]] tags
+  const actionMatches = trimmed.match(/\[\[action\]\]([\s\S]*?)\[\[\/action\]\]/g);
+
+  // Extract [[meta]]
+  const metaMatch = trimmed.match(/\[\[meta\]\]([\s\S]*?)\[\[\/meta\]\]/);
+
+  // Extract [[suggest]]
+  const suggestMatch = trimmed.match(/\[\[suggest\]\]([\s\S]*?)\[\[\/suggest\]\]/);
+
+  // Helper: parse JSON inside a delimiter, cleaning wrapper
+  function parseDelimiterJson(raw) {
+    const cleaned = raw
+      .replace(/\[\[action\]\]/g, '')
+      .replace(/\[\[\/action\]\]/g, '')
+      .replace(/\[\[meta\]\]/g, '')
+      .replace(/\[\[\/meta\]\]/g, '')
+      .replace(/\[\[suggest\]\]/g, '')
+      .replace(/\[\[\/suggest\]\]/g, '')
+      .trim();
+    return JSON.parse(cleaned);
+  }
+
+  // Helper: try to parse JSON, return null on failure (doesn't throw)
+  function tryParseDelimiterJson(raw) {
+    try { return parseDelimiterJson(raw); } catch { return null; }
+  }
+
+  try {
+    // SUGGEST mode — only if content is valid JSON
+    if (suggestMatch) {
+      const suggestion = tryParseDelimiterJson(suggestMatch[0]);
+      if (suggestion) {
+        return { mode: 'SUGGEST', response, suggestion };
+      }
+      // Invalid JSON inside suggest — ignore the suggest tag and continue
+    }
+
+    // META mode — only if content is valid JSON
+    if (metaMatch) {
+      const meta = tryParseDelimiterJson(metaMatch[0]);
+      if (meta) {
+        return { mode: 'META', response, meta_action: meta.action || meta.meta_action, params: meta.params || {} };
+      }
+    }
+
+    // ACTION / PLAN mode
+    if (actionMatches && actionMatches.length > 0) {
+      const validActions = actionMatches.map(a => tryParseDelimiterJson(a)).filter(Boolean);
+      if (validActions.length > 1) {
+        // PLAN: multiple valid actions
+        return { mode: 'PLAN', response, steps: validActions };
+      }
+      if (validActions.length === 1) {
+        // Single ACTION
+        return { mode: 'ACTION', response, tool: validActions[0].tool, params: validActions[0].params || {} };
+      }
+    }
+
+    // CHAT/DONE mode: if we extracted any response content
+    if (responseMatch) {
+      return { mode: 'CHAT', response };
+    }
+  } catch (e) {
+    // Delimiter parsing failed — return null so caller can fallback
+    return null;
+  }
+
+  // No delimiters found and doesn't look like JSON — treat as plain text CHAT
+  return { mode: 'CHAT', response: trimmed };
 }
 
 // ============================================================
@@ -886,11 +1031,11 @@ class LunaSoul extends EventEmitter {
       return { success: false, error: err.message, sessionId };
     }
 
-    // Parse response
-    let parsed = parseKimiResponse(kimiResponse);
+    // Parse response (tag-based primary, JSON fallback for backward compatibility)
+    let parsed = parseTagResponse(kimiResponse) || parseKimiResponse(kimiResponse);
     if (!parsed) {
       // Graceful fallback: treat as CHAT
-      this.emit('progress', { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId });
+      this.emit('progress', { type: 'warning', message: '⚠️ Resposta não reconhecida, tratando como chat', sessionId });
       parsed = { mode: 'CHAT', response: kimiResponse };
     }
 
@@ -988,10 +1133,10 @@ class LunaSoul extends EventEmitter {
         return;
       }
 
-      // Parse the full response
-      let parsed = parseKimiResponse(fullResponse);
+      // Parse the full response (tag-based primary, JSON fallback)
+      let parsed = parseTagResponse(fullResponse) || parseKimiResponse(fullResponse);
       if (!parsed) {
-        yield { type: 'warning', message: '⚠️ Resposta não-JSON, tratando como chat', sessionId };
+        yield { type: 'warning', message: '⚠️ Resposta não reconhecida, tratando como chat', sessionId };
         parsed = { mode: 'CHAT', response: fullResponse };
       }
 
@@ -1279,7 +1424,7 @@ class LunaSoul extends EventEmitter {
       const activeFilesContext = workspaceManager.getActiveFilesContext('luna-cli');
 
       // Build full prompt
-      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}${workspaceContext ? '\n\n--- WORKSPACE ---\n' + workspaceContext : ''}${activeFilesContext ? '\n\n' + activeFilesContext : ''}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+      const prompt = `${systemPrompt}\n\n--- CONTEXTO DO DESKTOP ---\n${desktopState}${workspaceContext ? '\n\n--- WORKSPACE ---\n' + workspaceContext : ''}${activeFilesContext ? '\n\n' + activeFilesContext : ''}\n\n--- HISTÓRICO ---\n${historyLines.join('\n')}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando XML tags:`;
 
       // Debug log
       if (process.env.LUNA_DEBUG) {
@@ -1293,9 +1438,10 @@ class LunaSoul extends EventEmitter {
       // We only need a short reminder + the current user input or tool result.
       // Include a condensed tool registry so Kimi remembers available actions.
       const miniReminder = `Você é Luna, agente autônomo de Abner Gabriel (CEO, NEXO DIGITAL S.L., Barcelona).
-REGRAS: Responda APENAS em JSON. NUNCA diga que não pode fazer algo — use ferramentas ou crie via META.
+REGRAS: Use delimitadores [[response]]...[[/response]] para texto. [[action]]{"tool":"...","params":{}}[[/action]] para ferramentas. NUNCA diga que não pode fazer algo — use ferramentas ou crie via META.
+EXEMPLO: [[response]]Oi! Como posso ajudar?[[/response]]
 FERRAMENTAS: readFile, writeFile, replaceInFile, executeShell, searchFiles, grep, viewDirectory, gitStatus, gitCommit, searchWeb, fetchURL, downloadFile, clipboardRead, clipboardWrite.
-FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"mode":"PLAN","steps":[...]} | {"mode":"DONE",...}`;
+FORMATOS: [[response]]...[[/response]] | [[action]]...[[/action]] | [[meta]]...[[/meta]] | [[suggest]]...[[/suggest]]`;
 
       // Workspace context (if set) — include in follow-ups too
       const workspaceCtx = workspaceManager.getFormattedManifest('luna-cli');
@@ -1306,9 +1452,9 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
       const isToolResult = options.isToolResult === true;
       let prompt;
       if (isToolResult) {
-        prompt = `${miniReminder}${workspaceSnippet}\n\nResultado da ferramenta:\n${userInput}\n\nResponda em JSON com o próximo passo ou uma mensagem amigável ao usuário:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\nResultado da ferramenta:\n${userInput}\n\nResponda usando XML tags com o próximo passo ou uma mensagem amigável ao usuário:`;
       } else {
-        prompt = `${miniReminder}${workspaceSnippet}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}${activeFilesCtx ? '\n\n' + activeFilesCtx : ''}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda em JSON:`;
+        prompt = `${miniReminder}${workspaceSnippet}\n\n--- HISTÓRICO RECENTE ---\n${historyLines.slice(-6).join('\n')}${activeFilesCtx ? '\n\n' + activeFilesCtx : ''}\n\n--- MENSAGEM ATUAL ---\nuser: ${userInput}\n\nResponda usando XML tags:`;
       }
 
       // Debug log
@@ -1962,7 +2108,7 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
       return { success: false, error: err.message, sessionId };
     }
 
-    const parsed = parseKimiResponse(kimiResponse);
+    const parsed = parseTagResponse(kimiResponse) || parseKimiResponse(kimiResponse);
     if (!parsed) {
       return { success: false, error: 'Failed to parse continuation', raw: kimiResponse, sessionId };
     }
@@ -2027,6 +2173,7 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
 module.exports = {
   LunaSoul,
   parseKimiResponse,
+  parseTagResponse,
   buildSystemPrompt,
   loadSkillIndex,
   loadPersona,
