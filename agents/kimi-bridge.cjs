@@ -849,6 +849,9 @@ class KimiBridge {
     const page = await this._getOrCreateUserPage(userId);
     const session = this.userSessions.get(userId);
 
+    // Reset stream interceptor state to prevent cross-message contamination
+    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
+
     log.info(`Creating new chat for user ${hashUserId(userId)}`);
     await page.goto('https://kimi.com/?chat_enter_method=new_chat', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
@@ -1014,6 +1017,9 @@ class KimiBridge {
     this._checkCooldown(userId);
 
     const page = await this._getOrCreateUserPage(userId);
+
+    // Reset stream interceptor state to prevent cross-message contamination
+    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
     const session = this.userSessions.get(userId);
 
     // Cooldown check: wait for current processing to finish
@@ -1530,8 +1536,16 @@ class KimiBridge {
       await page.addInitScript(() => {
         if (window.__lunaInterceptorInstalled) return;
         window.__lunaInterceptorInstalled = true;
+        const MAX_EVENTS = 500;
         window.__lunaStream = {
           reasoning: '', content: '', events: [], active: false, startTime: Date.now(), error: null
+        };
+        window.__lunaResetStream = function() {
+          window.__lunaStream.reasoning = '';
+          window.__lunaStream.content = '';
+          window.__lunaStream.events = [];
+          window.__lunaStream.active = false;
+          window.__lunaStream.error = null;
         };
 
         function isChatUrl(url) {
@@ -1584,6 +1598,10 @@ class KimiBridge {
             if (r.reasoning) window.__lunaStream.reasoning += r.reasoning;
             if (r.content) window.__lunaStream.content += r.content;
             window.__lunaStream.events.push(r);
+            // Circular buffer: keep only last MAX_EVENTS
+            if (window.__lunaStream.events.length > MAX_EVENTS) {
+              window.__lunaStream.events = window.__lunaStream.events.slice(-MAX_EVENTS);
+            }
           }
         }
 
@@ -1597,12 +1615,30 @@ class KimiBridge {
           window.__lunaStream.active = true;
           const response = await origFetch.apply(this, args);
 
-          // Clone response to read body without breaking the original consumer
+          // Read stream in real-time using ReadableStream reader
           try {
             const cloned = response.clone();
-            const text = await cloned.text();
-            const results = parseSseChunk(text);
-            accumulate(results);
+            const reader = cloned.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              // Process complete SSE lines from buffer
+              const lines = buffer.split('\n');
+              buffer = lines.pop(); // keep incomplete line in buffer
+              const chunk = lines.join('\n');
+              if (chunk) {
+                const results = parseSseChunk(chunk);
+                accumulate(results);
+              }
+            }
+            // Process any remaining buffer
+            if (buffer) {
+              const results = parseSseChunk(buffer);
+              accumulate(results);
+            }
           } catch (e) {
             window.__lunaStream.error = e.message;
           }
@@ -2033,6 +2069,9 @@ class KimiBridge {
 
     const page = await this._getOrCreateUserPage(userId);
     const session = this.userSessions.get(userId);
+
+    // Reset stream interceptor state to prevent cross-message contamination
+    await page.evaluate(() => { if (window.__lunaResetStream) window.__lunaResetStream(); });
 
     // Wait for any ongoing processing
     if (session.processing) {

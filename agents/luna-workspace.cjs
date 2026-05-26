@@ -74,11 +74,16 @@ function matchesGitignore(relativePath, patterns) {
   return false;
 }
 
-// ── Tree Scanner ──
-async function scanTree(rootPath, depth = 0, gitignorePatterns = []) {
-  const result = { dirs: [], files: [] };
+// ── Safe Tree Scanner ──
+const SAFE_MAX_ENTRIES = 1000;
+const SAFE_MAX_DEPTH = 10;
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache', '.output', 'out', 'tmp', 'temp']);
 
-  if (depth > MAX_TREE_DEPTH) return result;
+async function scanTree(rootPath, depth = 0, gitignorePatterns = [], workspaceRoot = null) {
+  const result = { dirs: [], files: [] };
+  const wsRoot = workspaceRoot || rootPath;
+
+  if (depth > SAFE_MAX_DEPTH) return result;
 
   let patterns = gitignorePatterns;
   const localGitignore = path.join(rootPath, '.gitignore');
@@ -94,9 +99,20 @@ async function scanTree(rootPath, depth = 0, gitignorePatterns = []) {
     return result;
   }
 
+  // Safety: abort if directory has too many entries (DoS protection)
+  if (entries.length > SAFE_MAX_ENTRIES) {
+    console.warn(`[workspace] Directory ${rootPath} has ${entries.length} entries (max ${SAFE_MAX_ENTRIES}). Skipping deeper scan.`);
+    return result;
+  }
+
   for (const entry of entries) {
     const fullPath = path.join(rootPath, entry.name);
-    const relPath = path.relative(rootPath, fullPath);
+
+    // Hardcoded skip for known large directories
+    if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue;
+
+    // Always compute relPath from workspace root (fixes gitignore matching for subdirs)
+    const relPath = path.relative(wsRoot, fullPath);
 
     if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
     if (matchesGitignore(relPath, patterns)) continue;
@@ -104,7 +120,7 @@ async function scanTree(rootPath, depth = 0, gitignorePatterns = []) {
     if (entry.isDirectory()) {
       result.dirs.push(entry.name);
       if (depth < MAX_TREE_DEPTH && result.dirs.length <= MAX_FILES_PER_DIR) {
-        const sub = await scanTree(fullPath, depth + 1, patterns);
+        const sub = await scanTree(fullPath, depth + 1, patterns, wsRoot);
         if (sub.dirs.length || sub.files.length) {
           result.dirs.push({ name: entry.name, children: sub });
         }

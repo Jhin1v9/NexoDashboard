@@ -105,6 +105,135 @@ function Header({ session, msgCount }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL CALL VISUAL SYSTEM — digno e extraordinário
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SPINNER_FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+
+// Categorize tools by semantic action
+function getToolCategory(tool) {
+  const t = (tool || '').toLowerCase();
+  if (t.includes('read') || t.includes('view') || t.includes('cat') || t.includes('fetch') || t.includes('get')) return 'read';
+  if (t.includes('write') || t.includes('edit') || t.includes('save') || t.includes('create') || t.includes('touch')) return 'write';
+  if (t.includes('shell') || t.includes('exec') || t.includes('run') || t.includes('cmd') || t.includes('npm') || t.includes('git')) return 'shell';
+  if (t.includes('search') || t.includes('find') || t.includes('grep') || t.includes('query')) return 'search';
+  if (t.includes('wait') || t.includes('sleep') || t.includes('pause')) return 'wait';
+  return 'generic';
+}
+
+// Style per category: color, icon, verb
+function getToolStyle(category) {
+  switch (category) {
+    case 'read':    return { color: C.user,    icon: '📖', verb: 'Lendo',      past: 'Lido' };
+    case 'write':   return { color: C.tool,    icon: '✏️ ', verb: 'Escrevendo', past: 'Escrito' };
+    case 'shell':   return { color: C.success, icon: '⚡', verb: 'Executando', past: 'Executado' };
+    case 'search':  return { color: C.luna,    icon: '🔍', verb: 'Buscando',   past: 'Encontrado' };
+    case 'wait':    return { color: C.system,  icon: '⏳', verb: 'Aguardando', past: 'Concluído' };
+    default:        return { color: C.tool,    icon: '🔧', verb: 'Processando',past: 'Concluído' };
+  }
+}
+
+// Extract the target of a tool (file path, url, command, etc.)
+function extractToolTarget(tool, params) {
+  if (!params || typeof params !== 'object') return '';
+  const p = params;
+  if (p.path) return p.path;
+  if (p.file) return p.file;
+  if (p.command) return p.command.slice(0, 60) + (p.command.length > 60 ? '…' : '');
+  if (p.cmd) return p.cmd.slice(0, 60) + (p.cmd.length > 60 ? '…' : '');
+  if (p.url) return p.url.slice(0, 60) + (p.url.length > 60 ? '…' : '');
+  if (p.query) return p.query.slice(0, 60) + (p.query.length > 60 ? '…' : '');
+  const firstKey = Object.keys(p).find(k => typeof p[k] === 'string' && p[k].length < 100);
+  return firstKey ? `${firstKey}=${p[firstKey].slice(0, 40)}` : '';
+}
+
+// Build the action line: "📖 Lendo test.js..."
+function formatToolAction(tool, params) {
+  const cat = getToolCategory(tool);
+  const style = getToolStyle(cat);
+  const target = extractToolTarget(tool, params);
+  return { line: `${style.icon} ${style.verb}${target ? ' ' + target : ''}...`, style };
+}
+
+// Summarize result with category-aware phrasing
+function formatToolResult(tool, output, success) {
+  const cat = getToolCategory(tool);
+  const style = getToolStyle(cat);
+  if (!success) return { line: `${style.icon} ${style.past} com erro`, style, isError: true };
+  if (!output) return { line: `${style.icon} ${style.past}`, style, isError: false };
+  const s = String(output);
+  if (s.length > 200 && s.includes('\n')) {
+    const lines = s.trim().split('\n').length;
+    const preview = s.trim().split('\n').slice(0, 3).join('\n');
+    return { line: `${style.icon} ${style.past} │ ${lines} linhas`, style, isError: false, preview };
+  }
+  const short = s.slice(0, 100) + (s.length > 100 ? '…' : '');
+  return { line: `${style.icon} ${style.past} │ ${short}`, style, isError: false };
+}
+
+// Mini preview for read operations (first few lines only)
+function formatPreview(output) {
+  if (!output) return null;
+  const s = String(output);
+  if (s.length < 50) return null;
+  const lines = s.trim().split('\n');
+  if (lines.length < 2) return null;
+  const previewLines = lines.slice(0, 4);
+  if (lines.length > 4) previewLines.push('│ …');
+  return previewLines;
+}
+
+const ToolCallItem = React.memo(function ToolCallItem({ msg }) {
+  const [frame, setFrame] = useState(0);
+  const completed = msg.completed === true;
+  useEffect(() => {
+    if (completed) return;
+    const iv = setInterval(() => setFrame(f => (f + 1) % SPINNER_FRAMES.length), 80);
+    return () => clearInterval(iv);
+  }, [completed]);
+  const tool = msg.tool || 'tool';
+  const { line, style } = formatToolAction(tool, msg.params);
+  return h(Box, { flexDirection: 'column', marginY: 1 },
+    h(Box, { flexDirection: 'row' },
+      h(Text, { color: style.color }, completed ? '◉ ' : `${SPINNER_FRAMES[frame]} `),
+      h(Text, { color: style.color, bold: true }, line)
+    ),
+    !completed && h(Box, { flexDirection: 'row', marginLeft: 1 },
+      h(Text, { color: C.dim, dimColor: true }, '│')
+    )
+  );
+});
+
+const ToolResultItem = React.memo(function ToolResultItem({ msg }) {
+  const tool = msg.tool || 'tool';
+  const ok = msg.success !== false;
+  const { line, style, isError, preview } = formatToolResult(tool, msg.output, ok);
+  const resultColor = isError ? C.error : C.success;
+  const resultIcon = isError ? '✗' : '✓';
+  return h(Box, { flexDirection: 'column', marginY: 1, marginLeft: 2 },
+    h(Box, { flexDirection: 'row' },
+      h(Text, { color: resultColor, bold: true }, `${resultIcon} `),
+      h(Text, { color: resultColor }, line),
+      h(Text, { color: C.dim, dimColor: true }, `  ${fmtTime(msg.timestamp)}`)
+    ),
+    preview && h(Box, {
+      marginLeft: 1,
+      marginTop: 0,
+      flexDirection: 'column',
+      borderStyle: 'single',
+      borderColor: '#333355',
+      paddingX: 1,
+      paddingY: 0,
+      width: '85%'
+    },
+      ...preview.map((pl, i) =>
+        h(Text, { key: i, color: C.dim, dimColor: true, wrap: 'wrap' }, pl)
+      )
+    )
+  );
+});
+
 const MessageItem = React.memo(function MessageItem({ msg }) {
   if (msg.type === 'user') {
     return h(Box, { flexDirection: 'column', marginY: 1 },
@@ -139,35 +268,11 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
   }
 
   if (msg.type === 'tool_call') {
-    const tool = msg.tool || 'tool';
-    const params = JSON.stringify(msg.params || {}).slice(0, 140);
-    return h(Box, { flexDirection: 'column', marginY: 1 },
-      h(Box, { flexDirection: 'row' },
-        h(Text, { color: C.tool, bold: true }, '🔧 '),
-        h(Text, { color: C.tool, bold: true }, tool),
-        h(Text, { color: C.dim, dimColor: true }, `  ${fmtTime(msg.timestamp)}`)
-      ),
-      h(Box, { marginLeft: 2 },
-        h(Text, { color: C.dim, wrap: 'wrap' }, params)
-      )
-    );
+    return h(ToolCallItem, { msg });
   }
 
   if (msg.type === 'tool_result') {
-    const ok = msg.success !== false;
-    const output = (msg.output || '').slice(0, 500);
-    return h(Box, { flexDirection: 'column', marginY: 1, marginLeft: 2 },
-      h(Box, { flexDirection: 'row' },
-        h(Text, { color: ok ? C.success : C.error }, ok ? '✅ ' : '❌ '),
-        h(Text, { color: ok ? C.success : C.error }, ok ? 'Sucesso' : 'Erro'),
-        h(Text, { color: C.dim, dimColor: true }, `  ${fmtTime(msg.timestamp)}`)
-      ),
-      output && h(Box, { marginLeft: 2, flexDirection: 'column' },
-        ...output.split('\n').map((line, i) =>
-          h(Text, { key: i, color: C.dim, wrap: 'wrap' }, line || ' ')
-        )
-      )
-    );
+    return h(ToolResultItem, { msg });
   }
 
   if (msg.type === 'system') {
@@ -180,13 +285,16 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
   return null;
 });
 
-function MessageList({ messages, streamingText, thinkingText, isStreaming, showThinkingStream }) {
-  // Show all messages — Ink handles overflow naturally
-  // Using React.memo on MessageItem prevents re-render of old messages during streaming
-  return h(Box, { flexDirection: 'column', width: '100%' },
-    messages.map(msg => h(MessageItem, { key: msg.id, msg })),
+function MessageList({ messages, streamingText, thinkingText, isStreaming, showThinkingStream, scrollOffset, maxHeight }) {
+  // Apply scroll offset: skip first N messages from bottom
+  const visibleMessages = scrollOffset > 0
+    ? messages.slice(0, Math.max(1, messages.length - scrollOffset))
+    : messages;
 
-    // Thinking mode: either full stream or compact indicator
+  return h(Box, { flexDirection: 'column', width: '100%', height: maxHeight || undefined, overflow: 'hidden' },
+    visibleMessages.map(msg => h(MessageItem, { key: msg.id, msg })),
+
+    // Thinking mode
     isStreaming && thinkingText && showThinkingStream && h(Box, { flexDirection: 'column', marginY: 1 },
       h(Box, { flexDirection: 'row' },
         h(Text, { color: C.dim, dimColor: true, bold: true }, '🧠 '),
@@ -248,7 +356,7 @@ function SuggestionBar({ suggestion }) {
   );
 }
 
-function StatusBar({ session, messages, isProcessing, activeToolCalls, bridgeStatus, sessionStartTime }) {
+function StatusBar({ session, messages, isProcessing, activeToolCalls, activeAgents, bridgeStatus, sessionStartTime, followMode, scrollOffset }) {
   const { columns } = useWindowSize();
   const [now, setNow] = useState(Date.now());
 
@@ -289,11 +397,18 @@ function StatusBar({ session, messages, isProcessing, activeToolCalls, bridgeSta
   // If terminal is narrow, stack vertically
   const isNarrow = columns < 100;
 
+  // Scroll indicator
+  const scrollIndicator = scrollOffset > 0
+    ? `⬆${scrollOffset}`
+    : (followMode ? '⬇' : '');
+
   const leftContent = h(Box, { flexDirection: 'row', width: isNarrow ? '100%' : '35%' },
     h(Text, { color: C.dim }, `${bridgeIcon} ${bridgeText} │ `),
     h(Text, { color: modeText === 'thinking' ? C.warning : C.success }, modeText),
     yoloText && h(Text, { color: C.error }, ` │ ${yoloText}`),
-    activeToolCalls > 0 && h(Text, { color: C.tool }, ` │ 🔧${activeToolCalls}`)
+    activeToolCalls > 0 && h(Text, { color: C.tool }, ` │ 🔧${activeToolCalls}`),
+    activeAgents > 0 && h(Text, { color: C.luna }, ` │ ⚙${activeAgents}`),
+    scrollIndicator && h(Text, { color: C.warning }, ` │ ${scrollIndicator}`)
   );
 
   const centerContent = h(Box, { flexDirection: 'row', width: isNarrow ? '100%' : '40%', justifyContent: 'center' },
@@ -566,6 +681,14 @@ function App({ luna, sessionManager, initialSession }) {
   const { exit } = useApp();
   const { rows, columns } = useWindowSize();
 
+  // Alternate screen buffer: isolate TUI from scrollback to prevent jump-to-top
+  useEffect(() => {
+    process.stdout.write('\x1b[?1049h'); // enter alternate screen
+    return () => {
+      process.stdout.write('\x1b[?1049l'); // exit alternate screen
+    };
+  }, []);
+
   // Estado
   const [session, setSession] = useState(initialSession);
   const [showPicker, setShowPicker] = useState(!initialSession);
@@ -578,6 +701,7 @@ function App({ luna, sessionManager, initialSession }) {
   const [showHelp, setShowHelp] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState(null);
   const [activeToolCalls, setActiveToolCalls] = useState(0);
+  const [activeAgents, setActiveAgents] = useState(0);
   const [canSteer, setCanSteer] = useState(false);
   const [steerInput, setSteerInput] = useState('');
   const [showSteerInput, setShowSteerInput] = useState(false);
@@ -585,6 +709,12 @@ function App({ luna, sessionManager, initialSession }) {
   const [sessionStartTime, setSessionStartTime] = useState(Date.now());
   const [awaitingLogin, setAwaitingLogin] = useState(false);
   const [showThinkingStream, setShowThinkingStream] = useState(session?.showThinkingStream ?? false);
+
+  // ── Scroll / Viewport Control ──
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [followMode, setFollowMode] = useState(true);
+  const [hasNewContent, setHasNewContent] = useState(false);
+  const messagesCountRef = useRef(0);
 
   // Refs for accumulated text to reduce re-renders
   const thinkingRef = useRef('');
@@ -615,6 +745,27 @@ function App({ luna, sessionManager, initialSession }) {
     } catch { setMessages([]); }
     setSessionStartTime(Date.now());
   }, [session?.id, sessionManager]);
+
+  // ── Follow Mode / Scroll Logic ──
+  useEffect(() => {
+    const count = messages.length;
+    if (count > messagesCountRef.current) {
+      if (followMode) {
+        setScrollOffset(0);
+      } else {
+        setHasNewContent(true);
+      }
+    }
+    messagesCountRef.current = count;
+  }, [messages.length, followMode]);
+
+  useEffect(() => {
+    if (isProcessing && !followMode) {
+      setFollowMode(true);
+      setScrollOffset(0);
+      setHasNewContent(false);
+    }
+  }, [isProcessing]);
 
   // Verificar status do bridge periodicamente
   useEffect(() => {
@@ -875,8 +1026,17 @@ function App({ luna, sessionManager, initialSession }) {
           return;
         }
         const git = new LunaGit(ws.path);
-        git.isRepo = true; // bypass init check
-        git.sessionBranch = git._getCurrentBranch();
+        await git.init();
+        const currentBranch = git._getCurrentBranch();
+        // Triple-guard: must be on a luna/session branch
+        if (!currentBranch || !currentBranch.startsWith('luna/session-')) {
+          setMessages(prev => [...prev, {
+            type: 'system', content: `🛡️ Undo bloqueado: branch atual é "${currentBranch || 'unknown'}". Só é permitido em branches "luna/session-*".`,
+            id: nextId(), timestamp: new Date().toISOString(),
+          }]);
+          return;
+        }
+        git.sessionBranch = currentBranch;
         const result = await git.undo();
         if (result.success) {
           setMessages(prev => [...prev, {
@@ -1251,11 +1411,24 @@ function App({ luna, sessionManager, initialSession }) {
           case 'action_end': {
             setActiveToolCalls(n => Math.max(0, n - 1));
             const res = ev.result;
+            // Mark corresponding tool_call as completed (stops spinner)
+            setMessages(prev => {
+              const updated = [...prev];
+              // Find last tool_call with same tool that isn't completed
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (updated[i].type === 'tool_call' && updated[i].tool === ev.tool && !updated[i].completed) {
+                  updated[i] = { ...updated[i], completed: true };
+                  break;
+                }
+              }
+              return updated;
+            });
             if (res) {
               const friendly = res.result?.friendlyMessage || res.friendlyMessage;
               const technical = res.result?.stdout || res.result?.output || res.result?.text || JSON.stringify(res.result);
               setMessages(prev => [...prev, {
                 type: 'tool_result', success: res.success !== false,
+                tool: ev.tool,
                 output: friendly || technical,
                 friendly: !!friendly,
                 timestamp: new Date().toISOString(),
@@ -1266,6 +1439,7 @@ function App({ luna, sessionManager, initialSession }) {
           }
 
           case 'plan_start':
+            setActiveAgents(n => n + 1);
             setStatusText(`📋 Plano: ${(ev.steps || []).length} passos`);
             break;
 
@@ -1274,6 +1448,7 @@ function App({ luna, sessionManager, initialSession }) {
             break;
 
           case 'plan_error':
+            setActiveAgents(n => Math.max(0, n - 1));
             setMessages(prev => [...prev, {
               type: 'system', content: `❌ Plano falhou no passo ${(ev.stepIndex || 0) + 1}: ${ev.error}`,
               timestamp: new Date().toISOString(), id: nextId(),
@@ -1281,14 +1456,17 @@ function App({ luna, sessionManager, initialSession }) {
             break;
 
           case 'plan_complete':
+            setActiveAgents(n => Math.max(0, n - 1));
             setStatusText('✅ Plano concluído');
             break;
 
           case 'meta_start':
+            setActiveAgents(n => n + 1);
             setStatusText(`🔮 META: ${ev.metaAction}`);
             break;
 
           case 'meta_end': {
+            setActiveAgents(n => Math.max(0, n - 1));
             const mres = ev.result;
             setMessages(prev => [...prev, {
               type: 'system',
@@ -1447,6 +1625,7 @@ function App({ luna, sessionManager, initialSession }) {
       thinkingStartRef.current = null;
       setStatusText('');
       setActiveToolCalls(0);
+      setActiveAgents(0);
       setCanSteer(false);
 
       const updated = sessionManager.loadSession(session.id);
@@ -1456,6 +1635,7 @@ function App({ luna, sessionManager, initialSession }) {
       await processQueue();
 
     } catch (err) {
+      setActiveAgents(0);
       const msg = err.message || '';
       const isConnectionError = msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT') || msg.includes('connectOverCDP') || msg.includes('disconnected');
 
@@ -1515,6 +1695,33 @@ function App({ luna, sessionManager, initialSession }) {
       if (isProcessingRef.current && canSteer) {
         setShowSteerInput(true);
       }
+      return;
+    }
+
+    // ── Scroll Control ──
+    // PgUp / PgDn / ↑ / ↓ for viewport scroll
+    if (key.pageUp) {
+      setScrollOffset(s => s + 5);
+      setFollowMode(false);
+      return;
+    }
+    if (key.pageDown) {
+      setScrollOffset(s => Math.max(0, s - 5));
+      return;
+    }
+    if (key.upArrow && key.shift) {
+      setScrollOffset(s => s + 1);
+      setFollowMode(false);
+      return;
+    }
+    if (key.downArrow && key.shift) {
+      setScrollOffset(s => Math.max(0, s - 1));
+      return;
+    }
+    if (key.end || (key.ctrl && input === 'e')) {
+      setScrollOffset(0);
+      setFollowMode(true);
+      setHasNewContent(false);
       return;
     }
   });
@@ -1588,7 +1795,16 @@ function App({ luna, sessionManager, initialSession }) {
       width: '100%',
       minHeight: 2,
     },
-      h(MessageList, { messages, streamingText, thinkingText, isProcessing, showThinkingStream }),
+      // New content indicator
+      hasNewContent && !followMode && h(Box, { flexDirection: 'row', justifyContent: 'center', height: 1 },
+        h(Text, { color: C.warning, bold: true, backgroundColor: C.headerBg }, ' ↓ Novas mensagens ↓ ')
+      ),
+      h(MessageList, {
+        messages, streamingText, thinkingText,
+        isStreaming: isProcessing, showThinkingStream,
+        scrollOffset,
+        maxHeight: rows - 6,
+      }),
     ),
 
     // Status
@@ -1627,8 +1843,11 @@ function App({ luna, sessionManager, initialSession }) {
       messages,
       isProcessing,
       activeToolCalls,
+      activeAgents,
       bridgeStatus,
       sessionStartTime,
+      followMode,
+      scrollOffset,
     }),
   );
 }
@@ -1691,8 +1910,14 @@ async function main() {
 
   render(h(App, { luna, sessionManager, initialSession: session }), { exitOnCtrlC: false });
 
-  process.on('exit', async () => {
-    await luna.disconnect();
+  const cleanup = () => {
+    process.stdout.write('\x1b[?1049l'); // restore primary screen
+  };
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+  process.on('exit', () => {
+    cleanup();
+    luna.disconnect?.().catch(() => {});
   });
 }
 

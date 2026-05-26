@@ -22,6 +22,7 @@ const { ComputerUseEngine } = require('./computer-use-engine.cjs');
 const lunaTools = require('./luna-tools.cjs');
 const { workspaceManager } = require('./luna-workspace.cjs');
 const { LunaGit } = require('./luna-git.cjs');
+const { ToolGuard } = require('./luna-tool-guard.cjs');
 
 const LUNA_DIR = path.join(os.homedir(), '.luna');
 const SKILLS_DIR = path.join(LUNA_DIR, 'skills');
@@ -656,6 +657,7 @@ class LunaSoul extends EventEmitter {
     this.defaultMode = options.defaultMode || 'thinking';
     this.autoSwitchEnabled = options.autoSwitch !== false; // default true
     this.lunaGit = null;
+    this.toolGuard = null; // lazy init quando workspace é setado
   }
 
   /** Initialize git for workspace if available */
@@ -671,6 +673,38 @@ class LunaSoul extends EventEmitter {
       return null;
     }
     return this.lunaGit;
+  }
+
+  /** Initialize ToolGuard for workspace */
+  _ensureToolGuard() {
+    const ws = workspaceManager.getWorkspace('luna-cli');
+    if (!ws) return null;
+    if (this.toolGuard && this.toolGuard.workspacePath === ws.path) return this.toolGuard;
+    this.toolGuard = new ToolGuard(ws.path);
+    return this.toolGuard;
+  }
+
+  /** Scrub secrets from tool output (API keys, tokens, passwords) */
+  _scrubSecrets(text) {
+    if (!text || typeof text !== 'string') return text;
+    const patterns = [
+      { regex: /sk-[a-zA-Z0-9]{48}/g, replacement: '[OPENAI_KEY_SCRUBBED]' },
+      { regex: /sk-[a-zA-Z0-9]{20,}/g, replacement: '[API_KEY_SCRUBBED]' },
+      { regex: /ghp_[a-zA-Z0-9]{36}/g, replacement: '[GITHUB_TOKEN_SCRUBBED]' },
+      { regex: /gho_[a-zA-Z0-9]{36}/g, replacement: '[GITHUB_OAUTH_SCRUBBED]' },
+      { regex: /AKIA[0-9A-Z]{16}/g, replacement: '[AWS_KEY_SCRUBBED]' },
+      { regex: /[A-Za-z0-9/+=]{40}/g, replacement: '[SECRET_SCRUBBED]' }, // generic base64-like secret
+      { regex: /Bearer\s+[a-zA-Z0-9_\-\.]+/g, replacement: 'Bearer [TOKEN_SCRUBBED]' },
+      { regex: /Basic\s+[a-zA-Z0-9/+=]+/g, replacement: 'Basic [AUTH_SCRUBBED]' },
+      { regex: /password[=:]\s*[^\s&;]+/gi, replacement: 'password=[PASSWORD_SCRUBBED]' },
+      { regex: /passwd[=:]\s*[^\s&;]+/gi, replacement: 'passwd=[PASSWORD_SCRUBBED]' },
+      { regex: /PRIVATE KEY[-\s]*BEGIN/g, replacement: '[PRIVATE_KEY_SCRUBBED]' },
+    ];
+    let scrubbed = text;
+    for (const { regex, replacement } of patterns) {
+      scrubbed = scrubbed.replace(regex, replacement);
+    }
+    return scrubbed;
   }
 
   /** Initialize Kimi Bridge connection */
@@ -1007,7 +1041,7 @@ class LunaSoul extends EventEmitter {
       case 'ACTION': {
         yield { type: 'action_start', tool: parsed.tool, params: parsed.params, sessionId };
         const actionResult = await this._handleAction(parsed, sessionId, options);
-        yield { type: 'action_end', result: actionResult, sessionId };
+        yield { type: 'action_end', tool: parsed.tool, result: actionResult, sessionId };
         yield actionResult;
         break;
       }
@@ -1074,7 +1108,7 @@ class LunaSoul extends EventEmitter {
         tool = parsed.tool || '';
         events.push({ type: 'action_start', tool: parsed.tool, params: parsed.params, sessionId });
         const actionResult = await this._handleAction(parsed, sessionId, options);
-        events.push({ type: 'action_end', result: actionResult, sessionId });
+        events.push({ type: 'action_end', tool: parsed.tool, result: actionResult, sessionId });
         output = actionResult.result?.stdout || actionResult.result?.output || actionResult.result?.text || JSON.stringify(actionResult.result);
         break;
       }
@@ -1467,124 +1501,78 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
       category: isFileTool ? 'file' : isDesktopTool ? 'desktop' : 'unknown',
     });
 
-    // Execute
-    let result;
-    try {
-      if (isFileTool && lunaTools[tool]) {
-        // Route params correctly for each tool
-        const p = params || {};
-        switch (tool) {
-          case 'readFile':
-            result = lunaTools.readFile(p.path || p.file, { offset: p.offset || p.line_offset, limit: p.limit || p.n_lines });
-            break;
-          case 'writeFile':
-            result = lunaTools.writeFile(p.path || p.filePath, p.content);
-            break;
-          case 'appendFile':
-            result = lunaTools.appendFile(p.path || p.filePath, p.content);
-            break;
-          case 'replaceInFile':
-            result = lunaTools.replaceInFile(p.path || p.filePath, p.old || p.oldStr, p.new || p.newStr, { replaceAll: p.replaceAll, edit: p.edit });
-            break;
-          case 'deleteFile':
-            result = lunaTools.deleteFile(p.path || p.filePath);
-            break;
-          case 'moveFile':
-            result = lunaTools.moveFile(p.source || p.from, p.destination || p.to);
-            break;
-          case 'copyFile':
-            result = lunaTools.copyFile(p.source || p.from, p.destination || p.to);
-            break;
-          case 'getFileInfo':
-            result = lunaTools.getFileInfo(p.path || p.filePath);
-            break;
-          case 'listFiles':
-            result = lunaTools.listFiles(p.pattern || '*', { cwd: p.cwd, limit: p.limit, dot: p.dot });
-            break;
-          case 'viewDirectory':
-            result = lunaTools.viewDirectory(p.path || p.dirPath, { depth: p.depth });
-            break;
-          case 'createDirectory':
-            result = lunaTools.createDirectory(p.path || p.dirPath);
-            break;
-          case 'removeDirectory':
-            result = lunaTools.removeDirectory(p.path || p.dirPath);
-            break;
-          case 'searchFiles':
-            result = lunaTools.searchFiles(p.pattern, { cwd: p.cwd, path: p.path, context: p.context, '-C': p['-C'], limit: p.limit });
-            break;
-          case 'grep':
-            result = lunaTools.grep(p.pattern, { cwd: p.cwd, path: p.path, glob: p.glob, include: p.include, context: p.context, '-C': p['-C'], limit: p.limit, output_mode: p.output_mode });
-            break;
-          case 'glob':
-            result = lunaTools.glob(p.pattern, { cwd: p.cwd, dot: p.dot, ignore: p.ignore, limit: p.limit });
-            break;
-          case 'searchWeb':
-            result = lunaTools.searchWeb(p.query || p.q, { limit: p.limit });
-            break;
-          case 'fetchURL':
-            result = await lunaTools.fetchURL(p.url, { limit: p.limit, timeout: p.timeout });
-            break;
-          case 'executeShell':
-            result = lunaTools.executeShell(p.command, { cwd: p.cwd, timeout: p.timeout });
-            break;
-          case 'runTests':
-            result = lunaTools.runTests({ cwd: p.cwd, timeout: p.timeout, command: p.command });
-            break;
-          case 'checkSyntax':
-            result = lunaTools.checkSyntax(p.path || p.filePath);
-            break;
-          case 'installPackages':
-            result = lunaTools.installPackages(p.packages || p.package, { cwd: p.cwd, timeout: p.timeout });
-            break;
-          case 'gitStatus':
-            result = lunaTools.gitStatus({ cwd: p.cwd });
-            break;
-          case 'gitDiff':
-            result = lunaTools.gitDiff({ cwd: p.cwd, staged: p.staged });
-            break;
-          case 'gitLog':
-            result = lunaTools.gitLog({ cwd: p.cwd, n: p.n, limit: p.limit });
-            break;
-          case 'gitCommit':
-            result = lunaTools.gitCommit(p.message, { cwd: p.cwd });
-            break;
-          case 'applyPatch':
-            result = lunaTools.applyPatch(p.patch || p.patchContent, { cwd: p.cwd });
-            break;
-          case 'downloadFile':
-            result = await lunaTools.downloadFile(p.url, p.destination || p.path, { timeout: p.timeout });
-            break;
-          case 'clipboardRead':
-            result = lunaTools.clipboardRead();
-            break;
-          case 'clipboardWrite':
-            result = lunaTools.clipboardWrite(p.text || p.content);
-            break;
-          case 'readMediaFile':
-            result = lunaTools.readMediaFile(p.path || p.filePath);
-            break;
-          case 'getCurrentDirectory':
-            result = lunaTools.getCurrentDirectory();
-            break;
-          case 'think':
-            result = lunaTools.think(p.thought || p.reasoning || p.text);
-            break;
-          default:
-            result = { success: false, error: `Ferramenta desconhecida: ${tool}` };
-        }
-      } else if (isDesktopTool) {
-        const action = { type: tool, params };
-        result = await this.engine.executeSingle(action);
-      } else if (tool === 'ipython' && params.code) {
-        // Fallback: Kimi sometimes returns ipython instead of executeShell
-        const code = params.code.replace(/'/g, "'\\''");
-        result = lunaTools.executeShell(`python3 -c '${code}'`, { cwd: params.cwd, timeout: params.timeout || 30000 });
-      } else {
-        result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
+    // ── Path Traversal Protection ──
+    // Ensure file paths stay within workspace (if workspace is set)
+    const ws = workspaceManager.getWorkspace('luna-cli');
+    if (ws && params.path) {
+      const resolved = path.resolve(params.path);
+      const wsResolved = path.resolve(ws.path);
+      if (!resolved.startsWith(wsResolved) && !params.path.startsWith('/tmp')) {
+        result = { success: false, error: `Path traversal bloqueado: "${params.path}" está fora do workspace "${ws.path}".` };
       }
-    } catch (err) {
-      result = { success: false, error: err.message };
+    }
+
+    // ── Execute ──
+    if (!result) {
+      try {
+        const guard = this._ensureToolGuard();
+        if (isFileTool && lunaTools[tool]) {
+          const p = params || {};
+          // Build tool executor lambda
+          const toolFn = () => {
+            switch (tool) {
+              case 'readFile': return lunaTools.readFile(p.path || p.file, { offset: p.offset || p.line_offset, limit: p.limit || p.n_lines });
+              case 'writeFile': return lunaTools.writeFile(p.path || p.filePath, p.content);
+              case 'appendFile': return lunaTools.appendFile(p.path || p.filePath, p.content);
+              case 'replaceInFile': return lunaTools.replaceInFile(p.path || p.filePath, p.old || p.oldStr, p.new || p.newStr, { replaceAll: p.replaceAll, edit: p.edit });
+              case 'deleteFile': return lunaTools.deleteFile(p.path || p.filePath);
+              case 'moveFile': return lunaTools.moveFile(p.source || p.from, p.destination || p.to);
+              case 'copyFile': return lunaTools.copyFile(p.source || p.from, p.destination || p.to);
+              case 'getFileInfo': return lunaTools.getFileInfo(p.path || p.filePath);
+              case 'listFiles': return lunaTools.listFiles(p.pattern || '*', { cwd: p.cwd, limit: p.limit, dot: p.dot });
+              case 'viewDirectory': return lunaTools.viewDirectory(p.path || p.dirPath, { depth: p.depth });
+              case 'createDirectory': return lunaTools.createDirectory(p.path || p.dirPath);
+              case 'removeDirectory': return lunaTools.removeDirectory(p.path || p.dirPath);
+              case 'searchFiles': return lunaTools.searchFiles(p.pattern, { cwd: p.cwd, path: p.path, context: p.context, '-C': p['-C'], limit: p.limit });
+              case 'grep': return lunaTools.grep(p.pattern, { cwd: p.cwd, path: p.path, glob: p.glob, include: p.include, context: p.context, '-C': p['-C'], limit: p.limit, output_mode: p.output_mode });
+              case 'glob': return lunaTools.glob(p.pattern, { cwd: p.cwd, dot: p.dot, ignore: p.ignore, limit: p.limit });
+              case 'searchWeb': return lunaTools.searchWeb(p.query || p.q, { limit: p.limit });
+              case 'fetchURL': return lunaTools.fetchURL(p.url, { limit: p.limit, timeout: p.timeout });
+              case 'executeShell': return lunaTools.executeShell(p.command, { cwd: p.cwd, timeout: p.timeout });
+              case 'runTests': return lunaTools.runTests({ cwd: p.cwd, timeout: p.timeout, command: p.command });
+              case 'checkSyntax': return lunaTools.checkSyntax(p.path || p.filePath);
+              case 'installPackages': return lunaTools.installPackages(p.packages || p.package, { cwd: p.cwd, timeout: p.timeout });
+              case 'gitStatus': return lunaTools.gitStatus({ cwd: p.cwd });
+              case 'gitDiff': return lunaTools.gitDiff({ cwd: p.cwd, staged: p.staged });
+              case 'gitLog': return lunaTools.gitLog({ cwd: p.cwd, n: p.n, limit: p.limit });
+              case 'gitCommit': return lunaTools.gitCommit(p.message, { cwd: p.cwd });
+              case 'applyPatch': return lunaTools.applyPatch(p.patch || p.patchContent, { cwd: p.cwd });
+              case 'downloadFile': return lunaTools.downloadFile(p.url, p.destination || p.path, { timeout: p.timeout });
+              case 'clipboardRead': return lunaTools.clipboardRead();
+              case 'clipboardWrite': return lunaTools.clipboardWrite(p.text || p.content);
+              case 'readMediaFile': return lunaTools.readMediaFile(p.path || p.filePath);
+              case 'getCurrentDirectory': return lunaTools.getCurrentDirectory();
+              case 'think': return lunaTools.think(p.thought || p.reasoning || p.text);
+              default: return { success: false, error: `Ferramenta desconhecida: ${tool}` };
+            }
+          };
+          if (guard) {
+            result = await guard.execute(tool, p, toolFn);
+          } else {
+            result = toolFn();
+          }
+        } else if (isDesktopTool) {
+          const action = { type: tool, params };
+          result = await this.engine.executeSingle(action);
+        } else if (tool === 'ipython' && params.code) {
+          const code = params.code.replace(/'/g, "'\\''");
+          result = lunaTools.executeShell(`python3 -c '${code}'`, { cwd: params.cwd, timeout: params.timeout || 30000 });
+        } else {
+          result = { success: false, error: `Ferramenta desconhecida: ${tool}. Use uma das ferramentas disponíveis.` };
+        }
+      } catch (err) {
+        result = { success: false, error: err.message };
+      }
     }
 
     // Auto-commit git hook for file-modifying tools
@@ -1607,8 +1595,12 @@ FORMATOS: {"mode":"CHAT",...} | {"mode":"ACTION","tool":"...","params":{}} | {"m
       }
     }
 
-    // Format output for storage
-    const outputText = result.content || result.stdout || result.output || JSON.stringify(result).slice(0, 2000);
+    // Format output for storage (with secret scrubbing)
+    const rawOutput = result.content || result.stdout || result.output || JSON.stringify(result).slice(0, 2000);
+    const outputText = this._scrubSecrets(rawOutput);
+    if (result.error) result.error = this._scrubSecrets(result.error);
+    if (result.stdout) result.stdout = this._scrubSecrets(result.stdout);
+    if (result.content) result.content = this._scrubSecrets(result.content);
 
     // Generate friendly feedback message
     const friendlyMessage = this._makeFriendlyFeedback(tool, params, result);

@@ -1,5 +1,63 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-26 — Security Hardening + Kimi Web Audit Fixes
+
+### Security (CRITICAL)
+- **ToolGuard integration** (`luna-soul.cjs` + `luna-tool-guard.cjs`)
+  - `_handleAction()` agora envolve TODAS as file tools com `ToolGuard.execute()`
+  - 7 padrões ativos: retry com backoff, circuit breaker, idempotency, schema
+    validation, timeout, checksum anti-drift, checkpoint por step
+  - Schema validation rejeita tools desconhecidas e params inválidos
+- **Path traversal fix** (`luna-soul.cjs`)
+  - Antes de executar qualquer tool: `path.resolve(params.path)` deve estar
+    dentro do `workspacePath`. Bloqueia `/etc/passwd`, `~/.ssh/id_rsa`, etc.
+- **Secret scrubber** (`luna-soul.cjs`)
+  - `_scrubSecrets()` remove padrões de API keys dos outputs: `sk-...`,
+    `ghp_...`, `AKIA...`, `Bearer ...`, `password=...`, `PRIVATE KEY`
+- **Undo safety — triple-guard** (`luna-tui.mjs`)
+  - `/undo` agora: (1) `git.init()`, (2) verifica `currentBranch.startsWith
+    ('luna/session-')`, (3) só executa em branches de sessão. Evita
+    `git reset --hard` em `main`/`develop`
+
+### Fixed
+- **Stream interceptor state reset** (`kimi-bridge.cjs`)
+  - `__lunaResetStream()` chamada no início de `newChat`, `sendMessage`,
+    `sendMessageStream` — elimina contaminação cruzada entre mensagens
+- **Memory leak no browser** (`kimi-bridge.cjs`)
+  - `accumulate()` trunca `events` para últimos 500 (buffer circular).
+    Sessões longas não mais causam OutOfMemory
+- **Fetch interceptor real-time** (`kimi-bridge.cjs`)
+  - Substituído `response.clone().text()` por `ReadableStream.getReader()` +
+    `TextDecoder` — lê chunks SSE em tempo real, não só no final
+- **Spinner eterno** (`luna-tui.mjs`)
+  - `ToolCallItem` para o `setInterval` quando `msg.completed === true`.
+    `action_end` marca a tool_call correspondente. CPU não mais consumida
+    indefinidamente
+- **Agent indicator preso** (`luna-tui.mjs`)
+  - `setActiveAgents(0)` adicionado no `catch` do stream + no cleanup normal.
+    Indicador `⚙` some corretamente após erro de rede
+- **ScanSafe — DoS protection** (`luna-workspace.cjs`)
+  - `SAFE_MAX_ENTRIES = 1000` por diretório + `SAFE_MAX_DEPTH = 10` +
+    `SKIP_DIRS` hardcoded. Early-abort se diretório tem >1000 entradas
+- **Gitignore matching** (`luna-workspace.cjs`)
+  - `relPath` agora é sempre `path.relative(workspaceRoot, fullPath)` —
+    patterns do root `.gitignore` funcionam corretamente em subdiretórios
+- **Alternate screen wrapper** (`~/.local/bin/luna`)
+  - Bash wrapper com `trap 'printf \"\\033[?1049l\"' EXIT INT TERM HUP` —
+    restaura terminal mesmo em crash hard (SIGKILL ainda não capturável,
+    mas wrapper mitiga SIGINT/SIGTERM)
+
+### Added
+- `luna-wrapper.sh` — wrapper alternativo para alternate screen restoration
+- `demo-animations.mjs` — demonstração visual das tool call animations
+
+### Tests
+- Todos os testes existentes continuam passando: 30/30 (12 thinking + 4
+  bridge + 8 workspace + 6 E2E)
+- Sintaxe validada em 7 arquivos modificados
+
+---
+
 ## [Unreleased] — 2026-05-25 — Fase 2: Computer Use + Luna CLI + Tool Registry
 
 ### Added
