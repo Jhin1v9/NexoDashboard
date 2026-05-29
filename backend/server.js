@@ -972,6 +972,13 @@ app.use((req, res, next) => {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (e) {
+    // Fallback: aceita INTERNAL_API_TOKEN como token de serviço
+    const serviceToken = process.env.INTERNAL_API_TOKEN;
+    if (serviceToken && token === serviceToken) {
+      req.user = { id: 'service', name: 'Service Bot', role: 'admin' };
+      next();
+      return;
+    }
     return res.status(401).json({ success: false, error: 'Token inválido ou expirado' });
   }
 });
@@ -7787,6 +7794,41 @@ app.post('/api/leads', async (req, res) => {
       email: email || '',
       phone: phone || '',
       source: source || 'manual',
+      type: 'lead',
+      status: 'potencial',
+      pipelineStatus: 'novo',
+      estimatedValue: estimatedValue || 0,
+      currency: 'EUR',
+      notes: notes || '',
+      assignedTo: assignedTo || null,
+      tags: tags || [],
+      createdAt: new Date().toISOString(),
+      lastContact: null,
+      convertedAt: null
+    };
+    await dataStore.saveLead(lead);
+    res.json({ success: true, lead });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/internal/leads — Criar lead via agente (sem rate limit)
+app.post('/api/internal/leads', async (req, res) => {
+  try {
+    const { displayName, name, email, phone, source, estimatedValue, notes, assignedTo, tags } = req.body;
+    const leadName = displayName || name;
+    if (!leadName) {
+      return res.status(400).json({ success: false, error: 'displayName obrigatorio' });
+    }
+    const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const lead = {
+      id,
+      displayName: leadName,
+      name: leadName,
+      email: email || '',
+      phone: phone || '',
+      source: source || 'luna-agent',
       type: 'lead',
       status: 'potencial',
       pipelineStatus: 'novo',

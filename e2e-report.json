@@ -1,0 +1,432 @@
+{
+  "timestamp": "2026-05-26T20:42:36.275Z",
+  "pages": [
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Tarefas",
+      "path": "/tarefas",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Leads",
+      "path": "/leads",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Financeiro",
+      "path": "/financeiro",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Caixa",
+      "path": "/financeiro/caixa",
+      "ok": true,
+      "consoleErrors": 2,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Gastos",
+      "path": "/financeiro/gastos",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Ideias",
+      "path": "/ideias",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Orçamentos",
+      "path": "/orcamentos",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Clientes",
+      "path": "/clientes",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Projetos",
+      "path": "/projetos",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "WhatsApp",
+      "path": "/whatsapp",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Email",
+      "path": "/email",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Relatórios",
+      "path": "/relatorios",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "GitHub",
+      "path": "/github",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Vercel",
+      "path": "/vercel",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Ferramentas",
+      "path": "/ferramentas",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Luna",
+      "path": "/luna",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Sistema",
+      "path": "/sistema",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Configurações",
+      "path": "/settings",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Segurança",
+      "path": "/seguranca",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    },
+    {
+      "name": "Changelog",
+      "path": "/changelog",
+      "ok": true,
+      "consoleErrors": 1,
+      "networkErrors": 0,
+      "network4xx": 0
+    }
+  ],
+  "api": [
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/auth/me",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/tasks",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/tasks/stats",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/leads",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/cash-box",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/cash-box/statement",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/finance/summary",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/finance/transactions",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/links",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/notifications",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/users",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/whatsapp/history",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/ideas",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/ideas/stats",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/changelog",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/changelog/latest",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/changelog/unread",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/luna/dashboard-state",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/system/status",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/whatsapp/status",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/agents/status",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/payments",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/quotes",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/expenses",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/members",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/security-logs",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/luna/threads",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/workspace/servers",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/dashboard/summary",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/dashboard/metrics",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/analytics/overview",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/kpi",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/security/settings",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/finance/categories",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    },
+    {
+      "endpoint": "/api/tasks/categories",
+      "method": "GET",
+      "status": 200,
+      "ok": true,
+      "error": null
+    }
+  ],
+  "summary": {
+    "passed": 36,
+    "failed": 2,
+    "warnings": 21
+  }
+}

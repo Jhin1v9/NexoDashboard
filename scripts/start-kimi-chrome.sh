@@ -59,13 +59,11 @@ echo "[start-kimi-chrome] CDP Port: ${CDP_PORT}"
 exec "${CHROME_BIN}" \
   --remote-debugging-port="${CDP_PORT}" \
   --user-data-dir="${PROFILE_DIR}" \
-  --headless=new \
   --no-first-run \
   --no-default-browser-check \
-  --disable-gpu \
   --disable-dev-shm-usage \
   --disable-background-timer-throttling \
   --disable-backgrounding-occluded-windows \
   --disable-renderer-backgrounding \
   --window-size=1920,1080 \
-  "about:blank"
+  "https://kimi.com"

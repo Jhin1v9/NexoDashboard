@@ -1,0 +1,71 @@
+Você é um engenheiro sênior de JavaScript/Node.js especialista em Playwright e DOM scraping.
+
+Gere o método COMPLETO `_extractToolMirrorFromDOM(page)` para uma classe KimiBridge em Node.js usando Playwright.
+
+CONTEXTO:
+- Luna CLI v3.3 conecta à Kimi Web (kimi.com) via Playwright CDP
+- A Kimi Web renderiza tool calls nativas no DOM com classes CSS específicas
+- O método roda dentro de `page.evaluate(() => { ... })`
+- Já existe um MutationObserver injetado que adiciona `data-luna-seq` e `data-luna-detected-at` aos nodes
+
+REQUISITOS:
+
+1. Encontre o ÚLTIMO segmento de mensagem do assistente:
+   - Seletores: '.segment-assistant', '.message-assistant', '[data-testid="assistant-message"]', etc.
+   - Se não encontrar, retorne array vazio
+
+2. Valide segurança — verifique se o node está DENTRO do container do assistente:
+   ```javascript
+   function isInsideAssistant(node) {
+     let parent = node.parentElement;
+     while (parent) {
+       const pc = (parent.className || '').toLowerCase();
+       if (pc.includes('assistant') || pc.includes('segment-assistant') || pc.includes('message-assistant')) return true;
+       parent = parent.parentElement;
+     }
+     return false;
+   }
+   ```
+   - Se um node NÃO está dentro do assistant, IGNORE (pode ser injeção maliciosa)
+
+3. Extraia de TODOS os tipos de tool calls:
+   - `.toolcall-container.default.toolcall-ipython`
+   - `.toolcall-container.default.toolcall-web_search`
+   - `.toolcall-container.default.toolcall-browser`
+   - `.toolcall-container.default.toolcall-computer`
+   - Fallback: `.toolcall-ipython`, `.toolcall-web_search`, etc.
+
+4. Para cada container:
+   - Detecte o tipo da tool do className (ipython, web_search, browser, computer)
+   - Extraia código/argumentos de `.toolcall-content pre/code`
+   - Extraia resultado (stdout) via TreeWalker de text nodes
+   - Extraia imagens de `img` (filtre avatar.moonshot.cn e statics.moonshot.cn)
+   - Leia `data-luna-seq` (sequence number) e `data-luna-detected-at` (timestamp)
+
+5. Extraia também `.segment-code` como fallback (quando Kimi mostra código sem executar):
+   - Detecte linguagem de `.segment-code-lang`
+   - Ignore blocks com lang 'plain' (são outputs, não código)
+   - Valide `isInsideAssistant(block)`
+
+6. Para `.ipython-images-container` (imagens standalone):
+   - Anexe imagens ao último resultado se nenhum tiver imagens
+
+7. Ordene resultados por `seq` (crescente) para garantir ordem FIFO de execução
+
+8. Retorne array de objetos:
+   ```javascript
+   {
+     code: string,        // código Python ou argumentos
+     result: string,      // stdout/resultado do sandbox
+     images: [{ src, alt }],
+     language: string,    // 'python', 'bash', 'javascript', etc.
+     source: string,      // 'kimi-sandbox' ou 'kimi-text'
+     sandboxExecution: boolean,
+     tool: string,        // 'ipython', 'web_search', 'browser', 'computer'
+     seq: number,         // sequence number do MutationObserver
+     detectedAt: number,  // timestamp de detecção
+   }
+   ```
+
+Gere o código COMPLETO em JavaScript (CommonJS), pronto para colar no arquivo.
+Responda APENAS com o bloco de código.

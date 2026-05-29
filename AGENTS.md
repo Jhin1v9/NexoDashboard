@@ -2,7 +2,7 @@
 # AGENTS.md — NEXO COMMAND CENTER v5.0
 # Documento de contexto para agentes de IA
 # Data: 2026-05-29
-# Último commit: 9d43690 (main)
+# Último commit: 331e236 (main)
 # ═══════════════════════════════════════════════════════════════════
 
 ## 🏢 EMPRESA
@@ -19,6 +19,7 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 ## 🚀 ESTADO ATUAL DO SISTEMA (2026-05-29)
 
 ### Commits Recentes (mais novos primeiro)
+- `331e236` docs: limpeza de documentação antiga + atualiza AGENTS.md, KIMI.MD, PLANO.md
 - `9d43690` fix: corrige erros 500 no dashboard — schema mismatch e bugs de API
 - `045f7f1` docs: relatório final v3.1 tags calibrado — 50/50 testes, E2E 3/3
 - `059a4bd` calibração(system+parser+action): 5 ajustes pós-migração double-bracket
@@ -264,4 +265,4 @@ curl -s -X POST http://localhost:3456/api/auth/login \
 
 ---
 
-*Atualizado: 2026-05-29 | Commit: 9d43690 | Status: Backend ✅ Frontend ✅ Luna CLI ✅*
+*Atualizado: 2026-05-29 | Commit: 331e236 | Status: Backend ✅ Frontend ✅ Luna CLI ✅*

@@ -1,0 +1,61 @@
+Você é um engenheiro sênior de segurança de software.
+
+Gere a classe COMPLETA `ToolGuard` em Node.js (CommonJS) para um agente de código AI.
+
+CONTEXTO:
+- Luna CLI v3.3 executa comandos shell e código Python localmente no PC do usuário
+- O agente se conecta à Kimi Web que gera código via tool calls nativas
+- O usuário é o único operador (CEO, máquina pessoal), mas o código pode ser malicioso
+- Existe um modo YOLO que bypassa confirmações
+
+REQUISITOS:
+
+1. Retry com backoff exponencial + jitter:
+   - Max 3 retries, base 300ms, max 5000ms
+   - Retry em: EAGAIN, EBUSY, EMFILE, ENFILE, EACCES, EPERM, lock, timeout
+
+2. Circuit Breaker:
+   - Janela de 60s, threshold de 3 chamadas iguais
+   - Detecta loop do LLM chamando mesmo tool com mesmos params
+
+3. Idempotency Keys:
+   - SHA256 hash de tool+params, 16 chars
+   - Evita duplicação de execução
+
+4. Schema Validation:
+   - Valida campos obrigatórios e tipos
+   - readFile: path obrigatório
+   - writeFile: path e content obrigatórios, path deve ser absoluto
+   - executeShell: command obrigatório
+   - Padrões proibidos em executeShell: rm -rf /, mkfs, dd if=, fork bomb
+
+5. Timeout:
+   - 30s para read/write, 120s para shell longo (npm test/build)
+
+6. Checksum de arquivo antes de editar:
+   - SHA256 do arquivo antes da modificação
+   - Detecta drift se arquivo mudou entre leitura e escrita
+
+7. Confirmação humana para operações DESTRUTIVAS (NOVO v3.3):
+   - Lista de operações que requerem confirmação:
+     * deleteFile, removeDirectory
+     * executeShell com: rm, chmod, chown, mkfs, dd, curl/wget com -F/--data, qualquer comando em ~/.ssh, /etc, /var
+     * ipython com código que contém: os.remove, os.rmdir, shutil.rmtree
+   - Se modo YOLO ativo (process.env.LUNA_YOLO === 'true' ou options.yolo === true): bypass confirmação
+   - Se não YOLO: retorne `{ success: false, error: 'OPERAÇÃO DESTRUTIVA: ... Use /yolo para bypass.', requiresConfirmation: true }`
+   - A UI (Ink TUI) detecta `requiresConfirmation` e pede confirmação ao usuário
+
+8. Checkpoint / Savepoint:
+   - Antes de operações destrutivas, faça git stash se possível
+   - Permite rollback se algo der errado
+
+DEPENDÊNCIAS:
+```javascript
+const fs = require('fs');
+const crypto = require('crypto');
+const path = require('path');
+```
+
+Gere a classe COMPLETA `ToolGuard` em JavaScript (CommonJS).
+Inclua todos os métodos: withRetry, CircuitBreaker, IdempotencyStore, validateToolCall, withTimeout, FileChecksumCache, checkDestructive, execute.
+Responda APENAS com o bloco de código.

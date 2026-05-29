@@ -101,9 +101,19 @@ function writeFile(filePath, content, opts = {}) {
   const resolved = resolvePath(filePath);
   try {
     const dir = path.dirname(resolved);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    let createdDir = false;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      createdDir = true;
+    }
     fs.writeFileSync(resolved, content, 'utf8');
-    return ok({ path: resolved, operation: 'write', bytes: Buffer.byteLength(content, 'utf8') });
+    return ok({
+      path: resolved,
+      operation: 'write',
+      bytes: Buffer.byteLength(content, 'utf8'),
+      createdDir: createdDir || undefined,
+      message: createdDir ? `PASTA AINDA NAO CRIADA. CRIEI PRIMEIRO: ${dir}` : undefined,
+    });
   } catch (e) {
     return err(e.message);
   }
@@ -113,9 +123,29 @@ function appendFile(filePath, content, opts = {}) {
   const resolved = resolvePath(filePath);
   try {
     const dir = path.dirname(resolved);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    let createdDir = false;
+    let createdFile = false;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      createdDir = true;
+    }
+    if (!fs.existsSync(resolved)) {
+      fs.writeFileSync(resolved, '', 'utf8');
+      createdFile = true;
+    }
     fs.appendFileSync(resolved, content, 'utf8');
-    return ok({ path: resolved, operation: 'append', bytes: Buffer.byteLength(content, 'utf8') });
+    return ok({
+      path: resolved,
+      operation: 'append',
+      bytes: Buffer.byteLength(content, 'utf8'),
+      createdDir: createdDir || undefined,
+      createdFile: createdFile || undefined,
+      message: createdDir
+        ? `PASTA AINDA NAO CRIADA. CRIEI PRIMEIRO: ${dir}`
+        : createdFile
+          ? `ARQUIVO NAO CRIADO. CRIEI PRIMEIRO PRA DEPOIS ESCREVER: ${resolved}`
+          : undefined,
+    });
   } catch (e) {
     return err(e.message);
   }
@@ -123,7 +153,16 @@ function appendFile(filePath, content, opts = {}) {
 
 function replaceInFile(filePath, oldStr, newStr, opts = {}) {
   const resolved = resolvePath(filePath);
-  if (!fs.existsSync(resolved)) return err(`Arquivo não encontrado: ${filePath}`);
+  let createdFile = false;
+
+  if (!fs.existsSync(resolved)) {
+    // FALLBACK: arquivo não existe — cria primeiro
+    const dir = path.dirname(resolved);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(resolved, '', 'utf8');
+    createdFile = true;
+  }
+
   try {
     let content = fs.readFileSync(resolved, 'utf8');
 
@@ -137,7 +176,12 @@ function replaceInFile(filePath, oldStr, newStr, opts = {}) {
         content = content.split(oldS).join(newS);
       }
       fs.writeFileSync(resolved, content, 'utf8');
-      return ok({ path: resolved, editsApplied: edits.length });
+      return ok({
+        path: resolved,
+        editsApplied: edits.length,
+        createdFile: createdFile || undefined,
+        message: createdFile ? `ARQUIVO NAO CRIADO. CRIEI PRIMEIRO PRA DEPOIS ESCREVER: ${resolved}` : undefined,
+      });
     }
 
     // Single edit
@@ -152,9 +196,67 @@ function replaceInFile(filePath, oldStr, newStr, opts = {}) {
     }
     content = content.split(target).join(replacement);
     fs.writeFileSync(resolved, content, 'utf8');
-    return ok({ path: resolved, occurrences });
+    return ok({
+      path: resolved,
+      occurrences,
+      createdFile: createdFile || undefined,
+      message: createdFile ? `ARQUIVO NAO CRIADO. CRIEI PRIMEIRO PRA DEPOIS ESCREVER: ${resolved}` : undefined,
+    });
   } catch (e) {
     return err(e.message);
+  }
+}
+
+function executeScript(code, opts = {}) {
+  if (!code || typeof code !== 'string') return err('Código do script é obrigatório');
+
+  const language = opts.language || opts.lang || 'bash';
+  const cwd = opts.cwd ? resolvePath(opts.cwd) : process.cwd();
+  const timeout = opts.timeout || 120000;
+
+  // Mapeia linguagem para extensão e executor
+  const langMap = {
+    bash: { ext: 'sh', executor: 'bash', shell: true },
+    sh: { ext: 'sh', executor: 'bash', shell: true },
+    shell: { ext: 'sh', executor: 'bash', shell: true },
+    powershell: { ext: 'ps1', executor: 'pwsh', shell: true },
+    ps1: { ext: 'ps1', executor: 'pwsh', shell: true },
+    python: { ext: 'py', executor: 'python3', shell: true },
+    py: { ext: 'py', executor: 'python3', shell: true },
+    node: { ext: 'js', executor: 'node', shell: true },
+    js: { ext: 'js', executor: 'node', shell: true },
+    javascript: { ext: 'js', executor: 'node', shell: true },
+  };
+
+  const config = langMap[language.toLowerCase()];
+  if (!config) return err(`Linguagem não suportada: ${language}. Use: bash, python, node, powershell`);
+
+  const scriptPath = path.join('/tmp', `luna-script-${Date.now()}.${config.ext}`);
+
+  try {
+    fs.writeFileSync(scriptPath, code, 'utf8');
+    fs.chmodSync(scriptPath, 0o755);
+
+    // Executa o script
+    const result = safeExec(`${config.executor} "${scriptPath}"`, { cwd, timeout });
+
+    // Limpa arquivo temporário (não bloqueante)
+    try { fs.unlinkSync(scriptPath); } catch {}
+
+    return ok({
+      language,
+      scriptPath,
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      exitCode: result.exitCode || 0,
+      success: result.exitCode === 0,
+      message: result.exitCode === 0
+        ? `✅ Script ${language} executado com sucesso`
+        : `❌ Script ${language} falhou (exit ${result.exitCode})`,
+    });
+  } catch (e) {
+    try { fs.unlinkSync(scriptPath); } catch {}
+    return err(`Falha ao executar script: ${e.message}`);
   }
 }
 
@@ -661,9 +763,18 @@ function clipboardWrite(text) {
   try {
     const env = { ...process.env, DISPLAY: process.env.DISPLAY || ':0' };
     // Try each clipboard tool separately
+    // v3.3-fix: xclip without -loops 1 + spawn detached so it persists in clipboard
     const tools = [
-      // xclip needs -loops 1 to not hang waiting for clipboard requests
-      () => execSync(`printf '%s' ${JSON.stringify(text)} | xclip -selection clipboard -loops 1`, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'], env }),
+      () => {
+        const { spawn } = require('child_process');
+        const proc = spawn('xclip', ['-selection', 'clipboard'], { env, detached: true });
+        proc.stdin.write(text);
+        proc.stdin.end();
+        proc.unref();
+        // Give it a moment to register
+        try { execSync('sleep 0.2', { timeout: 1000 }); } catch {}
+        return true;
+      },
       () => execSync(`printf '%s' ${JSON.stringify(text)} | xsel --clipboard --input`, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'], env }),
       () => execSync(`printf '%s' ${JSON.stringify(text)} | wl-copy`, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'], env }),
     ];
@@ -714,6 +825,111 @@ function think(thought) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 11. DASHBOARD TOOLS (API REST localhost:3456)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DASHBOARD_BASE = 'http://localhost:3456/api';
+function getInternalApiToken() {
+  return process.env.INTERNAL_API_TOKEN || '';
+}
+
+async function dashboardApi(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const token = getInternalApiToken();
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${DASHBOARD_BASE}${path}`, opts);
+  if (!res.ok) throw new Error(`Dashboard API ${path}: ${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+async function dashboardCreateTask(params) {
+  const task = await dashboardApi('/tasks', 'POST', {
+    title: params.title || 'Sem título',
+    description: params.description || '',
+    status: params.status || 'pending',
+    priority: params.priority || 'medium',
+    assignedTo: params.assignee || params.assignedTo || null,
+    dueDate: params.dueDate || null,
+    source: 'luna-agent'
+  });
+  return ok({ stdout: `✅ Tarefa criada: ${task.title} (ID: ${task.id})` });
+}
+
+async function dashboardListTasks(params) {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.assignee) query.set('assignedTo', params.assignee);
+  if (params.priority) query.set('priority', params.priority);
+  const data = await dashboardApi(`/tasks?${query.toString()}`);
+  const tasks = Array.isArray(data) ? data : (data.tasks || []);
+  const lines = tasks.map(t => `- [${t.status}] ${t.title} (P: ${t.priority})`).join('\n');
+  return ok({ stdout: `📋 ${tasks.length} tarefa(s):\n${lines || 'Nenhuma tarefa encontrada.'}` });
+}
+
+async function dashboardCreateLead(params) {
+  const data = await dashboardApi('/internal/leads', 'POST', {
+    displayName: params.name || params.displayName || 'Sem nome',
+    email: params.email || '',
+    phone: params.phone || '',
+    source: params.source || 'luna-agent',
+    estimatedValue: params.estimatedValue || 0,
+    notes: params.notes || '',
+    assignedTo: params.assignedTo || null,
+    tags: params.tags || []
+  });
+  const lead = data.lead || data;
+  return ok({ stdout: `✅ Lead criado: ${lead.displayName || lead.name} (ID: ${lead.id})` });
+}
+
+async function dashboardListLeads(params) {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.assignedTo) query.set('assignedTo', params.assignedTo);
+  if (params.search) query.set('search', params.search);
+  const data = await dashboardApi(`/leads?${query.toString()}`);
+  const leads = data.leads || [];
+  const lines = leads.map(l => `- [${l.pipelineStatus || 'new'}] ${l.displayName || l.name} (${l.email || 'sem email'})`).join('\n');
+  return ok({ stdout: `📋 ${leads.length} lead(s):\n${lines || 'Nenhum lead encontrado.'}` });
+}
+
+async function dashboardGetFinanceSummary(params) {
+  const data = await dashboardApi('/finance/summary');
+  return ok({ stdout: `💰 Finance Summary:\n- Expected: ${data.totalExpected || 0}\n- Received: ${data.totalReceived || 0}\n- Pending: ${data.totalPending || 0}\n- Overdue: ${data.overduePayments || 0}` });
+}
+
+async function dashboardCreateIdea(params) {
+  const body = {
+    title: params.title || 'Sem título',
+    type: params.type || 'brainstorm',
+    priority: params.priority || 'media',
+    status: params.status || 'rascunho',
+    tags: params.tags || [],
+    createdBy: 'luna-web',
+    createdByName: 'Luna Web'
+  };
+  if (params.description || params.content) {
+    body.content = { blocks: [{ type: 'paragraph', content: params.description || params.content || '' }] };
+  }
+  const data = await dashboardApi('/ideas', 'POST', body);
+  const idea = data.data || data;
+  return ok({ stdout: `💡 Ideia criada: "${idea.title || params.title}" (ID: ${idea.id || 'n/a'})` });
+}
+
+async function dashboardListIdeas(params) {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.type) query.set('type', params.type);
+  if (params.priority) query.set('priority', params.priority);
+  if (params.search) query.set('search', params.search);
+  if (params.limit) query.set('limit', String(params.limit));
+  const data = await dashboardApi(`/ideas?${query.toString()}`);
+  const ideas = data.data?.ideas || data.ideas || [];
+  const lines = ideas.map(i => `- [${i.status}] ${i.title} (tipo: ${i.type}, prio: ${i.priority})`).join('\n');
+  return ok({ stdout: `💡 ${ideas.length} ideia(s):\n${lines || 'Nenhuma ideia encontrada.'}` });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -740,6 +956,7 @@ module.exports = {
   fetchURL,
   // Shell
   executeShell,
+  executeScript,
   runTests,
   checkSyntax,
   installPackages,
@@ -759,6 +976,19 @@ module.exports = {
   readMediaFile,
   // Reasoning
   think,
+  // Dashboard
+  dashboardCreateTask,
+  dashboardListTasks,
+  dashboardCreateLead,
+  dashboardListLeads,
+  dashboardGetFinanceSummary,
+  dashboardCreateIdea,
+  dashboardListIdeas,
   // System
   getCurrentDirectory,
+  // Project Validation
+  validateProject: (projectPath) => {
+    const { validateProject } = require('./luna-code-validator.cjs');
+    return validateProject(projectPath);
+  },
 };

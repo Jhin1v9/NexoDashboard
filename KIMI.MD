@@ -54,6 +54,7 @@ last_updated: 2026-05-29T16:00:00+02:00
 **Status:** ✅ v3.3 entregue — 110/110 testes passando, E2E validado
 
 **Commits recentes (main):**
+- `331e236` docs: limpeza de documentação antiga + atualiza AGENTS.md, KIMI.MD, PLANO.md
 - `9d43690` fix: corrige erros 500 — schema mismatch e bugs de API
 - `059a4bd` calibração: 5 ajustes pós-migração double-bracket
 - `6d5e8d1` feat: migrate from JSON to double-bracket delimiters

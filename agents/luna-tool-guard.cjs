@@ -169,6 +169,19 @@ const TOOL_SCHEMAS = {
     types: { command: 'string' },
     forbiddenPatterns: [/^\s*rm\s+-rf\s+\//, /^\s*mkfs/, /^\s*dd\s+if=/, /^\s*:\(\)\{\s*:\|:\s*&\s*\};:/],
   },
+  // v3.3: Kimi native tools — schema entries for guard validation
+  ipython: {
+    required: ['code'],
+    types: { code: 'string' },
+  },
+  browser: {
+    required: ['url'],
+    types: { url: 'string' },
+  },
+  computer: {
+    required: ['action'],
+    types: { action: 'string', x: 'number', y: 'number', text: 'string' },
+  },
   glob: {
     required: ['pattern'],
     types: { pattern: 'string' },
@@ -176,6 +189,11 @@ const TOOL_SCHEMAS = {
   grep: {
     required: ['pattern'],
     types: { pattern: 'string', path: 'string', type: 'string' },
+  },
+  validateProject: {
+    required: ['path'],
+    types: { path: 'string' },
+    pathMustBeAbsolute: true,
   },
 };
 
@@ -222,6 +240,77 @@ function validateToolCall(toolName, params) {
   }
 
   return true;
+}
+
+// ── 4b. Python Sandbox (AST-light import deny-list) ──
+// v3.4: os/pathlib/sys are allowed — ipython runs on the user's REAL PC,
+// and the prompt explicitly tells Kimi Web that os/pathlib are fine.
+const PYTHON_FORBIDDEN_IMPORTS = [
+  'subprocess', 'shutil', 'socket', 'multiprocessing',
+  'pty', 'resource', 'ctypes', 'ctypes.util',
+];
+const PYTHON_DANGEROUS_BUILTINS = [
+  'eval', 'exec', 'compile', '__import__',
+  // Note: 'open' removed — file I/O is legitimate for ipython tool.
+  // Path traversal protection is handled at the lunaTools level.
+];
+
+function validatePythonCode(code) {
+  if (!code || typeof code !== 'string') return { ok: false, reason: 'código vazio' };
+
+  // Deny-list de imports
+  const importRe = new RegExp(
+    `(?:^|[^\\w])import\\s+(${PYTHON_FORBIDDEN_IMPORTS.join('|')})(?:\\s|$|,|;)`,
+    'm'
+  );
+  const fromImportRe = new RegExp(
+    `(?:^|[^\\w])from\\s+(${PYTHON_FORBIDDEN_IMPORTS.join('|')})\\s+import`,
+    'm'
+  );
+  if (importRe.test(code)) {
+    return { ok: false, reason: `import proibido detectado: ${importRe.exec(code)[1]}` };
+  }
+  if (fromImportRe.test(code)) {
+    return { ok: false, reason: `from-import proibido detectado: ${fromImportRe.exec(code)[1]}` };
+  }
+
+  // Deny-list de builtins perigosos
+  const builtinRe = new RegExp(
+    `(?:^|[^\\w])(${PYTHON_DANGEROUS_BUILTINS.join('|')})\\s*\\(`,
+    'm'
+  );
+  if (builtinRe.test(code)) {
+    return { ok: false, reason: `builtin perigoso detectado: ${builtinRe.exec(code)[1]}` };
+  }
+
+  // Restrições de path / home
+  if (code.includes('~/.ssh') || code.includes('/etc/passwd') || code.includes('/etc/shadow')) {
+    return { ok: false, reason: 'acesso a arquivos sensíveis do sistema detectado' };
+  }
+
+  return { ok: true };
+}
+
+// ── 4c. Destructive Operation Detection ──
+const DESTRUCTIVE_PATTERNS = [
+  { pattern: /^\s*rm\s+/, message: 'Remoção de arquivo/pasta (rm)' },
+  { pattern: /^\s*chmod\s+/, message: 'Alteração de permissões (chmod)' },
+  { pattern: /^\s*chown\s+/, message: 'Alteração de propriedade (chown)' },
+  { pattern: /^\s*curl\s+.*-F[\s\"\'=]/i, message: 'Upload de arquivo (curl -F)' },
+  { pattern: /~\/\.ssh/, message: 'Acesso a ~/.ssh' },
+  { pattern: /^\s*mkfs/, message: 'Formatação de disco (mkfs)' },
+  { pattern: /^\s*dd\s+if=/, message: 'Escrita de disco raw (dd)' },
+  { pattern: /^\s*sudo\s+/, message: 'Escalada de privilégio (sudo)' },
+];
+
+function checkDestructivePattern(command) {
+  if (!command || typeof command !== 'string') return null;
+  for (const { pattern, message } of DESTRUCTIVE_PATTERNS) {
+    if (pattern.test(command)) {
+      return { destructive: true, message, pattern: pattern.toString() };
+    }
+  }
+  return null;
 }
 
 // ── 5. Timeout Wrapper ──
@@ -446,4 +535,6 @@ module.exports = {
   validateToolCall,
   computeChecksum,
   TOOL_SCHEMAS,
+  validatePythonCode,
+  checkDestructivePattern,
 };

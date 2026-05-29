@@ -13,8 +13,5 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
-# Enter alternate screen antes de rodar o Node
-printf '\033[?1049h'
-
 # Executa Luna CLI passando todos os argumentos
 node "$(dirname "$0")/luna-tui.mjs" "$@"

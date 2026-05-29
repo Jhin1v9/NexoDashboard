@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Luna TUI v3.1 — Interface Terminal com Ink + React
+ * Luna TUI v3.3 — Interface Terminal com Ink + React
  * Arquitetura inspirada em ShellAgent, Claude Code, Gemini CLI
  */
 
@@ -11,6 +11,7 @@ import { LunaSoul } from './luna-soul.cjs';
 import { SessionManager } from './session-manager.cjs';
 import { workspaceManager } from './luna-workspace.cjs';
 import { execSync, spawn } from 'child_process';
+import { cleanThinking, getThinkingMetrics, stripResponseTags } from './thinking-cleaner.cjs';
 
 const h = React.createElement;
 
@@ -31,6 +32,12 @@ const C = {
   system: '#aaaaaa',
   input: '#ffffff',
   border: '#444444',
+  code: '#ff79c6',
+  codeBg: '#2d2d4a',
+  path: '#8be9fd',
+  url: '#bd93f9',
+  command: '#50fa7b',
+  thinkingBg: '#1a1a2e',
 };
 
 const PERSONA_COLORS = {
@@ -41,6 +48,180 @@ const PERSONA_COLORS = {
   product: C.warning,
   surgeon: C.error,
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RICH TEXT PARSER — Markdown + Syntax Highlighting para Terminal
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Quebra uma linha em segmentos tipados para renderização rica no Ink.
+ * Detecta: **negrito**, *itálico*, `código`, /paths, https://urls, comandos shell
+ */
+function tokenizeRichText(line) {
+  const tokens = [];
+  let remaining = line;
+
+  // Ordem de prioridade: code > bold > italic > path > url > command
+  const patterns = [
+    { regex: /^(```[^`]*```|``[^`]*``|`[^`]+`)/, type: 'code' },
+    { regex: /^\*\*([^*]+)\*\*/, type: 'bold' },
+    { regex: /^\*([^*]+)\*/, type: 'italic' },
+    { regex: /^(\/[^\s:;|&<>"'{}()[\]]+|~\/[^\s:;|&<>"'{}()[\]]*)/, type: 'path' },
+    { regex: /^https?:\/\/[^\s]+/, type: 'url' },
+  ];
+
+  while (remaining.length > 0) {
+    let matched = false;
+    for (const { regex, type } of patterns) {
+      const m = remaining.match(regex);
+      if (m) {
+        const raw = m[0];
+        // Extrai conteúdo interno para code/bold/italic
+        let text = raw;
+        if (type === 'code') {
+          // Remove backticks
+          const backticks = raw.match(/^(`+)/)[1];
+          text = raw.slice(backticks.length, raw.length - backticks.length);
+        } else if (type === 'bold') {
+          text = m[1];
+        } else if (type === 'italic') {
+          text = m[1];
+        }
+        tokens.push({ type, text: text || raw });
+        remaining = remaining.slice(raw.length);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      // Pega texto comum até o próximo caractere especial
+      const nextSpecial = remaining.search(/[`*\/]|https?:/);
+      const take = nextSpecial === -1 ? remaining.length : nextSpecial;
+      if (take === 0) {
+        // Caractere especial isolado, consome 1
+        tokens.push({ type: 'text', text: remaining[0] });
+        remaining = remaining.slice(1);
+      } else {
+        tokens.push({ type: 'text', text: remaining.slice(0, take) });
+        remaining = remaining.slice(take);
+      }
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Converte tokens de uma linha em array de componentes Ink <Text>.
+ * O chamador deve embrulhar em <Box flexDirection="row">.
+ */
+function renderRichLine(line, baseColor = C.input, baseDim = false) {
+  const tokens = tokenizeRichText(line);
+  if (tokens.length === 1 && tokens[0].type === 'text') {
+    // Linha simples, sem formatação — retorna array com um Text
+    return [h(Text, { color: baseColor, dimColor: baseDim, wrap: 'wrap' }, line || ' ')];
+  }
+  return tokens.map((tok, i) => {
+    const key = `${i}-${tok.text.slice(0, 10)}`;
+    switch (tok.type) {
+      case 'bold':
+        return h(Text, { key, color: baseColor, bold: true, wrap: 'wrap' }, tok.text);
+      case 'italic':
+        return h(Text, { key, color: baseColor, italic: true, wrap: 'wrap' }, tok.text);
+      case 'code':
+        return h(Text, { key, color: C.code, backgroundColor: C.codeBg, wrap: 'wrap' }, tok.text);
+      case 'path':
+        return h(Text, { key, color: C.path, wrap: 'wrap' }, tok.text);
+      case 'url':
+        return h(Text, { key, color: C.url, wrap: 'wrap' }, tok.text);
+      default:
+        return h(Text, { key, color: baseColor, dimColor: baseDim, wrap: 'wrap' }, tok.text);
+    }
+  });
+}
+
+/**
+ * Renderiza múltiplas linhas com parsing rico.
+ * Detecta blocos de código delimitados por ```
+ */
+function renderRichText(text, baseColor = C.input, baseDim = false) {
+  if (!text) return [];
+  const lines = text.split('\n');
+  const result = [];
+  let inCodeBlock = false;
+  let codeBuffer = [];
+  let codeLang = '';
+  let lineIdx = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    const isFence = trimmed.startsWith('```');
+
+    if (isFence && !inCodeBlock) {
+      inCodeBlock = true;
+      codeLang = trimmed.slice(3).trim();
+      codeBuffer = [];
+      continue;
+    }
+    if (isFence && inCodeBlock) {
+      inCodeBlock = false;
+      // Renderiza bloco de código
+      result.push(
+        h(Box, {
+          key: `code-${lineIdx++}`,
+          flexDirection: 'column',
+          borderStyle: 'single',
+          borderColor: '#333355',
+          backgroundColor: C.codeBg,
+          paddingX: 1,
+          paddingY: 0,
+          marginY: 1,
+          width: '95%',
+        },
+          codeLang && h(Text, { color: C.dim, dimColor: true, italic: true }, codeLang),
+          ...codeBuffer.map((cl, i) =>
+            h(Text, { key: i, color: C.code, wrap: 'wrap' }, cl || ' ')
+          )
+        )
+      );
+      codeBuffer = [];
+      codeLang = '';
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+    } else {
+      result.push(
+        h(Box, { key: `line-${lineIdx++}`, flexDirection: 'row', flexWrap: 'wrap' },
+          ...renderRichLine(line, baseColor, baseDim)
+        )
+      );
+    }
+  }
+
+  // Se terminou com bloco de código aberto, renderiza o que sobrou
+  if (inCodeBlock && codeBuffer.length > 0) {
+    result.push(
+      h(Box, {
+        key: `code-end`,
+        flexDirection: 'column',
+        borderStyle: 'single',
+        borderColor: '#333355',
+        backgroundColor: C.codeBg,
+        paddingX: 1,
+        paddingY: 0,
+        marginY: 1,
+        width: '95%',
+      },
+        ...codeBuffer.map((cl, i) =>
+          h(Text, { key: i, color: C.code, wrap: 'wrap' }, cl || ' ')
+        )
+      )
+    );
+  }
+
+  return result;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UTILITÁRIOS
@@ -165,7 +346,7 @@ function formatToolResult(tool, output, success) {
   const s = String(output);
   if (s.length > 200 && s.includes('\n')) {
     const lines = s.trim().split('\n').length;
-    const preview = s.trim().split('\n').slice(0, 3).join('\n');
+    const preview = s.trim().split('\n').slice(0, 3);
     return { line: `${style.icon} ${style.past} │ ${lines} linhas`, style, isError: false, preview };
   }
   const short = s.slice(0, 100) + (s.length > 100 ? '…' : '');
@@ -243,9 +424,7 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
         h(Text, { color: C.dim, dimColor: true }, `  ${fmtTime(msg.timestamp)}`)
       ),
       h(Box, { marginLeft: 2, flexDirection: 'column' },
-        ...(msg.content || '').split('\n').map((line, i) =>
-          h(Text, { key: i, wrap: 'wrap' }, line || ' ')
-        )
+        ...renderRichText(msg.content || '', C.user, false)
       )
     );
   }
@@ -260,9 +439,7 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
         h(Text, { color: C.dim, dimColor: true }, `${modeTag}  ${fmtTime(msg.timestamp)}`)
       ),
       h(Box, { marginLeft: 2, flexDirection: 'column' },
-        ...content.split('\n').map((line, i) =>
-          h(Text, { key: i, wrap: 'wrap' }, line || ' ')
-        )
+        ...renderRichText(content, C.input, false)
       )
     );
   }
@@ -276,16 +453,21 @@ const MessageItem = React.memo(function MessageItem({ msg }) {
   }
 
   if (msg.type === 'system') {
-    return h(Box, { flexDirection: 'row', marginY: 1 },
-      h(Text, { color: C.system, dimColor: true }, '⚡ '),
-      h(Text, { color: C.system, dimColor: true, wrap: 'wrap' }, msg.content || '')
+    return h(Box, { flexDirection: 'column', marginY: 1 },
+      h(Box, { flexDirection: 'row' },
+        h(Text, { color: C.system, dimColor: true }, '⚡ '),
+        h(Text, { color: C.system, dimColor: true, italic: true }, 'Sistema')
+      ),
+      h(Box, { marginLeft: 2, flexDirection: 'column' },
+        ...renderRichText(msg.content || '', C.system, true)
+      )
     );
   }
 
   return null;
 });
 
-function MessageList({ messages, streamingText, thinkingText, isStreaming, showThinkingStream, scrollOffset, maxHeight }) {
+function MessageList({ messages, streamingText, thinkingText, isStreaming, showThinkingStream, scrollOffset, maxHeight, thinkingCollapsed, onToggleThinking }) {
   // Apply scroll offset: skip first N messages from bottom
   const visibleMessages = scrollOffset > 0
     ? messages.slice(0, Math.max(1, messages.length - scrollOffset))
@@ -294,16 +476,24 @@ function MessageList({ messages, streamingText, thinkingText, isStreaming, showT
   return h(Box, { flexDirection: 'column', width: '100%', height: maxHeight || undefined, overflow: 'hidden' },
     visibleMessages.map(msg => h(MessageItem, { key: msg.id, msg })),
 
-    // Thinking mode
-    isStreaming && thinkingText && showThinkingStream && h(Box, { flexDirection: 'column', marginY: 1 },
+    // Thinking mode — COLAPSADO por padrão (header apenas)
+    isStreaming && thinkingText && showThinkingStream && h(Box, {
+      flexDirection: 'column',
+      marginY: 1,
+      borderStyle: 'single',
+      borderColor: '#333355',
+      backgroundColor: C.thinkingBg,
+      paddingX: 1,
+      paddingY: thinkingCollapsed ? 0 : 1,
+      width: '95%',
+    },
       h(Box, { flexDirection: 'row' },
-        h(Text, { color: C.dim, dimColor: true, bold: true }, '🧠 '),
-        h(Text, { color: C.dim, dimColor: true, bold: true }, 'Pensando...')
+        h(Text, { color: C.warning, bold: true }, '🧠 '),
+        h(Text, { color: C.warning, bold: true }, thinkingCollapsed ? 'Pensando... (clique para expandir)' : 'Pensando...'),
+        thinkingCollapsed && h(Text, { color: C.dim, dimColor: true, italic: true }, `  (${getThinkingMetrics(thinkingText).tokens} tokens)`)
       ),
-      h(Box, { marginLeft: 2, flexDirection: 'column' },
-        ...thinkingText.split('\n').map((line, i) =>
-          h(Text, { key: i, color: C.dim, dimColor: true, wrap: 'wrap' }, line || ' ')
-        )
+      !thinkingCollapsed && h(Box, { flexDirection: 'column', marginTop: 1 },
+        ...renderRichText(thinkingText, C.dim, true)
       )
     ),
 
@@ -314,9 +504,7 @@ function MessageList({ messages, streamingText, thinkingText, isStreaming, showT
         h(Text, { color: C.luna, bold: true }, 'Luna')
       ),
       h(Box, { marginLeft: 2, flexDirection: 'column' },
-        ...streamingText.split('\n').map((line, i) =>
-          h(Text, { key: i, wrap: 'wrap' }, line || ' ')
-        ),
+        ...renderRichText(streamingText, C.input, false),
         !thinkingText && h(Text, { color: C.luna }, '▋')
       )
     )
@@ -356,7 +544,7 @@ function SuggestionBar({ suggestion }) {
   );
 }
 
-function StatusBar({ session, messages, isProcessing, activeToolCalls, activeAgents, bridgeStatus, sessionStartTime, followMode, scrollOffset }) {
+function StatusBar({ session, messages, isProcessing, activeToolCalls, activeAgents, bridgeStatus, sessionStartTime, followMode, scrollOffset, aiState }) {
   const { columns } = useWindowSize();
   const [now, setNow] = useState(Date.now());
 
@@ -387,6 +575,15 @@ function StatusBar({ session, messages, isProcessing, activeToolCalls, activeAge
   // YOLO
   const yoloText = session.yoloMode ? '🔥YOLO' : '';
 
+  // AI State indicator colors
+  const stateConfig = {
+    idle:     { dot: '⚪', label: 'idle',     color: C.dim },
+    analyzing:{ dot: '🟡', label: 'thinking', color: C.warning },
+    responding:{ dot: '🟢', label: 'responding', color: C.success },
+    error:    { dot: '🔴', label: 'error',    color: C.error },
+  };
+  const st = stateConfig[aiState] || stateConfig.idle;
+
   // Mode
   const modeText = session.mode || 'thinking';
 
@@ -404,7 +601,7 @@ function StatusBar({ session, messages, isProcessing, activeToolCalls, activeAge
 
   const leftContent = h(Box, { flexDirection: 'row', width: isNarrow ? '100%' : '35%' },
     h(Text, { color: C.dim }, `${bridgeIcon} ${bridgeText} │ `),
-    h(Text, { color: modeText === 'thinking' ? C.warning : C.success }, modeText),
+    h(Text, { color: st.color, bold: true }, `${st.dot} ${st.label}`),
     yoloText && h(Text, { color: C.error }, ` │ ${yoloText}`),
     activeToolCalls > 0 && h(Text, { color: C.tool }, ` │ 🔧${activeToolCalls}`),
     activeAgents > 0 && h(Text, { color: C.luna }, ` │ ⚙${activeAgents}`),
@@ -683,9 +880,19 @@ function App({ luna, sessionManager, initialSession }) {
 
   // Alternate screen buffer: isolate TUI from scrollback to prevent jump-to-top
   useEffect(() => {
-    process.stdout.write('\x1b[?1049h'); // enter alternate screen
+    // v3.5-fix: exit alternate screen first (in case previous TUI crashed)
+    process.stdout.write('\x1b[?1049l'); // exit alternate screen
+    process.stdout.write('\x1b[?25h');    // show cursor
+    process.stdout.write('\x1b[0m');      // reset colors
+    // small delay to let terminal settle before entering alternate screen
+    const timer = setTimeout(() => {
+      process.stdout.write('\x1b[?1049h'); // enter alternate screen
+    }, 50);
     return () => {
+      clearTimeout(timer);
       process.stdout.write('\x1b[?1049l'); // exit alternate screen
+      process.stdout.write('\x1b[?25h');    // show cursor
+      process.stdout.write('\x1b[0m');      // reset colors
     };
   }, []);
 
@@ -710,6 +917,11 @@ function App({ luna, sessionManager, initialSession }) {
   const [awaitingLogin, setAwaitingLogin] = useState(false);
   const [showThinkingStream, setShowThinkingStream] = useState(session?.showThinkingStream ?? false);
 
+  // ── AI State for status indicators ──
+  // 'idle' | 'analyzing' | 'responding' | 'error'
+  const [aiState, setAiState] = useState('idle');
+  const [thinkingCollapsed, setThinkingCollapsed] = useState(true);
+
   // ── Scroll / Viewport Control ──
   const [scrollOffset, setScrollOffset] = useState(0);
   const [followMode, setFollowMode] = useState(true);
@@ -725,6 +937,31 @@ function App({ luna, sessionManager, initialSession }) {
   const messageQueue = useRef([]);
   const isProcessingRef = useRef(false);
   isProcessingRef.current = isProcessing;
+
+  // v3.5-fix: Watchdog — force reset isProcessing if stuck for >10min
+  // This prevents input lock when the bridge generator never terminates.
+  useEffect(() => {
+    if (!isProcessing) return;
+    const stuckTimer = setTimeout(() => {
+      console.error('[LunaTUI] Watchdog: isProcessing stuck for 10min — forcing reset');
+      setIsProcessing(false);
+      setStreamingText('');
+      setThinkingText('');
+      setStatusText('');
+      setActiveToolCalls(0);
+      setActiveAgents(0);
+      setAiState('idle');
+      setMessages(prev => [...prev, {
+        type: 'system', content: '⏹ Operação abortada (timeout de segurança).',
+        timestamp: new Date().toISOString(), id: nextId(),
+      }]);
+      // Process queued messages
+      if (messageQueue.current.length > 0) {
+        setTimeout(() => processQueue(), 500);
+      }
+    }, 10 * 60 * 1000); // 10 minutes
+    return () => clearTimeout(stuckTimer);
+  }, [isProcessing]);
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -752,7 +989,12 @@ function App({ luna, sessionManager, initialSession }) {
     if (count > messagesCountRef.current) {
       if (followMode) {
         setScrollOffset(0);
+        setHasNewContent(false);
       } else {
+        // Maintain visual position when new messages arrive while user is reading history.
+        // New message is appended at bottom, so increment scrollOffset to keep
+        // the same viewport instead of pushing content up unexpectedly.
+        setScrollOffset(prev => prev + 1);
         setHasNewContent(true);
       }
     }
@@ -839,6 +1081,8 @@ function App({ luna, sessionManager, initialSession }) {
   // Core: handle a message with streaming
   const handleCommand = useCallback(async (text, retries = 0) => {
     if (!session) return;
+    // Reset abort flag for new operation
+    shouldAbortRef.current = false;
 
     // /sair
     if (text === '/sair' || text === '/exit') { exit(); return; }
@@ -1327,6 +1571,7 @@ function App({ luna, sessionManager, initialSession }) {
       timestamp: new Date().toISOString(), id: nextId(),
     }]);
     setIsProcessing(true);
+    const processingStart = Date.now();
     setStatusText('🧠 Analisando...');
     setStreamingText('');
     setThinkingText('');
@@ -1345,9 +1590,31 @@ function App({ luna, sessionManager, initialSession }) {
 
       let finalResult = null;
 
+      // Watchdog: protect against infinite loops or stalled streams
+      const WATCHDOG_STALL_MS = 60000;   // 60s without any event
+      const WATCHDOG_MAX_MS = 300000;    // 5m total hard limit
+      let lastEventTime = Date.now();
+      let streamTimedOut = false;
+      const watchdog = setInterval(() => {
+        const now = Date.now();
+        if (now - lastEventTime > WATCHDOG_STALL_MS) {
+          streamTimedOut = true;
+          clearInterval(watchdog);
+        }
+        if (now - processingStart > WATCHDOG_MAX_MS) {
+          streamTimedOut = true;
+          clearInterval(watchdog);
+        }
+      }, 5000);
+
       for await (const ev of stream) {
+        lastEventTime = Date.now();
+        if (streamTimedOut) break;
+        // If user aborted with Ctrl+C, ignore remaining events
+        if (shouldAbortRef.current) continue;
         switch (ev.type) {
           case 'thinking_start':
+            setAiState('analyzing');
             setStatusText('🧠 Pensando...');
             thinkingStartRef.current = Date.now();
             break;
@@ -1356,12 +1623,14 @@ function App({ luna, sessionManager, initialSession }) {
             const full = ev.fullThinking || '';
             thinkingRef.current = full;
             if (showThinkingStream) {
-              setThinkingText(full);
+              // Clean thinking before displaying
+              const cleaned = cleanThinking(full, { removeNoise: true, deduplicate: true });
+              setThinkingText(cleaned.thinking);
             }
             // Compute compact indicator
             const elapsed = thinkingStartRef.current ? ((Date.now() - thinkingStartRef.current) / 1000).toFixed(1) : '0.0';
-            const tokens = estimateTokens(full);
-            const tokStr = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
+            const metrics = getThinkingMetrics(full);
+            const tokStr = metrics.tokens >= 1000 ? `${(metrics.tokens / 1000).toFixed(1)}k` : `${metrics.tokens}`;
             if (!showThinkingStream) {
               setStatusText(`🧠 Thinking ${'.'.repeat((Date.now() / 200) % 4)}  ${elapsed}s · ${tokStr} tokens`);
             } else {
@@ -1371,10 +1640,15 @@ function App({ luna, sessionManager, initialSession }) {
           }
 
           case 'response_delta': {
-            const full = ev.fullResponse || '';
+            const full = stripResponseTags(ev.fullResponse || '');
             responseRef.current = full;
             setStreamingText(full);
+            setAiState('responding');
             setStatusText('💬 Respondendo...');
+            // When response starts, collapse thinking if it was expanded
+            if (showThinkingStream && !thinkingCollapsed) {
+              setThinkingCollapsed(true);
+            }
             break;
           }
 
@@ -1387,8 +1661,9 @@ function App({ luna, sessionManager, initialSession }) {
             break;
 
           case 'response_done':
-            setStreamingText(ev.response || '');
-            setThinkingText(showThinkingStream ? '' : thinkingRef.current);
+            setStreamingText(stripResponseTags(ev.response || ''));
+            setThinkingText('');
+            setAiState('idle');
             break;
 
           case 'mode_detected':
@@ -1496,6 +1771,17 @@ function App({ luna, sessionManager, initialSession }) {
 
           case 'error': {
             const errMsg = ev.error || '';
+            // CRITICAL: Always release processing lock on error so user can type again
+            setIsProcessing(false);
+            setStreamingText('');
+            setThinkingText('');
+            setStatusText('');
+            setAiState('error');
+            setActiveToolCalls(0);
+            setActiveAgents(0);
+            setCanSteer(false);
+            thinkingRef.current = '';
+            responseRef.current = '';
             const isConnErr = errMsg.includes('ECONNREFUSED') || errMsg.includes('ETIMEDOUT') || errMsg.includes('connectOverCDP') || errMsg.includes('disconnected');
             if (isConnErr) {
               setMessages(prev => [...prev, {
@@ -1577,6 +1863,25 @@ function App({ luna, sessionManager, initialSession }) {
             finalResult = ev.result;
             break;
         }
+      }
+      clearInterval(watchdog);
+
+      // Handle stream timeout — force release lock
+      if (streamTimedOut && !finalResult) {
+        setIsProcessing(false);
+        setStreamingText('');
+        setThinkingText('');
+        setStatusText('');
+        setAiState('error');
+        setActiveToolCalls(0);
+        setActiveAgents(0);
+        thinkingRef.current = '';
+        responseRef.current = '';
+        setMessages(prev => [...prev, {
+          type: 'system', content: '⏱️ Stream travado por timeout (sem eventos por 60s ou >5m total). Lock liberado.',
+          timestamp: new Date().toISOString(), id: nextId(),
+        }]);
+        return;
       }
 
       // Add final assistant message if it's a chat/done response
@@ -1685,9 +1990,37 @@ function App({ luna, sessionManager, initialSession }) {
     }
   }, [session, luna, sessionManager, messages.length, exit, processQueue]);
 
+  // Abort controller for Ctrl+C during processing
+  const shouldAbortRef = useRef(false);
+
   // Teclas globais
   useInput((input, key) => {
-    if (key.ctrl && input === 'c') { exit(); return; }
+    if (key.ctrl && input === 'c') {
+      if (isProcessingRef.current) {
+        // Abort current operation instead of exiting
+        shouldAbortRef.current = true;
+        setIsProcessing(false);
+        setStreamingText('');
+        setThinkingText('');
+        setStatusText('');
+        setActiveToolCalls(0);
+        setActiveAgents(0);
+        setCanSteer(false);
+        setMessages(prev => [...prev, {
+          type: 'system', content: '⏹ Operação abortada pelo usuário.',
+          timestamp: new Date().toISOString(), id: nextId(),
+        }]);
+        // Fire-and-forget: ask bridge to click stop button
+        (async () => {
+          try {
+            await luna.kimiBridge?.abortGeneration?.('luna-cli');
+          } catch (e) { /* ignore */ }
+        })();
+        return;
+      }
+      exit();
+      return;
+    }
     if (key.ctrl && input === 'h') { setShowHelp(h => !h); return; }
 
     // Ctrl+S: Steer mode — inject mid-response guidance
@@ -1804,6 +2137,8 @@ function App({ luna, sessionManager, initialSession }) {
         isStreaming: isProcessing, showThinkingStream,
         scrollOffset,
         maxHeight: rows - 6,
+        thinkingCollapsed,
+        onToggleThinking: () => setThinkingCollapsed(c => !c),
       }),
     ),
 
@@ -1848,6 +2183,7 @@ function App({ luna, sessionManager, initialSession }) {
       sessionStartTime,
       followMode,
       scrollOffset,
+      aiState,
     }),
   );
 }
@@ -1865,7 +2201,7 @@ async function main() {
   };
 
   if (hasFlag('--version') || hasFlag('-v')) {
-    console.log('3.1.0');
+    console.log('3.3.0');
     process.exit(0);
   }
 

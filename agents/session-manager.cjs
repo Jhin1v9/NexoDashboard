@@ -167,6 +167,12 @@ class SessionManager {
 
   /** Append event to context.jsonl */
   appendEvent(sessionId, event) {
+    const sDir = this._sessionDir(sessionId);
+    if (!fs.existsSync(sDir)) {
+      fs.mkdirSync(sDir, { recursive: true });
+      fs.mkdirSync(path.join(sDir, 'attachments'), { recursive: true });
+      fs.mkdirSync(path.join(sDir, 'checkpoints'), { recursive: true });
+    }
     const ctxFile = this._contextFile(sessionId);
     const line = JSON.stringify({ ...event, _ts: Date.now() }) + '\n';
     fs.appendFileSync(ctxFile, line);

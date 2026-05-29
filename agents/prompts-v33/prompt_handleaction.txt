@@ -1,0 +1,73 @@
+Você é um engenheiro sênior de JavaScript/Node.js com 15 anos de experiência.
+
+Gere o método COMPLETO `_handleAction` para uma classe LunaSoul em Node.js (CommonJS).
+
+CONTEXTO DO SISTEMA:
+- Luna CLI v3.3 — agente autônomo que se conecta à Kimi Web via Playwright CDP
+- A Kimi Web tem ferramentas nativas: ipython, web_search, browser, computer
+- Essas ferramentas rodam no sandbox da Moonshot (nuvem), NÃO no PC do usuário
+- A Luna CLI captura as tool calls do DOM da Kimi Web e executa localmente no PC do usuário
+- O system prompt instrui a Kimi: "o sandbox é um espelho read-only do PC, ignore FileNotFoundError"
+
+REQUISITOS DO MÉTODO `_handleAction(parsedAction, sessionId, options)`:
+
+1. Extraia `tool` e `params` de `parsedAction`
+2. Se `tool === 'ipython'`:
+   - Extraia `code` de `params.code` ou `params.command`
+   - Valide segurança: deny-list de padrões perigosos em Python:
+     * `import os` seguido de `system`, `remove`, `rmdir`, `unlink`
+     * `import subprocess`
+     * `import shutil`
+     * `__import__`
+     * `eval(` / `exec(`
+     * `os.system` / `os.popen` / `os.spawn`
+     * `subprocess.run` / `subprocess.call` / `subprocess.Popen`
+   - Use regex com flag `i` (case insensitive)
+   - Se perigoso: retorne `{ success: false, error: 'Segurança: código Python bloqueado. Contém padrões perigosos.' }`
+   - Se seguro: gere heredoc único (`PYEOF_${timestamp}_${random}`) e execute via `lunaTools.executeShell({ command })`
+   - Use `guard.execute('executeShell', ...)` se ToolGuard disponível
+
+3. Se `tool === 'browser'`:
+   - Extraia `url` de `params.url`
+   - Se não tiver url, tente extrair de `params` como string
+   - Execute via `lunaTools.fetchURL({ url })`
+
+4. Se `tool === 'computer'`:
+   - Extraia `action` de `params.action` (default: 'screenshot')
+   - Ações suportadas: 'click', 'type', 'keypress', 'hotkey', 'screenshot', 'scroll', 'wait', 'open_app'
+   - Execute via `this.engine.executeSingle({ type: action, params: desktopParams })`
+   - Se ação não suportada: retorne erro listando ações válidas
+
+5. Se `tool === 'web_search'`:
+   - Extraia `query` de `params.query`
+   - Execute via `lunaTools.searchWeb({ query })`
+
+6. Para ferramentas Luna padrão (readFile, writeFile, etc.):
+   - Use switch-case com todas as ferramentas de `lunaTools`
+   - Execute diretamente ou via `guard.execute()` se disponível
+   - Ferramentas de arquivo: readFile, writeFile, replaceInFile, appendFile, deleteFile, moveFile, copyFile, getFileInfo
+   - Ferramentas de diretório: listFiles, viewDirectory, createDirectory, removeDirectory
+   - Ferramentas de busca: searchFiles, grep, glob, searchWeb, fetchURL
+   - Shell: executeShell, runTests, checkSyntax, installPackages
+   - Git: gitStatus, gitDiff, gitLog, gitCommit
+   - Desktop: shell, click, type, keypress, hotkey, screenshot, scroll, wait, open_app, ocr
+   - Util: applyPatch, downloadFile, clipboardRead, clipboardWrite, readMediaFile, think, getCurrentDirectory
+
+7. Auto-commit git:
+   - Após operações de modificação: writeFile, appendFile, replaceInFile, deleteFile, moveFile
+   - Se `this.lunaGit` existir e `options.autoCommit !== false`, chame `this.lunaGit.commitChanges(...)`
+
+8. Retorne sempre: `{ success: boolean, result?: any, error?: string, tool: string }`
+
+DEPENDÊNCIAS DISPONÍVEIS:
+```javascript
+const lunaTools = require('./luna-tools.cjs');
+const { ToolGuard } = require('./luna-tool-guard.cjs');
+// this.engine = new ComputerUseEngine()
+// this.lunaGit = new LunaGit(workspacePath) | null
+// this.toolGuard = new ToolGuard(workspacePath) | null
+```
+
+Gere o código COMPLETO, pronto para substituir o método existente em luna-soul.cjs.
+Não omita nenhuma ferramenta. Use tratamento de erro robusto.
+Responda APENAS com o bloco de código JavaScript.
