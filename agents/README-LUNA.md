@@ -1,123 +1,147 @@
-# 🌙 Luna CLI v3.1
+# Luna CLI — Espelho Completo v3.3
 
-Terminal UI agente autônomo para Abner Gabriel (CEO NEXO DIGITAL S.L., Barcelona).
+> Assistente CLI autônomo de desktop com Playwright + React + Ink.
+> Conecta-se ao Kimi Web e espelha ferramentas nativas localmente no PC físico.
 
-Conecta ao **Kimi Web** via Playwright CDP e controla o PC com 32+ ferramentas nativas.
-
-## 🚀 Instalação Rápida
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Jhin1v9/NexoDashboard/main/install-luna.sh | bash
-```
-
-Ou manualmente:
+## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/Jhin1v9/NexoDashboard.git ~/NEXO_DASHBOARD_PRO
-cd ~/NEXO_DASHBOARD_PRO/agents
-npm install
-ln -s ~/NEXO_DASHBOARD_PRO/agents/luna-tui.mjs ~/.local/bin/luna
+# 1. Terminal 1 — Iniciar Luna TUI (modo visível)
+cd ~/NEXO_DASHBOARD_PRO/agents && npx luna-tui --user abner
+
+# 2. Terminal 2 — Iniciar Kimi bridge
+node kimi-bridge.cjs
+
+# 3. Enviar mensagem (o bridge retorna JSON no stdout)
+echo '{"userId":"abner","action":"send_message","content":"O que é Bitcoin?"}' | node kimi-bridge.cjs
 ```
 
-## 🔐 Primeiro Uso (Login)
+## 🏗️ Architecture v3.3
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Kimi Web (HER Cloud)                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
+│  │  ipython    │  │ web_search  │  │  browser        │  │
+│  │  (sandbox)  │  │  (API)      │  │  (fetch)        │  │
+│  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘  │
+│         │                │                    │          │
+│         ▼                ▼                    ▼          │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │           DOM (React components)                  │  │
+│  │   .toolcall-ipython  .toolcall-web_search         │  │
+│  │   .toolcall-browser  .toolcall-computer           │  │
+│  └────────────────────────┬───────────────────────────┘  │
+└───────────────────────────┼──────────────────────────────┘
+                            │ CDP port 9222
+                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Luna Bridge (CDP)                     │
+│  ┌──────────────────┐  ┌─────────────────────────────┐  │
+│  │  MutationObserver │  │  DOM Mirror Extractor        │  │
+│  │  (FIFO ordering)  │  │  (_extractToolMirrorFromDOM) │  │
+│  └──────────────────┘  └─────────────────────────────┘  │
+│                    ┌──────────────┐                       │
+│                    │  Luna Soul   │                       │
+│                    │  (orchestra) │                       │
+│                    └──────┬───────┘                       │
+│              ┌────────────┼────────────┐                  │
+│    ┌─────────▼──────┐   ┌▼────────────▼┐  ┌───────────┐ │
+│    │  luna-tools    │   │ luna-tool-guard│  │   engine  │ │
+│    │  (32 tools)    │   │ (security)     │  │ (desktop) │ │
+│    └────────────────┘   └──────────────┘  └───────────┘ │
+└─────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+                  ┌─────────────────┐
+                  │  PC Físico Local │
+                  └─────────────────┘
+```
+
+## 🔧 Ferramentas suportadas
+
+### Luna Native (local)
+| Tool | Descrição |
+|------|-----------|
+| `readFile` | Ler arquivo |
+| `writeFile` | Escrever arquivo |
+| `listDir` | Listar diretório |
+| `executeShell` | Executar shell |
+| `searchWeb` | Busca web (requer API key) |
+| `fetchURL` | Fetch HTTP nativo |
+| `clipboardWrite` | Escrever no clipboard |
+| `screenshot` | Screenshot do desktop |
+| ... + 24 mais | |
+
+### Kimi Native (espelhado)
+| Tool | Fonte DOM | Execução Local |
+|------|-----------|----------------|
+| `ipython` | `.toolcall-ipython` | `executeShell` (Python3) |
+| `web_search` | `.toolcall-web_search` | `searchWeb` |
+| `browser` | `.toolcall-browser` | `fetchURL` |
+| `computer` | `.toolcall-computer` | Desktop Engine |
+
+## 🔒 Segurança
+
+### Python Sandbox
+- **Blocked imports**: `os`, `subprocess`, `shutil`, `socket`, `multiprocessing`, `pty`, `resource`, `ctypes`
+- **Blocked builtins**: `eval`, `exec`, `compile`, `__import__`, `open`
+- **Blocked paths**: `~/.ssh`, `/etc/passwd`, `/etc/shadow`
+
+### Destructive Operations Gate
+Detecta e solicita confirmação `[s/N]` para:
+- `rm`, `chmod`, `chown`
+- `curl -F` (upload)
+- `~/.ssh` access
+- `mkfs`, `dd if=`
+- `sudo`
+
+### ToolGuard
+- Schema validation para todas as tools
+- Circuit breaker (falha após 3 erros)
+- Idempotency via checksum SHA256
+- Timeout (30s) e retry (1x)
+
+## 🧪 Testing
 
 ```bash
-luna
-# Dentro do TUI, digite:
-/login
+# Rodar suite completa
+node run-all-tests.mjs
+
+# Testes unitários apenas
+node test-all-tools.mjs
+
+# Teste E2E manual
+node test-e2e.mjs
 ```
 
-O `/login` vai:
-1. Verificar se Chrome está rodando com `--remote-debugging-port=9222`
-2. Se não estiver, iniciar o Chrome automaticamente
-3. Abrir kimi.com e verificar se você está logado
-4. Se não estiver logado, navegar para a página de login
+**Resultados v3.3 (2026-05-26):**
+- Unit Tests: 48/48 ✅
+- Integration: 6/6 ✅
+- Security: 22/22 ✅
+- Advanced (Adapter + Ledger): 18/18 ✅
+- E2E + Regression: 16/16 ✅
 
-**Faça login manualmente no Chrome que abriu.** Depois disso, a Luna está pronta.
+## 📁 Files principais
 
-## 🖥️ Interface
+| Arquivo | Linhas | Responsabilidade |
+|---------|--------|-----------------|
+| `kimi-bridge.cjs` | ~3000 | CDP bridge, DOM extraction, stream polling |
+| `luna-soul.cjs` | ~2300 | Orquestração, parser, tool routing |
+| `luna-tools.cjs` | ~1000 | 32+ tool implementations |
+| `luna-tool-guard.cjs` | ~530 | Segurança, sandbox, circuit breaker |
+| `kimi-tool-adapter.cjs` | ~200 | Adapter Pattern nativo→Luna |
+| `tool-call-ledger.cjs` | ~180 | Ledger de tool calls com deduplicação |
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 🌙 Luna │ Nova sessão │ a1b2c3d4 │ 2 msgs │ default │ thinking │ 🔥YOLO    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  > Você                          17:06:35                                   │
-│  oi                                                                         │
-│                                                                             │
-│  🌙 Luna                         17:06:56                                   │
-│  Oi, Abner! 🌙 Luna aqui. Pronta pra te ajudar.                           │
-│                                                                             │
-│  📖 readFile                     17:07:10                                   │
-│  {"path":"~/Documentos/teste.txt"}                                          │
-│    ✅ Sucesso                                                               │
-│    1 │ Olá, sou a Luna!                                                     │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ ❯ digite aqui...                                                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ 🟢 online │ thinking │ ctx: ████░░░░ 15% │ 12.3k/200k │ ⏱ 04:32 │ 8 msgs  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+## 📝 Notas
 
-## ⌨️ Comandos
+- Kimi Web usa **Connect-RPC** (`application/connect+json`), não SSE. O interceptor de rede não funciona. DOM Mirror é o único caminho viável.
+- `searchWeb` requer API key em `~/.luna/config.json` (`googleSearchApiKey`, `googleSearchEngineId`)
+- A semântica `[LUNA-MIRROR]` é **read-only** — Kimi deve usar o resultado real como ground truth
 
-| Comando | Ação |
-|---------|------|
-| `/login` | Inicia Chrome e verifica login no Kimi |
-| `/status` | Status do sistema |
-| `/yolo` | Toggle modo sem confirmação |
-| `/novo` | Nova sessão |
-| `/limpar` | Limpa contexto |
-| `/modo <nome>` | Muda persona |
-| `/skills` | Lista skills |
-| `/help` | Ajuda |
-| `Ctrl+S` | Steer (interromper/responder mid-flight) |
-| `Ctrl+V` | Colar do clipboard |
-| `Ctrl+H` | Toggle ajuda |
-| `Ctrl+C` | Sair |
+## 📜 Changelog
 
-## 🛠️ Ferramentas (32+)
+Veja [CHANGELOG.md](CHANGELOG.md).
 
-| Categoria | Ferramentas |
-|-----------|-------------|
-| **Arquivo** | `readFile`, `writeFile`, `appendFile`, `replaceInFile`, `deleteFile`, `moveFile`, `copyFile`, `getFileInfo` |
-| **Diretório** | `listFiles`, `viewDirectory`, `createDirectory`, `removeDirectory` |
-| **Busca** | `searchFiles`, `grep`, `glob`, `searchWeb`, `fetchURL` |
-| **Shell** | `executeShell`, `runTests`, `checkSyntax`, `installPackages` |
-| **Git** | `gitStatus`, `gitDiff`, `gitLog`, `gitCommit` |
-| **Utilidades** | `applyPatch`, `downloadFile`, `clipboardRead`, `clipboardWrite`, `readMediaFile` |
-| **Raciocínio** | `think` |
-| **Desktop** | `shell`, `click`, `type`, `keypress`, `hotkey`, `screenshot`, `scroll`, `wait`, `open_app`, `ocr` |
-
-## 🧠 Arquitetura
-
-```
-Usuário → TUI (Ink + React)
-            ↓
-        LunaSoul (orquestrador)
-            ↓
-    KimiBridge (Playwright CDP)  ←→  Kimi Web (cérebro)
-            ↓
-        luna-tools.cjs (32 ferramentas)
-```
-
-## 📦 Dependências
-
-- Node.js v18+
-- Google Chrome / Chromium
-- xclip (para clipboard)
-- npm packages: `ink`, `react`, `playwright`, `glob`, `turndown`
-
-## ⚙️ Variáveis de Ambiente
-
-| Variável | Default | Descrição |
-|----------|---------|-----------|
-| `KIMI_CDP_URL` | `http://localhost:9222` | URL do Chrome DevTools Protocol |
-| `KIMI_TIMEOUT` | `120000` | Timeout padrão (ms) |
-| `KIMI_MAX_PAGES` | `5` | Máximo de páginas concorrentes |
-| `KIMI_IDLE_TIMEOUT` | `600000` | Tempo para fechar página inativa (ms) |
-
-## 📝 Licença
-
-Proprietário — NEXO DIGITAL S.L.
+---
+*Luna CLI v3.3 "Espelho Completo" — NEXO DIGITAL S.L. — 2026-05-26*

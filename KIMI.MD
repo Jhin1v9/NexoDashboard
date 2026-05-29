@@ -23,7 +23,7 @@
 active_instance: kimi-fase1-fix
 signature: KIMI-FASE1-FIX 🟢
 context_system: .kimi-context/ (v1)
-last_updated: 2026-05-25T00:30:00+02:00
+last_updated: 2026-05-29T16:00:00+02:00
 ```
 
 **Regra para múltiplas instâncias Kimi:**
@@ -43,102 +43,90 @@ last_updated: 2026-05-25T00:30:00+02:00
 
 **Branch oficial:** `main`
 
-**Persistência:** PostgreSQL (Neon) é a **única fonte da verdade**. JSON files ainda existem para entidades não migradas, mas `pg-sync.js` foi **removido**.
+**Persistência:** PostgreSQL (Neon) é a **única fonte da verdade**. 19/19 entidades migradas. JSON files são legado.
 
 ---
 
 ## 2. Current Focus
 
-### 🎯 Sprint Ativo: Fase 1 — Preview Contextual + Confirmação + Undo (CORREÇÕES CRÍTICAS)
+### 🎯 Sprint Ativo: Luna CLI v3.3 "Espelho Completo" + Hotfixes Críticos
 
-**Status:** ✅ Concluído — 3/3 testes E2E passando, dashboard operacional para uso rotineiro
+**Status:** ✅ v3.3 entregue — 110/110 testes passando, E2E validado
 
-**Commits:**
-- `f05e9f1` fix(frontend): corrige bug confirmPendingActions lendo estado antes do React atualizar
-- `a8b66be` docs: atualiza handoff + registry de ideas
+**Commits recentes (main):**
+- `9d43690` fix: corrige erros 500 — schema mismatch e bugs de API
+- `059a4bd` calibração: 5 ajustes pós-migração double-bracket
+- `6d5e8d1` feat: migrate from JSON to double-bracket delimiters
+- `56b84a5` fix(security): ToolGuard + path traversal + undo safety
+- `0ba8319` feat(git): git-native safety — branch-per-session + /undo /diff /reset
 
-**Bugs corrigidos:**
-1. ✅ Clique em Confirmar no preview agora executa a ação (bug crítico do `confirmPendingActions`)
-2. ✅ NLU pré-carregado no startup (evita 5s de delay na 1ª requisição)
-3. ✅ Ollama removido (consumia RAM/CPU sem uso — será substituído por API)
-4. ✅ Syntax error por comentário de bloco desbalanceado corrigido
-5. ✅ Testes E2E simplificados e passando (nomes reais, não esquisitos)
+### ✅ Concluído Recentemente
+| Fase | Status | Detalhe |
+|------|--------|---------|
+| Double-bracket migration | ✅ | Parser `parseTagResponse()`, 20/20 unit tests |
+| System prompt redução | ✅ | ~2000 → ~300 tokens, taxa execução ~70% → >95% |
+| DOM Mirror v3.3 | ✅ | 4 tipos nativos (ipython, web_search, browser, computer) |
+| ToolGuard integration | ✅ | 7 padrões: retry, circuit breaker, idempotency, schema, timeout, checksum, checkpoint |
+| Python sandbox | ✅ | AST-light deny-list (os, subprocess, eval, exec, open) |
+| Performance chat | ✅ | `processLunaChatRequest()` pura — eliminou ~6-8s de delay |
+| PostgreSQL 19/19 | ✅ | `datastore-pg.js` 100%, 90/90 Jest tests |
 
-### ⚡ Fase 1.5 — Performance: Eliminar chamada HTTP interna
-
-**Status:** ✅ Concluído — `processLunaChatRequest()` extrada como função pura
-
-**Problema:** `/api/luna/threads/:id/messages` fazia `fetch()` para `localhost:${PORT}/api/luna/chat`, atravessando o stack Express inteiro. Isso adicionava ~6-8s de delay em CADA mensagem.
-
-**Solução:**
-- Extraiu `processLunaChatRequest(body, authHeader)` de `app.post('/api/luna/chat', ...)`
-- Função retorna objetos puros (`return {...}`) em vez de `res.json()`
-- Endpoint de threads chama `processLunaChatRequest()` diretamente (zero HTTP)
-- Endpoint `/api/luna/chat` virou wrapper que chama a função e envia `res.json()`
-
-**Impacto:** Cada mensagem no chat agora economiza 1 round-trip HTTP completo (~6-8s → ~0ms de overhead).
+### 🔥 Próximo: HOTFIXES (executar ANTES de qualquer feature nova)
+| # | Bug | Arquivo | Severidade |
+|---|-----|---------|------------|
+| H1 | IntentParser regex email — `"responder email"` → `consultar_emails` errado | `IntentParser.js:268` | 🔴 |
+| H2 | `totalExpensesMonth` usa `e.date` (não existe no modelo) | `server.js:~4564` | 🔴 |
+| H3 | `typeof null === 'object'` zera `amount` silenciosamente | `server.js:~4569` | 🔴 |
+| H4 | ActionExecutor `m.body` tratado como string quando é objeto | `ActionExecutor.js:983` | 🔴 |
 
 ### 🗄️ Fase 0.1 — Reverse Schema Engineering + Migração PG
 
 **Status:** ✅ Concluído — 19/19 entidades migradas (100%)
 
-#### Arquitetura de Persistência (REESCRITA)
-- `backend/datastore-pg.js` — Datastore 100% PostgreSQL. 33 funções, zero fallback JSON.
-- `backend/db.js` — Wrapper node-postgres com pool, transactions, health check.
-- `backend/migrations/005-real-schema.sql` — Schema REAL do server.js (Reverse Schema Engineering).
-- `backend/migrate-005.js` — Script de migração JSON → PG (1.228 rows migrados).
-- `pg-sync.js` — **REMOVIDO** (arquivado em `backend/archive/`).
+- `backend/datastore-pg.js` — 58 funções, zero fallback JSON.
+- `backend/db.js` — Pool node-postgres com transactions.
+- `backend/migrations/005-real-schema.sql` — Schema real.
+- `pg-sync.js` — **REMOVIDO**.
 
-#### Entidades Migradas para PG ✅
-| # | Entidade | Rotas | Testes |
-|---|----------|-------|--------|
-| 1 | `users` | GET/PUT | 3 ✅ |
-| 2 | `tasks` | CRUD + comentários | 4 ✅ |
-| 3 | `payments` | CRUD + transactions + split | 5 ✅ |
-| 4 | `expenses` | CRUD + pay | 5 ✅ |
-| 5 | `cash_box` | Singleton + entries + reconcile + payments | 4 ✅ |
-| 6 | `quotes` | CRUD | 5 ✅ |
-| 7 | `leads` | CRUD + convert | 5 ✅ |
-| 8 | `notifications` | CRUD + read-all | 5 ✅ |
-| 9 | `company_tasks` | Internal consumers (insights, action-center, batch) | 5 ✅ |
-| 10 | `links` | CRUD + enrich + sync + stats | 5 ✅ |
-
-**Testes totais:** 46/46 passando (`npx jest --verbose`)
-
-#### Entidades Pendentes (ainda em JSON)
-`members`, `transactions`, `security_logs`, `changelog`, `ideas`, `whatsapp_history`, `luna_threads`, `luna_buffer`, `workspace_clients`
-
-**Regra:** UMA entidade por vez. Testada. Aprovada pelo Abner. Só aí próxima.
+**Testes:** 90/90 Jest passando.
 
 ---
 
 ## 3. Arquitetura Crítica
 
 ### Backend (Node.js, CommonJS, ~8.800 linhas)
-- `backend/server.js` — Monolito Express. Endpoint `/api/luna/chat` com NLU → ActionExecutor
-- `backend/datastore-pg.js` — **NOVO** — PostgreSQL-only datastore (33 funções, schema 1:1 com JSON)
-- `backend/db.js` — Pool node-postgres (`query`, `get`, `run`, `transaction`)
-- `backend/services/luna-nlu.js` — Motor NLP.js (node-nlp). Corpus PT/ES/CA. Modelo em `backend/data/luna-model.nlp`
-- `agents/core/ActionExecutor.js` — 113+ ações. Executa tarefas, pagamentos, emails, etc.
-- `agents/core/NLUActionMapper.js` — Mapeia intents NLU → ações do ActionExecutor
-- `agents/core/IntentParser.js` — Regex fallback quando NLU não reconhece
-- `agents/telegram-luna-agent.cjs` — Bot do Telegram (@lunanexobot). Framework wizard declarativo com 6 ações interativas.
+- `backend/server.js` — Monolito Express. `/api/luna/chat` → NLU → ActionExecutor
+- `backend/datastore-pg.js` — PostgreSQL-only datastore (58 funções)
+- `backend/db.js` — Pool node-postgres
+- `backend/services/luna-nlu.js` — NLP.js corpus PT/ES/CA
+- `backend/services/luna-semantic-nlu.js` — Semantic Embedding Engine (`Xenova/paraphrase-multilingual-MiniLM-L12-v2`)
+- `backend/services/action-preview.js` — Preview contextual com dados reais
+- `backend/services/undo-service.js` — Undo/Redo persistente
+- `agents/core/ActionExecutor.js` — 113+ ações
+- `agents/core/NLUActionMapper.js` — Mapeia intents → ações
+- `agents/core/IntentParser.js` — Regex fallback (BUG-001 aqui!)
+- `agents/telegram-luna-agent.cjs` — Bot Telegram @lunanexobot
 
 ### Frontend (React 18, Vite, Tailwind)
-- `frontend/src/pages/Workspace.jsx` — Página `/workspace` (clientes, pastas, arquivos, viewer)
-- `frontend/src/components/workspace/WorkspaceFileViewer.jsx` — Viewer/editor fullscreen com syntax highlighting
-- `frontend/src/pages/LunaControl.jsx` — Página `/luna` (terminal + chat + comandos)
-- `frontend/src/components/luna/LunaFloatingButton.jsx` — Botão flutuante global (mini-chat + Decision Engine)
-- `frontend/src/components/luna/LunaActionDrawer.jsx` — Drawer inline 380px sem blur
-- `frontend/src/components/luna/LunaSafetyDelay.jsx` — Safety delay 1.5s com undo
-- `frontend/src/components/luna/LunaActionFlow.jsx` — Orquestrador de apresentação
-- `frontend/src/components/luna/SmartFormModal.jsx` — Modal de formulário para intents com fields
-- `frontend/src/components/luna/LunaIntentSchemas.js` — Schemas de formulário por intent (137 intents)
+- `frontend/src/pages/Workspace.jsx` — Página `/workspace`
+- `frontend/src/components/luna/LunaFloatingButton.jsx` — FAB global (BUG: re-render a cada pixel no drag)
+- `frontend/src/components/luna/LunaChatPanel.jsx` — Chat HUD futurista
+- `frontend/src/pages/LunaControl.jsx` — Terminal + Chat + Comandos
+- `frontend/src/pages/Tarefas.jsx` — Tarefas (BUG: mention regex `/@\w+/g` quebrado)
 
-### NLU Flow (prioridade)
-1. **NLU** (`node-nlp`) — Score ≥0.5 → executa direto
-2. **Regex** (`IntentParser`) — Fallback para padrões conhecidos
-3. **LLM** (Gemini) — Fallback social/conversação (API revogada, offline)
+### Luna CLI (`agents/`)
+- `luna-soul.cjs` — Orquestrador (~2300 linhas)
+- `kimi-bridge.cjs` — Playwright CDP bridge (~3000 linhas)
+- `luna-tool-guard.cjs` — Segurança + sandbox
+- `luna-tools.cjs` — 32+ tool implementations
+- `kimi-tool-adapter.cjs` — Adapter Pattern nativo→Luna
+- `tool-call-ledger.cjs` — Ledger de tool calls com deduplicação
+
+### NLU Flow (cascata)
+1. **NLU** (`node-nlp`) — Score ≥0.5 → executa
+2. **Regex** (`IntentParser`) — Fallback fast path
+3. **Semantic** (`luna-semantic-nlu.js`) — Embeddings similarity
+4. **LLM** (Gemini/Ollama) — Fallback conversação
 
 ---
 
@@ -146,13 +134,20 @@ last_updated: 2026-05-25T00:30:00+02:00
 
 | Problema | Severidade | Status |
 |----------|-----------|--------|
-| API Gemini revogada (`AIzaSyCRgGWJemoesHA2V2NlQ2l46ooy0qO7R9g`) | 🔴 Alta | NLU offline cobre 100% dos comandos operacionais, mas IA generativa está offline |
-| `pg-sync.js` removido — JSON files desatualizados para entidades não migradas | 🟡 Média | 14 entidades ainda usam JSON. Migrar UMA POR UMA |
-| Cash box balance no PG pode estar desatualizado vs JSON antigo | 🟡 Média | Reconciliar após migrar transactions |
-| Email params (`para`, `assunto`) não extraídos de frases naturais | 🟡 Média | `extractEmail()` e `extractAfterKeyword()` existem mas são básicos |
-| `concluir tarefa` sem match → avisa "desconhecida" | 🟢 Baixa | Poderia sugerir tarefas similares no futuro |
-| **Backend não reiniciado após deploy** | ✅ Resolvido | `kill` + `nohup node server.js` no script de restart |
-| **pg-sync.js corrompendo dados** | ✅ Resolvido | Removido completamente |
+| BUG-001: IntentParser regex email errado | 🔴 Alta | Regex `query_email` captura `"responder email"` |
+| BUG-002: `totalExpensesMonth` campo inexistente | 🔴 Alta | Usa `e.date` em vez de `startDate\|renewDate` |
+| BUG-003: `typeof null === 'object'` | 🔴 Alta | Zera `amount` quando null |
+| BUG-007: ActionExecutor `m.body` como string | 🔴 Alta | `{text,caption}` → `"[object Object]"` |
+| API Gemini revogada | 🟡 Média | NLU offline cobre 100% operacional. Ollama pendente |
+| 149 leituras `readJSON()` no server.js | 🟡 Média | Ignoram `datastore-pg.js`, desincronizam PG |
+| `/luna-control` sem auth | 🟡 Média | Qualquer um acessa |
+| Rate limit só no login | 🟡 Média | Tasks, payments, expenses sem proteção |
+| ChangelogBadge double close | 🟢 Baixa | Race condition overlay + mousedown |
+| LunaFloatingButton re-render drag | 🟢 Baixa | God component 632 linhas |
+| NotificationCenter auto-mark-read | 🟢 Baixa | Usuário nunca vê unread |
+| **Backend não reiniciado após deploy** | ✅ Resolvido | `kill` + `nohup` no script |
+| **pg-sync.js corrompendo dados** | ✅ Resolvido | Removido |
+| **Performance chat 6-8s** | ✅ Resolvido | `processLunaChatRequest()` pura |
 
 ---
 
@@ -160,14 +155,16 @@ last_updated: 2026-05-25T00:30:00+02:00
 
 | Fase | Progresso Real | Gap Principal |
 |------|---------------|---------------|
-| 0.1 — Reverse Schema Engineering | 🟡 53% | 10/19 entidades migradas. Links concluído. |
+| 0.1 — Reverse Schema Engineering | ✅ 100% | 19/19 entidades migradas |
+| 0.2 — Frontend/WebSocket bugs | ✅ 100% | 9/9 bugs corrigidos |
 | 1 — Fundação de Consciência | ✅ 100% | — |
 | 2 — Eliminar o Modal | ✅ ~90% | Modo C e D implementados |
 | 3 — Execução Inteligente | ✅ ~90% | Preview visual implementado |
 | 4 — Consciência por Módulo | ✅ 100% | — |
 | 5 — NLP.js + Contexto | ✅ 100% | — |
-| 6 — Sugestões Proativas | 🟡 ~30% | Badge no botão flutuante, falta expandir |
-| 7 — Workspace File Viewer | ✅ 100% | Editor + syntax highlighting + contexto Luna |
+| 6 — Sugestões Proativas | 🟡 ~30% | Badge no FAB, falta expandir |
+| 7 — Workspace File Viewer | ✅ 100% | — |
+| Luna CLI v3.3 | ✅ 100% | 110/110 tests, >95% exec rate |
 
 ---
 
@@ -179,14 +176,19 @@ last_updated: 2026-05-25T00:30:00+02:00
 4. **PostgreSQL é a única fonte da verdade** — JSON files são legado. Migrar para PG, não o contrário.
 5. **Qualidade > velocidade** — O usuário odeia retrabalho. Uma entidade por vez, testada, aprovada.
 6. **Schema 1:1** — Nenhum adapter/mapper. Nomes de campos no PG = nomes no JSON.
+7. **Luna CLI usa CommonJS (.cjs)** — NUNCA TypeScript, NUNCA ESM `import/export`.
+8. **Kimi Web usa Connect-RPC** — NÃO SSE. DOM Mirror é o único caminho viável para extração.
 
 ---
 
 ## 6. Comandos Úteis
 
 ```bash
-# Testes (46 testes, todas as entidades migradas)
-cd backend && npx jest --verbose
+# Testes backend (Jest)
+cd backend && npx jest --verbose        # 90/90
+
+# Testes Luna CLI
+cd agents && node run-all-tests.mjs     # 110/110
 
 # Build frontend
 cd frontend && npm run build
@@ -217,3 +219,5 @@ git log --oneline -5 && git status
 - **Branch:** `main`
 - **Neon DB:** PostgreSQL com 22 tabelas
 - **Schema Audit:** `backend/docs/SCHEMA_AUDIT.md` (46KB)
+- **Backlog completo:** `BACKLOG-100-FUNCIONAL.md`
+- **Plano prioritário:** `.kimi/CONSOLIDADO_MASTER.md`
