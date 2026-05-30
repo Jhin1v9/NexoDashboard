@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Mail, MessageCircle, Instagram,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
-  Shield, Lightbulb, Bot, Terminal, FolderOpen, FileText
+  Shield, Lightbulb, Bot, Terminal, FolderOpen, FileText,
+  Sparkles
 } from 'lucide-react'
 
 const navItems = [
@@ -41,6 +42,7 @@ const navItems = [
   { path: '/luna', icon: Bot, label: 'Luna', badge: 'AI' },
   { path: '/changelog', icon: FileText, label: 'Atualizacoes', badge: 'v3.2' },
   { path: '/settings', icon: Settings, label: 'Configuracoes' },
+  { path: '/luna-web', icon: Sparkles, label: 'Luna Web', badge: 'Chat', external: 'http://localhost:3458' },
 ]
 
 function isSectionActive(children, pathname) {
@@ -55,6 +57,29 @@ function NavItem({ item, sidebarOpen }) {
     : location.pathname === item.path
 
   if (!hasChildren) {
+    if (item.external) {
+      return (
+        <a
+          href={item.external}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          title={!sidebarOpen ? item.label : ''}
+        >
+          <item.icon size={20} />
+          {sidebarOpen && (
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-sm font-medium truncate">{item.label}</span>
+              {item.badge && (
+                <span className="flex-shrink-0 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] font-bold rounded">
+                  {item.badge}
+                </span>
+              )}
+            </div>
+          )}
+        </a>
+      )
+    }
     return (
       <NavLink
         to={item.path}

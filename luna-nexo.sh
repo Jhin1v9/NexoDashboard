@@ -61,8 +61,8 @@ start_services() {
   echo "╔══════════════════════════════════════════════════════════════╗"
   echo "║     NEXO DIGITAL PRO + LUNA WEB — Unified Launcher         ║"
   echo "╠══════════════════════════════════════════════════════════════╣"
-  echo "║  Dashboard API:  http://localhost:3456                      ║"
-  echo "║  Luna Web:       http://localhost:3456                      ║"
+  echo "║  Dashboard:      http://localhost:3456                      ║"
+  echo "║  Luna Web:       http://localhost:3458                      ║"
   echo "║  Luna Web Dev:   http://localhost:5173                      ║"
   echo "╚══════════════════════════════════════════════════════════════╝"
   echo -e "${NC}"
@@ -70,6 +70,7 @@ start_services() {
   # Matar processos antigos
   echo -e "${BOLD}Limpando processos antigos...${NC}"
   kill_port 3456
+  kill_port 3458
   kill_port 5173
   
   # Limpar PIDs antigos
@@ -83,8 +84,12 @@ start_services() {
   echo $! > "$NEXO_PID_FILE"
   sleep 2
 
-  # 2. Luna Web is now served by Dashboard (porta 3456)
-  # config-server.cjs deprecated — routes merged into backend/server.js
+  # 2. Luna Web Server (porta 3458)
+  echo -e "${MAGENTA}▶ Iniciando Luna Web Server (porta 3458)...${NC}"
+  cd "$NEXO_DIR/backend"
+  LUNA_PORT=3458 nohup node luna-server.js > /dev/null 2>&1 &
+  echo $! > "$LUNA_PID_FILE"
+  sleep 2
 
   # 3. Luna Web Vite
   if [ -f "$LUNA_WEB/node_modules/.bin/vite" ]; then
@@ -124,6 +129,7 @@ stop_services() {
   
   # Garantir que nada ficou nas portas
   kill_port 3456
+  kill_port 3458
   kill_port 5173
   
   echo -e "${GREEN}✓ Todos os serviços encerrados.${NC}"
@@ -149,12 +155,14 @@ status_services() {
     fi
   }
   
-  check_service "NEXO Dashboard + Luna" 3456 "$NEXO_PID_FILE" "$CYAN"
-  check_service "Luna Web Vite"          5173 "$VITE_PID_FILE" "$YELLOW"
+  check_service "NEXO Dashboard"    3456 "$NEXO_PID_FILE" "$CYAN"
+  check_service "Luna Web Server"   3458 "$LUNA_PID_FILE" "$MAGENTA"
+  check_service "Luna Web Vite"     5173 "$VITE_PID_FILE" "$YELLOW"
   
   echo ""
   echo -e "${DIM}URLs:${NC}"
-  echo -e "  ${CYAN}http://localhost:3456${NC} — Dashboard + Luna Web"
+  echo -e "  ${CYAN}http://localhost:3456${NC} — Dashboard"
+  echo -e "  ${MAGENTA}http://localhost:3458${NC} — Luna Web"
   echo -e "  ${YELLOW}http://localhost:5173${NC} — Luna Web Dev (Vite)"
 }
 
@@ -164,6 +172,7 @@ show_logs() {
   
   # Iniciar serviços em foreground com logs coloridos
   kill_port 3456
+  kill_port 3458
   kill_port 5173
   
   # Nexo em background com pipe (cwd must be backend/ for dotenv)
@@ -172,8 +181,10 @@ show_logs() {
     node server.js 2>&1 | colorize_nexo &
   NEXO_BG=$!
   
-  # Luna routes are now inside Dashboard server.js
-  # config-server.cjs deprecated
+  # Luna em background com pipe
+  cd "$NEXO_DIR/backend"
+  LUNA_PORT=3458 node luna-server.js 2>&1 | colorize_log &
+  LUNA_BG=$!
   
   # Vite em background com pipe
   if [ -f "$LUNA_WEB/node_modules/.bin/vite" ]; then

@@ -31,8 +31,6 @@ const dataStore = require('./datastore-pg');
 // Discord Mention Notifier
 const { sendMentionNotification, setWebhookUrl } = require('./services/discord-notifier');
 
-// ── Luna Web Chat Routes ──
-const { router: lunaChatRouter, setupAuth: setupLunaAuth } = require('./luna-chat-routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -1035,9 +1033,6 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
-
-// ── Serve Luna Web static files (PRIORIDADE sobre Dashboard legacy) ──
-app.use(express.static(path.join(__dirname, '../../.luna-kernel/luna-web/dist')));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -9283,16 +9278,12 @@ app.get('/api/workspace/servers/:serverId/logs/stream', requireAuth, (req, res) 
   });
 });
 
-// ── Luna Web Chat Routes + Auth ──
-setupLunaAuth({ validateCredentials, generateToken, requireAuth });
-app.use(lunaChatRouter);
-
 // ============================================================================
-// Catch-all → Luna Web SPA
+// Catch-all
 // ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../.luna-kernel/luna-web/dist/index.html'));
+  res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
 // Start
