@@ -59,6 +59,30 @@ function createWebSession(title = 'Nova conversa', mode = 'thinking') {
   return session;
 }
 
+async function loadSessionFromDB(id) {
+  try {
+    const row = await db.get(
+      `SELECT id, title, mode, messages, created_at, updated_at 
+       FROM luna_chat_sessions WHERE id = $1`,
+      [id]
+    );
+    if (!row) return null;
+    const session = {
+      id: row.id,
+      title: row.title,
+      mode: row.mode,
+      messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+    webSessions.set(id, session);
+    return session;
+  } catch (e) {
+    console.error('[DB] Erro ao carregar sessão:', e.message);
+    return null;
+  }
+}
+
 function getWebSession(id) {
   return webSessions.get(id);
 }
@@ -254,10 +278,19 @@ router.post('/api/chat', async (req, res) => {
 });
 
 // GET /api/chat/stream — SSE streaming
-router.get('/api/chat/stream', (req, res) => {
+router.get('/api/chat/stream', async (req, res) => {
   const sessionId = req.query.sessionId;
   if (!sessionId) {
     return res.status(400).send('sessionId obrigatório');
+  }
+
+  // Garantir que a sessão está carregada na memória
+  let currentSession = getWebSession(sessionId);
+  if (!currentSession) {
+    currentSession = await loadSessionFromDB(sessionId);
+  }
+  if (!currentSession) {
+    return res.status(404).send('Sessão não encontrada');
   }
 
   res.set({
@@ -276,16 +309,13 @@ router.get('/api/chat/stream', (req, res) => {
   let lastMsgIndex = 0;
 
   const checkInterval = setInterval(() => {
-    const currentSession = getWebSession(sessionId);
-    if (!currentSession) {
-      sendSSE(res, 'error', { type: 'error', message: 'Sessão não encontrada', sessionId });
-      clearInterval(checkInterval);
-      clearInterval(keepAlive);
-      res.end();
+    const session = getWebSession(sessionId);
+    if (!session) {
+      // Sessão foi removida da memória, tenta recarregar
       return;
     }
 
-    const newMessages = currentSession.messages.slice(lastMsgIndex);
+    const newMessages = session.messages.slice(lastMsgIndex);
     for (const msg of newMessages) {
       const eventData = {
         id: msg.id,
@@ -306,7 +336,7 @@ router.get('/api/chat/stream', (req, res) => {
 
       sendSSE(res, msg.type, eventData);
     }
-    lastMsgIndex = currentSession.messages.length;
+    lastMsgIndex = session.messages.length;
   }, 100);
 
   req.on('close', () => {
@@ -349,14 +379,17 @@ router.get('/api/chat/sessions', async (req, res) => {
 });
 
 // GET /api/chat/session/:id/messages
-router.get('/api/chat/session/:id/messages', (req, res) => {
-  const session = getWebSession(req.params.id);
+router.get('/api/chat/session/:id/messages', async (req, res) => {
+  let session = getWebSession(req.params.id);
+  if (!session) {
+    session = await loadSessionFromDB(req.params.id);
+  }
   if (!session) return res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
   res.json({ ok: true, messages: session.messages });
 });
 
 // POST /api/chat/session — create/rename/delete
-router.post('/api/chat/session', (req, res) => {
+router.post('/api/chat/session', async (req, res) => {
   const { action, sessionId, title } = req.body;
 
   switch (action) {
@@ -367,7 +400,9 @@ router.post('/api/chat/session', (req, res) => {
     }
     case 'rename': {
       if (!sessionId || !title) return res.status(400).json({ ok: false, error: 'sessionId e title obrigatórios' });
-      if (renameWebSession(sessionId, title)) {
+      let session = getWebSession(sessionId);
+      if (!session) session = await loadSessionFromDB(sessionId);
+      if (session && renameWebSession(sessionId, title)) {
         res.json({ ok: true });
       } else {
         res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
