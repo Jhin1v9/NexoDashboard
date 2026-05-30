@@ -14,6 +14,7 @@ mkdir -p "$PID_DIR"
 NEXO_PID_FILE="$PID_DIR/nexo.pid"
 LUNA_PID_FILE="$PID_DIR/luna.pid"
 VITE_PID_FILE="$PID_DIR/vite.pid"
+TELEGRAM_PID_FILE="$PID_DIR/telegram.pid"
 
 colors() {
   CYAN='\033[0;36m'
@@ -72,9 +73,20 @@ start_services() {
   kill_port 3456
   kill_port 3458
   kill_port 5173
+  # Parar bot do Telegram se estiver rodando
+  if [ -f "$TELEGRAM_PID_FILE" ]; then
+    pid=$(cat "$TELEGRAM_PID_FILE")
+    if kill -0 "$pid" 2>/dev/null; then
+      echo -e "  ${YELLOW}→ Parando Telegram Bot (PID: $pid)${NC}"
+      kill -TERM "$pid" 2>/dev/null || true
+      sleep 1
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+    rm -f "$TELEGRAM_PID_FILE"
+  fi
   
   # Limpar PIDs antigos
-  rm -f "$NEXO_PID_FILE" "$LUNA_PID_FILE" "$VITE_PID_FILE"
+  rm -f "$NEXO_PID_FILE" "$LUNA_PID_FILE" "$VITE_PID_FILE" "$TELEGRAM_PID_FILE"
 
   # 1. Nexo Backend (cwd must be backend/ for dotenv to find .env)
   echo -e "${CYAN}▶ Iniciando NEXO Dashboard (porta 3456)...${NC}"
@@ -100,6 +112,12 @@ start_services() {
   else
     echo -e "${RED}⚠ Vite não encontrado em $LUNA_WEB${NC}"
   fi
+
+  # 4. Telegram Bot (Luna Adapter v4.0)
+  echo -e "${GREEN}▶ Iniciando Telegram Bot (@lunanexobot)...${NC}"
+  cd "$NEXO_DIR/agents"
+  nohup node telegram-luna-adapter.cjs > /dev/null 2>&1 &
+  echo $! > "$TELEGRAM_PID_FILE"
 
   sleep 2
   echo ""
@@ -158,6 +176,14 @@ status_services() {
   check_service "NEXO Dashboard"    3456 "$NEXO_PID_FILE" "$CYAN"
   check_service "Luna Web Server"   3458 "$LUNA_PID_FILE" "$MAGENTA"
   check_service "Luna Web Vite"     5173 "$VITE_PID_FILE" "$YELLOW"
+  # Telegram Bot status (check by PID, not port)
+  local tg_pid=""
+  [ -f "$TELEGRAM_PID_FILE" ] && tg_pid=$(cat "$TELEGRAM_PID_FILE")
+  if [ -n "$tg_pid" ] && kill -0 "$tg_pid" 2>/dev/null; then
+    echo -e "  ${GREEN}●${NC} ${BOLD}Telegram Bot${NC} ${GREEN}(rodando)${NC} — @lunanexobot"
+  else
+    echo -e "  ${RED}●${NC} ${BOLD}Telegram Bot${NC} ${RED}(parado)${NC} — @lunanexobot"
+  fi
   
   echo ""
   echo -e "${DIM}URLs:${NC}"
