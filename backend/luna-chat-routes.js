@@ -39,8 +39,40 @@ async function getLunaSoul() {
 const webSessions = new Map();
 const activeStreams = new Map();
 
+// Periodic cleanup of orphaned activeStreams (e.g. client disconnect without close event)
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 10 * 60 * 1000; // 10 minutes
+  for (const [id, meta] of activeStreams) {
+    if (meta.createdAt && (now - meta.createdAt > maxAge)) {
+      console.warn(`[WEB] Cleaning orphaned stream ${id} (age ${Math.round((now - meta.createdAt) / 1000)}s)`);
+      activeStreams.delete(id);
+    }
+  }
+}, 60000); // check every minute
+
+async function dbRunWithRetry(sql, params, retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await db.run(sql, params);
+    } catch (e) {
+      lastErr = e;
+      const delay = Math.min(1000 * Math.pow(2, i), 5000);
+      console.warn(`[DB] Retry ${i + 1}/${retries} in ${delay}ms: ${e.message}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  console.error('[DB] Failed after retries:', lastErr.message);
+  throw lastErr;
+}
+
+function generateWebSessionId() {
+  return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+
 function createWebSession(title = 'Nova conversa', mode = 'thinking') {
-  const id = 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  const id = generateWebSessionId();
   const session = {
     id,
     title,
@@ -50,8 +82,8 @@ function createWebSession(title = 'Nova conversa', mode = 'thinking') {
     updatedAt: new Date().toISOString(),
   };
   webSessions.set(id, session);
-  // Persistir no PostgreSQL (fire-and-forget)
-  db.run(
+  // Persistir no PostgreSQL (fire-and-forget with retry)
+  dbRunWithRetry(
     `INSERT INTO luna_chat_sessions (id, user_id, title, mode, messages, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5::jsonb, NOW(), NOW())`,
     [id, 'anonymous', title, mode, JSON.stringify([])]
@@ -94,8 +126,8 @@ function deleteWebSession(id) {
     activeStreams.delete(id);
   }
   const result = webSessions.delete(id);
-  // Deletar do PostgreSQL (fire-and-forget)
-  db.run(
+  // Deletar do PostgreSQL (fire-and-forget with retry)
+  dbRunWithRetry(
     `DELETE FROM luna_chat_sessions WHERE id = $1`,
     [id]
   ).catch(e => console.error('[DB] Erro ao deletar sessão:', e.message));
@@ -107,8 +139,8 @@ function renameWebSession(id, title) {
   if (session) {
     session.title = title;
     session.updatedAt = new Date().toISOString();
-    // Atualizar no PostgreSQL (fire-and-forget)
-    db.run(
+    // Atualizar no PostgreSQL (fire-and-forget with retry)
+    dbRunWithRetry(
       `UPDATE luna_chat_sessions SET title = $1, updated_at = NOW() WHERE id = $2`,
       [title, id]
     ).catch(e => console.error('[DB] Erro ao renomear sessão:', e.message));
@@ -122,8 +154,8 @@ function addMessageToSession(sessionId, message) {
   if (session) {
     session.messages.push(message);
     session.updatedAt = new Date().toISOString();
-    // Persistir no PostgreSQL (fire-and-forget)
-    db.run(
+    // Persistir no PostgreSQL (fire-and-forget with retry)
+    dbRunWithRetry(
       `UPDATE luna_chat_sessions SET messages = $1::jsonb, updated_at = NOW() WHERE id = $2`,
       [JSON.stringify(session.messages), sessionId]
     ).catch(e => console.error('[DB] Erro ao salvar mensagem:', e.message));
@@ -206,7 +238,7 @@ function writeSystemPrompt(newPrompt) {
 // ============================================================
 function sendSSE(res, event, data) {
   res.write(`event: message\n`);
-  res.write(`data: ${JSON.stringify({ ...data, _eventType: event })}\n\n`);
+  res.write(`data: ${JSON.stringify({ ...data, type: event })}\n\n`);
 }
 
 // ============================================================
@@ -215,7 +247,7 @@ function sendSSE(res, event, data) {
 
 // POST /api/chat — send message
 router.post('/api/chat', async (req, res) => {
-  const { message, sessionId, mode = 'thinking' } = req.body;
+  const { message, sessionId, mode = 'thinking', files } = req.body;
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
   let session = sessionId ? getWebSession(sessionId) : null;
@@ -229,10 +261,11 @@ router.post('/api/chat', async (req, res) => {
     role: 'user',
     type: 'text',
     content: message,
+    files: files || [],
     timestamp: new Date().toISOString(),
   });
 
-  activeStreams.set(session.id, { cancelled: false });
+  activeStreams.set(session.id, { cancelled: false, createdAt: Date.now() });
 
   res.json({ ok: true, sessionId: session.id, status: 'processing' });
 
@@ -249,7 +282,7 @@ router.post('/api/chat', async (req, res) => {
       const streamMeta = activeStreams.get(session.id);
       if (!streamMeta || streamMeta.cancelled) break;
 
-      if (['response_delta', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta'].includes(ev.type)) {
+      if (['response_delta', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta', 'login_required'].includes(ev.type)) {
         addMessageToSession(session.id, {
           id: 'ev-' + Date.now(),
           role: 'assistant',
@@ -265,11 +298,14 @@ router.post('/api/chat', async (req, res) => {
     }
   } catch (e) {
     console.error('[WEB] Erro no processamento:', e.message);
+    const isLoginRequired = e.message === 'KIMI_LOGIN_REQUIRED' || e.message?.includes('login');
     addMessageToSession(session.id, {
       id: 'err-' + Date.now(),
       role: 'assistant',
-      type: 'error',
-      content: e.message,
+      type: isLoginRequired ? 'login_required' : 'error',
+      content: isLoginRequired
+        ? 'Sessão do Kimi expirada. Por favor, faça login novamente no Chrome e recarregue a página.'
+        : e.message,
       timestamp: new Date().toISOString(),
     });
   } finally {
@@ -332,7 +368,10 @@ router.get('/api/chat/stream', async (req, res) => {
       if (msg.params) eventData.params = msg.params;
       if (msg.result) eventData.result = msg.result;
       if (msg.type === 'error') eventData.error = msg.content;
-      if (msg.role === 'user') eventData.content = msg.content;
+      if (msg.role === 'user') {
+        eventData.content = msg.content;
+        if (msg.files && msg.files.length > 0) eventData.files = msg.files;
+      }
 
       sendSSE(res, msg.type, eventData);
     }

@@ -1,10 +1,16 @@
 /**
  * Voting Module Routes — extracted from Dashboard server.js
  * CEOs vote on actions; approved tool_actions auto-execute.
+ *
+ * FIXES APPLIED (v1.1):
+ * - File-level locking prevents race conditions on concurrent read-modify-write
+ * - generateId uses crypto.randomUUID() instead of Date.now()+Math.random()
+ * - CEO list loaded from VOTING_CEO_USERS env var (fallback to hardcoded)
  */
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Telegram notifier for voting notifications
 let telegramNotifier = null;
@@ -19,24 +25,68 @@ const VOTING_SESSIONS_FILE = path.join(DATA_DIR, 'voting-sessions.json');
 const VOTING_VOTES_FILE = path.join(DATA_DIR, 'voting-votes.json');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 
+// ============================================================
+// ATOMIC FILE OPERATIONS (prevents race conditions)
+// ============================================================
+const fileLocks = new Map();
+
+async function withFileLock(file, fn) {
+  const key = String(file);
+  while (fileLocks.get(key)) {
+    await new Promise(r => setTimeout(r, 10));
+  }
+  fileLocks.set(key, true);
+  try {
+    return fn();
+  } finally {
+    fileLocks.set(key, false);
+  }
+}
+
 function readJSON(file, fallback) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf-8'));
   } catch { return fallback; }
 }
-function writeJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
-}
-function generateId(prefix = 'id') {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+async function writeJSON(file, data) {
+  await withFileLock(file, () => {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
+  });
 }
 
-const CEOs = ['abner', 'nonoke', 'elias'];
+/**
+ * Atomic read-modify-write for JSON files.
+ * The modifier receives the current data and should return the new data.
+ * Lock is held for the entire duration.
+ */
+async function withJSONFile(file, fallback, modifier) {
+  await withFileLock(file, () => {
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    } catch {
+      data = fallback;
+    }
+    const result = modifier(data);
+    if (result !== undefined) {
+      fs.writeFileSync(file, JSON.stringify(result, null, 2), 'utf-8');
+    }
+  });
+}
+
+function generateId(prefix = 'id') {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+const CEOs = (process.env.VOTING_CEO_USERS || 'abner,nonoke,elias')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
 
 // Tool registry for auto-execute of approved actions
 const votingToolRegistry = {
   async dashboardCreateTask(params) {
-    const tasks = readJSON(TASKS_FILE) || [];
     const newTask = {
       id: generateId('task'),
       title: params.title || 'Untitled Task',
@@ -50,22 +100,27 @@ const votingToolRegistry = {
       addedBy: 'voting-auto',
       source: 'voting'
     };
-    tasks.push(newTask);
-    writeJSON(TASKS_FILE, tasks);
+    await withJSONFile(TASKS_FILE, [], (tasks) => {
+      tasks.push(newTask);
+      return tasks;
+    });
     return { success: true, task: newTask };
   },
   async dashboardUpdateTask(params) {
-    const tasks = readJSON(TASKS_FILE) || [];
-    const idx = tasks.findIndex(t => t.id === params.taskId);
-    if (idx === -1) throw new Error(`Task ${params.taskId} not found`);
-    tasks[idx] = { ...tasks[idx], ...params.updates, updatedAt: new Date().toISOString() };
-    writeJSON(TASKS_FILE, tasks);
-    return { success: true, task: tasks[idx] };
+    let updated = null;
+    await withJSONFile(TASKS_FILE, [], (tasks) => {
+      const idx = tasks.findIndex(t => t.id === params.taskId);
+      if (idx === -1) throw new Error(`Task ${params.taskId} not found`);
+      tasks[idx] = { ...tasks[idx], ...params.updates, updatedAt: new Date().toISOString() };
+      updated = tasks[idx];
+      return tasks;
+    });
+    return { success: true, task: updated };
   },
   async dashboardDeleteTask(params) {
-    const tasks = readJSON(TASKS_FILE) || [];
-    const filtered = tasks.filter(t => t.id !== params.taskId);
-    writeJSON(TASKS_FILE, filtered);
+    await withJSONFile(TASKS_FILE, [], (tasks) => {
+      return tasks.filter(t => t.id !== params.taskId);
+    });
     return { success: true, deleted: params.taskId };
   }
 };
@@ -130,7 +185,6 @@ module.exports = function(app, { requireAuth }) {
       if (type === 'tool_action' && !toolName) return res.status(400).json({ error: 'toolName required for tool_action type' });
       if (![2, 3].includes(parseInt(quorumRequired))) return res.status(400).json({ error: 'quorumRequired must be 2 or 3' });
 
-      const sessions = readJSON(VOTING_SESSIONS_FILE, []);
       const votes = {};
       CEOs.forEach(ceo => { votes[ceo] = null; });
 
@@ -151,8 +205,10 @@ module.exports = function(app, { requireAuth }) {
         votes
       };
 
-      sessions.push(newSession);
-      writeJSON(VOTING_SESSIONS_FILE, sessions);
+      await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+        sessions.push(newSession);
+        return sessions;
+      });
 
       // Notificar Telegram
       if (telegramNotifier?.sendVotingNotification) {
@@ -174,79 +230,113 @@ module.exports = function(app, { requireAuth }) {
       if (!vote || !['yes', 'no'].includes(vote)) {
         return res.status(400).json({ error: 'Vote must be "yes" or "no"' });
       }
-      const sessions = readJSON(VOTING_SESSIONS_FILE, []);
-      const sessionIdx = sessions.findIndex(s => s.id === req.params.id);
-      if (sessionIdx === -1) return res.status(404).json({ error: 'Session not found' });
-
-      const session = sessions[sessionIdx];
-      if (session.status !== 'open' && session.status !== 'voting') {
-        return res.status(400).json({ error: `Session is ${session.status}, cannot vote` });
-      }
       if (!CEOs.includes(username)) {
         return res.status(403).json({ error: 'Only CEOs can vote' });
       }
 
-      const votedAt = new Date().toISOString();
-      session.votes[username] = { vote, votedAt, comment };
-      if (session.status === 'open') session.status = 'voting';
-
-      const auditVotes = readJSON(VOTING_VOTES_FILE, []);
-      auditVotes.push({ id: generateId('vote'), sessionId: session.id, voter: username, vote, comment, votedAt });
-      writeJSON(VOTING_VOTES_FILE, auditVotes);
-
-      const yesVotes = Object.values(session.votes).filter(v => v && v.vote === 'yes').length;
-      const noVotes = Object.values(session.votes).filter(v => v && v.vote === 'no').length;
-      const totalCEOs = CEOs.length;
+      let resultSession = null;
+      let yourVote = null;
+      let tally = null;
       let autoExecuteResult = null;
-
       let notificationType = null;
 
-    if (noVotes >= 1) {
-        session.status = 'rejected';
-        session.result = 'rejected';
-        session.closedAt = votedAt;
-        notificationType = 'rejected';
-      } else if (yesVotes >= session.quorumRequired) {
-        session.status = 'approved';
-        session.result = 'approved';
-        session.closedAt = votedAt;
-        if (session.type === 'tool_action' && session.toolName) {
-          try {
-            autoExecuteResult = await executeVotingTool(session.toolName, session.toolParams || {});
-            session.executionResult = autoExecuteResult;
-          } catch (execErr) {
-            console.error('[AUTO-EXECUTE] Error:', execErr.message);
-            session.executionResult = { success: false, error: execErr.message };
+      await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+        const sessionIdx = sessions.findIndex(s => s.id === req.params.id);
+        if (sessionIdx === -1) throw new Error('SESSION_NOT_FOUND');
+
+        const session = sessions[sessionIdx];
+        if (session.status !== 'open' && session.status !== 'voting') {
+          throw new Error(`SESSION_CLOSED:${session.status}`);
+        }
+
+        const votedAt = new Date().toISOString();
+        session.votes[username] = { vote, votedAt, comment };
+        if (session.status === 'open') session.status = 'voting';
+
+        const yesVotes = Object.values(session.votes).filter(v => v && v.vote === 'yes').length;
+        const noVotes = Object.values(session.votes).filter(v => v && v.vote === 'no').length;
+        const totalCEOs = CEOs.length;
+
+        if (noVotes >= 1) {
+          session.status = 'rejected';
+          session.result = 'rejected';
+          session.closedAt = votedAt;
+          notificationType = 'rejected';
+        } else if (yesVotes >= session.quorumRequired) {
+          session.status = 'approved';
+          session.result = 'approved';
+          session.closedAt = votedAt;
+          if (session.type === 'tool_action' && session.toolName) {
+            // Auto-execute is async but we must return the modified sessions array.
+            // We store a flag and execute after releasing the lock.
+            session._pendingAutoExecute = true;
+          }
+        } else {
+          const votedCount = Object.values(session.votes).filter(v => v !== null).length;
+          if (votedCount >= totalCEOs && yesVotes < session.quorumRequired && noVotes === 0) {
+            session.status = 'closed';
+            session.result = 'closed_without_quorum';
+            session.closedAt = votedAt;
           }
         }
-      } else {
-        const votedCount = Object.values(session.votes).filter(v => v !== null).length;
-        if (votedCount >= totalCEOs && yesVotes < session.quorumRequired && noVotes === 0) {
-          session.status = 'closed';
-          session.result = 'closed_without_quorum';
-          session.closedAt = votedAt;
+
+        sessions[sessionIdx] = session;
+        resultSession = session;
+        yourVote = { vote, votedAt, comment };
+        tally = { yes: yesVotes, no: noVotes, pending: totalCEOs - yesVotes - noVotes };
+        return sessions;
+      });
+
+      // If the session needs auto-execute, do it AFTER releasing the file lock
+      if (resultSession && resultSession._pendingAutoExecute) {
+        try {
+          autoExecuteResult = await executeVotingTool(resultSession.toolName, resultSession.toolParams || {});
+        } catch (execErr) {
+          console.error('[AUTO-EXECUTE] Error:', execErr.message);
+          autoExecuteResult = { success: false, error: execErr.message };
         }
+        // Update session with execution result
+        await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+          const idx = sessions.findIndex(s => s.id === resultSession.id);
+          if (idx !== -1) {
+            sessions[idx].executionResult = autoExecuteResult;
+            delete sessions[idx]._pendingAutoExecute;
+          }
+          return sessions;
+        });
+        resultSession.executionResult = autoExecuteResult;
+        delete resultSession._pendingAutoExecute;
       }
 
-      sessions[sessionIdx] = session;
-      writeJSON(VOTING_SESSIONS_FILE, sessions);
+      // Write audit log
+      const auditEntry = { id: generateId('vote'), sessionId: req.params.id, voter: username, vote, comment, votedAt: yourVote.votedAt };
+      await withJSONFile(VOTING_VOTES_FILE, [], (auditVotes) => {
+        auditVotes.push(auditEntry);
+        return auditVotes;
+      });
 
       // Notificar Telegram
       if (telegramNotifier?.sendVotingNotification) {
         if (notificationType) {
-          telegramNotifier.sendVotingNotification({ type: notificationType, session }).catch(() => {});
-        } else if (session.status === 'open' || session.status === 'voting') {
-          telegramNotifier.sendVotingNotification({ type: 'vote', session, voter: username, voteValue: vote }).catch(() => {});
+          telegramNotifier.sendVotingNotification({ type: notificationType, session: resultSession }).catch(() => {});
+        } else if (resultSession.status === 'open' || resultSession.status === 'voting') {
+          telegramNotifier.sendVotingNotification({ type: 'vote', session: resultSession, voter: username, voteValue: vote }).catch(() => {});
         }
       }
 
       res.json({
-        session,
-        yourVote: { vote, votedAt, comment },
-        tally: { yes: yesVotes, no: noVotes, pending: totalCEOs - yesVotes - noVotes },
-        autoExecuted: session.type === 'tool_action' && session.status === 'approved' ? session.executionResult : null
+        session: resultSession,
+        yourVote,
+        tally,
+        autoExecuted: resultSession.type === 'tool_action' && resultSession.status === 'approved' ? resultSession.executionResult : null
       });
     } catch (err) {
+      if (err.message === 'SESSION_NOT_FOUND') {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      if (err.message.startsWith('SESSION_CLOSED:')) {
+        return res.status(400).json({ error: `Session is ${err.message.split(':')[1]}, cannot vote` });
+      }
       console.error('[API] Error voting:', err);
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -255,20 +345,25 @@ module.exports = function(app, { requireAuth }) {
   // DELETE /api/voting/sessions/:id
   app.delete('/api/voting/sessions/:id', requireAuth, async (req, res) => {
     try {
-      const sessions = readJSON(VOTING_SESSIONS_FILE, []);
-      const sessionIdx = sessions.findIndex(s => s.id === req.params.id);
-      if (sessionIdx === -1) return res.status(404).json({ error: 'Session not found' });
-      const session = sessions[sessionIdx];
-      if (session.createdBy !== req.user.userId) {
-        return res.status(403).json({ error: 'Only the creator can delete this session' });
-      }
-      if (session.status !== 'open' && session.status !== 'voting') {
-        return res.status(400).json({ error: 'Cannot delete a closed session' });
-      }
-      const deleted = sessions.splice(sessionIdx, 1)[0];
-      writeJSON(VOTING_SESSIONS_FILE, sessions);
+      let deleted = null;
+      await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+        const sessionIdx = sessions.findIndex(s => s.id === req.params.id);
+        if (sessionIdx === -1) throw new Error('SESSION_NOT_FOUND');
+        const session = sessions[sessionIdx];
+        if (session.createdBy !== req.user.userId) {
+          throw new Error('FORBIDDEN');
+        }
+        if (session.status !== 'open' && session.status !== 'voting') {
+          throw new Error('SESSION_CLOSED');
+        }
+        deleted = sessions.splice(sessionIdx, 1)[0];
+        return sessions;
+      });
       res.json({ message: 'Session deleted', session: deleted });
     } catch (err) {
+      if (err.message === 'SESSION_NOT_FOUND') return res.status(404).json({ error: 'Session not found' });
+      if (err.message === 'FORBIDDEN') return res.status(403).json({ error: 'Only the creator can delete this session' });
+      if (err.message === 'SESSION_CLOSED') return res.status(400).json({ error: 'Cannot delete a closed session' });
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -297,32 +392,43 @@ module.exports = function(app, { requireAuth }) {
       if (!CEOs.includes(voter)) {
         return res.status(403).json({ error: 'Only CEOs can vote' });
       }
-      const sessions = readJSON(VOTING_SESSIONS_FILE, []);
-      const sessionIdx = sessions.findIndex(s => s.id === sessionId);
-      if (sessionIdx === -1) return res.status(404).json({ error: 'Session not found' });
-      const session = sessions[sessionIdx];
-      if (session.status !== 'open' && session.status !== 'voting') {
-        return res.status(400).json({ error: `Session is ${session.status}, cannot vote` });
-      }
-      const votedAt = new Date().toISOString();
-      session.votes[voter] = { vote, votedAt, comment: 'Telegram' };
-      if (session.status === 'open') session.status = 'voting';
 
-      const auditVotes = readJSON(VOTING_VOTES_FILE, []);
-      auditVotes.push({ id: generateId('vote'), sessionId, voter, vote, comment: 'Telegram', votedAt });
-      writeJSON(VOTING_VOTES_FILE, auditVotes);
+      let resultSession = null;
 
-      const yesVotes = Object.values(session.votes).filter(v => v && v.vote === 'yes').length;
-      const noVotes = Object.values(session.votes).filter(v => v && v.vote === 'no').length;
-      if (noVotes >= 1) {
-        session.status = 'rejected'; session.result = 'rejected'; session.closedAt = votedAt;
-      } else if (yesVotes >= session.quorumRequired) {
-        session.status = 'approved'; session.result = 'approved'; session.closedAt = votedAt;
-      }
-      sessions[sessionIdx] = session;
-      writeJSON(VOTING_SESSIONS_FILE, sessions);
-      res.json({ session, voter, vote, votedAt });
+      await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+        const sessionIdx = sessions.findIndex(s => s.id === sessionId);
+        if (sessionIdx === -1) throw new Error('SESSION_NOT_FOUND');
+        const session = sessions[sessionIdx];
+        if (session.status !== 'open' && session.status !== 'voting') {
+          throw new Error(`SESSION_CLOSED:${session.status}`);
+        }
+        const votedAt = new Date().toISOString();
+        session.votes[voter] = { vote, votedAt, comment: 'Telegram' };
+        if (session.status === 'open') session.status = 'voting';
+
+        const yesVotes = Object.values(session.votes).filter(v => v && v.vote === 'yes').length;
+        const noVotes = Object.values(session.votes).filter(v => v && v.vote === 'no').length;
+        if (noVotes >= 1) {
+          session.status = 'rejected'; session.result = 'rejected'; session.closedAt = votedAt;
+        } else if (yesVotes >= session.quorumRequired) {
+          session.status = 'approved'; session.result = 'approved'; session.closedAt = votedAt;
+        }
+        sessions[sessionIdx] = session;
+        resultSession = session;
+        return sessions;
+      });
+
+      // Write audit log
+      const auditEntry = { id: generateId('vote'), sessionId, voter, vote, comment: 'Telegram', votedAt: new Date().toISOString() };
+      await withJSONFile(VOTING_VOTES_FILE, [], (auditVotes) => {
+        auditVotes.push(auditEntry);
+        return auditVotes;
+      });
+
+      res.json({ session: resultSession, voter, vote, votedAt: auditEntry.votedAt });
     } catch (err) {
+      if (err.message === 'SESSION_NOT_FOUND') return res.status(404).json({ error: 'Session not found' });
+      if (err.message.startsWith('SESSION_CLOSED:')) return res.status(400).json({ error: `Session is ${err.message.split(':')[1]}, cannot vote` });
       console.error('[API] Error telegram vote:', err);
       res.status(500).json({ error: 'Internal server error' });
     }

@@ -998,6 +998,7 @@ const PUBLIC_API_ROUTES = [
   '/api/tasks',               // Luna bot context builder (local-only)
   '/api/ideas',               // Luna bot context builder (local-only)
   '/api/finance/summary',     // Luna bot context builder (local-only)
+  '/api/voting/telegram-vote', // Telegram bot callback voting (protected by secret in body)
 ];
 
 app.use((req, res, next) => {
@@ -1328,6 +1329,14 @@ app.get('/api/tasks', async (req, res) => {
   res.json(tasks);
 });
 
+// Telegram notifier for tasks
+let taskNotifier = null;
+try {
+  taskNotifier = require('./services/telegram-notifier');
+} catch (e) {
+  console.warn('[Tasks] telegram-notifier não disponível:', e.message);
+}
+
 app.post('/api/tasks', async (req, res) => {
   const now = new Date().toISOString();
   const task = {
@@ -1341,11 +1350,18 @@ app.post('/api/tasks', async (req, res) => {
     addedBy: req.body.addedBy || 'sistema',
     assignedTo: req.body.assignedTo || null,
     source: req.body.source || 'manual',
+    tags: req.body.tags || [],
     comments: [],
     createdAt: now,
     updatedAt: now
   };
   await dataStore.saveTask(task);
+  
+  // Notificar Telegram
+  if (taskNotifier?.sendTaskNotification) {
+    taskNotifier.sendTaskNotification(task).catch(() => {});
+  }
+  
   res.json(task);
 });
 

@@ -25,7 +25,13 @@ function requireAuth(req, res, next) {
   try {
     const token = authHeader.slice(7);
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    // Load full user data from users.json
+    const usersData = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
+    const user = usersData.users?.[decoded.userId.toLowerCase()];
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Usuário não encontrado' });
+    }
+    req.user = { id: decoded.userId, name: user.name || decoded.userId, role: user.role || 'User', color: user.color };
     next();
   } catch (e) {
     return res.status(401).json({ success: false, error: 'Token inválido' });
