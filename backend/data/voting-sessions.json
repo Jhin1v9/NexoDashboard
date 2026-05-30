@@ -1,0 +1,22 @@
+[
+  {
+    "id": "sess-mpseom5s-bg73",
+    "title": "Teste votação integrada",
+    "description": "Sessão de teste",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdBy": "abner",
+    "createdAt": "2026-05-30T13:48:04.528Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  }
+]

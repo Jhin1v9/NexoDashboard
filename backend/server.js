@@ -31,6 +31,8 @@ const dataStore = require('./datastore-pg');
 // Discord Mention Notifier
 const { sendMentionNotification, setWebhookUrl } = require('./services/discord-notifier');
 
+// ── Voting Routes ──
+const setupVotingRoutes = require('./voting-routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -3491,6 +3493,9 @@ app.use('/api/ideas', ideasRouter(requireAuth));
 // ═══════════════════════════════════════════════════════════════════════════════
 const leadsRouter = require('./routes/leads');
 app.use('/api/leads', leadsRouter);
+
+// ── Voting Routes ──
+setupVotingRoutes(app, { requireAuth });
 
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──

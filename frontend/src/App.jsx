@@ -44,6 +44,7 @@ import Seguranca from './pages/Seguranca'
 import Changelog from './pages/Changelog'
 import Ideias from './pages/Ideias'
 import IdeaEditor from './pages/IdeaEditor'
+import Votacao from './pages/Votacao'
 
 // Layout para rotas protegidas (com sidebar, topbar, etc.)
 function ProtectedLayout() {
@@ -90,6 +91,7 @@ function ProtectedLayout() {
             <Route path="/sistema" element={<SystemEngine />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/seguranca" element={<Seguranca />} />
+            <Route path="/votacao" element={<Votacao />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </main>
