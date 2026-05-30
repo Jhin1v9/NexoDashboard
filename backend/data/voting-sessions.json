@@ -6,10 +6,34 @@
     "type": "generic",
     "toolName": null,
     "toolParams": null,
-    "status": "open",
+    "status": "rejected",
     "quorumRequired": 2,
     "createdBy": "abner",
     "createdAt": "2026-05-30T13:48:04.528Z",
+    "closedAt": "2026-05-30T13:49:40.405Z",
+    "result": "rejected",
+    "executionResult": null,
+    "votes": {
+      "abner": {
+        "vote": "no",
+        "votedAt": "2026-05-30T13:49:40.405Z",
+        "comment": ""
+      },
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpsf1hqa-027x",
+    "title": "Teste botão criar",
+    "description": "Testando se funciona",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdBy": "abner",
+    "createdAt": "2026-05-30T13:58:05.314Z",
     "closedAt": null,
     "result": null,
     "executionResult": null,

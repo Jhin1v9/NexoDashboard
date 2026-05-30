@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, cloneElement } from 'react'
 import { Plus, Zap, FileText, Users } from 'lucide-react'
 
 const TOOL_OPTIONS = [
@@ -54,7 +54,11 @@ export default function VotingCreateModal({ onCreate, children }) {
 
   return (
     <>
-      {children || (
+      {children ? (
+        <div onClick={() => setOpen(true)} className="cursor-pointer inline-block">
+          {children}
+        </div>
+      ) : (
         <button
           onClick={() => setOpen(true)}
           className="btn-primary flex items-center gap-1.5 text-sm"

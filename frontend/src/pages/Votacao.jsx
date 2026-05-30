@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useVoting } from '../hooks/useVoting'
 import useWebSocket from '../hooks/useWebSocket'
 import VotingSessionList from '../components/voting/VotingSessionList'
@@ -15,6 +15,7 @@ export default function Votacao() {
   const [activeFilter, setActiveFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCollapsed, setFilterCollapsed] = useState(false)
+  const createBtnRef = useRef(null)
 
   useEffect(() => {
     if (!lastMessage) return
@@ -89,7 +90,7 @@ export default function Votacao() {
         <VotingFilterPanel
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
-          onCreateVoting={() => document.getElementById('voting-create-btn')?.click()}
+          onCreateVoting={() => createBtnRef.current?.click()}
           stats={voting.stats}
           collapsed={filterCollapsed}
           onToggleCollapse={() => setFilterCollapsed(!filterCollapsed)}
@@ -128,7 +129,7 @@ export default function Votacao() {
             </button>
             <div id="voting-create-btn-wrapper">
               <VotingCreateModal onCreate={handleCreate}>
-                <button className="btn-primary flex items-center gap-1.5 text-sm">
+                <button ref={createBtnRef} className="btn-primary flex items-center gap-1.5 text-sm">
                   <BarChart3 className="w-4 h-4" />
                   Nova
                 </button>

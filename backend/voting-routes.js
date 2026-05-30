@@ -6,6 +6,14 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
+// Telegram notifier for voting notifications
+let telegramNotifier = null;
+try {
+  telegramNotifier = require('./services/telegram-notifier');
+} catch (e) {
+  console.warn('[Voting] telegram-notifier não disponível:', e.message);
+}
+
 const DATA_DIR = path.join(__dirname, 'data');
 const VOTING_SESSIONS_FILE = path.join(DATA_DIR, 'voting-sessions.json');
 const VOTING_VOTES_FILE = path.join(DATA_DIR, 'voting-votes.json');
@@ -145,6 +153,12 @@ module.exports = function(app, { requireAuth }) {
 
       sessions.push(newSession);
       writeJSON(VOTING_SESSIONS_FILE, sessions);
+
+      // Notificar Telegram
+      if (telegramNotifier?.sendVotingNotification) {
+        telegramNotifier.sendVotingNotification({ type: 'new', session: newSession }).catch(() => {});
+      }
+
       res.status(201).json(newSession);
     } catch (err) {
       console.error('[API] Error creating session:', err);
@@ -185,10 +199,13 @@ module.exports = function(app, { requireAuth }) {
       const totalCEOs = CEOs.length;
       let autoExecuteResult = null;
 
-      if (noVotes >= 1) {
+      let notificationType = null;
+
+    if (noVotes >= 1) {
         session.status = 'rejected';
         session.result = 'rejected';
         session.closedAt = votedAt;
+        notificationType = 'rejected';
       } else if (yesVotes >= session.quorumRequired) {
         session.status = 'approved';
         session.result = 'approved';
@@ -213,6 +230,15 @@ module.exports = function(app, { requireAuth }) {
 
       sessions[sessionIdx] = session;
       writeJSON(VOTING_SESSIONS_FILE, sessions);
+
+      // Notificar Telegram
+      if (telegramNotifier?.sendVotingNotification) {
+        if (notificationType) {
+          telegramNotifier.sendVotingNotification({ type: notificationType, session }).catch(() => {});
+        } else if (session.status === 'open' || session.status === 'voting') {
+          telegramNotifier.sendVotingNotification({ type: 'vote', session, voter: username, voteValue: vote }).catch(() => {});
+        }
+      }
 
       res.json({
         session,
