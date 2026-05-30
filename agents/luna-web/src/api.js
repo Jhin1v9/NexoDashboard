@@ -52,7 +52,10 @@ export class SSEManager {
     };
 
     this.eventSource.onerror = () => {
-      this.eventSource.close();
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = null;
+      }
       this._setStatus('disconnected');
       if (!this.isIntentionallyClosed && !this.gracefulClose && this.reconnectAttempts < this.maxReconnectAttempts) {
         const delay = Math.min(this.baseDelay * Math.pow(2, this.reconnectAttempts), this.maxDelay);
@@ -111,6 +114,15 @@ export async function sessionAction(action, sessionId, title) {
     body: JSON.stringify(body)
   });
   return res.json();
+}
+
+export async function fetchSessionMessages(sessionId) {
+  try {
+    const res = await fetch(`/api/chat/session/${encodeURIComponent(sessionId)}/messages`);
+    return res.json();
+  } catch {
+    return { ok: false, messages: [] };
+  }
 }
 
 export async function fetchConfig() {

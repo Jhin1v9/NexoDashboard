@@ -90,3 +90,4 @@ e2e/screenshots/
 e2e/playwright-report/
 luna-test-results/
 e2e/e2e/
+backend/data/alerts.json

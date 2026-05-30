@@ -529,7 +529,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
 
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'update_idea', ideaId: targetId, message: `Ideia "${idea.title}" atualizada` };
     }
 
@@ -552,7 +552,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'delete_idea', ideaId: targetId, message: `Ideia "${idea.title}" arquivada` };
     }
 
@@ -588,7 +588,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
       idea.updatedAt = now;
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'add_comment', ideaId: targetId, message: 'Comentario adicionado' };
     }
 
@@ -611,7 +611,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'change_status', ideaId: targetId, message: `Status alterado para "${params.status}"` };
     }
 
@@ -663,7 +663,7 @@ async function executeToolCall(toolCall, currentIdeaId, reqUser) {
       });
       ideasData.ideas[targetId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
       return { success: true, action: 'convert_to_task', ideaId: targetId, taskId: newTaskId, message: `Ideia convertida em tarefa ${newTaskId}` };
     }
 
@@ -924,7 +924,7 @@ module.exports = function(requireAuth) {
       }
 
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.status(201).json({ success: true, data: { idea: newIdea } });
 
@@ -1066,7 +1066,7 @@ module.exports = function(requireAuth) {
       }
 
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.status(201).json({ success: true, data: { idea: newIdea } });
 
@@ -1351,7 +1351,7 @@ module.exports = function(requireAuth) {
       // Salvar
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({ success: true, data: { idea } });
 
@@ -1394,7 +1394,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({
         success: true,
@@ -1466,7 +1466,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.status(201).json({ success: true, data: { comment: newComment } });
 
@@ -1531,7 +1531,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({ success: true, data: { message: 'Comentario removido com sucesso' } });
 
@@ -1600,7 +1600,7 @@ module.exports = function(requireAuth) {
       idea.updatedAt = new Date().toISOString();
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({
         success: true,
@@ -1722,7 +1722,7 @@ module.exports = function(requireAuth) {
       idea.updatedAt = now;
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({
         success: true,
@@ -1829,7 +1829,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({
         success: true,
@@ -1899,7 +1899,7 @@ module.exports = function(requireAuth) {
 
       ideasData.ideas[ideaId] = idea;
       backupJSON(IDEAS_FILE);
-      await saveIdeasData();
+      await saveIdeasData(ideasData);
 
       res.json({
         success: true,

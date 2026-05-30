@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "description": "IPs confiáveis — não disparam alertas de segurança",
+  "updatedAt": "2026-05-29T23:29:28.616Z",
+  "trusted": {
+    "abner": {
+      "name": "Abner Gabriel",
+      "role": "CEO",
+      "ips": [
+        "127.0.0.1"
+      ],
+      "autoCapture": true,
+      "notes": "Capturar IP automaticamente no próximo login"
+    },
+    "nonoke": {
+      "name": "Enoque (Nonoke)",
+      "role": "CEO",
+      "ips": [],
+      "autoCapture": true,
+      "notes": "Capturar IP automaticamente no próximo login"
+    },
+    "elias": {
+      "name": "Elias",
+      "role": "CEO",
+      "ips": [],
+      "autoCapture": true,
+      "notes": "Capturar IP automaticamente no próximo login"
+    }
+  }
+}

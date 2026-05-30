@@ -5,7 +5,7 @@
 
 set -e
 
-PROFILE_DIR="/tmp/chrome-user-profile"
+PROFILE_DIR="${HOME}/.luna/chrome-profile"
 CDP_PORT="${KIMI_CDP_PORT:-9222}"
 
 # Clean lock files that may prevent Chrome from starting
@@ -13,9 +13,10 @@ rm -f "${PROFILE_DIR}/SingletonLock"
 rm -f "${PROFILE_DIR}/SingletonSocket"
 rm -f "${PROFILE_DIR}/SingletonCookie"
 
-# Copy profile from user's Chrome if it doesn't exist yet
+# v3.7-fix: Always use persistent profile ~/.luna/chrome-profile
+# If it doesn't exist yet, copy from user's Chrome profile
 if [ ! -d "${PROFILE_DIR}/Default" ]; then
-  echo "[start-kimi-chrome] Copying Chrome profile..."
+  echo "[start-kimi-chrome] Persistent profile not found. Copying from user's Chrome..."
   mkdir -p "${PROFILE_DIR}"
   if [ -d "${HOME}/.config/google-chrome/Default" ]; then
     cp -r "${HOME}/.config/google-chrome/Default" "${PROFILE_DIR}/"

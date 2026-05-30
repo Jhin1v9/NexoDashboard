@@ -1,5 +1,67 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-29 — Luna Web v3.6 + Kimi Bridge v3.6 + Unified Launcher
+
+### Added
+- **Unified Launcher** (`luna-nexo.sh` + `start-all.js`)
+  - Script shell unificado: `./luna-nexo.sh [start|stop|restart|status|logs]`
+  - Inicia NEXO Dashboard (3456) + Luna Config Server (3458) + Luna Web Vite (5173)
+  - Logs coloridos por serviço (cyan=NEXO, magenta=Luna, yellow=Vite)
+  - Mata processos antigos nas portas antes de iniciar (evita conflitos)
+  - Graceful shutdown com SIGTERM + fallback SIGKILL após 5s
+  - `start-all.js` — alternativa em Node.js com pipes coloridos em tempo real
+- **Luna Web Chat History Endpoint** (`config-server.cjs`)
+  - `GET /api/chat/session/:id/messages` — retorna histórico completo de mensagens
+  - Permite reconstrução do chat ao trocar de sessão (não limpa mais a tela)
+
+### Fixed (Luna Web Frontend — v3.6)
+- **Thinking Bubble stale/repetido** (`ChatArea.svelte`)
+  - `handleSend()` agora reseta `currentAssistantId = null` e `thinkingId = null`
+  - Evita que thinking da mensagem anterior "cole" na nova mensagem
+- **Histórico vazio ao trocar de sessão** (`ChatArea.svelte`)
+  - `connectSSE()` agora é `async` e carrega histórico ANTES de conectar SSE
+  - Reconstrói thinking, response, tools e erros a partir do backend
+  - Remove thinking "orphan" quando response começa
+- **Deduplicação SSE** (`ChatArea.svelte`)
+  - Eventos com `event.id` já existente na store são ignorados
+  - Evita mensagens duplicadas em reconnects do EventSource
+- **Sessão não encontrada no create** (`App.svelte`)
+  - `handleNewSession()` agora aguarda resposta do backend antes de trocar sessão
+  - `currentMode` restaurado ao trocar de sessão (persistência de modo por sessão)
+- **SSE null reference** (`api.js`)
+  - `onerror` verifica `if (this.eventSource)` antes de chamar `.close()`
+  - Evita `Cannot read properties of null (reading 'close')`
+
+### Fixed (Kimi Bridge — v3.6)
+- **Stream interceptor reset** (`kimi-bridge-interceptor-toolcalls.js`)
+  - `window.__lunaResetStream` exposto para reset correto entre mensagens
+  - Antes: `reasoning = ''` (string) quebrava `.push()` → interceptor parava
+  - Agora: arrays são limpos corretamente, interceptor funciona em todas as msgs
+- **Interceptor array→string** (`kimi-bridge.cjs`)
+  - `_pollThinkingAndResponse()` junta `s.reasoning.join('')` e `s.content.join('')`
+  - Retorna strings em vez de arrays crus para comparação correta
+- **fullThinking nos deltas** (`kimi-bridge.cjs` + `config-server.cjs`)
+  - `thinking_delta` agora inclui `fullThinking: poll.thinking`
+  - Frontend pode exibir thinking acumulado corretamente (não apenas o delta)
+
+### Fixed (Backend — Ideas Persistence)
+- **`saveIdeasData()` sem argumento** (`backend/routes/ideas.js`)
+  - 15 endpoints chamavam `await saveIdeasData()` sem passar `ideasData`
+  - Isso fazia recarregar do PostgreSQL/JSON, perdendo a ideia criada em memória
+  - Corrigido para `await saveIdeasData(ideasData)` em todos os endpoints
+- **`INTERNAL_API_TOKEN` sincronizado** (`.luna-kernel/.env`)
+  - Token divergente entre luna-kernel (`test-token...`) e backend (JWT real)
+  - Causava 401 Unauthorized em TODAS as chamadas dashboard do Luna Chat
+  - Agora ambos usam o mesmo JWT — tools do dashboard funcionam
+
+### IDEIA Adicionada
+- **`idea-001`: Luna Mascot Animada — Personagem Viva no Chat**
+  - Criada via API com sucesso após correção do bug de persistência
+  - Status: aprovada | Prioridade: alta | Tipo: feature
+  - Tags: luna, mascot, animation, ui, frontend, live2d, character
+
+---
+
 ## [Unreleased] — 2026-05-26 — Security Hardening + Kimi Web Audit Fixes
 
 ### Security (CRITICAL)

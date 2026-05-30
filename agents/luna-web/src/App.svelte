@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { sessions, currentSessionId, isStreaming, messages, lunaConfig, connectionStatus } from './stores.js';
+  import { sessions, currentSessionId, isStreaming, messages, lunaConfig, connectionStatus, currentMode } from './stores.js';
   import { fetchSessions, fetchConfig, sessionAction, SSEManager } from './api.js';
   import Sidebar from './components/Sidebar.svelte';
   import ChatArea from './components/ChatArea.svelte';
@@ -11,12 +11,11 @@
   let mobileSidebarOpen = false;
 
   async function handleNewSession() {
-    const id = 'web-' + Date.now();
-    const res = await sessionAction('create', id, 'Nova Sessão');
-    if (res.ok || res.session) {
-      const newSession = res.session || { id, title: 'Nova Sessão', updatedAt: new Date().toISOString() };
+    const res = await sessionAction('create', null, 'Nova Sessão');
+    if (res.ok && res.session) {
+      const newSession = { ...res.session, updatedAt: new Date().toISOString() };
       sessions.update(s => [newSession, ...s]);
-      currentSessionId.set(id);
+      currentSessionId.set(res.session.id);
     }
   }
 
@@ -68,7 +67,11 @@
   <Sidebar
     sessions={$sessions}
     currentId={$currentSessionId}
-    onSelect={(id) => currentSessionId.set(id)}
+    onSelect={(id) => {
+      const sess = $sessions.find(s => s.id === id);
+      if (sess?.mode) currentMode.set(sess.mode);
+      currentSessionId.set(id);
+    }}
     onNew={handleNewSession}
     onRename={handleRename}
     onDelete={handleDelete}

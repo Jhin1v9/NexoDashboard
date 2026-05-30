@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { isStreaming, currentMode, messages } from '../stores.js';
-  import { sendMessage, cancelStream, SSEManager } from '../api.js';
+  import { sendMessage, cancelStream, SSEManager, fetchSessionMessages } from '../api.js';
   import ChatHeader from './ChatHeader.svelte';
   import MessagesList from './MessagesList.svelte';
   import ChatInput from './ChatInput.svelte';
@@ -21,9 +21,29 @@
     if (!event) return;
     if (event.sessionId && event.sessionId !== sessionId) return;
 
+    // v3.6-fix: Deduplicate events by ID — SSE may resend historical events on reconnect
+    if (event.id) {
+      const exists = $messages.some(m => m.id === event.id);
+      if (exists) return;
+    }
+
     const { type } = event;
 
     switch (type) {
+      case 'user': {
+        // v3.6-fix: Handle user messages from SSE history sync
+        messages.update(msgs => {
+          // Avoid duplicates
+          if (msgs.some(m => m.id === event.id)) return msgs;
+          return [...msgs, {
+            id: event.id || 'user-' + Date.now(),
+            type: 'user',
+            content: event.content || event.text || '',
+            timestamp: event.timestamp || new Date().toISOString()
+          }];
+        });
+        break;
+      }
       case 'thinking_start': {
         messages.update(msgs => {
           const cleaned = removeAllThinking(msgs);
@@ -164,16 +184,105 @@
     }
   }
 
-  function connectSSE() {
+  async function connectSSE() {
     if (!sessionId) return;
     // NAO reconecta se ja esta conectado na mesma sessao
     if (lastConnectedSessionId === sessionId && sseManager.eventSource) return;
 
     currentAssistantId = null;
     thinkingId = null;
-    messages.set([]);
     sseManager.disconnect();
     sseManager = new SSEManager();
+
+    // v3.6-fix: Load full message history from backend instead of clearing
+    try {
+      const history = await fetchSessionMessages(sessionId);
+      if (history.ok && history.messages) {
+        const loaded = [];
+        let currentAssistantContent = '';
+        let currentThinkingContent = '';
+        let currentThinkingId = null;
+        for (const msg of history.messages) {
+          if (msg.role === 'user') {
+            loaded.push({
+              id: msg.id || 'msg-' + Math.random().toString(36).slice(2),
+              type: 'user',
+              content: msg.content || '',
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          } else if (msg.type === 'thinking_start') {
+            currentThinkingContent = '';
+            currentThinkingId = 'think-' + Math.random().toString(36).slice(2);
+            loaded.push({
+              id: currentThinkingId,
+              type: 'thinking',
+              content: '',
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          } else if (msg.type === 'thinking_delta') {
+            currentThinkingContent = msg.fullThinking || msg.text || currentThinkingContent;
+            if (currentThinkingId) {
+              const thinkMsg = loaded.find(m => m.id === currentThinkingId);
+              if (thinkMsg) thinkMsg.content = currentThinkingContent;
+            }
+          } else if (msg.type === 'response_delta' && msg.content) {
+            // Remove thinking when response starts
+            if (currentThinkingId) {
+              const idx = loaded.findIndex(m => m.id === currentThinkingId);
+              if (idx !== -1) loaded.splice(idx, 1);
+              currentThinkingId = null;
+            }
+            currentAssistantContent = msg.content;
+          } else if (msg.type === 'done') {
+            // Remove any leftover thinking
+            if (currentThinkingId) {
+              const idx = loaded.findIndex(m => m.id === currentThinkingId);
+              if (idx !== -1) loaded.splice(idx, 1);
+              currentThinkingId = null;
+            }
+            const finalText = msg.result?.response || msg.content || currentAssistantContent || '';
+            if (finalText) {
+              loaded.push({
+                id: msg.id || 'resp-' + Math.random().toString(36).slice(2),
+                type: 'assistant',
+                content: finalText,
+                timestamp: msg.timestamp || new Date().toISOString(),
+              });
+            }
+            currentAssistantContent = '';
+            currentThinkingContent = '';
+          } else if (msg.type === 'error') {
+            loaded.push({
+              id: msg.id || 'err-' + Math.random().toString(36).slice(2),
+              type: 'error',
+              content: msg.content || 'Erro desconhecido',
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          } else if (msg.type === 'action_start' && msg.tool) {
+            loaded.push({
+              id: msg.id || 'tool-' + Math.random().toString(36).slice(2),
+              type: 'tool',
+              tool: msg.tool,
+              params: msg.params || {},
+              result: null,
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          } else if (msg.type === 'action_end' && msg.result) {
+            const lastTool = loaded.slice().reverse().find(m => m.type === 'tool' && !m.result);
+            if (lastTool) {
+              lastTool.result = msg.result;
+            }
+          }
+        }
+        messages.set(loaded);
+      } else {
+        messages.set([]);
+      }
+    } catch (e) {
+      console.error('Failed to load session history:', e);
+      messages.set([]);
+    }
+
     sseManager.connect(sessionId, handleEvent);
     lastConnectedSessionId = sessionId;
   }
@@ -190,6 +299,10 @@
 
   async function handleSend(msg, files) {
     if (!msg.trim() || !sessionId) return;
+
+    // v3.6-fix: Reset assistant tracking before sending new message
+    currentAssistantId = null;
+    thinkingId = null;
 
     const userMsg = {
       id: 'user-' + Date.now(),

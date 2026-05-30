@@ -31,6 +31,9 @@ const dataStore = require('./datastore-pg');
 // Discord Mention Notifier
 const { sendMentionNotification, setWebhookUrl } = require('./services/discord-notifier');
 
+// ── Luna Web Chat Routes ──
+const { router: lunaChatRouter, setupAuth: setupLunaAuth } = require('./luna-chat-routes');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -134,6 +137,51 @@ lunaActionExecutor.apiKey = SERVICE_TOKEN;
 const SECURITY_SETTINGS_FILE = path.join(DATA_DIR, 'security-settings.json');
 if (!fs.existsSync(SECURITY_SETTINGS_FILE)) {
   fs.writeFileSync(SECURITY_SETTINGS_FILE, JSON.stringify({ version: '1.0', settings: { maxAttemptsBeforeAlert: 1 }, lastNotifiedAt: null }, null, 2));
+}
+
+// ── Trusted IPs System ──
+const TRUSTED_IPS_FILE = path.join(DATA_DIR, 'trusted-ips.json');
+if (!fs.existsSync(TRUSTED_IPS_FILE)) {
+  fs.writeFileSync(TRUSTED_IPS_FILE, JSON.stringify({
+    version: '1.0',
+    description: 'IPs confiáveis — não disparam alertas de segurança',
+    updatedAt: new Date().toISOString(),
+    trusted: {
+      abner: { name: 'Abner Gabriel', role: 'CEO', ips: [], autoCapture: true, notes: '' },
+      nonoke: { name: 'Enoque (Nonoke)', role: 'CEO', ips: [], autoCapture: true, notes: '' },
+      elias: { name: 'Elias', role: 'CEO', ips: [], autoCapture: true, notes: '' }
+    }
+  }, null, 2));
+}
+
+function loadTrustedIps() {
+  try {
+    return readJSON(TRUSTED_IPS_FILE, { trusted: {} });
+  } catch { return { trusted: {} }; }
+}
+
+function saveTrustedIps(data) {
+  data.updatedAt = new Date().toISOString();
+  writeJSON(TRUSTED_IPS_FILE, data);
+}
+
+function isTrustedIp(ip) {
+  const data = loadTrustedIps();
+  for (const user of Object.values(data.trusted || {})) {
+    if ((user.ips || []).includes(ip)) return true;
+  }
+  return false;
+}
+
+function captureIpForUser(ip, username) {
+  const data = loadTrustedIps();
+  const userKey = username.toLowerCase().trim();
+  const user = (data.trusted || {})[userKey];
+  if (user && user.autoCapture && !user.ips.includes(ip)) {
+    user.ips.push(ip);
+    saveTrustedIps(data);
+    console.log(`[TRUSTED-IP] Capturado IP ${ip} para ${user.name}`);
+  }
 }
 
 
@@ -987,6 +1035,9 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
+
+// ── Serve Luna Web static files (PRIORIDADE sobre Dashboard legacy) ──
+app.use(express.static(path.join(__dirname, '../../.luna-kernel/luna-web/dist')));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -8424,12 +8475,15 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const attemptedUser = username.toLowerCase().trim();
+    const isTrusted = isTrustedIp(ip);
 
     // Validar credenciais
     const user = await validateCredentials(attemptedUser, password);
 
     if (!user) {
       // Login falho — coleta MÁXIMA de dados do intruso
+      // Se for IP confiável, não dispara alertas externos (só loga local)
+      const skipAlerts = isTrusted;
       const location = await getIpLocation(ip);
 
       // Enriquecer fingerprint com dados do IP para heurísticas
@@ -8511,7 +8565,7 @@ app.post('/api/auth/login', async (req, res) => {
       const settings = settingsData.settings || {};
       const maxAttempts = settings.maxAttemptsBeforeAlert || 1;
 
-      if (recentAttempts.length >= maxAttempts) {
+      if (!skipAlerts && recentAttempts.length >= maxAttempts) {
         // Envia para Discord (sempre, sem rate limit por tentativa)
         const discordResult = await sendSecurityDiscordAlert(intruderData, attemptedUser, location, recentAttempts, images);
         if (discordResult.sent) {
@@ -8532,12 +8586,19 @@ app.post('/api/auth/login', async (req, res) => {
           const updated = { ...event, notified: event.notified, notificationChannel: event.notificationChannel };
           await dataStore.saveSecurityLog(updated);
         }
+      } else if (skipAlerts) {
+        console.log(`[SECURITY] Login falho por IP confiável (${ip}) — usuário: ${attemptedUser} — ALERTA SUPRIMIDO`);
       }
 
       return res.status(401).json({ success: false, error: 'Credenciais inválidas' });
     }
 
     // Login sucesso — limpar tentativas falhas deste IP
+    loginAttempts.delete(ip);
+    
+    // Capturar IP automaticamente para usuários conhecidos
+    captureIpForUser(ip, user.id);
+    
     const token = generateToken(user.id);
     res.json({ success: true, token, user });
 
@@ -8559,6 +8620,40 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     const user = users.users?.[req.user.userId];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
     res.json({ success: true, user: { id: req.user.userId, name: user.name, role: user.role, color: user.color } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/security/trusted-ips — Lista IPs confiáveis
+app.get('/api/security/trusted-ips', requireAuth, (req, res) => {
+  try {
+    const data = loadTrustedIps();
+    res.json({ success: true, trusted: data.trusted || {} });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/security/trusted-ips — Adiciona/remove IP confiável
+app.post('/api/security/trusted-ips', requireAuth, (req, res) => {
+  try {
+    const { userKey, ip, action } = req.body;
+    if (!userKey || !ip || !['add', 'remove'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'userKey, ip e action (add/remove) obrigatórios' });
+    }
+    const data = loadTrustedIps();
+    const user = (data.trusted || {})[userKey.toLowerCase().trim()];
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Usuário não encontrado em trusted-ips' });
+    }
+    if (action === 'add') {
+      if (!user.ips.includes(ip)) user.ips.push(ip);
+    } else {
+      user.ips = user.ips.filter(i => i !== ip);
+    }
+    saveTrustedIps(data);
+    res.json({ success: true, trusted: data.trusted });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -9188,12 +9283,16 @@ app.get('/api/workspace/servers/:serverId/logs/stream', requireAuth, (req, res) 
   });
 });
 
+// ── Luna Web Chat Routes + Auth ──
+setupLunaAuth({ validateCredentials, generateToken, requireAuth });
+app.use(lunaChatRouter);
+
 // ============================================================================
-// Catch-all
+// Catch-all → Luna Web SPA
 // ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+  res.sendFile(path.join(__dirname, '../../.luna-kernel/luna-web/dist/index.html'));
 });
 
 // Start
@@ -9234,6 +9333,7 @@ async function startServer() {
   }
   server.listen(PORT, BIND_IP, async () => {
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
+    console.log(`🌙 Luna Web integrada em http://${BIND_IP}:${PORT}`);
 
     // ── Preload NLU model (BLOQUEANTE — backend só fica online quando NLU estiver pronto) ──
     if (lunaNLU && typeof lunaNLU.process === 'function') {
