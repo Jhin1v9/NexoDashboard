@@ -1,5 +1,48 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-05-31 — Leads Fix + Plan Mode + Auto-Health + No Limits
+
+### Fixed (Dashboard — Leads Pipeline)
+- **Conflito de rotas POST `/api/leads`** (`backend/server.js`)
+  - Router público `routes/leads.js` era montado em `/api/leads` e interceptava TODOS os POSTs do dashboard
+  - Dashboard enviava `{displayName, email, ...}` mas o router público esperava `{name, companyName, message}`
+  - Resultado: erro de validação `"Nome é obrigatório"` ao criar lead pela UI
+  - **Fix:** Router público movido para `/api/demo-leads` — rotas internas do dashboard agora funcionam corretamente
+- **Botão "Converter em Cliente" inexistente** (`frontend/src/components/leads/LeadModal.jsx` + `frontend/src/pages/Leads.jsx`)
+  - A rota `/api/leads/:id/convert` existia no backend mas nunca era chamada pelo frontend
+  - **Fix:** Adicionado botão "Converter" no modal de visualização do lead (só aparece quando `pipelineStatus !== 'ganho'`)
+  - **Fix:** Implementada função `convertLead()` no `Leads.jsx` — chama a API, atualiza o estado local, mostra alert de sucesso
+- **Dashboard não iniciava via `luna-nexo.sh`** (`luna-nexo.sh`)
+  - `nohup node server.js > /dev/null` falhava silenciosamente
+  - **Fix:** Logs redirecionados para arquivos (`dashboard.log`, `luna-server.log`, `vite.log`, `telegram.log`)
+  - **Fix:** Adicionada verificação de health com `ss -tlnp` após iniciar cada serviço + retry com sleep extra
+
+### Added (Luna Web — Plan Mode v5.0)
+- **Plan Mode — Sherlock Holmes** (`luna-soul.cjs` + `luna-chat-routes.js` + frontend)
+  - `processPlanModeStream()` — investigação read-only com restrição de ferramentas destrutivas
+  - Endpoints: `POST /api/plan`, `/api/plan/approve`, `/api/plan/reject`, `/api/plan/revise`
+  - `PlanCard.svelte` — card noir com Lucide icons (`Search`, `Shield`, `CheckCircle`, `XCircle`, `Pencil`)
+  - `ChatInput.svelte` — comando `/plan` + toggle `Shift+Tab`
+  - Planos persistidos em `~/.luna-kernel/plans/<sessionId>.md`
+
+### Added (Luna Web — Local System Commands)
+- **Comandos `/` para controle local** (`luna-chat-routes.js` + frontend)
+  - `/reiniciar`, `/status`, `/parar`, `/ligar`, `/health`, `/logs`
+  - Executam `luna-nexo.sh` diretamente via `child_process.exec`
+  - Respostas mostradas no chat como mensagens de sistema
+
+### Added (Luna Web — Auto-Health Monitor)
+- **Monitoramento automático** (`luna-chat-routes.js`)
+  - Intervalo de 30s verifica se LunaSoul está saudável e porta 3458 está aberta
+  - Após 3 falhas consecutivas, executa `luna-nexo.sh restart` automaticamente
+
+### Changed (Luna Kernel — Sem Limites)
+- **Loop principal nunca para em agent/swarm** (`luna-soul.cjs`)
+  - Removido `return` prematuro quando Kimi retorna `CHAT`/`DONE` em modo agent/swarm
+  - Agora continua perguntando ao Kimi se há mais ações pendentes até o contexto acabar
+  - `FORCE_COMPLETE_NO_BUTTONS_MS` aumentado de 45s para 5min (`kimi-bridge.cjs`)
+  - `runTask` também continua indefinidamente até context limit ou erro fatal
+
 ## [Unreleased] — 2026-05-29 — Luna Web v3.6 + Kimi Bridge v3.6 + Unified Launcher
 
 ### Added
