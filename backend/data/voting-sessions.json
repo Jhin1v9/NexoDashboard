@@ -42,5 +42,161 @@
       "nonoke": null,
       "elias": null
     }
+  },
+  {
+    "id": "sess-mpshlj20-0a1u",
+    "title": "Teste votação",
+    "description": "",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 3,
+    "createdAt": "2026-05-30T15:09:39.384Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpshnmml-mdzf",
+    "title": "Teste votação 2",
+    "description": "",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 3,
+    "createdAt": "2026-05-30T15:11:17.325Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpspyjll-usnk",
+    "title": "🗳️ Teste Votação - Kimi/Luna Automation",
+    "description": "Votação de teste criada automaticamente pelo sistema Luna para verificar integração com Telegram.",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:03:43.545Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpsqatlp-0joh",
+    "title": "🗳️ Teste Votação - Telegram Integration",
+    "description": "Segunda votação de teste para verificar notificação Telegram.",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:13:16.381Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpsqf8yl-jz2o",
+    "title": "🗳️ Votação Teste - Notificação Telegram",
+    "description": "Votação de teste para verificar se a notificação chega no grupo do Telegram!",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:16:42.910Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpsqlwpk-tfow",
+    "title": "🚀 Lançar Nova Feature AI — Luna v6.0",
+    "description": "Proposta para implementar o novo sistema de votação premium com notificações estilizadas no Telegram e integração completa com o dashboard.",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:21:53.624Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-mpsqn9zc-7noz",
+    "title": "🚀 Lançar Nova Feature AI — Luna v6.0 PREMIUM",
+    "description": "Proposta para implementar o novo sistema de votação premium com notificações ESPETACULARES no Telegram!",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "open",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:22:57.480Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": null,
+      "nonoke": null,
+      "elias": null
+    }
+  },
+  {
+    "id": "sess-98f23483-2ab1-45ec-a563-fd8845f03217",
+    "title": "🚀 Deploy Luna v6.0 PREMIUM",
+    "description": "Teste final do sistema de votação com notificações premium e feedback de botões!",
+    "type": "generic",
+    "toolName": null,
+    "toolParams": null,
+    "status": "voting",
+    "quorumRequired": 2,
+    "createdAt": "2026-05-30T19:29:36.807Z",
+    "closedAt": null,
+    "result": null,
+    "executionResult": null,
+    "votes": {
+      "abner": {
+        "vote": "yes",
+        "votedAt": "2026-05-30T19:55:00.480Z",
+        "comment": "Telegram"
+      },
+      "nonoke": null,
+      "elias": null
+    }
   }
 ]

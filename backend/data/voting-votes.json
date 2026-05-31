@@ -6,5 +6,13 @@
     "vote": "no",
     "comment": "",
     "votedAt": "2026-05-30T13:49:40.405Z"
+  },
+  {
+    "id": "vote-a82065b5-82d2-4215-b756-6117ebe75bcb",
+    "sessionId": "sess-98f23483-2ab1-45ec-a563-fd8845f03217",
+    "voter": "abner",
+    "vote": "yes",
+    "comment": "Telegram",
+    "votedAt": "2026-05-30T19:55:00.481Z"
   }
 ]
