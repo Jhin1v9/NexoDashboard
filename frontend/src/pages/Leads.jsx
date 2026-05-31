@@ -276,14 +276,12 @@ export default function Leads() {
           <LeadModal
             onClose={() => setShowModal(false)}
             onSave={async (leadData) => {
-              try {
-                const res = await axios.post('/api/leads', leadData)
-                if (res.data.success) {
-                  setLeads(prev => [...prev, res.data.lead])
-                  setShowModal(false)
-                }
-              } catch (e) {
-                console.error('Erro ao criar lead:', e)
+              const res = await axios.post('/api/leads', leadData)
+              if (res.data.success) {
+                setLeads(prev => [...prev, res.data.lead])
+                setShowModal(false)
+              } else {
+                throw new Error(res.data.error || 'Erro ao criar lead')
               }
             }}
           />
@@ -297,14 +295,12 @@ export default function Leads() {
             lead={selectedLead}
             onClose={() => setSelectedLead(null)}
             onSave={async (leadData) => {
-              try {
-                const res = await axios.put(`/api/leads/${selectedLead.id}`, leadData)
-                if (res.data.success) {
-                  setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, ...leadData } : l))
-                  setSelectedLead(null)
-                }
-              } catch (e) {
-                console.error('Erro ao atualizar lead:', e)
+              const res = await axios.put(`/api/leads/${selectedLead.id}`, leadData)
+              if (res.data.success) {
+                setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, ...leadData } : l))
+                setSelectedLead(null)
+              } else {
+                throw new Error(res.data.error || 'Erro ao atualizar lead')
               }
             }}
             onDelete={(id) => {

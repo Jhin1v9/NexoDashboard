@@ -19,6 +19,8 @@ const FOUNDERS = [
 
 export default function LeadModal({ lead, onClose, onSave, onDelete, onConvert, isConverting }) {
   const [editMode, setEditMode] = useState(!lead)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState(null)
   const [form, setForm] = useState({
     displayName: lead?.displayName || '',
     email: lead?.email || '',
@@ -31,13 +33,21 @@ export default function LeadModal({ lead, onClose, onSave, onDelete, onConvert, 
     tags: lead?.tags?.join(', ') || ''
   })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onSave({
-      ...form,
-      estimatedValue: Number(form.estimatedValue) || 0,
-      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean)
-    })
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      await onSave({
+        ...form,
+        estimatedValue: Number(form.estimatedValue) || 0,
+        tags: form.tags.split(',').map(t => t.trim()).filter(Boolean)
+      })
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Erro ao salvar lead')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const founder = FOUNDERS.find(f => f.id === lead?.assignedTo)
@@ -219,19 +229,26 @@ export default function LeadModal({ lead, onClose, onSave, onDelete, onConvert, 
           className="w-full px-3 py-2 bg-nexo-bg border border-nexo-border rounded-lg text-sm text-nexo-text focus:outline-none focus:border-nexo-primary resize-none"
         />
       </div>
+      {error && (
+        <div className="px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400">
+          {error}
+        </div>
+      )}
       <div className="flex justify-end gap-2 pt-2">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-nexo-muted hover:text-nexo-text text-sm transition-colors"
+          disabled={isSubmitting}
+          className="px-4 py-2 text-nexo-muted hover:text-nexo-text text-sm transition-colors disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-nexo-primary rounded-lg text-sm hover:opacity-90 transition-opacity"
+          disabled={isSubmitting || !form.displayName.trim()}
+          className="px-4 py-2 bg-nexo-primary rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {lead ? 'Salvar' : 'Criar Lead'}
+          {isSubmitting ? 'Salvando...' : (lead ? 'Salvar' : 'Criar Lead')}
         </button>
       </div>
     </form>
