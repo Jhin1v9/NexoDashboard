@@ -1,22 +1,30 @@
 {
   "versao": "1.0",
-  "ultimaAtualizacao": "2026-05-19T16:59:05.168Z",
+  "ultimaAtualizacao": "2026-05-31T19:41:27.428Z",
   "clientes": [
     {
-      "id": "tpv-sorveteria",
-      "nome": "Juan",
-      "caminho": "tpv-sorveteria",
-      "status": "ativo",
-      "cor": "#22C55E",
-      "responsavel": "todos"
-    },
-    {
-      "id": "teste-manual",
-      "nome": "Cliente Teste Manual",
-      "caminho": "teste-manual",
+      "id": "cliente-luna-teste",
+      "nome": "Cliente Teste Luna",
+      "caminho": "cliente-luna-teste",
       "status": "ativo",
       "cor": "#3b82f6",
-      "responsavel": "todos"
+      "responsavel": "abner",
+      "tipo": "cliente",
+      "dataInicio": "2026-05-26T22:00:00.000Z",
+      "orcamentoTotal": 0,
+      "moeda": "EUR",
+      "tags": [],
+      "anotacoes": "",
+      "criadoEm": "2026-05-27T12:50:22.440Z",
+      "atualizadoEm": "2026-05-27T12:50:22.440Z"
+    },
+    {
+      "id": "lead-1780256420004-5ajw",
+      "nome": "Lead Teste Dashboard",
+      "caminho": "lead-1780256420004-5ajw",
+      "status": "ativo",
+      "cor": "#22C55E",
+      "responsavel": "abner"
     }
   ]
 }

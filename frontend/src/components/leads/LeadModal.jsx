@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, Trash2, Euro, Mail, Phone, Tag } from 'lucide-react'
+import { X, Trash2, Euro, Mail, Phone, Tag, UserCheck } from 'lucide-react'
 
 const PIPELINE_COLUMNS = [
   { id: 'novo', label: 'Novo', color: '#6B7280', icon: '🔵' },
@@ -17,7 +17,7 @@ const FOUNDERS = [
   { id: 'elias', name: 'Elias', color: '#ffa502', emoji: '🎯' },
 ]
 
-export default function LeadModal({ lead, onClose, onSave, onDelete }) {
+export default function LeadModal({ lead, onClose, onSave, onDelete, onConvert, isConverting }) {
   const [editMode, setEditMode] = useState(!lead)
   const [form, setForm] = useState({
     displayName: lead?.displayName || '',
@@ -269,6 +269,20 @@ export default function LeadModal({ lead, onClose, onSave, onDelete }) {
                 className="text-nexo-primary hover:opacity-80 text-xs px-2 py-1 rounded hover:bg-nexo-primary/10"
               >
                 {editMode ? 'Ver' : 'Editar'}
+              </button>
+            )}
+            {lead && lead.pipelineStatus !== 'ganho' && onConvert && (
+              <button
+                onClick={() => {
+                  if (confirm('Converter este lead em cliente? Isso criará um workspace.')) {
+                    onConvert(lead.id)
+                  }
+                }}
+                disabled={isConverting}
+                className="text-nexo-success hover:opacity-80 text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-nexo-success/10 disabled:opacity-50"
+              >
+                <UserCheck size={14} />
+                {isConverting ? 'Convertendo...' : 'Converter'}
               </button>
             )}
             <button onClick={onClose} className="text-nexo-muted hover:text-nexo-text">

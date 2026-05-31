@@ -5,6 +5,82 @@
 # Último commit: 331e236 (main)
 # ═══════════════════════════════════════════════════════════════════
 
+## ⚠️ ARQUITETURA REAL DO LUNA WEB — LEIA ANTES DE EDITAR
+
+> **CRÍTICO:** A arquitetura do Luna Web mudou. Não edite os arquivos errados.
+
+### Backend do Luna Web (porta 3458)
+| Arquivo | Localização | Função |
+|---------|-------------|--------|
+| `luna-server.js` | `NEXO_DASHBOARD_PRO/backend/luna-server.js` | **Servidor Express principal** — serve static files, auth JWT, rotas REST |
+| `luna-chat-routes.js` | `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js` | **Router Express** — endpoints `/api/chat/*`, `/api/plan/*`, `/api/system/*`, `/api/config`, SSE streaming |
+| `server.js` | `NEXO_DASHBOARD_PRO/backend/server.js` | Dashboard NEXO (porta 3456) — NÃO confundir com luna-server.js |
+
+**❌ NÃO EDITE:** `~/.luna-kernel/config-server.cjs` — está **DEFASADO** (só existe como `.BAK`). O backend real é o `luna-server.js` acima.
+
+**✅ EDITE ESTES ARQUIVOS para mudanças no backend do Luna Web:**
+- `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js` — rotas da API, SSE, Plan Mode, system commands
+- `NEXO_DASHBOARD_PRO/backend/luna-server.js` — apenas se precisar mudar porta, static files, ou auth setup
+
+### Frontend do Luna Web
+| Arquivo | Localização | Função |
+|---------|-------------|--------|
+| Source Svelte | `~/.luna-kernel/luna-web/src/` | **Source of truth** — edite aqui |
+| Build produção | `~/.luna-kernel/luna-web/dist/` | Gerado por `npm run build` |
+| Dev server Vite | `NEXO_DASHBOARD_PRO/agents/luna-web/` | **CÓPIA ANTIGA** — NÃO edite aqui |
+
+**❌ NÃO EDITE:** `NEXO_DASHBOARD_PRO/agents/luna-web/` — é uma cópia antiga. O source real está em `~/.luna-kernel/luna-web/src/`.
+
+**✅ EDITE ESTES ARQUIVOS para mudanças no frontend:**
+- `~/.luna-kernel/luna-web/src/components/*.svelte`
+- `~/.luna-kernel/luna-web/src/api.js`
+- `~/.luna-kernel/luna-web/src/stores.js`
+- `~/.luna-kernel/luna-web/src/app.css`
+
+**Após editar o frontend:**
+```bash
+cd ~/.luna-kernel/luna-web && npm run build
+# O build gera em ~/.luna-kernel/luna-web/dist/
+# luna-server.js serve automaticamente de ../../.luna-kernel/luna-web/dist/
+```
+
+### Engine Luna (compartilhado)
+| Arquivo | Localização | Função |
+|---------|-------------|--------|
+| `luna-soul.cjs` | `~/.luna-kernel/luna-soul.cjs` | Orquestrador — processa mensagens, Plan Mode, executa tools |
+| `kimi-bridge.cjs` | `~/.luna-kernel/kimi-bridge.cjs` | Bridge Playwright CDP para Kimi Web |
+| `session-manager.cjs` | `~/.luna-kernel/session-manager.cjs` | Gerenciamento de sessões |
+
+**✅ EDITE:** `~/.luna-kernel/luna-soul.cjs` — lógica de processamento, limites, modos de operação
+**✅ EDITE:** `~/.luna-kernel/kimi-bridge.cjs` — bridge, timeouts, extração DOM
+
+### Script de controle
+```bash
+# Iniciar/parar/reiniciar TODOS os serviços
+bash /home/jhin/NEXO_DASHBOARD_PRO/luna-nexo.sh [start|stop|restart|status|logs]
+
+# Serviços gerenciados:
+# - NEXO Dashboard (porta 3456)
+# - Luna Web Server (porta 3458) ← luna-server.js
+# - Luna Web Vite Dev (porta 5173)
+# - Telegram Bot (@lunanexobot)
+```
+
+### Resumo — O que editar para cada mudança
+| Se você quer mudar... | Edite este arquivo |
+|-----------------------|-------------------|
+| Rotas API do chat (/api/chat, /api/plan, /api/system) | `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js` |
+| SSE streaming, sessões, persistência | `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js` |
+| Porta do servidor, auth setup, static files | `NEXO_DASHBOARD_PRO/backend/luna-server.js` |
+| Lógica de processamento de mensagens, modos, limites | `~/.luna-kernel/luna-soul.cjs` |
+| Bridge Kimi, timeouts, extração DOM | `~/.luna-kernel/kimi-bridge.cjs` |
+| Componentes UI, chat input, plan card, sidebar | `~/.luna-kernel/luna-web/src/components/*.svelte` |
+| API client frontend (fetch calls) | `~/.luna-kernel/luna-web/src/api.js` |
+| Stores Svelte, estado global | `~/.luna-kernel/luna-web/src/stores.js` |
+| Tema CSS, variáveis, cores | `~/.luna-kernel/luna-web/src/app.css` |
+
+---
+
 ## 🏢 EMPRESA
 
 **NEXO DIGITAL S.L.** — Barcelona, Espanha
@@ -83,63 +159,51 @@ Ownership: 25% cada + 25% reinvestimento NEXO. Todos fullstack.
 ## 📁 ESTRUTURA DE ARQUIVOS CRÍTICA
 
 ```
-NEXO_DASHBOARD_PRO/
+NEXO_DASHBOARD_PRO/                    ← Dashboard + Luna Web Backend
 ├── backend/
-│   ├── server.js              ← ~8750 linhas. APIs REST + WebSocket
-│   ├── datastore-pg.js        ← 58 funções — source of truth PostgreSQL
-│   ├── db.js                  ← Pool node-postgres (Neon)
-│   ├── services/
-│   │   ├── url-classifier.js
-│   │   ├── link-preview.js
-│   │   ├── luna-semantic-nlu.js   ← Semantic Embedding Engine
-│   │   ├── luna-nlu.js            ← NLP.js corpus PT/ES/CA
-│   │   ├── action-preview.js      ← Preview contextual
-│   │   └── undo-service.js        ← Undo/Redo persistente
+│   ├── server.js                      ← Dashboard NEXO (porta 3456) — ~8750 linhas
+│   ├── luna-server.js                 ← Luna Web Server (porta 3458) — Express + static
+│   ├── luna-chat-routes.js            ← Router Express — /api/chat, /api/plan, /api/system, SSE
+│   ├── datastore-pg.js                ← 58 funções — source of truth PostgreSQL
+│   ├── db.js                          ← Pool node-postgres (Neon)
+│   ├── services/                      ← Serviços do Dashboard
 │   ├── migrations/
-│   │   └── 005-real-schema.sql    ← Schema real do PG
-│   ├── __tests__/             ← 19 suites, 90 testes Jest
-│   └── data/                  ← JSON legado (inofensivos, não mais lidos)
-├── frontend/src/
-│   ├── components/
-│   │   ├── luna/              ← LunaChatPanel, LunaFloatingButton, LunaActionBridge
-│   │   ├── email/             ← EmailHub, EmailCompose
-│   │   ├── NotificationCenter.jsx
-│   │   ├── LinkHub.jsx
-│   │   └── Sidebar.jsx
-│   ├── pages/
-│   │   ├── Dashboard.jsx
-│   │   ├── WhatsApp.jsx
-│   │   ├── Tarefas.jsx
-│   │   ├── Caixa.jsx
-│   │   ├── Financeiro.jsx
-│   │   ├── LunaControl.jsx
-│   │   └── SystemEngine.jsx
-│   └── context/
-│       ├── AuthContext.jsx
-│       └── ToastContext.jsx
-├── agents/
-│   ├── core/
-│   │   ├── IntentParser.js        ← NLU v2 — 96% acerto
-│   │   ├── ActionExecutor.js      ← 113+ ações, 21 categorias
-│   │   └── NLUActionMapper.js     ← Mapeia intents → ações
-│   ├── luna-soul.cjs              ← Orquestrador Luna CLI
-│   ├── kimi-bridge.cjs            ← Playwright CDP bridge
-│   ├── luna-tool-guard.cjs        ← Segurança + sandbox
-│   ├── luna-workspace.cjs         ← Workspace scanner
-│   ├── luna-git.cjs               ← Git-native safety
-│   ├── telegram-luna-agent.cjs    ← Bot Telegram @lunanexobot
-│   └── CHANGELOG.md               ← Luna CLI changelog
-├── .kimi-context/
-│   ├── handoff.md                 ← Estado entre sessões
-│   ├── nlu-gap-analysis.md        ← Gaps do NLU
-│   └── plans-vs-reality.md        ← Tracking de planos
-├── .kimi/
-│   ├── CONSOLIDADO_MASTER.md      ← Plano de ação prioritário
-│   └── PROTOCOLO_MULTI_KIMI.md    ← Multi-agent protocol
-├── AGENTS.md                      ← Este documento
-├── PLANO.md                       ← Estado vivo — backlog e decisões
-├── BACKLOG-100-FUNCIONAL.md       ← Backlog completo de bugs/tarefas
-└── KIMI.MD                        ← Contexto operacional Kimi
+│   ├── __tests__/                     ← 19 suites Jest
+│   └── data/                          ← JSON legado
+├── frontend/src/                      ← React 18 — Dashboard NEXO (porta 3457)
+│   ├── components/luna/               ← LunaChatPanel, LunaFloatingButton (DASHBOARD)
+│   └── pages/                         ← Dashboard, Tarefas, Financeiro, etc.
+├── agents/                            ← CLI Luna + cópia antiga do frontend
+│   ├── core/                          ← IntentParser, ActionExecutor, NLUActionMapper
+│   ├── luna-soul.cjs                  ← ⚠️ CÓPIA ANTIGA — source real está em ~/.luna-kernel/
+│   ├── kimi-bridge.cjs                ← ⚠️ CÓPIA ANTIGA — source real está em ~/.luna-kernel/
+│   ├── telegram-luna-adapter.cjs      ← Bot Telegram @lunanexobot
+│   └── luna-web/                      ← ⚠️ CÓPIA ANTIGA — source real está em ~/.luna-kernel/luna-web/
+├── luna-nexo.sh                       ← Script unificado start/stop/restart/status/logs
+├── AGENTS.md                          ← Este documento
+├── PLANO.md                           ← Estado vivo — backlog e decisões
+└── ...
+
+~/.luna-kernel/                        ← LUNA KERNEL v5.0 — SOURCE OF TRUTH
+├── luna-soul.cjs                      ← Orquestrador — processa mensagens, Plan Mode, tools
+├── kimi-bridge.cjs                    ← Bridge Playwright CDP para Kimi Web
+├── session-manager.cjs                ← Gerenciamento de sessões
+├── luna-tools.cjs                     ← Ferramentas executadas no PC local
+├── luna-tool-guard.cjs                ← Segurança + sandbox
+├── luna-git.cjs                       ← Git-native safety
+├── luna-web/                          ← FRONTEND SOURCE OF TRUTH — Svelte 4 + Tailwind
+│   ├── src/
+│   │   ├── components/                ← ChatArea, ChatInput, PlanCard, Sidebar, MessagesList
+│   │   ├── api.js                     ← Cliente API — fetch calls
+│   │   ├── stores.js                  ← Stores Svelte — estado global
+│   │   └── app.css                    ← Tema CSS, variáveis
+│   └── dist/                          ← Build de produção — servido por luna-server.js
+├── LUNA_MASTER_PROMPT.md              ← System prompt da Luna
+└── plans/                             ← Planos gerados pelo Plan Mode
+
+~/.config/systemd/user/                ← Systemd (NÃO USADO ATUALMENTE)
+└── luna-server.service                ← Aponta para ~/.luna-kernel/config-server.cjs (DEFASADO)
+                                     ← O serviço real é gerenciado por luna-nexo.sh
 ```
 
 ---
@@ -165,11 +229,23 @@ NEXO_DASHBOARD_PRO/
 ## 🤖 LUNA KERNEL v5.0 (`.luna-kernel/`)
 
 Stack: Node.js v24+, CommonJS (.cjs), sem TypeScript.
-- **Luna Web**: Svelte 4 + Tailwind + SSE streaming
-- **Kimi Bridge**: Playwright CDP + DOM Mirror + MutationObserver
+- **Luna Web Frontend**: Svelte 4 + Tailwind + SSE streaming — source em `~/.luna-kernel/luna-web/src/`
+- **Luna Web Backend**: Express em `NEXO_DASHBOARD_PRO/backend/luna-server.js` + `luna-chat-routes.js`
+- **Kimi Bridge**: Playwright CDP + DOM Mirror + MutationObserver — `~/.luna-kernel/kimi-bridge.cjs`
+- **Luna Soul**: Orquestrador — `~/.luna-kernel/luna-soul.cjs` — carregado por luna-chat-routes.js
 - **ToolGuard**: 7 padrões de resiliência
 - **NLU**: IntentParser 96% + Semantic Embedding (`Xenova/paraphrase-multilingual-MiniLM-L12-v2`)
 - **LLM Offline**: Ollama (`gemma4:4b` intent, `gemma4:12b` chat, `nomic-embed-text` embeddings)
+
+### ⚠️ Arquivos DEFASADOS — NÃO EDITE
+| Arquivo | Por que está defasado |
+|---------|----------------------|
+| `~/.luna-kernel/config-server.cjs` | Backend antigo (http nativo). Substituido por `luna-server.js` + `luna-chat-routes.js` em NEXO_DASHBOARD_PRO/backend/ |
+| `~/.luna-kernel/config-server.cjs.BAK` | Backup do arquivo defasado |
+| `NEXO_DASHBOARD_PRO/agents/luna-web/` | Cópia antiga do frontend. Source real em `~/.luna-kernel/luna-web/` |
+| `NEXO_DASHBOARD_PRO/agents/luna-soul.cjs` | Cópia antiga. Source real em `~/.luna-kernel/luna-soul.cjs` |
+| `NEXO_DASHBOARD_PRO/agents/kimi-bridge.cjs` | Cópia antiga. Source real em `~/.luna-kernel/kimi-bridge.cjs` |
+| `~/.config/systemd/user/luna-server.service` | Aponta para config-server.cjs defasado. Serviço real gerenciado por `luna-nexo.sh` |
 
 ---
 
@@ -257,7 +333,14 @@ curl -s -X POST http://localhost:3456/api/auth/login \
 - O usuário é CEO da NEXO, baseado em Barcelona, fala **pt-BR**
 - Prefere **1 arquivo por vez**, com revisão brutal
 - Quer **EXTRAORDINÁRIO**, não "bom o suficiente"
-- Backend: `localhost:3456`, Frontend: `localhost:3457`
+- **LEIA A SEÇÃO "ARQUITETURA REAL DO LUNA WEB" ACIMA antes de editar qualquer arquivo**
+- Backend Dashboard: `localhost:3456`, Frontend Dashboard: `localhost:3457`
+- **Luna Web**: `localhost:3458` (backend) / `localhost:5173` (Vite dev)
+- **NUNCA** edite `~/.luna-kernel/config-server.cjs` — está defasado
+- **NUNCA** edite arquivos em `NEXO_DASHBOARD_PRO/agents/luna-web/` — é cópia antiga
+- **SEMPRE** edite o source em `~/.luna-kernel/luna-web/src/` e faça `npm run build`
+- **SEMPRE** edite `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js` para rotas da API do chat
+- **SEMPRE** reinicie com `bash /home/jhin/NEXO_DASHBOARD_PRO/luna-nexo.sh restart` após mudanças no backend
 - **NUNCA** enviar mensagens no grupo do Paulo (regra absoluta — leitura ONLY)
 - **NUNCA** reconstruir — apenas evoluir o que existe
 - **SEMPRE** ler `AGENTS.md`, `PLANO.md`, `KIMI.MD` e `.kimi-context/handoff.md` antes de agir
@@ -265,4 +348,4 @@ curl -s -X POST http://localhost:3456/api/auth/login \
 
 ---
 
-*Atualizado: 2026-05-29 | Commit: 331e236 | Status: Backend ✅ Frontend ✅ Luna CLI ✅*
+*Atualizado: 2026-05-31 | Commit: arquitetura-luna-web-documentada | Status: Backend ✅ Frontend ✅ Luna Web ✅ Plan Mode ✅ Auto-Health ✅*

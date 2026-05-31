@@ -91,23 +91,28 @@ start_services() {
   # 1. Nexo Backend (cwd must be backend/ for dotenv to find .env)
   echo -e "${CYAN}▶ Iniciando NEXO Dashboard (porta 3456)...${NC}"
   cd "$NEXO_DIR/backend"
-  PORT=3456 BIND_IP=127.0.0.1 \
-    nohup node server.js > /dev/null 2>&1 &
+  # Usar log file para debug em vez de /dev/null
+  nohup bash -c 'PORT=3456 BIND_IP=127.0.0.1 node server.js' > "$NEXO_DIR/backend/dashboard.log" 2>&1 &
   echo $! > "$NEXO_PID_FILE"
-  sleep 2
+  sleep 5
+  # Verificar se subiu
+  if ! ss -tlnp 2>/dev/null | grep -q ':3456 '; then
+    echo -e "${YELLOW}  ⚠ Dashboard não respondeu, tentando novamente...${NC}"
+    sleep 5
+  fi
 
   # 2. Luna Web Server (porta 3458)
   echo -e "${MAGENTA}▶ Iniciando Luna Web Server (porta 3458)...${NC}"
   cd "$NEXO_DIR/backend"
-  LUNA_PORT=3458 nohup node luna-server.js > /dev/null 2>&1 &
+  nohup bash -c 'LUNA_PORT=3458 node luna-server.js' > "$NEXO_DIR/backend/luna-server.log" 2>&1 &
   echo $! > "$LUNA_PID_FILE"
-  sleep 2
+  sleep 3
 
   # 3. Luna Web Vite
   if [ -f "$LUNA_WEB/node_modules/.bin/vite" ]; then
     echo -e "${YELLOW}▶ Iniciando Luna Web Vite (porta 5173)...${NC}"
     cd "$LUNA_WEB"
-    nohup npx vite --host > /dev/null 2>&1 &
+    nohup npx vite --host > "$NEXO_DIR/backend/vite.log" 2>&1 &
     echo $! > "$VITE_PID_FILE"
   else
     echo -e "${RED}⚠ Vite não encontrado em $LUNA_WEB${NC}"
@@ -116,10 +121,10 @@ start_services() {
   # 4. Telegram Bot (Luna Adapter v4.0)
   echo -e "${GREEN}▶ Iniciando Telegram Bot (@lunanexobot)...${NC}"
   cd "$NEXO_DIR/agents"
-  nohup node telegram-luna-adapter.cjs > /dev/null 2>&1 &
+  nohup node telegram-luna-adapter.cjs > "$NEXO_DIR/backend/telegram.log" 2>&1 &
   echo $! > "$TELEGRAM_PID_FILE"
 
-  sleep 2
+  sleep 3
   echo ""
   echo -e "${GREEN}${BOLD}✓ Todos os serviços iniciados!${NC}"
   echo -e "${DIM}  Use './luna-nexo.sh status' para verificar${NC}"

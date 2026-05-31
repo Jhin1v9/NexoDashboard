@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   Mail, Paperclip, Star, StarOff, AlertTriangle,
   CheckCircle, Clock, ChevronLeft, ChevronRight

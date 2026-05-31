@@ -1,3 +1,4 @@
+import React from 'react'
 export default function VotingQuorumBar({ yesVotes, noVotes, quorumRequired, totalCEOs, compact = false }) {
   const yesPct = Math.min((yesVotes / quorumRequired) * 100, 100)
   const noPct = noVotes > 0 ? 100 : 0

@@ -1,3 +1,4 @@
+import React from 'react'
 import VotingSessionCard from './VotingSessionCard'
 
 export default function VotingSessionList({ sessions, currentUser, loading, onVote, onDelete }) {

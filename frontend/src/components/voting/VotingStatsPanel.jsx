@@ -1,3 +1,4 @@
+import React from 'react'
 import { Clock, CheckCircle2, XCircle, Vote } from 'lucide-react'
 
 export default function VotingStatsPanel({ stats }) {

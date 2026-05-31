@@ -85,7 +85,7 @@ export default function RegisterPage() {
         ? form.customCompanySize.trim()
         : form.companySize
 
-      const res = await axios.post('/api/leads', {
+      const res = await axios.post('/api/demo-leads', {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),

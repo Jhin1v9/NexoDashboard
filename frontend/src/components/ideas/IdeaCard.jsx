@@ -1,3 +1,4 @@
+import React from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Lightbulb, MessageSquare, Calendar, Building2 } from 'lucide-react'

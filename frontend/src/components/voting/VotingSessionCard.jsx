@@ -1,3 +1,4 @@
+import React from 'react'
 import VotingQuorumBar from './VotingQuorumBar'
 import { ThumbsUp, ThumbsDown, Trash2, Clock, CheckCircle2, XCircle, Zap, MessageSquare } from 'lucide-react'
 

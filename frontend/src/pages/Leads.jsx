@@ -32,6 +32,7 @@ export default function Leads() {
   const [viewMode, setViewMode] = useState('kanban') // kanban | list
   const [showModal, setShowModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState(null)
+  const [convertingId, setConvertingId] = useState(null)
 
   const fetchLeads = async () => {
     try {
@@ -94,6 +95,24 @@ export default function Leads() {
       setLeads(prev => prev.filter(l => l.id !== leadId))
     } catch (e) {
       console.error('Erro ao remover lead:', e)
+    }
+  }
+
+  const convertLead = async (leadId) => {
+    try {
+      setConvertingId(leadId)
+      const res = await axios.post(`/api/leads/${leadId}/convert`)
+      if (res.data.success) {
+        // Atualiza o lead na lista com os dados convertidos
+        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, type: 'cliente-externo', status: 'ativo', pipelineStatus: 'ganho', convertedAt: new Date().toISOString() } : l))
+        setSelectedLead(null)
+        alert('✅ Lead convertido em cliente com sucesso!')
+      }
+    } catch (e) {
+      console.error('Erro ao converter lead:', e)
+      alert('❌ Erro ao converter lead: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setConvertingId(null)
     }
   }
 
@@ -292,6 +311,8 @@ export default function Leads() {
               deleteLead(id)
               setSelectedLead(null)
             }}
+            onConvert={convertLead}
+            isConverting={convertingId === selectedLead?.id}
           />
         )}
       </AnimatePresence>

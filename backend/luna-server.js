@@ -77,14 +77,14 @@ app.use(lunaChatRouter);
 // Static files
 app.use(express.static(path.join(__dirname, '../../.luna-kernel/luna-web/dist')));
 
-// SPA fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../.luna-kernel/luna-web/dist/index.html'));
-});
-
-// Health
+// Health — MUST be before SPA fallback
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'luna-web', timestamp: new Date().toISOString() });
+});
+
+// SPA fallback — MUST be after all API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../.luna-kernel/luna-web/dist/index.html'));
 });
 
 app.listen(PORT, () => {

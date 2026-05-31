@@ -1,3 +1,4 @@
+import React from 'react'
 ﻿import { motion } from 'framer-motion'
 import { Wallet, TrendingUp, TrendingDown, BarChart3, ArrowRight } from 'lucide-react'
 

@@ -3508,7 +3508,7 @@ app.use('/api/ideas', ideasRouter(requireAuth));
 // Leads Routes (Demo Request — público, sem auth)
 // ═══════════════════════════════════════════════════════════════════════════════
 const leadsRouter = require('./routes/leads');
-app.use('/api/leads', leadsRouter);
+app.use('/api/demo-leads', leadsRouter);
 
 // ── Voting Routes ──
 setupVotingRoutes(app, { requireAuth });
