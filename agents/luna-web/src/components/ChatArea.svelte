@@ -85,6 +85,22 @@
         }
         break;
       }
+      // v5.3: REAL-TIME JSON response streaming — show response immediately when detected
+      case 'assistant': {
+        messages.update(msgs => removeAllThinking(msgs));
+        thinkingId = null;
+        // Create a NEW assistant message for each response_detected event
+        // This allows multiple responses to appear before actions
+        const newId = 'resp-' + Date.now();
+        currentAssistantId = newId;
+        messages.update(msgs => [...msgs, {
+          id: newId,
+          type: 'assistant',
+          content: event.response || '',
+          timestamp: new Date().toISOString()
+        }]);
+        break;
+      }
       case 'action_start': {
         const toolId = 'tool-' + Date.now();
         messages.update(msgs => [...msgs, {

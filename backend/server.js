@@ -154,32 +154,34 @@ if (!fs.existsSync(TRUSTED_IPS_FILE)) {
   }, null, 2));
 }
 
-function loadTrustedIps() {
+async function loadTrustedIps() {
   try {
-    return readJSON(TRUSTED_IPS_FILE, { trusted: {} });
+    return await dataStore.getTrustedIps();
   } catch { return { trusted: {} }; }
 }
 
-function saveTrustedIps(data) {
-  data.updatedAt = new Date().toISOString();
-  writeJSON(TRUSTED_IPS_FILE, data);
+async function saveTrustedIps(data) {
+  const now = new Date().toISOString();
+  for (const [key, val] of Object.entries(data.trusted || {})) {
+    await dataStore.saveTrustedIp(key, { ...val, updatedAt: now });
+  }
 }
 
-function isTrustedIp(ip) {
-  const data = loadTrustedIps();
+async function isTrustedIp(ip) {
+  const data = await loadTrustedIps();
   for (const user of Object.values(data.trusted || {})) {
     if ((user.ips || []).includes(ip)) return true;
   }
   return false;
 }
 
-function captureIpForUser(ip, username) {
-  const data = loadTrustedIps();
+async function captureIpForUser(ip, username) {
+  const data = await loadTrustedIps();
   const userKey = username.toLowerCase().trim();
   const user = (data.trusted || {})[userKey];
   if (user && user.autoCapture && !user.ips.includes(ip)) {
     user.ips.push(ip);
-    saveTrustedIps(data);
+    await dataStore.saveTrustedIp(userKey, user);
     console.log(`[TRUSTED-IP] Capturado IP ${ip} para ${user.name}`);
   }
 }
@@ -3553,44 +3555,54 @@ app.delete('/api/quotes/:id', async (req, res) => {
 });
 
 // ── Operations Center / Centro de Operações ──
-const OPS_STATE_FILE = path.join(DATA_DIR, 'ops-state.json');
 
-app.get('/api/ops', (req, res) => {
-  const state = readJSON(OPS_STATE_FILE) || {
-    alerts: [],
-    activeOperations: [],
-    recentChanges: [],
-    systemHealth: { status: 'ok', lastCheck: new Date().toISOString() }
-  };
-  res.json(state);
+app.get('/api/ops', async (req, res) => {
+  try {
+    const state = await dataStore.getOpsState();
+    res.json(state);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.post('/api/ops/alerts', (req, res) => {
-  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
-  const alert = { id: `alert-${Date.now()}`, ...req.body, createdAt: new Date().toISOString() };
-  state.alerts.unshift(alert);
-  if (state.alerts.length > 50) state.alerts = state.alerts.slice(0, 50);
-  writeJSON(OPS_STATE_FILE, state);
-  broadcast({ type: 'ops', data: state });
-  res.json(alert);
+app.post('/api/ops/alerts', async (req, res) => {
+  try {
+    const state = await dataStore.getOpsState();
+    const alert = { id: `alert-${Date.now()}`, ...req.body, createdAt: new Date().toISOString() };
+    state.alerts.unshift(alert);
+    if (state.alerts.length > 50) state.alerts = state.alerts.slice(0, 50);
+    await dataStore.saveOpsState(state);
+    broadcast({ type: 'ops', data: state });
+    res.json(alert);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.delete('/api/ops/alerts/:id', (req, res) => {
-  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
-  state.alerts = state.alerts.filter(a => a.id !== req.params.id);
-  writeJSON(OPS_STATE_FILE, state);
-  broadcast({ type: 'ops', data: state });
-  res.json({ success: true });
+app.delete('/api/ops/alerts/:id', async (req, res) => {
+  try {
+    const state = await dataStore.getOpsState();
+    state.alerts = state.alerts.filter(a => a.id !== req.params.id);
+    await dataStore.saveOpsState(state);
+    broadcast({ type: 'ops', data: state });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.post('/api/ops/changes', (req, res) => {
-  const state = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
-  const change = { id: `change-${Date.now()}`, ...req.body, timestamp: new Date().toISOString() };
-  state.recentChanges.unshift(change);
-  if (state.recentChanges.length > 100) state.recentChanges = state.recentChanges.slice(0, 100);
-  writeJSON(OPS_STATE_FILE, state);
-  broadcast({ type: 'ops', data: state });
-  res.json(change);
+app.post('/api/ops/changes', async (req, res) => {
+  try {
+    const state = await dataStore.getOpsState();
+    const change = { id: `change-${Date.now()}`, ...req.body, timestamp: new Date().toISOString() };
+    state.recentChanges.unshift(change);
+    if (state.recentChanges.length > 100) state.recentChanges = state.recentChanges.slice(0, 100);
+    await dataStore.saveOpsState(state);
+    broadcast({ type: 'ops', data: state });
+    res.json(change);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Members ── migrado para PostgreSQL
@@ -4348,13 +4360,6 @@ app.post('/api/luna/pending/:id/execute', requireAuth, async (req, res) => {
     mention.executedAction = type;
     writeJSON(bufferFile, buffer);
 
-    // Forçar sync do tasks.json para PostgreSQL
-    const tasksFile = path.join(DATA_DIR, 'tasks.json');
-    if (fs.existsSync(tasksFile)) {
-      const tasksData = readJSON(tasksFile) || [];
-      writeJSON('tasks.json', tasksData);
-    }
-
     res.json({ success: true, message: 'Ação executada', result });
   } catch (e) {
     console.error('[LunaPending] Erro ao executar:', e);
@@ -4973,30 +4978,29 @@ app.get('/api/luna/insights', requireAuth, async (req, res) => {
 
     // ── Financeiro ──
     try {
-      const cash = JSON.parse(fs.readFileSync(path.join(dataDir, 'cash-box.json'), 'utf8'));
+      const cash = await dataStore.getCashBox();
       insights.modules.finance = {
-        balance: cash.balance || 0,
-        monthlyIncome: cash.monthlyIncome || 0,
-        monthlyExpenses: cash.monthlyExpenses || 0,
-        projectedBalance: cash.projectedBalance || 0,
-        status: (cash.balance || 0) >= 0 ? 'positive' : 'negative',
+        balance: cash.balance?.value || 0,
+        monthlyIncome: cash.monthlyIncome?.value || 0,
+        monthlyExpenses: cash.monthlyExpenses?.value || 0,
+        projectedBalance: cash.projectedBalance?.value || 0,
+        status: (cash.balance?.value || 0) >= 0 ? 'positive' : 'negative',
       };
     } catch (e) { insights.modules.finance = null; }
 
     // ── Leads ──
     try {
-      const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
-      const arr = Array.isArray(leads) ? leads : [];
+      const leads = await dataStore.getLeads();
       insights.modules.leads = {
-        total: arr.length,
-        new: arr.filter(l => l.status === 'new').length,
-        negotiating: arr.filter(l => l.pipelineStatus === 'negotiating' || l.status === 'negotiating').length,
+        total: leads.length,
+        new: leads.filter(l => l.pipelineStatus === 'novo').length,
+        negotiating: leads.filter(l => l.pipelineStatus === 'negociacao' || l.pipelineStatus === 'proposta').length,
       };
     } catch (e) { insights.modules.leads = null; }
 
     // ── Emails ──
     try {
-      const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
+      const drafts = readJSON(path.join(DATA_DIR, 'email-drafts.json'), { drafts: [] });
       const pendingDrafts = drafts.drafts ? drafts.drafts.filter(d => d.status === 'pending').length : 0;
       insights.modules.emails = {
         draftsPending: pendingDrafts,
@@ -5191,22 +5195,18 @@ app.post('/api/luna/batch', requireAuth, async (req, res) => {
     // Leads
     if (domain === 'lead') {
       try {
-        const leadsPath = path.join(dataDir, 'leads.json');
-        if (!fs.existsSync(leadsPath)) {
-          return res.json({ success: true, modified: 0 });
-        }
-        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-        const arr = Array.isArray(leads) ? leads : [];
-        arr.forEach(l => {
-          if (!ids.includes(l.id) && !ids.includes(String(l.id))) return;
+        const leads = await dataStore.getLeads();
+        for (const l of leads) {
+          if (!ids.includes(l.id) && !ids.includes(String(l.id))) continue;
           if (action === 'marcar_contatado') {
-            l.status = 'contacted';
-            l.pipelineStatus = 'contacted';
-            l.contactedAt = new Date().toISOString();
+            l.status = 'contatado';
+            l.pipelineStatus = 'contatado';
+            l.lastContact = new Date().toISOString();
+            l.updatedAt = new Date().toISOString();
+            await dataStore.saveLead(l);
             modified++;
           }
-        });
-        writeJSON(leadsPath, arr);
+        }
       } catch (leadErr) {
         console.error('[LunaBatch] Erro ao processar leads:', leadErr.message);
         errors.push('lead: ' + leadErr.message);
@@ -5310,7 +5310,7 @@ async function buildActionCenterItems(dataDir) {
 
   // ── Emails (drafts pendentes) ──
   try {
-    const drafts = JSON.parse(fs.readFileSync(path.join(dataDir, 'email-drafts.json'), 'utf8'));
+    const drafts = readJSON(path.join(dataDir, 'email-drafts.json'), { drafts: [] });
     if (drafts.drafts) {
       drafts.drafts.filter(d => d.status === 'pending' || d.status === 'pending_approval').forEach(d => {
         const id = `email-draft-${d.id}`;
@@ -5336,16 +5336,15 @@ async function buildActionCenterItems(dataDir) {
 
   // ── Leads novos ──
   try {
-    const leads = JSON.parse(fs.readFileSync(path.join(dataDir, 'leads.json'), 'utf8'));
-    const arr = Array.isArray(leads) ? leads : [];
-    arr.filter(l => l.status === 'new' || l.pipelineStatus === 'new').forEach(l => {
+    const leads = await dataStore.getLeads();
+    leads.filter(l => l.pipelineStatus === 'novo').forEach(l => {
       const id = `lead-new-${l.id}`;
       if (isDismissed(id, dismissed)) return;
       items.push({
         id,
         type: 'lead',
         priority: 'info',
-        title: l.name || l.company || 'Lead novo',
+        title: l.displayName || l.name || 'Lead novo',
         description: l.source ? `Origem: ${l.source}` : 'Novo prospect no pipeline',
         module: 'leads',
         entityId: l.id,
@@ -5361,8 +5360,8 @@ async function buildActionCenterItems(dataDir) {
 
   // ── Financeiro (caixa negativo) ──
   try {
-    const cash = JSON.parse(fs.readFileSync(path.join(dataDir, 'cash-box.json'), 'utf8'));
-    if ((cash.balance || 0) < 0) {
+    const cash = await dataStore.getCashBox();
+    if ((cash.balance?.value || 0) < 0) {
       const id = 'finance-negative-balance';
       if (!isDismissed(id, dismissed)) {
         items.push({
@@ -5370,7 +5369,7 @@ async function buildActionCenterItems(dataDir) {
           type: 'finance',
           priority: 'warning',
           title: 'Caixa negativo',
-          description: `Saldo atual: R$ ${cash.balance.toFixed(2).replace('.', ',')}`,
+          description: `Saldo atual: ${cash.balance?.currency || 'EUR'} ${(cash.balance?.value || 0).toFixed(2)}`,
           module: 'financeiro',
           entityId: null,
           actions: [
@@ -5383,10 +5382,10 @@ async function buildActionCenterItems(dataDir) {
     }
   } catch (e) { /* silencioso */ }
 
-  // ── Alertas ativos ──
+  // ── Alertas ativos (migrado para ops_state no PostgreSQL) ──
   try {
-    const alerts = JSON.parse(fs.readFileSync(path.join(dataDir, 'alerts.json'), 'utf8'));
-    const active = Array.isArray(alerts) ? alerts.filter(a => a.active !== false && a.resolved !== true) : [];
+    const opsState = await dataStore.getOpsState();
+    const active = (opsState.alerts || []).filter(a => a.active !== false && a.resolved !== true);
     active.forEach(a => {
       const id = `alert-${a.id}`;
       if (isDismissed(id, dismissed)) return;
@@ -6977,7 +6976,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const quotes = await dataStore.getQuotes();
     const leads = await dataStore.getLeads();
     const members = await dataStore.getMembers();
-    const opsState = readJSON(OPS_STATE_FILE) || { alerts: [], activeOperations: [], recentChanges: [] };
+    const opsState = await dataStore.getOpsState();
     const transactions = await dataStore.getTransactions();
     const whatsappTasks = readJSON(WAPP_FILE) || [];
     const agentData = readJSON(AGENT_DATA_FILE) || {};
@@ -7607,16 +7606,6 @@ app.post('/api/email/ai/action-items-to-tasks', requireAuth, async (req, res) =>
 
 // ── LUNA EMAIL DRAFTS: rascunhos de resposta para aprovação ──
 
-const EMAIL_DRAFTS_FILE = path.join(DATA_DIR, 'email-drafts.json');
-
-function readEmailDrafts() {
-  return readJSON(EMAIL_DRAFTS_FILE, { drafts: [], lastId: 0 });
-}
-
-function writeEmailDrafts(data) {
-  writeJSON(EMAIL_DRAFTS_FILE, data);
-}
-
 // Gerar rascunho da Luna e criar tarefa + notificação para aprovação
 app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
   try {
@@ -7632,10 +7621,10 @@ app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
       { from, subject }
     );
 
-    // Salvar rascunho local
-    const draftsData = readEmailDrafts();
-    draftsData.lastId = (draftsData.lastId || 0) + 1;
-    const draftId = `luna-draft-${draftsData.lastId}`;
+    // Salvar rascunho no PostgreSQL
+    const allDrafts = await dataStore.getEmailDrafts();
+    const lastId = allDrafts.length > 0 ? parseInt(allDrafts[0].id.replace('luna-draft-', '')) || 0 : 0;
+    const draftId = `luna-draft-${lastId + 1}`;
     const draft = {
       id: draftId,
       emailId,
@@ -7650,9 +7639,7 @@ app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    draftsData.drafts.unshift(draft);
-    if (draftsData.drafts.length > 200) draftsData.drafts = draftsData.drafts.slice(0, 200);
-    writeEmailDrafts(draftsData);
+    await dataStore.saveEmailDraft(draft);
 
     // Criar tarefa para aprovação via ActionExecutor
     const taskResult = await lunaActionExecutor.execute([
@@ -7689,11 +7676,10 @@ app.post('/api/email/ai/draft-for-approval', requireAuth, async (req, res) => {
 });
 
 // Listar rascunhos (opcionalmente filtrar por threadId)
-app.get('/api/email/drafts', requireAuth, (req, res) => {
+app.get('/api/email/drafts', requireAuth, async (req, res) => {
   try {
     const { threadId, status } = req.query;
-    const draftsData = readEmailDrafts();
-    let drafts = draftsData.drafts || [];
+    let drafts = await dataStore.getEmailDrafts();
     if (threadId) drafts = drafts.filter(d => d.threadId === threadId);
     if (status) drafts = drafts.filter(d => d.status === status);
     res.json({ success: true, drafts });
@@ -7703,15 +7689,15 @@ app.get('/api/email/drafts', requireAuth, (req, res) => {
 });
 
 // Aprovar rascunho
-app.post('/api/email/drafts/:id/approve', requireAuth, (req, res) => {
+app.post('/api/email/drafts/:id/approve', requireAuth, async (req, res) => {
   try {
-    const draftsData = readEmailDrafts();
-    const draft = draftsData.drafts.find(d => d.id === req.params.id);
+    const drafts = await dataStore.getEmailDrafts();
+    const draft = drafts.find(d => d.id === req.params.id);
     if (!draft) return res.status(404).json({ success: false, error: 'Rascunho não encontrado' });
     draft.status = 'approved';
     draft.approvedBy = req.user?.userId || 'user';
     draft.updatedAt = new Date().toISOString();
-    writeEmailDrafts(draftsData);
+    await dataStore.saveEmailDraft(draft);
     res.json({ success: true, draft });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -7719,14 +7705,14 @@ app.post('/api/email/drafts/:id/approve', requireAuth, (req, res) => {
 });
 
 // Rejeitar rascunho
-app.post('/api/email/drafts/:id/reject', requireAuth, (req, res) => {
+app.post('/api/email/drafts/:id/reject', requireAuth, async (req, res) => {
   try {
-    const draftsData = readEmailDrafts();
-    const draft = draftsData.drafts.find(d => d.id === req.params.id);
+    const drafts = await dataStore.getEmailDrafts();
+    const draft = drafts.find(d => d.id === req.params.id);
     if (!draft) return res.status(404).json({ success: false, error: 'Rascunho não encontrado' });
     draft.status = 'rejected';
     draft.updatedAt = new Date().toISOString();
-    writeEmailDrafts(draftsData);
+    await dataStore.saveEmailDraft(draft);
     res.json({ success: true, draft });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -7813,42 +7799,11 @@ app.post('/api/emails/sync', async (req, res) => {
 
 const LEAD_STATUSES = ['novo', 'contatado', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'];
 
-// GET /api/leads — Lista todos os leads (PostgreSQL + leads.json fallback)
+// GET /api/leads — Lista todos os leads (PostgreSQL)
 app.get('/api/leads', async (req, res) => {
   try {
     const { status, assignedTo, source, search } = req.query;
     let leads = await dataStore.getLeads();
-
-    // Merge with leads.json (file-based leads from Luna Web / Dashboard CRM)
-    try {
-      const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
-      const seen = new Set(leads.map(l => l.id));
-      for (const fl of fileLeads) {
-        if (!seen.has(fl.id)) {
-          leads.push({
-            id: fl.id,
-            displayName: fl.name || fl.displayName,
-            name: fl.name || fl.displayName,
-            email: fl.email || '',
-            phone: fl.phone || '',
-            source: fl.source || 'manual',
-            type: fl.type || 'lead',
-            status: fl.status || 'potencial',
-            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
-            estimatedValue: fl.value || fl.estimatedValue || 0,
-            currency: 'EUR',
-            notes: fl.notes || '',
-            assignedTo: fl.assignedTo || null,
-            tags: fl.tags || [],
-            createdAt: fl.createdAt || new Date().toISOString(),
-            lastContact: null,
-            convertedAt: fl.convertedAt || null
-          });
-        }
-      }
-    } catch (fileErr) {
-      console.warn('[Leads] Erro ao ler leads.json:', fileErr.message);
-    }
 
     if (status) leads = leads.filter(l => l.pipelineStatus === status);
     if (assignedTo) leads = leads.filter(l => l.assignedTo === assignedTo);
@@ -7868,43 +7823,11 @@ app.get('/api/leads', async (req, res) => {
   }
 });
 
-// GET /api/leads/:id — Detalhe de um lead (PostgreSQL + leads.json fallback)
+// GET /api/leads/:id — Detalhe de um lead (PostgreSQL)
 app.get('/api/leads/:id', async (req, res) => {
   try {
     const leads = await dataStore.getLeads();
-    let lead = leads.find(l => l.id === req.params.id);
-
-    // Fallback to leads.json
-    if (!lead) {
-      try {
-        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
-        const fl = fileLeads.find(l => l.id === req.params.id);
-        if (fl) {
-          lead = {
-            id: fl.id,
-            displayName: fl.name || fl.displayName,
-            name: fl.name || fl.displayName,
-            email: fl.email || '',
-            phone: fl.phone || '',
-            source: fl.source || 'manual',
-            type: fl.type || 'lead',
-            status: fl.status || 'potencial',
-            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
-            estimatedValue: fl.value || fl.estimatedValue || 0,
-            currency: 'EUR',
-            notes: fl.notes || '',
-            assignedTo: fl.assignedTo || null,
-            tags: fl.tags || [],
-            createdAt: fl.createdAt || new Date().toISOString(),
-            lastContact: null,
-            convertedAt: fl.convertedAt || null
-          };
-        }
-      } catch (fileErr) {
-        console.warn('[Leads] Erro ao ler leads.json:', fileErr.message);
-      }
-    }
-
+    const lead = leads.find(l => l.id === req.params.id);
     if (!lead) return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     res.json({ success: true, lead });
   } catch (e) {
@@ -8030,40 +7953,7 @@ app.post('/api/leads/:id/convert', async (req, res) => {
   try {
     const leads = await dataStore.getLeads();
     const leadId = req.params.id;
-    let lead = leads.find(l => l.id === leadId);
-    let fromFile = false;
-
-    // Fallback to leads.json
-    if (!lead) {
-      try {
-        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
-        const fl = fileLeads.find(l => l.id === leadId);
-        if (fl) {
-          lead = {
-            id: fl.id,
-            displayName: fl.name || fl.displayName,
-            name: fl.name || fl.displayName,
-            email: fl.email || '',
-            phone: fl.phone || '',
-            source: fl.source || 'manual',
-            type: fl.type || 'lead',
-            status: fl.status || 'potencial',
-            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
-            estimatedValue: fl.value || fl.estimatedValue || 0,
-            currency: 'EUR',
-            notes: fl.notes || '',
-            assignedTo: fl.assignedTo || null,
-            tags: fl.tags || [],
-            createdAt: fl.createdAt || new Date().toISOString(),
-            lastContact: null,
-            convertedAt: null
-          };
-          fromFile = true;
-        }
-      } catch (fileErr) {
-        console.warn('[Convert] Erro ao ler leads.json:', fileErr.message);
-      }
-    }
+    const lead = leads.find(l => l.id === leadId);
 
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
@@ -8077,26 +7967,7 @@ app.post('/api/leads/:id/convert', async (req, res) => {
       convertedAt: new Date().toISOString()
     };
 
-    // Save to PostgreSQL if possible, otherwise update leads.json
-    try {
-      await dataStore.saveLead(updated);
-    } catch (pgErr) {
-      console.warn('[Convert] PostgreSQL save failed, updating leads.json:', pgErr.message);
-    }
-
-    // Always update leads.json for file-based persistence
-    if (fromFile) {
-      try {
-        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
-        const idx = fileLeads.findIndex(l => l.id === leadId);
-        if (idx >= 0) {
-          fileLeads[idx] = { ...fileLeads[idx], status: 'ganho', convertedAt: updated.convertedAt };
-          writeJSON(path.join(DATA_DIR, 'leads.json'), fileLeads);
-        }
-      } catch (fileErr) {
-        console.warn('[Convert] Erro ao atualizar leads.json:', fileErr.message);
-      }
-    }
+    await dataStore.saveLead(updated);
 
     // Cria workspace se ainda não existir
     let workspace = null;
@@ -8632,7 +8503,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const attemptedUser = username.toLowerCase().trim();
-    const isTrusted = isTrustedIp(ip);
+    const isTrusted = await isTrustedIp(ip);
 
     // Validar credenciais
     const user = await validateCredentials(attemptedUser, password);
@@ -8754,7 +8625,7 @@ app.post('/api/auth/login', async (req, res) => {
     loginAttempts.delete(ip);
     
     // Capturar IP automaticamente para usuários conhecidos
-    captureIpForUser(ip, user.id);
+    await captureIpForUser(ip, user.id);
     
     const token = generateToken(user.id);
     res.json({ success: true, token, user });
@@ -8783,9 +8654,9 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // GET /api/security/trusted-ips — Lista IPs confiáveis
-app.get('/api/security/trusted-ips', requireAuth, (req, res) => {
+app.get('/api/security/trusted-ips', requireAuth, async (req, res) => {
   try {
-    const data = loadTrustedIps();
+    const data = await loadTrustedIps();
     res.json({ success: true, trusted: data.trusted || {} });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8793,13 +8664,13 @@ app.get('/api/security/trusted-ips', requireAuth, (req, res) => {
 });
 
 // POST /api/security/trusted-ips — Adiciona/remove IP confiável
-app.post('/api/security/trusted-ips', requireAuth, (req, res) => {
+app.post('/api/security/trusted-ips', requireAuth, async (req, res) => {
   try {
     const { userKey, ip, action } = req.body;
     if (!userKey || !ip || !['add', 'remove'].includes(action)) {
       return res.status(400).json({ success: false, error: 'userKey, ip e action (add/remove) obrigatórios' });
     }
-    const data = loadTrustedIps();
+    const data = await loadTrustedIps();
     const user = (data.trusted || {})[userKey.toLowerCase().trim()];
     if (!user) {
       return res.status(404).json({ success: false, error: 'Usuário não encontrado em trusted-ips' });
@@ -8809,7 +8680,7 @@ app.post('/api/security/trusted-ips', requireAuth, (req, res) => {
     } else {
       user.ips = user.ips.filter(i => i !== ip);
     }
-    saveTrustedIps(data);
+    await saveTrustedIps(data);
     res.json({ success: true, trusted: data.trusted });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8875,7 +8746,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 app.get('/api/security/log', requireAuth, async (req, res) => {
   try {
     const result = await dataStore.getSecurityLogs();
-    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    const settingsData = await dataStore.getSecuritySettings();
     res.json({ success: true, events: result.events.slice(0, 50), settings: settingsData.settings || {} });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8883,9 +8754,9 @@ app.get('/api/security/log', requireAuth, async (req, res) => {
 });
 
 // GET /api/security/settings — Retorna configurações de segurança
-app.get('/api/security/settings', requireAuth, (req, res) => {
+app.get('/api/security/settings', requireAuth, async (req, res) => {
   try {
-    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    const settingsData = await dataStore.getSecuritySettings();
     res.json({ success: true, settings: settingsData.settings || {} });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8893,11 +8764,11 @@ app.get('/api/security/settings', requireAuth, (req, res) => {
 });
 
 // PUT /api/security/settings — Atualiza configurações de segurança
-app.put('/api/security/settings', requireAuth, (req, res) => {
+app.put('/api/security/settings', requireAuth, async (req, res) => {
   try {
-    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    const settingsData = await dataStore.getSecuritySettings();
     settingsData.settings = { ...settingsData.settings, ...req.body };
-    writeJSON(SECURITY_SETTINGS_FILE, settingsData);
+    await dataStore.saveSecuritySettings(settingsData);
     res.json({ success: true, settings: settingsData.settings });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -8907,7 +8778,7 @@ app.put('/api/security/settings', requireAuth, (req, res) => {
 // POST /api/security/test-whatsapp — Testa envio de alerta no WhatsApp
 app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
   try {
-    const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
+    const settingsData = await dataStore.getSecuritySettings();
     if (settingsData.settings?.whatsappAlerts === false) {
       return res.status(400).json({ success: false, error: 'Alertas no WhatsApp estão desativados. Ative na aba Segurança primeiro.' });
     }
@@ -9147,35 +9018,6 @@ app.get('/api/workspace/clients', requireAuth, async (req, res) => {
         estimatedValue: data.estimatedValue || null,
         type: data.type || 'lead'
       });
-    }
-
-    // 3. Leads de leads.json (criados via Luna Web / Dashboard CRM) que ainda não têm workspace
-    try {
-      const leadsPath = path.join(DATA_DIR, 'leads.json');
-      const leadsData = readJSON(leadsPath) || [];
-      for (const lead of leadsData) {
-        if (!lead.id || merged.has(lead.id)) continue;
-        const displayName = lead.name || lead.displayName || lead.company || lead.id;
-        merged.set(lead.id, {
-          id: lead.id,
-          nome: displayName,
-          caminho: lead.id,
-          status: lead.status === 'ganho' ? 'ativo' : (lead.status || 'novo'),
-          cor: lead.cor || lead.color || '#22C55E',
-          responsavel: lead.assignedTo || lead.assignee || 'todos',
-          kind: 'lead',
-          pipelineStatus: lead.pipelineStatus || lead.status || 'novo',
-          email: lead.email || null,
-          phone: lead.phone || null,
-          source: lead.source || null,
-          estimatedValue: lead.value || lead.estimatedValue || null,
-          type: lead.type || 'lead',
-          notes: lead.notes || null,
-          createdAt: lead.createdAt || null
-        });
-      }
-    } catch (leadErr) {
-      console.warn('[Workspace/Leads] Erro ao ler leads.json:', leadErr.message);
     }
 
     const clientes = Array.from(merged.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));

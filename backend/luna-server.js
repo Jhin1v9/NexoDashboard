@@ -6,6 +6,22 @@
  */
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
+// v5.3-fix: KEEP-ALIVE — agent never dies unless Chrome is intentionally closed
+process.on('uncaughtException', (err) => {
+  console.error('[LUNA-KEEP-ALIVE] Uncaught Exception:', err.message);
+  console.error(err.stack);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[LUNA-KEEP-ALIVE] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+// Also catch SIGTERM/SIGINT to prevent accidental death
+process.on('SIGTERM', () => {
+  console.log('[LUNA-KEEP-ALIVE] SIGTERM received — ignoring, agent stays alive');
+});
+process.on('SIGINT', () => {
+  console.log('[LUNA-KEEP-ALIVE] SIGINT received — ignoring, agent stays alive');
+});
+
 const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');

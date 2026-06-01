@@ -1048,6 +1048,208 @@ async function getProjectTypeTemplate(projectType) {
 }
 
 // ============================================================
+// SECURITY SETTINGS
+// ============================================================
+async function getSecuritySettings() {
+  const row = await db.get('SELECT * FROM security_settings WHERE id=$1', ['default']);
+  if (!row) return { settings: { maxAttemptsBeforeAlert: 1 }, version: '1.0', lastNotifiedAt: null };
+  return {
+    settings: row.settings || {},
+    version: row.version || '1.0',
+    lastNotifiedAt: row.last_notified_at
+  };
+}
+
+async function saveSecuritySettings(data) {
+  await db.run(
+    `INSERT INTO security_settings (id, settings, version, last_notified_at, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       settings = $2, version = $3, last_notified_at = $4, updated_at = NOW()`,
+    [data.id || 'default', JSON.stringify(data.settings || {}), data.version || '1.0', data.lastNotifiedAt || null]
+  );
+  return data;
+}
+
+// ============================================================
+// TRUSTED IPs
+// ============================================================
+async function getTrustedIps() {
+  const rows = await db.query('SELECT * FROM trusted_ips ORDER BY user_key');
+  const trusted = {};
+  rows.forEach(r => {
+    trusted[r.user_key] = {
+      name: r.name,
+      role: r.role,
+      ips: r.ips || [],
+      autoCapture: r.auto_capture,
+      notes: r.notes
+    };
+  });
+  return { trusted, updatedAt: rows[0]?.updated_at };
+}
+
+async function saveTrustedIp(userKey, data) {
+  await db.run(
+    `INSERT INTO trusted_ips (id, user_key, name, role, ips, auto_capture, notes, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+     ON CONFLICT (user_key) DO UPDATE SET
+       name = $3, role = $4, ips = $5, auto_capture = $6, notes = $7, updated_at = NOW()`,
+    [data.id || `ceo-${userKey}`, userKey, data.name, data.role, JSON.stringify(data.ips || []), data.autoCapture !== false, data.notes || '']
+  );
+  return data;
+}
+
+// ============================================================
+// EMAIL DRAFTS
+// ============================================================
+async function getEmailDrafts() {
+  const rows = await db.query('SELECT * FROM email_drafts ORDER BY created_at DESC');
+  return rows.map(r => ({
+    id: r.id,
+    emailId: r.email_id,
+    threadId: r.thread_id,
+    subject: r.subject,
+    body: r.body,
+    notes: r.notes,
+    tone: r.tone,
+    status: r.status,
+    to: r.to_recipient,
+    createdBy: r.created_by,
+    approvedBy: r.approved_by,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  }));
+}
+
+async function saveEmailDraft(draft) {
+  await db.run(
+    `INSERT INTO email_drafts (id, email_id, thread_id, subject, body, notes, tone, status, to_recipient, created_by, approved_by, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       subject = $4, body = $5, notes = $6, tone = $7, status = $8, to_recipient = $9,
+       approved_by = $11, updated_at = NOW()`,
+    [draft.id, draft.emailId || null, draft.threadId || null, draft.subject || '', draft.body || '',
+     draft.notes || '', draft.tone || 'professional', draft.status || 'pending', draft.to || null,
+     draft.createdBy || 'luna', draft.approvedBy || null, draft.createdAt || null]
+  );
+  return draft;
+}
+
+async function deleteEmailDraft(id) {
+  await db.run('DELETE FROM email_drafts WHERE id=$1', [id]);
+  return true;
+}
+
+// ============================================================
+// VOTING
+// ============================================================
+async function getVotingSessions() {
+  const rows = await db.query('SELECT * FROM voting_sessions ORDER BY created_at DESC');
+  return rows.map(r => ({
+    id: r.id,
+    title: r.title,
+    description: r.description,
+    type: r.type,
+    toolName: r.tool_name,
+    toolParams: r.tool_params || {},
+    status: r.status,
+    quorumRequired: r.quorum_required,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+    closedAt: r.closed_at,
+    result: r.result,
+    executionResult: r.execution_result,
+    updatedAt: r.updated_at
+  }));
+}
+
+async function getVotingSessionById(id) {
+  const row = await db.get('SELECT * FROM voting_sessions WHERE id=$1', [id]);
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    toolName: row.tool_name,
+    toolParams: row.tool_params || {},
+    status: row.status,
+    quorumRequired: row.quorum_required,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    closedAt: row.closed_at,
+    result: row.result,
+    executionResult: row.execution_result,
+    updatedAt: row.updated_at
+  };
+}
+
+async function saveVotingSession(session) {
+  await db.run(
+    `INSERT INTO voting_sessions (id, title, description, type, tool_name, tool_params, status, quorum_required, created_by, created_at, closed_at, result, execution_result, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, NOW()), $11, $12, $13, NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       title = $2, description = $3, type = $4, tool_name = $5, tool_params = $6, status = $7,
+       quorum_required = $8, closed_at = $11, result = $12, execution_result = $13, updated_at = NOW()`,
+    [session.id, session.title, session.description || '', session.type || 'generic', session.toolName || null,
+     JSON.stringify(session.toolParams || {}), session.status || 'open', session.quorumRequired || 2,
+     session.createdBy || null, session.createdAt || null, session.closedAt || null,
+     session.result || null, JSON.stringify(session.executionResult || {})]
+  );
+  return session;
+}
+
+async function getVotingVotes(sessionId) {
+  const rows = await db.query('SELECT * FROM voting_votes WHERE session_id=$1 ORDER BY voted_at', [sessionId]);
+  return rows.map(r => ({
+    id: r.id,
+    sessionId: r.session_id,
+    voter: r.voter,
+    vote: r.vote,
+    comment: r.comment,
+    votedAt: r.voted_at
+  }));
+}
+
+async function saveVotingVote(vote) {
+  await db.run(
+    `INSERT INTO voting_votes (id, session_id, voter, vote, comment, voted_at)
+     VALUES ($1, $2, $3, $4, $5, COALESCE($6, NOW()))
+     ON CONFLICT (id) DO UPDATE SET
+       vote = $4, comment = $5`,
+    [vote.id, vote.sessionId, vote.voter, vote.vote, vote.comment || '', vote.votedAt || null]
+  );
+  return vote;
+}
+
+// ============================================================
+// OPS STATE
+// ============================================================
+async function getOpsState() {
+  const row = await db.get('SELECT * FROM ops_state WHERE id=$1', ['default']);
+  if (!row) return { alerts: [], activeOperations: [], recentChanges: [], systemHealth: { status: 'ok' } };
+  return {
+    alerts: row.alerts || [],
+    activeOperations: row.active_operations || [],
+    recentChanges: row.recent_changes || [],
+    systemHealth: row.system_health || { status: 'ok' }
+  };
+}
+
+async function saveOpsState(data) {
+  await db.run(
+    `INSERT INTO ops_state (id, alerts, active_operations, recent_changes, system_health, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       alerts = $2, active_operations = $3, recent_changes = $4, system_health = $5, updated_at = NOW()`,
+    [data.id || 'default', JSON.stringify(data.alerts || []), JSON.stringify(data.activeOperations || []),
+     JSON.stringify(data.recentChanges || []), JSON.stringify(data.systemHealth || { status: 'ok' })]
+  );
+  return data;
+}
+
+// ============================================================
 // EXPORTS
 // ============================================================
 module.exports = {
@@ -1077,4 +1279,9 @@ module.exports = {
   getTimelineCollaborators, joinTimeline, leaveTimeline,
   getPhaseHistory, savePhaseHistory,
   getProjectTypeTemplates, getProjectTypeTemplate,
+  getSecuritySettings, saveSecuritySettings,
+  getTrustedIps, saveTrustedIp,
+  getEmailDrafts, saveEmailDraft, deleteEmailDraft,
+  getVotingSessions, getVotingSessionById, saveVotingSession, getVotingVotes, saveVotingVote,
+  getOpsState, saveOpsState,
 };
