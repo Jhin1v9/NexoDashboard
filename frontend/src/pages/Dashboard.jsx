@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion'
 import { 
   Users, CheckSquare, AlertTriangle, TrendingUp, TrendingDown,
-  Bell, Plus, Trash2, MessageCircle, FileText, Zap, Wallet,
+  Bell, Plus, Trash2, FileText, Zap, Wallet,
   ArrowUpRight, ArrowDownRight, PiggyBank, Receipt, ShoppingCart,
   CircleDollarSign, Target, Activity, Calendar, Clock, Moon,
   Terminal, Play, Square, ExternalLink
@@ -80,7 +80,6 @@ const MiniBar = ({ value, max, color }) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { data } = useRealtime('/api/state', 30000)
-  const { data: agentData } = useRealtime('/api/whatsapp-agent', 60000)
   const { data: lunaData } = useRealtime('/api/luna/status', 30000)
   const { data: summaryData } = useRealtime('/api/finance/summary', 30000)
   const { data: cashBoxData } = useRealtime('/api/cash-box', 30000)
@@ -93,7 +92,6 @@ export default function Dashboard() {
   const clients = data?.clients || []
   const tasks = data?.tasks || []
   const predictions = data?.predictions || []
-  const agentStats = agentData?.stats || {}
   const summary = summaryData || {}
   const cashBox = cashBoxData || {}
 
@@ -231,8 +229,8 @@ export default function Dashboard() {
         <StatCard icon={AlertTriangle} label="Alertas" value={predictions.length} color="#ef4444" />
       </div>
 
-      {/* Luna + WhatsApp + Reminders Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Luna + Reminders Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* Luna Stats */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
@@ -263,36 +261,6 @@ export default function Dashboard() {
             <div className="text-center p-2 bg-nexo-card rounded-lg">
               <div className="text-lg font-bold text-nexo-primary">{lunaData?.lastScan ? new Date(lunaData.lastScan).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
               <div className="text-[10px] text-nexo-muted">Último Scan</div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* WhatsApp Stats */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-nexo-muted flex items-center gap-2">
-              <MessageCircle size={16} className="text-nexo-success" />
-              WhatsApp Intelligence
-            </h2>
-            <button onClick={() => navigate('/whatsapp')} className="text-xs text-nexo-info hover:underline">Ver →</button>
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            <div className="text-center p-2 bg-nexo-card rounded-lg">
-              <div className="text-lg font-bold text-nexo-success">{agentStats.totalMessages || 0}</div>
-              <div className="text-[10px] text-nexo-muted">Msgs</div>
-            </div>
-            <div className="text-center p-2 bg-nexo-card rounded-lg">
-              <div className="text-lg font-bold text-nexo-warning">{agentStats.totalTasks || 0}</div>
-              <div className="text-[10px] text-nexo-muted">Tarefas</div>
-            </div>
-            <div className="text-center p-2 bg-nexo-card rounded-lg">
-              <div className="text-lg font-bold text-nexo-info">{agentStats.totalIdeas || 0}</div>
-              <div className="text-[10px] text-nexo-muted">Ideias</div>
-            </div>
-            <div className="text-center p-2 bg-nexo-card rounded-lg">
-              <div className="text-lg font-bold text-nexo-primary">{agentStats.participants?.length || 0}</div>
-              <div className="text-[10px] text-nexo-muted">Membros</div>
             </div>
           </div>
         </motion.div>

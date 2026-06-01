@@ -28,7 +28,6 @@ const TABS = [
 ];
 
 const QUICK_COMMANDS = [
-  { id: 'escanear-agora', label: 'Escanear Agora', icon: Scan, desc: 'Forca scan do WhatsApp', color: 'text-blue-400', bg: 'hover:bg-blue-500/10 border-blue-500/30' },
   { id: 'reescanear', label: 'Re-escanear', icon: RefreshCw, desc: 'Reset checkpoint + scan full', color: 'text-purple-400', bg: 'hover:bg-purple-500/10 border-purple-500/30' },
   { id: 'limpar-memoria', label: 'Limpar Buffer', icon: Trash, desc: 'Limpa buffer de mensagens', color: 'text-orange-400', bg: 'hover:bg-orange-500/10 border-orange-500/30' },
   { id: 'gerar-relatorio', label: 'Gerar Relatorio', icon: FileText, desc: 'Gera relatorio do dia', color: 'text-green-400', bg: 'hover:bg-green-500/10 border-green-500/30' },
@@ -654,7 +653,6 @@ export default function LunaControl() {
           <div className="space-y-1 text-sm">
             <StatusRow label="Agente Luna" active={isRunning} />
             <StatusRow label="Chrome CDP" active={status?.chromeConnected} />
-            <StatusRow label="WhatsApp" active={status?.whatsappConnected} />
             <StatusRow label={`Telegram @${telegramStatus.botUsername || 'bot'}`} active={telegramStatus.running} />
             <div className="flex justify-between">
               <span className="text-nexo-muted">Ultimo Scan</span>

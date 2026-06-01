@@ -197,7 +197,6 @@ function ActivityFeed({ changes }) {
               onClick={() => change.details && setSelectedChange(change)}
             >
               <div className={`w-2 h-2 rounded-full ${
-                change.type === 'whatsapp' ? 'bg-nexo-success' :
                 change.type === 'finance' ? 'bg-nexo-primary' :
                 change.type === 'github' ? 'bg-nexo-warning' :
                 'bg-nexo-info'
@@ -222,7 +221,6 @@ function ActivityFeed({ changes }) {
 }
 
 function ExecutiveSummary({ data }) {
-  const messages = data?.messages || []
   const tasks = data?.tasks || []
   const payments = data?.payments || []
 
@@ -250,11 +248,6 @@ function ExecutiveSummary({ data }) {
   const highPriorityTasks = tasks.filter?.(t => t.priority === 'high') || []
   if (highPriorityTasks.length > 0) {
     summary.push(`🔴 ${highPriorityTasks.length} tarefa${highPriorityTasks.length > 1 ? 's' : ''} de alta prioridade`)
-  }
-
-  // WhatsApp
-  if (messages.length > 0) {
-    summary.push(`💬 ${messages.length} mensagens novas no WhatsApp`)
   }
 
   if (summary.length === 0) {
@@ -290,7 +283,6 @@ export default function Operacoes() {
   const { data: opsData } = useRealtime('/api/ops', 10000)
   const { data: cashBox } = useRealtime('/api/cash-box', 30000)
   const { data: payments } = useRealtime('/api/payments', 30000)
-  const { data: wappData } = useRealtime('/api/whatsapp-agent', 30000)
   const { data: tasks } = useRealtime('/api/tasks', 30000)
 
   const [selectedMetric, setSelectedMetric] = useState(null)
@@ -315,13 +307,10 @@ export default function Operacoes() {
   const pendingAmount = (payments || []).filter(p => p.status === 'pending' || p.status === 'waiting_quote')
     .reduce((s, p) => s + (p.totalAmount?.value || 0), 0)
   const totalTasks = (tasks || []).length
-  const wappMessages = wappData?.stats?.totalMessages || 0
-
   const metrics = [
     { title: 'Caixa', value: `€ ${balance.toLocaleString('pt-BR')}`, change: balance >= 0 ? 0 : -100, icon: Activity, color: 'bg-nexo-primary' },
     { title: 'Pendente', value: `€ ${pendingAmount.toLocaleString('pt-BR')}`, icon: Clock, color: 'bg-nexo-warning' },
     { title: 'Tarefas', value: totalTasks, icon: CheckCircle, color: 'bg-nexo-success' },
-    { title: 'WhatsApp', value: wappMessages, icon: MessageSquare, color: 'bg-nexo-info' },
   ]
 
   return (
@@ -350,7 +339,7 @@ export default function Operacoes() {
       </div>
 
       {/* Executive Summary */}
-      <ExecutiveSummary data={{ cashBox, payments, tasks, messages: wappData?.recentMessages || [] }} />
+      <ExecutiveSummary data={{ cashBox, payments, tasks }} />
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-4 gap-4">
@@ -470,7 +459,6 @@ export default function Operacoes() {
           {[
             { name: 'Backend API', status: 'online', latency: '12ms' },
             { name: 'WebSocket', status: 'online', latency: '8ms' },
-            { name: 'WhatsApp Agent', status: wappData?.status === 'needs_login' ? 'warning' : 'online', latency: wappData?.status === 'needs_login' ? 'N/A' : '30s' },
             { name: 'Chrome CDP', status: 'online', latency: '9223' },
           ].map((svc, i) => (
             <div key={i} className="p-3 rounded-lg bg-nexo-card/50 flex items-center gap-3">

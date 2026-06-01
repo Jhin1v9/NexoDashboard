@@ -11,7 +11,6 @@ export const MODULE_SUGGESTIONS = {
     quick: [
       'resumo do dia',
       'tarefas pendentes',
-      'menções no whatsapp',
       'saldo do caixa',
       'leads novos',
     ],
@@ -21,7 +20,6 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'tarefas P0', desc: 'Mostra tarefas críticas (prioridade máxima)' },
       { cmd: 'saldo do caixa', desc: 'Quanto temos disponível no caixa' },
       { cmd: 'leads novos', desc: 'Leads que entraram recentemente no pipeline' },
-      { cmd: 'menções no whatsapp', desc: 'Mensagens onde você foi mencionado' },
       { cmd: 'gastos do mês', desc: 'Total de despesas do mês atual' },
       { cmd: 'criar tarefa', desc: 'Adiciona uma nova tarefa ao sistema' },
     ],
@@ -41,7 +39,7 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'alertas de segurança', desc: 'Alertas ativos e logs de segurança' },
       { cmd: 'resumo do dia', desc: 'Panorama geral do NEXO agora' },
       { cmd: 'tarefas P0', desc: 'Tarefas críticas que precisam de atenção imediata' },
-      { cmd: 'verificar menções', desc: 'Onde você foi marcado no WhatsApp' },
+      { cmd: 'verificar menções', desc: 'Onde você foi mencionado' },
       { cmd: 'criar tarefa', desc: 'Adiciona tarefa com prioridade e responsável' },
       { cmd: 'listar projetos', desc: 'Status de todos os projetos ativos' },
       { cmd: 'leads em negociação', desc: 'Leads que estão perto de fechar' },
@@ -158,26 +156,6 @@ export const MODULE_SUGGESTIONS = {
     ],
   },
 
-  whatsapp: {
-    label: 'WhatsApp',
-    quick: [
-      'mensagens recentes',
-      'verificar menções',
-      'scan do whatsapp',
-      'classificar mensagens',
-      'relatório do grupo',
-    ],
-    help: [
-      { cmd: 'mensagens recentes', desc: 'Últimas mensagens dos grupos' },
-      { cmd: 'verificar menções', desc: 'Onde você foi marcado com @' },
-      { cmd: 'scan do whatsapp', desc: 'Executa scan manual dos grupos' },
-      { cmd: 'classificar mensagens', desc: 'Classifica buffer não processado' },
-      { cmd: 'relatório do grupo', desc: 'Resumo das atividades recentes' },
-      { cmd: 'enviar mensagem', desc: 'Envia zap para um contato' },
-      { cmd: 'tarefas do whatsapp', desc: 'Tarefas detectadas nas mensagens' },
-    ],
-  },
-
   ideas: {
     label: 'Ideias',
     quick: [
@@ -283,8 +261,7 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'status do sistema', desc: 'Panorama geral do NEXO' },
       { cmd: 'criar tarefa', desc: 'Adiciona tarefa ao sistema' },
       { cmd: 'adicionar despesa', desc: 'Registra despesa no financeiro' },
-      { cmd: 'enviar mensagem whatsapp', desc: 'Envia zap para contato' },
-      { cmd: 'responder email', desc: 'Gera resposta com IA' },
+            { cmd: 'responder email', desc: 'Gera resposta com IA' },
       { cmd: 'listar projetos', desc: 'Status dos projetos' },
       { cmd: 'saldo do caixa', desc: 'Financeiro atual' },
     ],
@@ -307,8 +284,7 @@ export const MODULE_SUGGESTIONS = {
       { cmd: 'saldo do caixa', desc: 'Quanto temos disponível' },
       { cmd: 'listar projetos', desc: 'Status dos projetos ativos' },
       { cmd: 'leads novos', desc: 'Potenciais clientes recentes' },
-      { cmd: 'verificar menções', desc: 'Menções no WhatsApp' },
-    ],
+          ],
   },
 }
 

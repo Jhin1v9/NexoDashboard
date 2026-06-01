@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Grid, List, RefreshCw, Link2, ExternalLink, Trash2,
-  Instagram, Youtube, Github, Linkedin, Globe, Twitter,
-  MessageCircle, FileText, Figma, Triangle, Chrome, Music,
+  Youtube, Github, Linkedin, Globe, Twitter,
+  FileText, Figma, Triangle, Chrome, Music,
   BookOpen, MessageSquare, HelpCircle, ChevronDown, ChevronUp,
   AlertTriangle, X
 } from 'lucide-react'
@@ -11,13 +11,11 @@ import { useLinks } from '../hooks/useLinks'
 
 // Mapeamento de ícones por plataforma (lucide-react)
 const PLATFORM_ICONS = {
-  instagram: Instagram,
   tiktok: Music,
   youtube: Youtube,
   github: Github,
   linkedin: Linkedin,
   twitter: Twitter,
-  whatsapp: MessageCircle,
   notion: FileText,
   figma: Figma,
   vercel: Triangle,
@@ -30,13 +28,11 @@ const PLATFORM_ICONS = {
 }
 
 const PLATFORM_LABELS = {
-  instagram: '📱 Instagram',
   tiktok: '🎵 TikTok',
   youtube: '📺 YouTube',
   github: '🐙 GitHub',
   linkedin: '💼 LinkedIn',
   twitter: '🐦 Twitter/X',
-  whatsapp: '💬 WhatsApp',
   notion: '📝 Notion',
   figma: '🎨 Figma',
   vercel: '▲ Vercel',
@@ -49,13 +45,11 @@ const PLATFORM_LABELS = {
 }
 
 const PLATFORM_COLORS = {
-  instagram: '#E4405F',
   tiktok: '#000000',
   youtube: '#FF0000',
   github: '#181717',
   linkedin: '#0A66C2',
   twitter: '#000000',
-  whatsapp: '#25D366',
   notion: '#000000',
   figma: '#F24E1E',
   vercel: '#000000',
@@ -149,7 +143,7 @@ export default function LinkHub() {
               </span>
             )}
           </h2>
-          <p className="text-xs text-nexo-muted mt-1">Links extraídos do WhatsApp, organizados por plataforma</p>
+          <p className="text-xs text-nexo-muted mt-1">Links organizados por plataforma</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -211,13 +205,11 @@ export default function LinkHub() {
             className="px-3 py-1.5 bg-nexo-bg border border-nexo-border rounded-lg text-xs text-nexo-text focus:outline-none focus:border-nexo-primary"
           >
             <option value="all">📁 Todas as Plataformas</option>
-            <option value="instagram">📱 Instagram</option>
             <option value="tiktok">🎵 TikTok</option>
             <option value="youtube">📺 YouTube</option>
             <option value="github">🐙 GitHub</option>
             <option value="linkedin">💼 LinkedIn</option>
             <option value="twitter">🐦 Twitter/X</option>
-            <option value="whatsapp">💬 WhatsApp</option>
             <option value="notion">📝 Notion</option>
             <option value="figma">🎨 Figma</option>
             <option value="vercel">▲ Vercel</option>

@@ -9,7 +9,6 @@ const CATEGORY_ICONS = {
   bugfix: Bug,
   security: Shield,
   performance: Zap,
-  whatsapp: Smartphone,
   finance: DollarSign,
   ai: Brain,
 };
@@ -20,7 +19,6 @@ const CATEGORY_COLORS = {
   bugfix: 'bg-red-500',
   security: 'bg-purple-500',
   performance: 'bg-yellow-500',
-  whatsapp: 'bg-emerald-600',
   finance: 'bg-amber-500',
   ai: 'bg-pink-500',
 };
@@ -31,7 +29,6 @@ const CATEGORY_LABELS = {
   bugfix: 'Correcao',
   security: 'Seguranca',
   performance: 'Performance',
-  whatsapp: 'WhatsApp',
   finance: 'Financeiro',
   ai: 'Inteligência Artificial',
 };

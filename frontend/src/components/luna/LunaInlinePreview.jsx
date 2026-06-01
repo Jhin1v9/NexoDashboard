@@ -27,7 +27,6 @@ const INTENT_ICONS = {
   'email.arquivar': CheckCircle,
   'financeiro.excluir_despesa': Trash2,
   'financeiro.excluir_pagamento': Trash2,
-  'whatsapp.enviar_mensagem': Send,
   'orcamento.deletar': Trash2,
   'orcamento.enviar_cliente': Send,
   'projeto.deletar': Trash2,
@@ -151,7 +150,6 @@ function getItemName(domain) {
     link: 'links',
     ideia: 'ideias',
     orcamento: 'orçamentos',
-    whatsapp: 'mensagens',
   }
   return names[domain] || 'itens'
 }

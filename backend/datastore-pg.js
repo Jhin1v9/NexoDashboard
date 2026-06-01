@@ -696,67 +696,6 @@ async function deleteChangelog(id) {
 }
 
 // ============================================================
-// WHATSAPP HISTORY (schema real — NOMES REAIS)
-// ============================================================
-async function getWhatsappHistory() {
-  const rows = await db.query('SELECT * FROM whatsapp_history ORDER BY timestamp DESC');
-  return rows.map(r => ({
-    id: r.id, text: r.text, body: r.body, author: r.author,
-    authorName: r.author_name, chat: r.chat, chatName: r.chat_name,
-    timestamp: r.timestamp, classification: r.classification,
-    reviewed: r.reviewed, correctedCategory: r.corrected_category,
-    notes: r.notes, sentViaDashboard: r.sent_via_dashboard,
-    direction: r.direction, responded: r.responded,
-    resolvedAuthor: r.resolved_author, createdAt: r.created_at
-  }));
-}
-
-async function saveWhatsappMessage(msg) {
-  await db.run(
-    `INSERT INTO whatsapp_history (id, text, body, author, author_name, chat, chat_name, timestamp, classification, reviewed, corrected_category, notes, sent_via_dashboard, direction, responded, resolved_author, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-     ON CONFLICT (id) DO UPDATE SET
-       text=$2, body=$3, author=$4, author_name=$5, chat=$6, chat_name=$7,
-       timestamp=$8, classification=$9, reviewed=$10, corrected_category=$11,
-       notes=$12, sent_via_dashboard=$13, direction=$14, responded=$15,
-       resolved_author=$16`,
-    [msg.id, msg.text, msg.body, msg.author, msg.authorName, msg.chat,
-     msg.chatName, msg.timestamp, JSON.stringify(msg.classification || {}),
-     msg.reviewed ?? false, msg.correctedCategory, msg.notes,
-     msg.sentViaDashboard ?? false, msg.direction, msg.responded ?? false,
-     JSON.stringify(msg.resolvedAuthor || {}), msg.createdAt || msg.timestamp]
-  );
-  notifyChange('whatsappHistory', await getWhatsappHistory());
-  return msg;
-}
-
-async function saveWhatsappHistory(messages) {
-  for (const msg of messages) {
-    await db.run(
-      `INSERT INTO whatsapp_history (id, text, body, author, author_name, chat, chat_name, timestamp, classification, reviewed, corrected_category, notes, sent_via_dashboard, direction, responded, resolved_author, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       ON CONFLICT (id) DO UPDATE SET
-         text=$2, body=$3, author=$4, author_name=$5, chat=$6, chat_name=$7,
-         timestamp=$8, classification=$9, reviewed=$10, corrected_category=$11,
-         notes=$12, sent_via_dashboard=$13, direction=$14, responded=$15,
-         resolved_author=$16`,
-      [msg.id, msg.text, msg.body, msg.author, msg.authorName, msg.chat,
-       msg.chatName, msg.timestamp, JSON.stringify(msg.classification || {}),
-       msg.reviewed ?? false, msg.correctedCategory, msg.notes,
-       msg.sentViaDashboard ?? false, msg.direction, msg.responded ?? false,
-       JSON.stringify(msg.resolvedAuthor || {}), msg.createdAt || msg.timestamp]
-    );
-  }
-  notifyChange('whatsappHistory', await getWhatsappHistory());
-  return messages;
-}
-
-async function deleteWhatsappMessage(id) {
-  await db.run('DELETE FROM whatsapp_history WHERE id = $1', [id]);
-  notifyChange('whatsappHistory', await getWhatsappHistory());
-}
-
-// ============================================================
 // LUNA THREADS (schema real — NOMES REAIS)
 // ============================================================
 async function getLunaThreads() {
@@ -1302,7 +1241,6 @@ module.exports = {
   getLinks, saveLink, deleteLink,
   getTransactions, saveTransaction, deleteTransaction,
   getChangelog, saveChangelog, deleteChangelog,
-  getWhatsappHistory, saveWhatsappMessage, saveWhatsappHistory, deleteWhatsappMessage,
   getLunaThreads, saveLunaThread, saveLunaThreads, deleteLunaThread,
   getLunaBuffer, saveLunaBuffer,
   getLunaCheckpoint, saveLunaCheckpoint,

@@ -21,10 +21,8 @@ import Clientes from './pages/Clientes'
 import Workspace from './pages/Workspace'
 import Projetos from './pages/Projetos'
 import Tarefas from './pages/Tarefas'
-import WhatsApp from './pages/WhatsApp'
 import EmailHub from './pages/EmailHub'
 import EmailCallback from './pages/EmailCallback'
-import InstagramHub from './pages/InstagramHub'
 import Relatorios from './pages/Relatorios'
 import GitHub from './pages/GitHub'
 import VercelProjects from './pages/VercelProjects'
@@ -72,10 +70,8 @@ function ProtectedLayout() {
             <Route path="/ideias" element={<Ideias />} />
             <Route path="/ideias/nova" element={<IdeaEditor />} />
             <Route path="/ideias/:id" element={<IdeaEditor />} />
-            <Route path="/whatsapp" element={<WhatsApp />} />
             <Route path="/email" element={<EmailHub />} />
             <Route path="/email/oauth/callback" element={<EmailCallback />} />
-            <Route path="/instagram" element={<InstagramHub />} />
             <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/github" element={<GitHub />} />
             <Route path="/vercel" element={<VercelProjects />} />

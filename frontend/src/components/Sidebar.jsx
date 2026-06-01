@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, Mail, MessageCircle, Instagram,
+  LayoutDashboard, Mail, MessageCircle,
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
   Shield, Lightbulb, Bot, Terminal, FolderOpen, FileText,
@@ -16,9 +16,7 @@ const navItems = [
     icon: MessageCircle,
     label: 'Comunicacao',
     children: [
-      { path: '/whatsapp', icon: MessageCircle, label: 'WhatsApp' },
       { path: '/email', icon: Mail, label: 'Email' },
-      { path: '/instagram', icon: Instagram, label: 'Instagram' },
     ]
   },
   {

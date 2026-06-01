@@ -375,43 +375,7 @@ export const INTENT_SCHEMAS = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // WHATSAPP
   // ══════════════════════════════════════════════════════════════════════════
-  'whatsapp.enviar_mensagem': {
-    title: 'Enviar Mensagem WhatsApp',
-    description: 'Preencha os dados para enviar uma mensagem.',
-    fields: {
-      chatName: {
-        label: 'Chat',
-        type: 'select',
-        required: true,
-        options: [
-          { value: '', label: 'Selecionar...' },
-          { value: 'Production', label: 'Production' },
-          { value: 'Dev', label: 'Dev' },
-          { value: 'Test', label: 'Test' },
-        ],
-      },
-      text: {
-        label: 'Mensagem',
-        type: 'textarea',
-        required: true,
-        placeholder: 'Sua mensagem...',
-        rows: 4,
-      },
-    },
-    submitConfig: {
-      method: 'POST',
-      endpoint: '/api/whatsapp/send',
-      transform: (values) => ({
-        chatName: values.chatName,
-        text: values.text,
-      }),
-    },
-    extractEntities: (entities) => ({
-      text: extractEntity(entities, 'mensagem'),
-    }),
-  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ORÇAMENTOS
@@ -474,7 +438,7 @@ export const INTENT_SCHEMAS = {
   // ══════════════════════════════════════════════════════════════════════════
   'sistema.ajuda': {
     title: 'Ajuda da Luna',
-    description: 'Posso ajudar com: emails, tarefas, projetos, clientes, financeiro, WhatsApp, orçamentos, leads e ideias.\n\nTente dizer algo como:\n• "cria tarefa urgente para revisar o site"\n• "quanto temos no caixa"\n• "manda zap pro cliente"\n• "faz proposta para o projeto Nexo"',
+    description: 'Posso ajudar com: emails, tarefas, projetos, clientes, financeiro, orçamentos, leads e ideias.\n\nTente dizer algo como:\n• "cria tarefa urgente para revisar o site"\n• "quanto temos no caixa"\n• "manda zap pro cliente"\n• "faz proposta para o projeto Nexo"',
     isInfo: true,
   },
 
@@ -498,8 +462,7 @@ export const INTENT_SCHEMAS = {
           { value: '/dashboard', label: 'Dashboard' },
           { value: '/tarefas', label: 'Tarefas' },
           { value: '/email', label: 'Email' },
-          { value: '/whatsapp', label: 'WhatsApp' },
-          { value: '/financeiro', label: 'Financeiro' },
+                    { value: '/financeiro', label: 'Financeiro' },
           { value: '/financeiro/caixa', label: 'Caixa' },
           { value: '/clientes', label: 'Clientes' },
           { value: '/orcamentos', label: 'Orçamentos' },
@@ -515,7 +478,7 @@ export const INTENT_SCHEMAS = {
 
   'social': {
     title: 'Oi! 👋',
-    description: 'Oi! Tô por aqui, pronta pra ajudar.\n\nPosso te ajudar com:\n• Criar tarefas, leads, ideias\n• Registrar pagamentos e despesas\n• Consultar caixa, projetos, links\n• Enviar emails e mensagens WhatsApp\n• Verificar menções e notificações\n\nO que você precisa?',
+    description: 'Oi! Tô por aqui, pronta pra ajudar.\n\nPosso te ajudar com:\n• Criar tarefas, leads, ideias\n• Registrar pagamentos e despesas\n• Consultar caixa, projetos, links\n• Enviar emails\n• Verificar menções e notificações\n\nO que você precisa?',
     isInfo: true,
   },
   'email.resumir': {
@@ -594,25 +557,6 @@ export const INTENT_SCHEMAS = {
     },
   },
 
-  'whatsapp.responder_cliente': {
-    title: 'responder_cliente',
-    description: 'Executar ação: responder_cliente',
-    fields: {
-      confirmar: {
-        label: 'Confirmar ação',
-        type: 'checkbox',
-        required: true,
-      },
-    },
-    submitConfig: {
-      method: 'POST',
-      endpoint: '/api/luna/action',
-      transform: (values) => ({
-        intent: 'whatsapp.responder_cliente',
-        confirmed: values.confirmar,
-      }),
-    },
-  },
 
   'orcamento.enviar_cliente': {
     title: 'Enviar ao Cliente',
@@ -686,11 +630,6 @@ export const INTENT_SCHEMAS = {
     },
   },
 
-  'whatsapp.verificar_mencoes': {
-    title: 'Verificar Menções',
-    description: 'Verificar menções pendentes.',
-    isInfo: true,
-  },
 
   'link.listar': {
     title: 'Listar',
@@ -974,61 +913,12 @@ export const INTENT_SCHEMAS = {
     },
   },
 
-  'whatsapp.mensagens_recentes': {
-    title: 'Mensagens Recentes',
-    description: 'Visualizar mensagens recentes.',
-    isInfo: true,
-  },
 
-  'whatsapp.scan': {
-    title: 'Scan',
-    description: 'Escanear mensagens.',
-    isInfo: true,
-  },
 
-  'whatsapp.classificar': {
-    title: 'Classificar Mensagens',
-    description: 'Classificar mensagens.',
-    isInfo: true,
-  },
 
-  'whatsapp.relatorio': {
-    title: 'Relatório',
-    description: 'Gerar relatório.',
-    isInfo: true,
-  },
 
-  'whatsapp.limpar_buffer': {
-    title: 'Limpar Buffer',
-    description: 'Limpar buffer de mensagens.',
-    isInfo: true,
-  },
 
-  'whatsapp.checkpoint': {
-    title: 'Checkpoint',
-    description: 'Criar checkpoint.',
-    isInfo: true,
-  },
 
-  'whatsapp.configurar': {
-    title: 'Configurar',
-    description: 'Configurar integração.',
-    fields: {
-      confirmar: {
-        label: 'Confirmar ação',
-        type: 'checkbox',
-        required: true,
-      },
-    },
-    submitConfig: {
-      method: 'POST',
-      endpoint: '/api/luna/action',
-      transform: (values) => ({
-        intent: 'whatsapp.configurar',
-        confirmed: values.confirmar,
-      }),
-    },
-  },
 
   'sistema.notificacoes_lidas': {
     title: 'Marcar Notificações como Lidas',
@@ -1208,23 +1098,8 @@ export const INTENT_SCHEMAS = {
     isInfo: true,
   },
 
-  'instagram.importar': {
-    title: 'Importar',
-    description: 'Importar dados.',
-    isInfo: true,
-  },
 
-  'instagram.mensagens': {
-    title: 'Mensagens',
-    description: 'Visualizar mensagens.',
-    isInfo: true,
-  },
 
-  'instagram.configurar': {
-    title: 'Configurar',
-    description: 'Configurar integração.',
-    isInfo: true,
-  },
 
   'github.repos': {
     title: 'Repositórios',
@@ -1268,11 +1143,6 @@ export const INTENT_SCHEMAS = {
     isInfo: true,
   },
 
-  'seguranca.testar_whatsapp': {
-    title: 'Testar WhatsApp',
-    description: 'Testar integração WhatsApp.',
-    isInfo: true,
-  },
 
   'seguranca.alerta': {
     title: 'Criar Alerta',
@@ -1520,23 +1390,8 @@ export const INTENT_SCHEMAS = {
     isInfo: true,
   },
 
-  'whatsapp.ver_historico': {
-    title: 'Ver Histórico',
-    description: 'Ver histórico de conversas.',
-    isInfo: true,
-  },
 
-  'whatsapp.sincronizar': {
-    title: 'Sincronizar',
-    description: 'Sincronizar dados atualizados.',
-    isInfo: true,
-  },
 
-  'whatsapp.marcar_nao_lido': {
-    title: 'Marcar como Não Lido',
-    description: 'Marcar como não lido.',
-    isInfo: true,
-  },
 
   'link.excluir': {
     title: 'Excluir',

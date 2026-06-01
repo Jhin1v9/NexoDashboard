@@ -1,13 +1,12 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, LayoutDashboard, Users, Rocket, CheckSquare, MessageCircle, Github, Triangle, Wrench, FileText, DollarSign } from 'lucide-react'
+import { Search, LayoutDashboard, Users, Rocket, CheckSquare, Github, Triangle, Wrench, FileText, DollarSign } from 'lucide-react'
 
 const commands = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Clientes', path: '/clientes', icon: Users },
   { label: 'Projetos', path: '/projetos', icon: Rocket },
   { label: 'Tarefas', path: '/tarefas', icon: CheckSquare },
-  { label: 'WhatsApp', path: '/whatsapp', icon: MessageCircle },
   { label: 'Relatórios', path: '/relatorios', icon: FileText },
   { label: 'GitHub', path: '/github', icon: Github },
   { label: 'Vercel', path: '/vercel', icon: Triangle },

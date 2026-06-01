@@ -5,7 +5,6 @@ import {
   ChevronDown, ChevronUp, MessageSquare, CheckSquare, 
   Lightbulb, Link2, TrendingUp, Clock, Send, AlertCircle
 } from 'lucide-react'
-import axios from 'axios'
 import useRealtime from '../hooks/useRealtime'
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -113,7 +112,6 @@ const ReportCard = ({ report, index, onView, onDownload }) => {
 
 export default function Relatorios() {
   const { data: historyData, loading, error, refetch } = useRealtime('/api/reports/history', 60000)
-  const { data: agentData } = useRealtime('/api/whatsapp-agent', 30000)
   const [viewingReport, setViewingReport] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState('all')
@@ -130,8 +128,7 @@ export default function Relatorios() {
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      await axios.post('/api/whatsapp-agent/refresh')
-      refetch()
+      await refetch()
     } catch (e) {
       console.error('Refresh failed:', e)
     } finally {
@@ -157,8 +154,6 @@ export default function Relatorios() {
     }
   }
 
-  const stats = agentData?.stats || {}
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -166,7 +161,7 @@ export default function Relatorios() {
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <FileText className="text-nexo-primary" />
-            Relatórios WhatsApp
+            Relatórios
           </h1>
           <p className="text-xs text-nexo-muted mt-1">
             Histórico de relatórios gerados automaticamente
@@ -184,9 +179,8 @@ export default function Relatorios() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={MessageSquare} label="Mensagens" value={stats.totalMessages || 0} color="#6366f1" />
-        <StatCard icon={CheckSquare} label="Tarefas" value={stats.totalTasks || 0} color="#f59e0b" />
-        <StatCard icon={Lightbulb} label="Ideias" value={stats.totalIdeas || 0} color="#3b82f6" />
+        <StatCard icon={CheckSquare} label="Tarefas" value={0} color="#f59e0b" />
+        <StatCard icon={Lightbulb} label="Ideias" value={0} color="#3b82f6" />
         <StatCard icon={TrendingUp} label="Relatórios" value={reports.length} color="#22c55e" />
       </div>
 

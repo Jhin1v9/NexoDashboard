@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Bell, X, Check, AlertTriangle, Shield, Info,
-  Zap, Lock, Mail, MessageSquare, DollarSign,
+  Zap, Lock, Mail, DollarSign,
   Trash2, CheckCheck, Filter
 } from 'lucide-react'
 import axios from 'axios'
@@ -47,15 +47,6 @@ const TYPE_CONFIG = {
     border: 'border-amber-500/20',
     dot: 'bg-amber-500',
     severity: 'medium'
-  },
-  whatsapp: {
-    icon: MessageSquare,
-    label: 'WhatsApp',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
-    dot: 'bg-emerald-500',
-    severity: 'low'
   },
   finance: {
     icon: DollarSign,

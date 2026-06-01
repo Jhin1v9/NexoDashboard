@@ -929,39 +929,6 @@ async function sendSecurityDiscordAlert(intruderData, attemptedUser, location, r
   }
 }
 
-// Helper: enviar alerta no WhatsApp (com rate limiting)
-// Retorna { sent: boolean, reason?: string }
-async function sendSecurityWhatsAlert(message, opts = {}) {
-  const { skipRateLimit = false, skipSettingsCheck = false } = opts;
-  const settingsData = readJSON(SECURITY_SETTINGS_FILE, { version: '1.0', settings: {}, lastNotifiedAt: null });
-  const settings = settingsData.settings || {};
-
-  if (!skipSettingsCheck && settings.whatsappAlerts === false) {
-    return { sent: false, reason: 'whatsapp_alerts_disabled' };
-  }
-
-  // Rate limiting: máximo 1 mensagem a cada 5 minutos (exceto para testes)
-  if (!skipRateLimit) {
-    const lastNotified = settingsData.lastNotifiedAt ? new Date(settingsData.lastNotifiedAt).getTime() : 0;
-    const now = Date.now();
-    if (now - lastNotified < 5 * 60 * 1000) {
-      return { sent: false, reason: 'rate_limited', retryAfter: Math.ceil((5 * 60 * 1000 - (now - lastNotified)) / 1000) };
-    }
-  }
-
-  try {
-    const WhatsAppSender = require('./services/whatsapp-sender');
-    const sender = new WhatsAppSender();
-    await sender.sendMessage({ chatName: 'Production', text: message });
-    settingsData.lastNotifiedAt = new Date().toISOString();
-    writeJSON(SECURITY_SETTINGS_FILE, settingsData);
-    return { sent: true };
-  } catch (e) {
-    console.error('[SECURITY] Falha ao enviar WhatsApp:', e.message);
-    return { sent: false, reason: 'send_error', error: e.message };
-  }
-}
-
 // Ensure data dir exists
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -1186,7 +1153,6 @@ const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GH_USERS_FILE = path.join(DATA_DIR, 'github_users.json');
 const VC_USERS_FILE = path.join(DATA_DIR, 'vercel_users.json');
-const WAPP_FILE = path.join(DATA_DIR, 'whatsapp-tasks.json');
 
 // Init defaults
 // (tasks are now persisted in PostgreSQL via datastore-pg.js)
@@ -1220,7 +1186,6 @@ const DEFAULT_PASSWORD_HASH = '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200Ei
 
 if (!fs.existsSync(GH_USERS_FILE)) writeJSON(GH_USERS_FILE, {});
 if (!fs.existsSync(VC_USERS_FILE)) writeJSON(VC_USERS_FILE, {});
-if (!fs.existsSync(WAPP_FILE)) writeJSON(WAPP_FILE, []);
 
 // --- Scanner ---
 function scanClients() {
@@ -1498,7 +1463,7 @@ app.get('/api/predictions', async (req, res) => {
   res.json(await getPredictions(scanClients()));
 });
 
-function normalizeWhatsappBuffer(buffer = {}) {
+function normalizeLunaBuffer(buffer = {}) {
   const messages = buffer.messages || buffer.newMessages || [];
   const tasks = buffer.tasks || buffer.newTasks || [];
   const ideas = buffer.ideas || buffer.newIdeas || [];
@@ -1535,458 +1500,31 @@ function normalizeWhatsappBuffer(buffer = {}) {
 
 async function readLunaBuffer() {
   const data = await dataStore.getLunaBuffer();
-  return normalizeWhatsappBuffer(data);
+  return normalizeLunaBuffer(data);
 }
 
-// WhatsApp tasks (legado)
-// FIX: /api/whatsapp agora retorna dados REAIS do backend/data/luna-buffer.json
-app.get('/api/whatsapp', async (req, res) => {
-    try {
-        res.json(await readLunaBuffer());
-    } catch (e) {
-        // Fallback para legado se erro
-        res.json(readJSON(WAPP_FILE) || []);
-    }
-});
-app.post('/api/whatsapp', (req, res) => {
-  const msgs = readJSON(WAPP_FILE) || [];
-  msgs.push({ ...req.body, id: Date.now().toString(), time: new Date().toISOString() });
-  writeJSON(WAPP_FILE, msgs);
-  res.json({ ok: true });
-});
 
-// WhatsApp Agent v8.0 — Dados do agente inteligente
-const AGENT_DATA_FILE = path.join(DATA_DIR, 'whatsapp-agent-data.json');
 const REPORT_HISTORY_FILE = path.join(DATA_DIR, 'report-history.json');
 const REPORTS_DIR = path.join(DATA_DIR, 'reports');
-const WHATSAPP_HISTORY_FILE = path.join(DATA_DIR, 'whatsapp-history.json');
-const BUFFER_FILE = path.join(DATA_DIR, 'luna-buffer.json');
-const CHECKPOINT_FILE = path.join(DATA_DIR, 'luna-checkpoint.json');
-const HISTORY_FILE = WHATSAPP_HISTORY_FILE;
 const CLIENTS_REGISTRY_FILE = path.join(DATA_DIR, 'schema', 'clients-registry.json');
 
 // Ensure reports dir exists
 if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
 if (!fs.existsSync(REPORT_HISTORY_FILE)) writeJSON(REPORT_HISTORY_FILE, { reports: [] });
-if (!fs.existsSync(WHATSAPP_HISTORY_FILE)) writeJSON(WHATSAPP_HISTORY_FILE, []);
 
 // Serve report files statically
 app.use('/reports', express.static(REPORTS_DIR));
 
-app.get('/api/whatsapp-agent', async (req, res) => {
-  try {
-    const data = readJSON(AGENT_DATA_FILE);
-    const buffer = await readLunaBuffer();
-    const history = await readWhatsappHistory();
-    const payload = data && !Array.isArray(data) ? data : {};
-    
-    // Calcular stats a partir do history.json em tempo real (não dos buffers voláteis)
-    const historyStats = history.reduce((acc, m) => {
-      const cat = m.classification?.category || 'unknown';
-      acc.byCategory[cat] = (acc.byCategory[cat] || 0) + 1;
-      acc.totalMessages++;
-      return acc;
-    }, { totalMessages: 0, byCategory: {} });
-    
-    const stats = {
-      ...(payload.stats || {}),
-      totalMessages: historyStats.totalMessages,
-      totalTasks: historyStats.byCategory['tarefaPendente'] || 0,
-      totalIdeas: historyStats.byCategory['ideia'] || 0,
-      totalDecisions: historyStats.byCategory['decisao'] || 0,
-      totalLinks: historyStats.byCategory['link'] || 0,
-      totalLeads: historyStats.byCategory['lead'] || 0,
-      totalFinance: historyStats.byCategory['financeiro'] || 0,
-      totalIgnored: historyStats.byCategory['ignored'] || 0,
-      totalNews: historyStats.byCategory['noticia'] || 0,
-      totalUrgency: historyStats.byCategory['urgencia'] || 0,
-      historyTotal: history.length,
-      // Manter compatibilidade com buffers para itens ainda não no history
-      bufferTasks: buffer.newTasks?.length || 0,
-      bufferLinks: buffer.newLinks?.length || 0,
-      bufferIdeas: buffer.newIdeas?.length || 0,
-      bufferLeads: buffer.newLeads?.length || 0,
-      bufferFinance: buffer.newFinance?.length || 0
-    };
-    res.json({
-      success: true,
-      ...payload,
-      ...buffer,
-      stats,
-      data: { ...payload, ...buffer, stats },
-      timestamp: new Date().toISOString()
-    });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
 
-app.get('/api/whatsapp-agent/status', async (req, res) => {
-  const data = readJSON(AGENT_DATA_FILE);
-  const buffer = await readLunaBuffer();
-  const history = await readWhatsappHistory();
-  const hasBufferActivity = (buffer.newTasks?.length || 0) + (buffer.newLinks?.length || 0) + (buffer.newLeads?.length || 0) > 0;
-  res.json({
-    active: !!data || hasBufferActivity || history.length > 0,
-    lastUpdate: data?.updatedAt || buffer.lastBufferUpdate || null,
-    historyTotal: history.length,
-    stats: data?.stats || buffer
-  });
-});
 
-async function readWhatsappHistory() {
-  return await dataStore.getWhatsappHistory();
-}
 
-async function writeWhatsappHistory(history) {
-  await dataStore.saveWhatsappHistory(Array.isArray(history) ? history : []);
-}
 
-function classificationCategory(classification) {
-  if (!classification) return 'unknown';
-  if (typeof classification === 'string') return classification;
-  return classification.category || classification.label || 'unknown';
-}
 
-// Resolve autor a partir do contacts-map.json v16.0
-function resolveAuthor(msg) {
-  try {
-    const contacts = schemas.contacts?.contacts || {};
-    const rawAuthor = msg.author || msg.originalAuthor || '';
-    const digits = rawAuthor.replace(/\D/g, '');
 
-    // Cores fixas para founders (quando não há avatar configurado)
-    const founderColors = {
-      'abner': '#3742fa',
-      'enoque': '#2ed573',
-      'elias': '#ffa502'
-    };
 
-    const pickColor = (name) => {
-      const n = (name || '').toLowerCase();
-      for (const [key, color] of Object.entries(founderColors)) {
-        if (n.includes(key)) return color;
-      }
-      return null;
-    };
 
-    // 1. Match exato
-    if (contacts[rawAuthor]) {
-      const c = contacts[rawAuthor];
-      const name = c.displayName || c.shortName || c.fullName || rawAuthor;
-      return {
-        name,
-        shortName: c.shortName || c.displayName || rawAuthor,
-        color: c.avatar?.color || pickColor(name) || '#6B7280',
-        avatar: c.avatar?.url || null,
-        avatarEmoji: c.avatarEmoji || '👤',
-        role: c.role || 'member',
-        phone: c.phones?.primary || digits || rawAuthor,
-        confidence: 1.0
-      };
-    }
 
-    // 2. Match parcial (últimos 8 dígitos)
-    if (digits.length >= 8) {
-      const tail = digits.slice(-8);
-      for (const [key, c] of Object.entries(contacts)) {
-        const keyDigits = key.replace(/\D/g, '');
-        if (keyDigits.slice(-8) === tail) {
-          const name = c.displayName || c.shortName || c.fullName || rawAuthor;
-          return {
-            name,
-            shortName: c.shortName || c.displayName || rawAuthor,
-            color: c.avatar?.color || pickColor(name) || '#6B7280',
-            avatar: c.avatar?.url || null,
-            avatarEmoji: c.avatarEmoji || '👤',
-            role: c.role || 'member',
-            phone: c.phones?.primary || digits || rawAuthor,
-            confidence: 0.8
-          };
-        }
-      }
-    }
 
-    // 3. Match por nome (displayName, shortName, fullName) — para mensagens do Playwright que vêm só com nome
-    // Estratégia 3a: extrair nome do início do texto quando autor está como 'Desconhecido'
-    let searchName = (msg.authorName || msg.pushName || rawAuthor || '').toLowerCase().trim();
-    if ((!searchName || searchName === 'desconhecido' || searchName === '?') && (msg.text || msg.body)) {
-      const text = (msg.text || msg.body).toString();
-      if (text.includes('\n')) {
-        const firstLine = text.split('\n')[0].trim();
-        if (firstLine && firstLine.length > 1 && firstLine.length < 30 && !firstLine.includes('http')) {
-          searchName = firstLine.toLowerCase();
-        }
-      }
-    }
-    if (searchName && searchName !== 'desconhecido' && searchName !== '?') {
-      for (const [key, c] of Object.entries(contacts)) {
-        const names = [
-          (c.displayName || '').toLowerCase(),
-          (c.shortName || '').toLowerCase(),
-          (c.fullName || '').toLowerCase(),
-          (c.codename || '').toLowerCase(),
-          ...(c.aliases || []).map(a => a.toLowerCase())
-        ];
-        // Match exato do nome ou do alias
-        if (names.includes(searchName)) {
-          const name = c.displayName || c.shortName || c.fullName || searchName;
-          return {
-            name,
-            shortName: c.shortName || c.displayName || searchName,
-            color: c.avatar?.color || pickColor(name) || '#6B7280',
-            avatar: c.avatar?.url || null,
-            avatarEmoji: c.avatarEmoji || '👤',
-            role: c.role || 'member',
-            phone: c.phones?.primary || digits || rawAuthor,
-            confidence: 0.7
-          };
-        }
-        // Match parcial: se o nome de busca está contido em algum nome do contato
-        // ou vice-versa (ex: "Enoque" corresponde a "Enoque G Santos Clemente")
-        for (const n of names) {
-          if (n && (n.includes(searchName) || searchName.includes(n))) {
-            const name = c.displayName || c.shortName || c.fullName || searchName;
-            return {
-              name,
-              shortName: c.shortName || c.displayName || searchName,
-              color: c.avatar?.color || pickColor(name) || '#6B7280',
-              avatar: c.avatar?.url || null,
-              avatarEmoji: c.avatarEmoji || '👤',
-              role: c.role || 'member',
-              phone: c.phones?.primary || digits || rawAuthor,
-              confidence: 0.5
-            };
-          }
-        }
-      }
-    }
-
-    // 4. Fallback: usar pushname (nome de exibição do WhatsApp) quando disponível
-    const pushName = msg.pushName || msg.pushname || msg._data?.pushname || msg._data?.notifyName;
-    if (pushName && pushName !== 'Desconhecido') {
-      return {
-        name: pushName,
-        shortName: pushName,
-        color: pickColor(pushName) || '#6B7280',
-        avatar: null,
-        avatarEmoji: '👤',
-        role: 'member',
-        phone: digits || rawAuthor,
-        confidence: 0.3
-      };
-    }
-
-    // 5. Último fallback
-    const fallbackName = msg.authorName || msg.originalAuthor || msg.author || 'Desconhecido';
-    return {
-      name: fallbackName,
-      shortName: fallbackName,
-      color: '#6B7280',
-      avatar: null,
-      avatarEmoji: '👤',
-      role: 'member',
-      phone: digits || rawAuthor,
-      confidence: 0
-    };
-  } catch (e) {
-    return {
-      name: msg.authorName || msg.author || 'Desconhecido',
-      shortName: msg.authorName || msg.author || 'Desconhecido',
-      color: '#6B7280',
-      avatar: null,
-      avatarEmoji: '👤',
-      role: 'member',
-      phone: msg.author || '',
-      confidence: 0
-    };
-  }
-}
-
-app.get('/api/whatsapp/history', async (req, res) => {
-  try {
-    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 50));
-    const chat = (req.query.chat || '').toString().trim().toLowerCase();
-    let messages = await readWhatsappHistory();
-
-    if (chat) {
-      messages = messages.filter(m => (m.chat || '').toLowerCase().includes(chat));
-    }
-
-    messages = messages
-      .slice()
-      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-      .slice(0, limit)
-      .map(m => {
-        // Re-resolve se o author salvo for 'Desconhecido' ou inválido (permite reprocessamento após melhorias no resolver)
-        const hasValidResolved = m.resolvedAuthor && m.resolvedAuthor.name && m.resolvedAuthor.name !== 'Desconhecido';
-        const freshResolved = resolveAuthor(m);
-        const useFresh = !hasValidResolved || freshResolved.confidence > (m.resolvedAuthor?.confidence || 0);
-        return { ...m, resolvedAuthor: useFresh ? freshResolved : m.resolvedAuthor };
-      });
-
-    res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// WhatsApp Send — Enviar mensagem via Playwright CDP
-app.post('/api/whatsapp/send', async (req, res) => {
-  try {
-    const { chatName, text } = req.body;
-    if (!chatName || !text) {
-      return res.status(400).json({ success: false, error: 'chatName e text obrigatorios' });
-    }
-
-    const WhatsAppSender = require('./services/whatsapp-sender');
-    const sender = new WhatsAppSender();
-    const result = await sender.sendMessage({ chatName, text });
-
-    // Salvar no historico como "enviado pelo dashboard"
-    const history = await readWhatsappHistory();
-    history.unshift({
-      id: `sent-${Date.now()}`,
-      text,
-      body: text,
-      author: 'NEXO Dashboard',
-      authorName: 'NEXO Dashboard',
-      chat: chatName,
-      timestamp: new Date().toISOString(),
-      sentViaDashboard: true,
-      direction: 'outgoing',
-      resolvedAuthor: {
-        name: 'NEXO Dashboard',
-        shortName: 'Dashboard',
-        color: '#3b82f6',
-        avatarEmoji: '🤖',
-        role: 'system',
-        confidence: 1.0
-      }
-    });
-    await writeWhatsappHistory(history);
-
-    broadcast({ type: 'whatsapp:sent', data: result });
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/classifications/review', async (req, res) => {
-  try {
-    const limit = Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50));
-    const messages = (await readWhatsappHistory())
-      .filter(m => m.classification && m.reviewed !== true)
-      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-      .slice(0, limit)
-      .map(m => ({
-        id: m.id,
-        text: m.text,
-        author: m.author,
-        chat: m.chat,
-        timestamp: m.timestamp,
-        classification: m.classification
-      }));
-
-    res.json({ success: true, total: messages.length, messages, timestamp: new Date().toISOString() });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.post('/api/classifications/:id/correct', async (req, res) => {
-  try {
-    const { correctCategory, notes } = req.body || {};
-    if (!correctCategory || typeof correctCategory !== 'string') {
-      return res.status(400).json({ success: false, error: 'correctCategory is required' });
-    }
-
-    const history = await readWhatsappHistory();
-    const index = history.findIndex(m => m.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: 'classification not found' });
-    }
-
-    const previousCategory = classificationCategory(history[index].classification);
-    history[index] = {
-      ...history[index],
-      reviewed: true,
-      correctedCategory: correctCategory,
-      reviewedAt: new Date().toISOString(),
-      notes: notes || null
-    };
-    await writeWhatsappHistory(history);
-
-    let learningApplied = false;
-    try {
-      const { SmartClassifier } = require('../agents/SmartClassifier_v16.js');
-      const classifier = new SmartClassifier();
-      classifier.learnFromCorrection(req.params.id, correctCategory, previousCategory);
-      learningApplied = true;
-    } catch (learningError) {
-      console.warn('[CLASSIFICATIONS] Learning fallback:', learningError.message);
-    }
-
-    res.json({
-      success: true,
-      id: req.params.id,
-      previousCategory,
-      correctCategory,
-      learningApplied,
-      message: 'Classification corrected'
-    });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/classifications/stats', async (req, res) => {
-  try {
-    const history = (await readWhatsappHistory()).filter(m => m.classification);
-    const byCategory = {};
-    let reviewed = 0;
-    let corrected = 0;
-
-    for (const item of history) {
-      const category = item.correctedCategory || classificationCategory(item.classification);
-      byCategory[category] = (byCategory[category] || 0) + 1;
-      if (item.reviewed === true) reviewed++;
-      if (item.correctedCategory && item.correctedCategory !== item.classification?.category) corrected++;
-    }
-
-    res.json({
-      success: true,
-      totalClassified: history.length,
-      byCategory,
-      reviewed,
-      pendingReview: Math.max(0, history.length - reviewed),
-      corrected,
-      correctionRate: reviewed ? corrected / reviewed : 0,
-      timestamp: new Date().toISOString()
-    });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// Trigger manual refresh of WhatsApp agent
-app.post('/api/whatsapp-agent/refresh', async (req, res) => {
-  try {
-    const agentPath = path.join(__dirname, '..', 'agents', 'nexo-whatsapp-agent-v8.mjs');
-    
-    const child = spawn('node', [agentPath], {
-      detached: true,
-      stdio: 'ignore',
-      cwd: path.join(__dirname, '..')
-    });
-    child.unref();
-    
-    res.json({ ok: true, message: 'Agent refresh triggered' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
 // Reports history
 app.get('/api/reports/history', (req, res) => {
@@ -3875,7 +3413,6 @@ function getEmojiForCategory(category) {
     bugfix: '🐛',
     security: '🔒',
     performance: 'âš¡',
-    whatsapp: '📱',
     finance: '💰',
   };
   return map[category] || '📝';
@@ -3897,19 +3434,8 @@ app.get('/luna-control', (req, res) => {
 // 1. Status do Luna
 app.get('/api/luna/status', async (req, res) => {
     try {
-        const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
-        const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
-        const history = await readWhatsappHistory();
-
-        let checkpoint = { hashes: [], lastScan: null, version: '14.1' };
-        let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
-
-        if (fs.existsSync(checkpointPath)) {
-            checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
-        }
-        if (fs.existsSync(bufferPath)) {
-            buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
-        }
+        const checkpoint = await dataStore.getLunaCheckpoint();
+        const buffer = await dataStore.getLunaBuffer();
 
         // Verificar se o processo do agente está rodando (daemon ou scheduler)
         const { execSync } = require('child_process');
@@ -3927,29 +3453,19 @@ app.get('/api/luna/status', async (req, res) => {
             } catch (e) { /* não está rodando */ }
         }
 
-        // Verificar conexão com Chrome CDP
-        let chromeConnected = false;
-        try {
-            execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
-            chromeConnected = true;
-        } catch (e) { /* Chrome offline */ }
-
         res.json({
             success: true,
             status: isRunning ? 'running' : 'stopped',
             pid: agentPid,
-            version: checkpoint.version || '18.0',
-            chromeConnected,
-            whatsappConnected: isRunning && chromeConnected,
-            lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
-            totalHashes: checkpoint.hashes?.length || 0,
-            historyTotal: history.length,
-            bufferMessages: buffer.newMessages?.length || 0,
-            bufferTasks: buffer.newTasks?.length || 0,
-            bufferIdeas: buffer.newIdeas?.length || 0,
-            bufferLinks: buffer.newLinks?.length || 0,
-            bufferLeads: buffer.newLeads?.length || 0,
-            sentiment: buffer.sentiment || { positive: 0, negative: 0, urgent: 0 }
+            version: checkpoint?.version || '18.0',
+            lastScan: checkpoint?.lastScan || buffer?.lastBufferUpdate || null,
+            totalHashes: checkpoint?.hashes?.length || 0,
+            bufferMessages: buffer?.newMessages?.length || 0,
+            bufferTasks: buffer?.newTasks?.length || 0,
+            bufferIdeas: buffer?.newIdeas?.length || 0,
+            bufferLinks: buffer?.newLinks?.length || 0,
+            bufferLeads: buffer?.newLeads?.length || 0,
+            sentiment: buffer?.sentiment || { positive: 0, negative: 0, urgent: 0 }
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -4029,54 +3545,6 @@ app.post('/api/luna/control', (req, res) => {
 // 7. Verificar links
 // 8. Forçar relatório
 // 9. Checkpoint
-app.get('/api/whatsapp/checkpoint', (req, res) => {
-    try {
-        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
-        const checkpoint = fs.existsSync(checkpointPath) ? JSON.parse(fs.readFileSync(checkpointPath, 'utf8')) : { hashes: [], lastScan: null, version: '14.1' };
-        res.json(checkpoint);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// 8. Reset checkpoint
-app.delete('/api/whatsapp/checkpoint', (req, res) => {
-    try {
-        const checkpointPath = path.join(__dirname, '..', 'agents', 'luna-checkpoint.json');
-        const emptyCheckpoint = { hashes: [], lastScan: null, version: '14.1', resetAt: new Date().toISOString() };
-        fs.writeFileSync(checkpointPath, JSON.stringify(emptyCheckpoint, null, 2), 'utf8');
-        res.json({ success: true, message: 'Checkpoint resetado. Próximo scan lerá TODAS as mensagens.' });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// 9. Buffer
-app.get('/api/whatsapp/buffer', (req, res) => {
-    try {
-        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
-        const buffer = fs.existsSync(bufferPath) ? JSON.parse(fs.readFileSync(bufferPath, 'utf8')) : { messages: [] };
-        res.json({ buffer });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// 10. Limpar buffer
-app.delete('/api/whatsapp/buffer', (req, res) => {
-    try {
-        const bufferPath = path.join(__dirname, '..', 'agents', 'luna-buffer.json');
-        const emptyBuffer = { 
-            messages: [], tasks: [], ideas: [], decisions: [], 
-            links: [], mentions: [], sentiment: { positive: 0, negative: 0, urgent: 0 },
-            lastUpdated: new Date().toISOString() 
-        };
-        fs.writeFileSync(bufferPath, JSON.stringify(emptyBuffer, null, 2), 'utf8');
-        res.json({ success: true, message: 'Buffer limpo' });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
 
 // 11. Configurações
 app.post('/api/luna/config', (req, res) => {
@@ -4378,7 +3846,6 @@ const LUNA_COMMANDS = {
   'limpar-memoria': { action: 'clear-buffer', description: 'Limpa o buffer de mensagens', category: 'memoria', icon: 'Trash2' },
   'esquecer-tudo': { action: 'reset-checkpoint', description: 'Reset checkpoint (proximo scan le tudo)', category: 'memoria', icon: 'Eraser' },
   'lembrar': { action: 'save-checkpoint', description: 'Salva estado atual como checkpoint', category: 'memoria', icon: 'Save' },
-  'escanear-agora': { action: 'force-scan', description: 'Forca scan imediato do WhatsApp', category: 'acoes', icon: 'Scan' },
   'gerar-relatorio': { action: 'force-report', description: 'Gera relatorio inteligente', category: 'acoes', icon: 'FileText' },
   'verificar-mencoes': { action: 'check-mentions', description: 'Verifica mencoes pendentes', category: 'acoes', icon: 'AtSign' },
   'verificar-links': { action: 'check-links', description: 'Verifica links pendentes', category: 'acoes', icon: 'Link' },
@@ -4425,14 +3892,12 @@ app.get('/api/projects', (req, res) => {
 app.get('/api/luna/analytics', async (req, res) => {
   try {
     const buffer = await dataStore.getLunaBuffer();
-    const history = await dataStore.getWhatsappHistory();
-    const checkpoint = readJSON(CHECKPOINT_FILE, { processedCount: 0, lastScan: null });
+    const checkpoint = await dataStore.getLunaCheckpoint();
 
     const tasks = buffer.newTasks || [];
     const tasksDone = buffer.newTasksDone || [];
     const leads = buffer.newLeads || [];
     const finance = buffer.newFinance || [];
-    const messages = history.messages || history || [];
 
     // Calcular métricas
     const p0Tasks = tasks.filter(t => /P0/i.test(t.priority || ''));
@@ -4452,22 +3917,12 @@ app.get('/api/luna/analytics', async (req, res) => {
       ? Math.round((tasksDone.length / tasks.length) * 100) 
       : 0;
 
-    // Participantes ativos (últimos 7 dias)
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentMessages = messages.filter(m => {
-      const ts = new Date(m.timestamp || m.time || 0).getTime();
-      return ts > sevenDaysAgo;
-    });
-    const activeParticipants = new Set(recentMessages.map(m => m.author || m.authorName)).size;
-
     res.json({
       success: true,
       analytics: {
         overview: {
-          totalMessagesProcessed: checkpoint.processedCount || 0,
-          totalMessagesInHistory: messages.length,
-          activeParticipants: activeParticipants,
-          lastScan: checkpoint.lastScan
+          totalMessagesProcessed: checkpoint?.processedCount || 0,
+          lastScan: checkpoint?.lastScan
         },
         tasks: {
           total: tasks.length,
@@ -4545,12 +4000,6 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
 
     const leads = Object.values(clients.clients || {}).filter(c => c.type === 'lead' || c.status === 'potencial' || c.pipelineStatus);
     const leadsNew = leads.filter(l => l.pipelineStatus === 'novo' || l.status === 'novo');
-
-    const whatsappConfig = configs.integrations?.whatsapp || {};
-    const ignoreWhatsApp = whatsappConfig.ignored === true;
-    const ignoreMessages = whatsappConfig.ignoreMessages !== false;
-    const ignoreLinks = whatsappConfig.ignoreLinks === true;
-    const ignoreMentions = whatsappConfig.ignoreMentions === true;
 
     let ctx = `📊 SNAPSHOT NEXO — ${new Date().toLocaleString('pt-BR')}\n\n`;
 
@@ -4660,18 +4109,6 @@ async function buildDashboardContext(contextModule = null, contextId = null, con
     ctx += `- Total no pipeline: ${leads.length}\n`;
     ctx += `- Novos: ${leadsNew.length}\n`;
 
-    if (!ignoreWhatsApp) {
-      const whatsappFile = path.join(DATA_DIR, 'whatsapp-history.json');
-      const whatsappHistory = readJSON(whatsappFile, []);
-      const mentions = whatsappHistory.filter(m => /@(?:LUNA|KIMI|KIMICLAW)/i.test(m.body || m.text || ''));
-      const pendingMentions = mentions.filter(m => !m.responded);
-      const links = buffer.newLinks || [];
-      ctx += `\n💬 WHATSAPP:\n`;
-      if (!ignoreMentions) ctx += `- Menções @Luna pendentes: ${pendingMentions.length}\n`;
-      if (!ignoreLinks) ctx += `- Links pendentes: ${links.length}\n`;
-      if (!ignoreMessages) ctx += `- Mensagens novas no buffer: ${buffer.newMessages?.length || 0}\n`;
-    }
-
     return ctx;
   } catch (e) {
     console.error('[buildDashboardContext] Erro:', e.message);
@@ -4711,7 +4148,7 @@ async function buildChatFallbackReply(userMessage) {
   // Comandos de status/panorama
   if (msg.includes('status') || msg.includes('panorama') || msg.includes('resumo') || msg.includes('tudo bem') || msg.includes('como anda') || msg.includes('oi') || msg.includes('olá') || msg.includes('opa')) {
     let reply = `👋 Tô aqui! (modo fallback)\n\n📊 Resumo rápido:\n• Tarefas: ${tasks.length} (${p0.length} P0, ${p1.length} P1)\n• Leads: ${leads.length}`;
-    if (buffer.newMessages?.length > 0) reply += `\n• WhatsApp: ${buffer.newMessages.length} mensagem(ões)`;
+
     reply += `\n\n💡 Tenta de novo em alguns minutos ou use comandos diretos como:\n"criar tarefa X", "registrar despesa de 50 em Y", "status"`;
     return reply;
   }
@@ -5620,7 +5057,6 @@ async function processLunaChatRequest(body, authHeader = null) {
           'cliente.deletar': 'excluir_cliente',
           'link.excluir': 'excluir_link',
           'email.enviar': 'enviar_email',
-          'whatsapp.enviar_mensagem': 'enviar_mensagem_whatsapp',
           'tarefa.atualizar': 'atualizar_tarefa',
           'lead.atualizar_status': 'atualizar_lead',
           'lead.converter': 'converter_lead',
@@ -5746,16 +5182,11 @@ async function processLunaChatRequest(body, authHeader = null) {
       // Ideias
       'criar_ideia', 'listar_ideias', 'atualizar_ideia', 'excluir_ideia', 'converter_ideia_em_tarefa',
       'comentar_ideia', 'criar_ideia_de_template', 'listar_templates_ideias',
-      // WhatsApp
-      'consultar_whatsapp', 'verificar_mencoes', 'enviar_mensagem_whatsapp',
-      'escanear_whatsapp', 'limpar_buffer_whatsapp', 'ver_historico_whatsapp', 'ver_classificacoes', 'corrigir_classificacao',
       // Email
       'consultar_emails', 'listar_emails', 'ler_email', 'enviar_email', 'responder_email', 'gerar_rascunho_email',
       'marcar_email_lido', 'marcar_email_nao_lido', 'favoritar_email', 'arquivar_email',
       'mover_para_lixeira', 'marcar_spam', 'aprovar_rascunho', 'rejeitar_rascunho',
       'sugerir_resposta_email', 'resumir_thread_email', 'analizar_email',
-      // Instagram
-      'listar_mensagens_instagram', 'importar_mensagem_instagram',
       // Links
       'listar_links', 'adicionar_link', 'excluir_link', 'enriquecer_link', 'sincronizar_links',
       // Operações
@@ -5764,7 +5195,7 @@ async function processLunaChatRequest(body, authHeader = null) {
       'controlar_servico', 'ver_logs_stack', 'verificar_stack',
       // Administração de Sistema — REMOVIDO (foco no Dashboard)
       // Segurança
-      'consultar_log_seguranca', 'atualizar_config_seguranca', 'testar_whatsapp_seguranca',
+      'consultar_log_seguranca', 'atualizar_config_seguranca',
       // Notificações
       'listar_notificacoes', 'marcar_notificacao_lida', 'marcar_todas_lidas', 'excluir_notificacao',
       // Usuários
@@ -6067,15 +5498,13 @@ REGRAS DE OURO:
 2. Se o usuário perguntar "tudo bem?" / "como anda?" / "oi" → responda com um BRIEFING PROATIVO: tarefas críticas, financeiro, leads, menções.
 3. Se houver P0 pendentes → MENCIONE com urgência (🔴).
 4. Se caixa estiver negativo → ALERTE (🚨).
-5. Se houver menções @Luna pendentes no WhatsApp → MENCIONE.
-6. Para ações de leitura/informação → execute direto, sem pedir confirmação.
-7. Para ações destrutivas (excluir, cancelar pagamento) → confirme antes.
-8. SEMPRE termine com uma SUGESTÃO DE AÇÃO ou pergunta útil. Nunca termine só com "posso ajudar?" genérico.
+5. Para ações de leitura/informação → execute direto, sem pedir confirmação.
+6. Para ações destrutivas (excluir, cancelar pagamento) → confirme antes.
+7. SEMPRE termine com uma SUGESTÃO DE AÇÃO ou pergunta útil. Nunca termine só com "posso ajudar?" genérico.
 
 EXEMPLOS DE SUGESTÕES PROATIVAS:
 - "Quer que eu registre esse pagamento com split automático?"
 - "Posso criar uma tarefa P0 para isso?"
-- "Quer que eu verifique as menções do WhatsApp agora?"
 - "O caixa tá negativo — quer que eu mostre os gastos do mês?"
 
 FORMATAÇÃO:
@@ -6114,7 +5543,7 @@ ${dataContext}`;
         `Todas as minhas conexões com o cérebro (Gemini) estão temporariamente esgotadas. ` +
         `Isso acontece porque usamos o plano gratuito, que tem limite de 20 requisições por dia por projeto do Google Cloud.\n\n` +
         `🔄 **A quota reseta às ${resetInfo.time} (${resetInfo.tz})** — daqui a pouco estou de volta!\n\n` +
-        `Enquanto isso, posso consultar dados locais (tarefas, leads, financeiro, WhatsApp) ` +
+        `Enquanto isso, posso consultar dados locais (tarefas, leads, financeiro) ` +
         `sem precisar do Gemini — só me perguntar! 📊`;
       return { success: true, reply: quotaReply, fallback: true, quotaExhausted: true, resetAt: resetInfo.iso, timestamp: new Date().toISOString() };
     }
@@ -6583,12 +6012,6 @@ function buildConciergeReply(result, authorName) {
         case 'finance':
           parts.push(`💰 Financeiro:\n  • Caixa: €${parseFloat(res.caixa || 0).toFixed(2)}\n  • Recebimentos pendentes: €${parseFloat(res.recebimentosPendentes || 0).toFixed(2)} (${res.clientesPendentes || 0} clientes)\n  • Gastos este mês: €${parseFloat(res.gastosMes || 0).toFixed(2)}`);
           break;
-        case 'whatsapp':
-          parts.push(`💬 WhatsApp:\n  • Menções @Luna pendentes: ${res.mencoesPendentes}\n  • Links pendentes: ${res.linksPendentes}\n  • Mensagens novas: ${res.mensagensNovas}`);
-          if (res.mencoesRecentes?.length > 0) {
-            parts.push(`  Menções recentes:\n${res.mencoesRecentes.map(m => `    - ${m.from}: "${m.text}"`).join('\n')}`);
-          }
-          break;
         case 'idea': parts.push(`ideia anotada`); break;
         case 'link': parts.push(`link salvo`); break;
         case 'task_deleted': parts.push(`🗑️ Tarefa "${res.titulo || res.title}" excluída`); break;
@@ -6633,15 +6056,6 @@ function buildConciergeReply(result, authorName) {
           parts.push(`💰 Caixa: €${parseFloat(res.balance?.value || 0).toFixed(2)}`);
           if (res.history?.length > 0) {
             parts.push(`Últimas movimentações:\n${res.history.map(h => `  • ${h.date || '?'}: ${h.type === 'income' || h.type === 'payment_received' ? '+' : '-'}€${parseFloat(h.amount || 0).toFixed(2)} ${h.description || ''}`).join('\n')}`);
-          }
-          break;
-        case 'whatsapp':
-          parts.push(`💬 WhatsApp:
-  • Menções @Luna pendentes: ${res.mencoesPendentes || 0}
-  • Links pendentes: ${res.linksPendentes || 0}
-  • Mensagens novas: ${res.mensagensNovas || 0}`);
-          if (res.mencoesRecentes?.length > 0) {
-            parts.push(`Menções recentes:\n${res.mencoesRecentes.map(m => `  - ${m.from}: "${m.text}"`).join('\n')}`);
           }
           break;
         case 'help':
@@ -6818,21 +6232,15 @@ app.post('/api/luna/command', async (req, res) => {
       }
       case 'status': {
         // Retorna status em tempo real
-        const checkpointPath = path.join(__dirname, 'data', 'luna-checkpoint.json');
-        const bufferPath = path.join(__dirname, 'data', 'luna-buffer.json');
-        const history = await readWhatsappHistory();
-        let checkpoint = { hashes: [], lastScan: null, version: '18.0' };
-        let buffer = { newMessages: [], newTasks: [], newIdeas: [] };
-        if (fs.existsSync(checkpointPath)) checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
-        if (fs.existsSync(bufferPath)) buffer = JSON.parse(fs.readFileSync(bufferPath, 'utf8'));
+        const checkpoint = await dataStore.getLunaCheckpoint();
+        const buffer = await dataStore.getLunaBuffer();
         result = {
           status: 'ok',
-          version: checkpoint.version || '18.0',
-          lastScan: checkpoint.lastScan || buffer.lastBufferUpdate || null,
-          historyTotal: history.length,
-          bufferMessages: buffer.newMessages?.length || 0,
-          bufferTasks: buffer.newTasks?.length || 0,
-          bufferIdeas: buffer.newIdeas?.length || 0
+          version: checkpoint?.version || '18.0',
+          lastScan: checkpoint?.lastScan || buffer?.lastBufferUpdate || null,
+          bufferMessages: buffer?.newMessages?.length || 0,
+          bufferTasks: buffer?.newTasks?.length || 0,
+          bufferIdeas: buffer?.newIdeas?.length || 0
         };
         break;
       }
@@ -6978,9 +6386,7 @@ app.get('/api/nexo-state', async (req, res) => {
     const members = await dataStore.getMembers();
     const opsState = await dataStore.getOpsState();
     const transactions = await dataStore.getTransactions();
-    const whatsappTasks = readJSON(WAPP_FILE) || [];
-    const agentData = readJSON(AGENT_DATA_FILE) || {};
-    const luna = readJSON(path.join(__dirname, '..', 'agents', 'luna-buffer.json')) || { messages: [], tasks: [], ideas: [] };
+    const luna = await dataStore.getLunaBuffer();
     const reportHistory = readJSON(REPORT_HISTORY_FILE) || { reports: [] };
 
     res.json({
@@ -7008,8 +6414,6 @@ app.get('/api/nexo-state', async (req, res) => {
         members: members,
         opsState: opsState,
         transactions: transactions,
-        whatsappTasks: whatsappTasks,
-        whatsappAgent: agentData,
         luna: luna,
         reportHistory: reportHistory,
 
@@ -8014,58 +7418,6 @@ app.delete('/api/leads/:id', async (req, res) => {
   }
 });
 
-// Instagram Hub API
-// ═══════════════════════════════════════════════════════════════════════════════
-
-app.get('/api/instagram/profile', (req, res) => {
-  try {
-    const profile = {
-      username: 'nexodigital',
-      displayName: 'NEXO Digital',
-      bio: 'Transformando ideias em realidade digital 🚀',
-      profileUrl: 'https://instagram.com/nexodigital',
-      avatarUrl: '/assets/nexo-insta-avatar.jpg',
-      followers: 1250,
-      following: 340,
-      posts: 89,
-      isBusiness: true,
-      category: 'Marketing Agency'
-    };
-    res.json({ success: true, profile });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/instagram/messages', (req, res) => {
-  try {
-    const instaFile = path.join(DATA_DIR, 'instagram-messages.json');
-    const data = fs.existsSync(instaFile) ? JSON.parse(fs.readFileSync(instaFile, 'utf8')) : { messages: [] };
-    res.json({ success: true, messages: data.messages || [] });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.post('/api/instagram/messages/import', (req, res) => {
-  try {
-    const { messages } = req.body;
-    const instaFile = path.join(DATA_DIR, 'instagram-messages.json');
-    const data = fs.existsSync(instaFile) ? JSON.parse(fs.readFileSync(instaFile, 'utf8')) : { messages: [] };
-    let added = 0;
-    for (const msg of (messages || [])) {
-      if (!data.messages.find(m => m.id === msg.id)) {
-        data.messages.unshift({ ...msg, importedAt: new Date().toISOString() });
-        added++;
-      }
-    }
-    fs.writeFileSync(instaFile, JSON.stringify(data, null, 2));
-    res.json({ success: true, added, total: data.messages.length });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
 // Detect Client API
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -8601,13 +7953,6 @@ app.post('/api/auth/login', async (req, res) => {
           event.notificationChannel = (event.notificationChannel || '') + '+discord';
         }
 
-        // Envia para WhatsApp (com rate limit)
-        const msg = `🚨 *ALERTA DE SEGURANÇA — NEXO DASHBOARD*\n\n*Login falho ${recentAttempts.length} vezes seguidas!*\n${risk.isAnonymous ? '⚠️ *CONEXÃO ANÔNIMA DETECTADA*\n' : ''}\n👤 Usuário tentado: ${attemptedUser}\n🌐 IP: ${ip}\n📍 Localização: ${location.city || 'Desconhecido'}, ${location.country || 'Desconhecido'}\n🏢 ISP: ${location.isp || 'Desconhecido'}\n🛡️ VPN/Proxy/Tor: ${risk.isVpn ? 'VPN ' : ''}${risk.isProxy ? 'Proxy ' : ''}${risk.isTor ? 'Tor ' : ''}${risk.isHosting ? 'Hosting ' : ''}\n\n💻 *DISPOSITIVO DO INTRUSO:*\n   Navegador: ${uaParsed.browser}\n   Sistema: ${uaParsed.os}\n   Dispositivo: ${uaParsed.device}\n   Arquitetura: ${uaParsed.arch}\n   GPU: ${deviceInfo.webgl || 'N/A'}\n   Tela: ${deviceInfo.screen || 'N/A'}\n   Idioma: ${deviceInfo.language || 'N/A'}\n   Timezone: ${deviceInfo.timezone || 'N/A'}\n   🆔 Fingerprint: ${deviceInfo.canvas?.slice(0, 16) || 'N/A'}\n\n📸 Câmera: ${images.cameraPhoto ? 'CAPTURADA' : 'N/A'}\n🖥️ Screenshot: ${images.screenshot ? 'CAPTURADO' : 'N/A'}\n\n⏰ Horário: ${new Date().toLocaleString('pt-BR')}\n⚠️ Ação recomendada: Verificar security log no dashboard`;
-        const alertResult = await sendSecurityWhatsAlert(msg);
-        if (alertResult.sent) {
-          event.notified = true;
-          event.notificationChannel = (event.notificationChannel || '') + '+whatsapp';
-        }
 
         // Persistir status de notificação no security log (PG)
         if (event.notified) {
@@ -8775,30 +8120,6 @@ app.put('/api/security/settings', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/security/test-whatsapp — Testa envio de alerta no WhatsApp
-app.post('/api/security/test-whatsapp', requireAuth, async (req, res) => {
-  try {
-    const settingsData = await dataStore.getSecuritySettings();
-    if (settingsData.settings?.whatsappAlerts === false) {
-      return res.status(400).json({ success: false, error: 'Alertas no WhatsApp estão desativados. Ative na aba Segurança primeiro.' });
-    }
-
-    const msg = `🧪 *TESTE DE ALERTA DE SEGURANÇA*\n\nEste é um teste enviado por ${req.user.userId}.\nSe você recebeu, o sistema de alertas está funcionando.\n\n⏰ ${new Date().toLocaleString('pt-BR')}`;
-    const result = await sendSecurityWhatsAlert(msg, { skipRateLimit: true });
-
-    if (result.sent) {
-      res.json({ success: true, message: 'Mensagem de teste enviada no WhatsApp!' });
-    } else if (result.reason === 'rate_limited') {
-      res.status(429).json({ success: false, error: `Rate limit ativo. Tente novamente em ${result.retryAfter}s.`, reason: result.reason });
-    } else if (result.reason === 'send_error') {
-      res.status(502).json({ success: false, error: `Falha ao enviar: ${result.error}`, reason: result.reason });
-    } else {
-      res.status(500).json({ success: false, error: 'Não foi possível enviar a mensagem.', reason: result.reason });
-    }
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATIONS API v1.0 — Notificações Persistentes

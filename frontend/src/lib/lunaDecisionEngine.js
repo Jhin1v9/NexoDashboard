@@ -31,7 +31,7 @@
  */
 
 const DESTRUCTIVE_KEYWORDS = ['apagar', 'deletar', 'excluir', 'remover', 'cancelar']
-const IRREVERSIBLE_INTENTS = ['email.enviar', 'whatsapp.enviar']
+const IRREVERSIBLE_INTENTS = ['email.enviar']
 
 /**
  * Verifica se um intent ou texto indica ação destrutiva.
