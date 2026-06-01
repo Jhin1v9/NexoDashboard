@@ -211,7 +211,7 @@ function votingButtons(sessionId, showButtons = true) {
         { text: `${E.cross} REJEITAR`, callback_data: `vote:${sessionId}:no` }
       ],
       [
-        { text: `${E.link} Abrir Dashboard`, url: `http://192.168.1.33:3456/votacao` }
+        { text: `${E.link} Abrir Dashboard`, url: `${baseUrl}/votacao` }
       ]
     ]
   };
@@ -376,7 +376,7 @@ function buildTaskNotification(task) {
     tagsText + '\n\n' +
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
     '📊 *Atividade:* ' + commentsText + '  |  🕐 Criada em ' + formatDate(task.createdAt) + '\n\n' +
-    '🔗 [▸ ABRIR NO DASHBOARD](http://192.168.1.33:3456/tarefas)'
+    '🔗 [▸ ABRIR NO DASHBOARD](' + escapeMdV2(baseUrl + '/tarefas') + ')'
   );
 }
 
@@ -389,6 +389,8 @@ async function sendTaskNotification(task) {
     console.warn('[TelegramNotifier] GROUP_CHAT_ID não configurado');
     return { sent: false, reason: 'group_chat_id_not_set' };
   }
+
+  const baseUrl = process.env.DASHBOARD_PUBLIC_URL || 'https://nexodashboard.onrender.com';
   
   try {
     const text = buildTaskNotification(task);
@@ -402,7 +404,7 @@ async function sendTaskNotification(task) {
             { text: '👤 Assumir', callback_data: 'task:' + task.id + ':assign' }
           ],
           [
-            { text: '🔗 Abrir Dashboard', url: 'http://192.168.1.33:3456/tarefas' }
+            { text: '🔗 Abrir Dashboard', url: baseUrl + '/tarefas' }
           ]
         ]
       }
@@ -458,9 +460,335 @@ function escapeMarkdown(text) {
   return String(text).replace(/([_\*\[\]\(\)~`>#+\-=|{}.!])/g, '\\$1');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURAÇÕES VISUAIS — LEADS & ROADMAPS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const PROJECT_TYPE_CONFIG = {
+  website:  { emoji: '🌐', label: 'Website / Landing' },
+  app:      { emoji: '📱', label: 'App Mobile' },
+  ecommerce:{ emoji: '🛒', label: 'E-commerce' },
+  sistema:  { emoji: '⚙️', label: 'Sistema / SaaS' },
+  landing:  { emoji: '🎯', label: 'Landing Page' },
+  outro:    { emoji: '📦', label: 'Outro' },
+};
+
+const LEAD_STATUS_CONFIG = {
+  novo:        { emoji: '🆕', label: 'NOVO' },
+  contatado:   { emoji: '📞', label: 'CONTATADO' },
+  proposta:    { emoji: '📄', label: 'PROPOSTA ENVIADA' },
+  negociacao:  { emoji: '🤝', label: 'NEGOCIAÇÃO' },
+  ganho:       { emoji: '✅', label: 'GANHO' },
+  perdido:     { emoji: '❌', label: 'PERDIDO' },
+  potencial:   { emoji: '💡', label: 'POTENCIAL' },
+  ativo:       { emoji: '🟢', label: 'ATIVO' },
+};
+
+const LEAD_SOURCE_CONFIG = {
+  website:     { emoji: '🌐', label: 'Site' },
+  'luna-agent':{ emoji: '🤖', label: 'Luna AI' },
+  manual:      { emoji: '✍️', label: 'Manual' },
+  demo:        { emoji: '🎯', label: 'Demo' },
+  referral:    { emoji: '👥', label: 'Indicação' },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS — PROGRESS BARS & FORMATTING
+// ═══════════════════════════════════════════════════════════════════════════
+
+function roadmapProgressBar(currentIdx, totalPhases) {
+  const filled = '█'.repeat(currentIdx + 1);
+  const empty = '░'.repeat(Math.max(0, totalPhases - currentIdx - 1));
+  return `${filled}${empty}`;
+}
+
+function formatCurrency(value, currency = 'EUR') {
+  const num = parseFloat(value) || 0;
+  const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'BRL' ? 'R$' : currency;
+  return `${symbol} ${num.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** Envia com HTML, fallback para texto plano */
+async function safeSendHtml(chatId, text, extra = {}) {
+  if (!bot) return { sent: false, reason: 'bot_not_initialized' };
+  try {
+    const msg = await bot.sendMessage(chatId, text, { ...extra, parse_mode: 'HTML' });
+    return { sent: true, messageId: msg.message_id };
+  } catch (e) {
+    console.warn('[TelegramNotifier] HTML falhou, enviando sem formatação:', e.message);
+    try {
+      const safeExtra = { ...extra };
+      delete safeExtra.parse_mode;
+      const plain = text.replace(/<[^>]+>/g, '');
+      const msg = await bot.sendMessage(chatId, plain, safeExtra);
+      return { sent: true, messageId: msg.message_id, fallback: true };
+    } catch (e2) {
+      return { sent: false, error: e2.message };
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BUILDER — ROADMAP / META NOTIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildRoadmapNotification(roadmap, creatorName, baseUrl) {
+  const pt = PROJECT_TYPE_CONFIG[roadmap.project_type] || PROJECT_TYPE_CONFIG.outro;
+  const title = escapeHtml(roadmap.title || 'Sem título');
+  const creator = escapeHtml(creatorName || roadmap.created_by || 'Sistema');
+  const value = formatCurrency(roadmap.total_value, roadmap.currency);
+  const phases = roadmap.phases || [];
+  const totalPhases = phases.length;
+  const currentIdx = roadmap.current_phase_index || 0;
+  const progressBar = roadmapProgressBar(currentIdx, totalPhases);
+
+  // Fases list
+  let phasesList = '';
+  if (totalPhases > 0) {
+    phasesList = '\n' + phases.map((p, i) => {
+      const status = i < currentIdx ? '✅' : i === currentIdx ? '▶️' : '⏳';
+      const name = escapeHtml(p.title || `Fase ${i + 1}`);
+      return `   ${status} ${name}`;
+    }).join('\n') + '\n';
+  }
+
+  // Payment schedule
+  let paymentText = '';
+  if (roadmap.payment_schedule && roadmap.payment_schedule.length > 0) {
+    paymentText = '\n💳 <b>Pagamentos:</b>\n' + roadmap.payment_schedule.map(p => {
+      const pct = p.percent || 0;
+      const lbl = escapeHtml(p.label || 'Parcela');
+      const paid = p.paid ? '✅' : '⏳';
+      return `   ${paid} ${lbl} (${pct}%)`;
+    }).join('\n') + '\n';
+  }
+
+  const text = (
+    '<b>╔══════════════════════════════════╗</b>\n' +
+    '🚀 <b>NOVO PROJETO CRIADO</b>\n' +
+    '<b>╚══════════════════════════════════╝</b>\n\n' +
+    '🎯 <b>' + title + '</b>\n\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    pt.emoji + ' <b>Tipo:</b> ' + escapeHtml(pt.label) + '\n' +
+    '💰 <b>Valor:</b> ' + escapeHtml(value) + '\n' +
+    '👤 <b>Criado por:</b> ' + creator + '\n' +
+    '🆔 <b>ID:</b> <code>' + escapeHtml(roadmap.id) + '</code>\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '📊 <b>Progresso das Fases:</b>\n' +
+    '<code>' + progressBar + '</code>  <b>' + (currentIdx + 1) + '/' + totalPhases + '</b>\n' +
+    phasesList +
+    paymentText +
+    '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    '🕐 Criado em ' + escapeHtml(formatDate(roadmap.createdAt || new Date().toISOString())) + '\n\n' +
+    '🔗 <a href="' + (baseUrl + '/metas') + '">▸ ABRIR NO DASHBOARD</a>'
+  );
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '🚀 Ver Projeto', url: baseUrl + '/metas' },
+        { text: '📊 Timeline', url: baseUrl + '/metas' }
+      ],
+      [
+        { text: '💰 Finanças', url: baseUrl + '/financeiro' },
+        { text: '✅ Tarefas', url: baseUrl + '/tarefas' }
+      ]
+    ]
+  };
+
+  return { text, inlineKeyboard };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BUILDER — LEAD NOTIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildLeadNotification(lead, creatorName, baseUrl) {
+  const statusCfg = LEAD_STATUS_CONFIG[lead.pipelineStatus || lead.status] || LEAD_STATUS_CONFIG.novo;
+  const sourceCfg = LEAD_SOURCE_CONFIG[lead.source] || { emoji: '📌', label: lead.source || 'Desconhecida' };
+  const name = escapeHtml(lead.displayName || lead.name || 'Sem nome');
+  const email = escapeHtml(lead.email || 'N/A');
+  const phone = escapeHtml(lead.phone || 'N/A');
+  const company = escapeHtml(lead.companyName || lead.name || 'N/A');
+  const notes = lead.notes
+    ? escapeHtml(lead.notes.slice(0, 400))
+    : '<i>Sem notas</i>';
+  const creator = escapeHtml(creatorName || lead.addedBy || 'Sistema');
+  const value = lead.estimatedValue
+    ? formatCurrency(lead.estimatedValue, lead.currency || 'EUR')
+    : 'N/A';
+
+  let tagsText = '';
+  if (lead.tags && lead.tags.length > 0) {
+    tagsText = '\n🏷️ <b>Tags:</b> ' + lead.tags.map(t => '<code>' + escapeHtml(t) + '</code>').join('  ');
+  }
+
+  const text = (
+    '<b>╔══════════════════════════════════╗</b>\n' +
+    '🎯 <b>NOVO LEAD</b>\n' +
+    '<b>╚══════════════════════════════════╝</b>\n\n' +
+    '👤 <b>' + name + '</b>\n\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    '📧 <b>Email:</b> ' + email + '\n' +
+    '📱 <b>Telefone:</b> ' + phone + '\n' +
+    '🏢 <b>Empresa:</b> ' + company + '\n' +
+    '💰 <b>Valor estimado:</b> ' + escapeHtml(value) + '\n' +
+    '🌐 <b>Fonte:</b> ' + sourceCfg.emoji + ' ' + escapeHtml(sourceCfg.label) + '\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '📝 <b>Notas:</b>\n' +
+    '<i>' + notes + '</i>' +
+    tagsText + '\n\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    statusCfg.emoji + ' <b>Status:</b> ' + escapeHtml(statusCfg.label) + '\n' +
+    '👤 <b>Criado por:</b> ' + creator + '\n' +
+    '🕐 ' + escapeHtml(formatDate(lead.createdAt || new Date().toISOString())) + '\n\n' +
+    '🔗 <a href="' + (baseUrl + '/leads') + '">▸ ABRIR NO DASHBOARD</a>'
+  );
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '👤 Ver Lead', url: baseUrl + '/leads' },
+        { text: '✅ Contatado', callback_data: 'lead:' + lead.id + ':contacted' }
+      ],
+      [
+        { text: '📄 Proposta', callback_data: 'lead:' + lead.id + ':proposal' },
+        { text: '🔗 Dashboard', url: baseUrl + '/dashboard' }
+      ]
+    ]
+  };
+
+  return { text, inlineKeyboard };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SENDER — ROADMAP
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function sendRoadmapNotification(roadmap) {
+  if (!bot) {
+    console.warn('[TelegramNotifier] Bot não inicializado');
+    return { sent: false, reason: 'bot_not_initialized' };
+  }
+  if (!GROUP_CHAT_ID) {
+    console.warn('[TelegramNotifier] GROUP_CHAT_ID não configurado');
+    return { sent: false, reason: 'group_chat_id_not_set' };
+  }
+
+  const baseUrl = process.env.DASHBOARD_PUBLIC_URL || 'https://nexodashboard.onrender.com';
+
+  const users = getUsers();
+  const creator = users[roadmap.created_by]?.name || roadmap.created_by || 'Sistema';
+
+  const { text, inlineKeyboard } = buildRoadmapNotification(roadmap, creator, baseUrl);
+
+  const results = [];
+
+  // Grupo
+  try {
+    const res = await safeSendHtml(GROUP_CHAT_ID, text, {
+      reply_markup: inlineKeyboard,
+      disable_web_page_preview: true
+    });
+    results.push({ chat: 'group', ...res });
+    if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de projeto enviada para o grupo');
+  } catch (err) {
+    results.push({ chat: 'group', sent: false, error: err.message });
+  }
+
+  // DMs CEOs
+  for (const ceo of ['abner', 'nonoke', 'elias']) {
+    const user = users[ceo];
+    if (user?.telegramId) {
+      try {
+        const res = await safeSendV2(user.telegramId, text, {
+          reply_markup: inlineKeyboard,
+          disable_web_page_preview: true
+        });
+        results.push({ chat: 'dm', user: ceo, ...res });
+      } catch (err) {
+        results.push({ chat: 'dm', user: ceo, sent: false, error: err.message });
+      }
+    }
+  }
+
+  return { sent: results.some(r => r.sent), results };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SENDER — LEAD
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function sendLeadNotification(lead) {
+  if (!bot) {
+    console.warn('[TelegramNotifier] Bot não inicializado');
+    return { sent: false, reason: 'bot_not_initialized' };
+  }
+  if (!GROUP_CHAT_ID) {
+    console.warn('[TelegramNotifier] GROUP_CHAT_ID não configurado');
+    return { sent: false, reason: 'group_chat_id_not_set' };
+  }
+
+  const baseUrl = process.env.DASHBOARD_PUBLIC_URL || 'https://nexodashboard.onrender.com';
+
+  const users = getUsers();
+  const creator = users[lead.addedBy]?.name || lead.addedBy || lead.createdBy || 'Sistema';
+
+  const { text, inlineKeyboard } = buildLeadNotification(lead, creator, baseUrl);
+
+  const results = [];
+
+  // Grupo
+  try {
+    const res = await safeSendHtml(GROUP_CHAT_ID, text, {
+      reply_markup: inlineKeyboard,
+      disable_web_page_preview: true
+    });
+    results.push({ chat: 'group', ...res });
+    if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de lead enviada para o grupo');
+  } catch (err) {
+    results.push({ chat: 'group', sent: false, error: err.message });
+  }
+
+  // DMs CEOs
+  for (const ceo of ['abner', 'nonoke', 'elias']) {
+    const user = users[ceo];
+    if (user?.telegramId) {
+      try {
+        const res = await safeSendV2(user.telegramId, text, {
+          reply_markup: inlineKeyboard,
+          disable_web_page_preview: true
+        });
+        results.push({ chat: 'dm', user: ceo, ...res });
+      } catch (err) {
+        results.push({ chat: 'dm', user: ceo, sent: false, error: err.message });
+      }
+    }
+  }
+
+  return { sent: results.some(r => r.sent), results };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════
+
 module.exports = {
   sendVotingNotification,
   sendTaskNotification,
+  sendRoadmapNotification,
+  sendLeadNotification,
+  buildRoadmapNotification,
+  buildLeadNotification,
+  buildTaskNotification,
   sendSimpleMessage,
   resolveMentions,
   escapeMarkdown,

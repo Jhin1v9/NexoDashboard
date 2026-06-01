@@ -7941,6 +7941,16 @@ app.post('/api/leads', async (req, res) => {
       convertedAt: null
     };
     await dataStore.saveLead(lead);
+
+    // Notificar Telegram
+    try {
+      if (taskNotifier?.sendLeadNotification) {
+        taskNotifier.sendLeadNotification(lead).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Leads] Falha ao notificar Telegram:', e.message);
+    }
+
     res.json({ success: true, lead });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -7976,6 +7986,16 @@ app.post('/api/internal/leads', async (req, res) => {
       convertedAt: null
     };
     await dataStore.saveLead(lead);
+
+    // Notificar Telegram
+    try {
+      if (taskNotifier?.sendLeadNotification) {
+        taskNotifier.sendLeadNotification(lead).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[InternalLeads] Falha ao notificar Telegram:', e.message);
+    }
+
     res.json({ success: true, lead });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });

@@ -7,7 +7,7 @@
 
 const { sendLeadNotification, isConfigured: emailConfigured } = require('./email.service');
 const { sendWebhookMessage } = require('./discord-notifier');
-const telegramNotify = require('./telegram-notification.service');
+const telegramNotifier = require('./telegram-notifier');
 
 /**
  * Notifica a equipe NEXO sobre um novo lead
@@ -60,19 +60,24 @@ async function notifyNewLead(lead) {
   }
 
   // 3. Telegram (sempre tenta, é o canal mais rápido para a equipe)
-  if (telegramNotify.isConfigured) {
-    try {
-      results.telegram = await telegramNotify.notifyNewLead({
-        displayName: lead.displayName,
-        email: lead.email,
-        companyName: lead.companyName,
-        companySize: lead.companySize,
-        phone: lead.phone,
-        notes: lead.notes
-      });
-    } catch (err) {
-      results.telegram = { sent: false, error: err.message };
-    }
+  try {
+    results.telegram = await telegramNotifier.sendLeadNotification({
+      displayName: lead.displayName,
+      email: lead.email,
+      companyName: lead.companyName,
+      companySize: lead.companySize,
+      phone: lead.phone,
+      notes: lead.notes,
+      source: lead.source || 'website',
+      status: 'potencial',
+      pipelineStatus: 'novo',
+      estimatedValue: 0,
+      currency: 'EUR',
+      tags: [],
+      createdAt: new Date().toISOString()
+    });
+  } catch (err) {
+    results.telegram = { sent: false, error: err.message };
   }
 
   // Log resumo

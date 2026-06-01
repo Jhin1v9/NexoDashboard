@@ -132,6 +132,18 @@ module.exports = function(dataStore, { requireAuth }) {
         await dataStore.saveTimeline(timeline);
       }
 
+      // Notificar Telegram
+      try {
+        const telegramNotifier = require('../services/telegram-notifier');
+        if (telegramNotifier.sendRoadmapNotification) {
+          telegramNotifier.sendRoadmapNotification(roadmap).catch(err => {
+            console.warn('[Roadmaps] Falha ao notificar Telegram:', err.message);
+          });
+        }
+      } catch (e) {
+        console.warn('[Roadmaps] telegram-notifier não disponível:', e.message);
+      }
+
       res.status(201).json(roadmap);
     } catch (err) {
       console.error('[Roadmaps] Error creating:', err);
