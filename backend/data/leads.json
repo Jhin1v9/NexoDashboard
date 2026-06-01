@@ -5,11 +5,12 @@
     "email": "teste@playwright.com",
     "phone": "+55 11 98888-7777",
     "source": "site",
-    "status": "novo",
+    "status": "ganho",
     "value": 15000,
     "notes": "",
     "createdAt": "2026-06-01T00:10:38.873Z",
-    "updatedAt": "2026-06-01T00:10:38.873Z"
+    "updatedAt": "2026-06-01T00:10:38.873Z",
+    "convertedAt": "2026-06-01T04:29:50.064Z"
   },
   {
     "id": "lead-mpugbsmd",

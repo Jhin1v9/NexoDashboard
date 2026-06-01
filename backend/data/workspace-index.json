@@ -1,7 +1,39 @@
 {
   "versao": "1.0",
-  "ultimaAtualizacao": "2026-05-31T19:41:27.428Z",
+  "ultimaAtualizacao": "2026-06-01T04:29:50.209Z",
   "clientes": [
+    {
+      "id": "lead-1780256971002-o0as",
+      "nome": "Lead E2E Render",
+      "caminho": "lead-1780256971002-o0as",
+      "status": "ativo",
+      "cor": "#22C55E",
+      "responsavel": "abner",
+      "tipo": "cliente",
+      "dataInicio": "2026-05-30T22:00:00.000Z",
+      "orcamentoTotal": 0,
+      "moeda": "EUR",
+      "tags": [],
+      "anotacoes": "",
+      "criadoEm": "2026-05-31T19:49:31.582Z",
+      "atualizadoEm": "2026-05-31T19:49:31.582Z"
+    },
+    {
+      "id": "lead-1780256420004-5ajw",
+      "nome": "Lead Teste Dashboard",
+      "caminho": "lead-1780256420004-5ajw",
+      "status": "ativo",
+      "cor": "#22C55E",
+      "responsavel": "abner",
+      "tipo": "cliente",
+      "dataInicio": "2026-05-30T22:00:00.000Z",
+      "orcamentoTotal": 0,
+      "moeda": "EUR",
+      "tags": [],
+      "anotacoes": "",
+      "criadoEm": "2026-05-31T19:41:27.505Z",
+      "atualizadoEm": "2026-05-31T19:41:27.505Z"
+    },
     {
       "id": "cliente-luna-teste",
       "nome": "Cliente Teste Luna",
@@ -19,12 +51,12 @@
       "atualizadoEm": "2026-05-27T12:50:22.440Z"
     },
     {
-      "id": "lead-1780256420004-5ajw",
-      "nome": "Lead Teste Dashboard",
-      "caminho": "lead-1780256420004-5ajw",
+      "id": "lead-mpugd3mh",
+      "nome": "Lead Teste Playwright",
+      "caminho": "lead-mpugd3mh",
       "status": "ativo",
       "cor": "#22C55E",
-      "responsavel": "abner"
+      "responsavel": "todos"
     }
   ]
 }

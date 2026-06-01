@@ -7813,11 +7813,42 @@ app.post('/api/emails/sync', async (req, res) => {
 
 const LEAD_STATUSES = ['novo', 'contatado', 'proposta_enviada', 'negociacao', 'ganho', 'perdido'];
 
-// GET /api/leads — Lista todos os leads
+// GET /api/leads — Lista todos os leads (PostgreSQL + leads.json fallback)
 app.get('/api/leads', async (req, res) => {
   try {
     const { status, assignedTo, source, search } = req.query;
     let leads = await dataStore.getLeads();
+
+    // Merge with leads.json (file-based leads from Luna Web / Dashboard CRM)
+    try {
+      const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
+      const seen = new Set(leads.map(l => l.id));
+      for (const fl of fileLeads) {
+        if (!seen.has(fl.id)) {
+          leads.push({
+            id: fl.id,
+            displayName: fl.name || fl.displayName,
+            name: fl.name || fl.displayName,
+            email: fl.email || '',
+            phone: fl.phone || '',
+            source: fl.source || 'manual',
+            type: fl.type || 'lead',
+            status: fl.status || 'potencial',
+            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
+            estimatedValue: fl.value || fl.estimatedValue || 0,
+            currency: 'EUR',
+            notes: fl.notes || '',
+            assignedTo: fl.assignedTo || null,
+            tags: fl.tags || [],
+            createdAt: fl.createdAt || new Date().toISOString(),
+            lastContact: null,
+            convertedAt: fl.convertedAt || null
+          });
+        }
+      }
+    } catch (fileErr) {
+      console.warn('[Leads] Erro ao ler leads.json:', fileErr.message);
+    }
 
     if (status) leads = leads.filter(l => l.pipelineStatus === status);
     if (assignedTo) leads = leads.filter(l => l.assignedTo === assignedTo);
@@ -7837,11 +7868,43 @@ app.get('/api/leads', async (req, res) => {
   }
 });
 
-// GET /api/leads/:id — Detalhe de um lead
+// GET /api/leads/:id — Detalhe de um lead (PostgreSQL + leads.json fallback)
 app.get('/api/leads/:id', async (req, res) => {
   try {
     const leads = await dataStore.getLeads();
-    const lead = leads.find(l => l.id === req.params.id);
+    let lead = leads.find(l => l.id === req.params.id);
+
+    // Fallback to leads.json
+    if (!lead) {
+      try {
+        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
+        const fl = fileLeads.find(l => l.id === req.params.id);
+        if (fl) {
+          lead = {
+            id: fl.id,
+            displayName: fl.name || fl.displayName,
+            name: fl.name || fl.displayName,
+            email: fl.email || '',
+            phone: fl.phone || '',
+            source: fl.source || 'manual',
+            type: fl.type || 'lead',
+            status: fl.status || 'potencial',
+            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
+            estimatedValue: fl.value || fl.estimatedValue || 0,
+            currency: 'EUR',
+            notes: fl.notes || '',
+            assignedTo: fl.assignedTo || null,
+            tags: fl.tags || [],
+            createdAt: fl.createdAt || new Date().toISOString(),
+            lastContact: null,
+            convertedAt: fl.convertedAt || null
+          };
+        }
+      } catch (fileErr) {
+        console.warn('[Leads] Erro ao ler leads.json:', fileErr.message);
+      }
+    }
+
     if (!lead) return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     res.json({ success: true, lead });
   } catch (e) {
@@ -7947,7 +8010,41 @@ app.post('/api/leads/:id/convert', async (req, res) => {
   try {
     const leads = await dataStore.getLeads();
     const leadId = req.params.id;
-    const lead = leads.find(l => l.id === leadId);
+    let lead = leads.find(l => l.id === leadId);
+    let fromFile = false;
+
+    // Fallback to leads.json
+    if (!lead) {
+      try {
+        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
+        const fl = fileLeads.find(l => l.id === leadId);
+        if (fl) {
+          lead = {
+            id: fl.id,
+            displayName: fl.name || fl.displayName,
+            name: fl.name || fl.displayName,
+            email: fl.email || '',
+            phone: fl.phone || '',
+            source: fl.source || 'manual',
+            type: fl.type || 'lead',
+            status: fl.status || 'potencial',
+            pipelineStatus: fl.pipelineStatus || fl.status || 'novo',
+            estimatedValue: fl.value || fl.estimatedValue || 0,
+            currency: 'EUR',
+            notes: fl.notes || '',
+            assignedTo: fl.assignedTo || null,
+            tags: fl.tags || [],
+            createdAt: fl.createdAt || new Date().toISOString(),
+            lastContact: null,
+            convertedAt: null
+          };
+          fromFile = true;
+        }
+      } catch (fileErr) {
+        console.warn('[Convert] Erro ao ler leads.json:', fileErr.message);
+      }
+    }
+
     if (!lead) {
       return res.status(404).json({ success: false, error: 'Lead nao encontrado' });
     }
@@ -7959,7 +8056,27 @@ app.post('/api/leads/:id/convert', async (req, res) => {
       pipelineStatus: 'ganho',
       convertedAt: new Date().toISOString()
     };
-    await dataStore.saveLead(updated);
+
+    // Save to PostgreSQL if possible, otherwise update leads.json
+    try {
+      await dataStore.saveLead(updated);
+    } catch (pgErr) {
+      console.warn('[Convert] PostgreSQL save failed, updating leads.json:', pgErr.message);
+    }
+
+    // Always update leads.json for file-based persistence
+    if (fromFile) {
+      try {
+        const fileLeads = readJSON(path.join(DATA_DIR, 'leads.json')) || [];
+        const idx = fileLeads.findIndex(l => l.id === leadId);
+        if (idx >= 0) {
+          fileLeads[idx] = { ...fileLeads[idx], status: 'ganho', convertedAt: updated.convertedAt };
+          writeJSON(path.join(DATA_DIR, 'leads.json'), fileLeads);
+        }
+      } catch (fileErr) {
+        console.warn('[Convert] Erro ao atualizar leads.json:', fileErr.message);
+      }
+    }
 
     // Cria workspace se ainda não existir
     let workspace = null;
@@ -9010,6 +9127,35 @@ app.get('/api/workspace/clients', requireAuth, async (req, res) => {
         estimatedValue: data.estimatedValue || null,
         type: data.type || 'lead'
       });
+    }
+
+    // 3. Leads de leads.json (criados via Luna Web / Dashboard CRM) que ainda não têm workspace
+    try {
+      const leadsPath = path.join(DATA_DIR, 'leads.json');
+      const leadsData = readJSON(leadsPath) || [];
+      for (const lead of leadsData) {
+        if (!lead.id || merged.has(lead.id)) continue;
+        const displayName = lead.name || lead.displayName || lead.company || lead.id;
+        merged.set(lead.id, {
+          id: lead.id,
+          nome: displayName,
+          caminho: lead.id,
+          status: lead.status === 'ganho' ? 'ativo' : (lead.status || 'novo'),
+          cor: lead.cor || lead.color || '#22C55E',
+          responsavel: lead.assignedTo || lead.assignee || 'todos',
+          kind: 'lead',
+          pipelineStatus: lead.pipelineStatus || lead.status || 'novo',
+          email: lead.email || null,
+          phone: lead.phone || null,
+          source: lead.source || null,
+          estimatedValue: lead.value || lead.estimatedValue || null,
+          type: lead.type || 'lead',
+          notes: lead.notes || null,
+          createdAt: lead.createdAt || null
+        });
+      }
+    } catch (leadErr) {
+      console.warn('[Workspace/Leads] Erro ao ler leads.json:', leadErr.message);
     }
 
     const clientes = Array.from(merged.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'));
