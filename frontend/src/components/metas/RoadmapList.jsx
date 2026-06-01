@@ -97,13 +97,7 @@ export default function RoadmapList({ roadmaps, loading, onSelect, activeId, onC
           >
             <ArrowUpDown className="w-3 h-3" />
           </button>
-          <button
-            onClick={onCreate}
-            className="h-7 px-2 rounded-lg bg-nexo-info/10 border border-nexo-info/30 text-nexo-info hover:bg-nexo-info/20 transition-colors"
-            title="Novo Projeto"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
+          {/* Botão Novo Projeto removido da lista — use o botão no header */}
         </div>
       </div>
 

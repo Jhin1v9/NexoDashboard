@@ -8,10 +8,27 @@
 const express = require('express');
 const http = require('http');
 const jwt = require('jsonwebtoken');
+const NodeCache = require('node-cache');
 const router = express.Router();
 
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3456';
-const JWT_SECRET = process.env.JWT_SECRET || 'nexo-test-secret-2026';
+// v5.2: Centralized config
+const config = require('../../../.luna-kernel/config/luna-config');
+
+// v5.2: In-memory cache for read-heavy endpoints
+const cache = new NodeCache({ stdTTL: config.DB.cacheTTL.stats, checkperiod: 60 });
+const CACHE_KEYS = {
+  leads: 'tools:leads',
+  tasks: 'tools:tasks',
+  finance: 'tools:finance',
+  voting: 'tools:voting',
+  stats: 'tools:stats',
+};
+function invalidateCache(...keys) {
+  keys.forEach(k => cache.del(k));
+}
+
+const DASHBOARD_URL = config.URLS.dashboard;
+const JWT_SECRET = config.AUTH.jwtSecret;
 
 // Service token for Dashboard PRO authentication
 function getServiceToken() {
@@ -27,7 +44,7 @@ function dashboardRequest(path, method = 'GET', body = null) {
     const token = getServiceToken();
     const options = {
       hostname: 'localhost',
-      port: 3456,
+      port: config.PORTS.dashboard,
       path,
       method,
       headers: {
@@ -61,6 +78,10 @@ function dashboardRequest(path, method = 'GET', body = null) {
 
 router.get('/api/tools/leads', async (req, res) => {
   try {
+    const cached = cache.get(CACHE_KEYS.leads);
+    if (cached) {
+      return res.json(cached);
+    }
     const result = await dashboardRequest('/api/leads');
     if (result.status !== 200 || !result.body.success) {
       return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
@@ -84,7 +105,9 @@ router.get('/api/tools/leads', async (req, res) => {
       stats.bySource[l.source || 'outro'] = (stats.bySource[l.source || 'outro'] || 0) + 1;
     });
 
-    res.json({ ok: true, leads, stats });
+    const response = { ok: true, leads, stats };
+    cache.set(CACHE_KEYS.leads, response, config.DB.cacheTTL.leads);
+    res.json(response);
   } catch (e) {
     console.error('[LunaTools] leads GET error:', e.message);
     res.status(502).json({ ok: false, error: e.message });
@@ -95,6 +118,7 @@ router.post('/api/tools/leads', async (req, res) => {
   try {
     const { name, email, phone, source, status, value, notes } = req.body;
     if (!name?.trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
+    invalidateCache(CACHE_KEYS.leads, CACHE_KEYS.stats);
 
     const result = await dashboardRequest('/api/leads', 'POST', {
       displayName: name.trim(),
@@ -123,6 +147,10 @@ router.post('/api/tools/leads', async (req, res) => {
 
 router.get('/api/tools/tasks', async (req, res) => {
   try {
+    const cached = cache.get(CACHE_KEYS.tasks);
+    if (cached) {
+      return res.json(cached);
+    }
     const result = await dashboardRequest('/api/tasks');
     if (result.status !== 200 || !Array.isArray(result.body)) {
       return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
@@ -146,7 +174,9 @@ router.get('/api/tools/tasks', async (req, res) => {
       }
     });
 
-    res.json({ ok: true, tasks, stats });
+    const response = { ok: true, tasks, stats };
+    cache.set(CACHE_KEYS.tasks, response, config.DB.cacheTTL.tasks);
+    res.json(response);
   } catch (e) {
     console.error('[LunaTools] tasks GET error:', e.message);
     res.status(502).json({ ok: false, error: e.message });
@@ -157,6 +187,7 @@ router.post('/api/tools/tasks', async (req, res) => {
   try {
     const { title, description, priority, taskType, dueDate, assignedTo } = req.body;
     if (!title?.trim()) return res.status(400).json({ ok: false, error: 'Título obrigatório' });
+    invalidateCache(CACHE_KEYS.tasks, CACHE_KEYS.stats);
 
     const result = await dashboardRequest('/api/tasks', 'POST', {
       title: title.trim(),
@@ -178,20 +209,105 @@ router.post('/api/tools/tasks', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FINANCE API → proxy to Dashboard PRO
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get('/api/tools/finance', async (req, res) => {
+  try {
+    const cached = cache.get(CACHE_KEYS.finance);
+    if (cached) {
+      return res.json(cached);
+    }
+    const result = await dashboardRequest('/api/finance/summary');
+    if (result.status !== 200) {
+      return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
+    }
+    const data = result.body;
+    const response = {
+      ok: true,
+      finance: {
+        balance: data.cashBoxBalance || data.balance?.value || 0,
+        monthlyIncome: data.monthlyIncome || data.totalIncome?.value || 0,
+        monthlyExpenses: data.monthlyExpenses || data.totalExpense?.value || 0,
+        totalExpected: data.totalExpected || 0,
+        totalReceived: data.totalReceived || 0,
+        totalPending: data.totalPending || 0,
+        activeClients: data.activeClients || 0,
+        overduePayments: data.overduePayments || 0,
+        currency: data.balance?.currency || 'EUR'
+      }
+    };
+    cache.set(CACHE_KEYS.finance, response, config.DB.cacheTTL.finance);
+    res.json(response);
+  } catch (e) {
+    console.error('[LunaTools] finance error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VOTING API → proxy to Dashboard PRO
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get('/api/tools/voting', async (req, res) => {
+  try {
+    const cached = cache.get(CACHE_KEYS.voting);
+    if (cached) {
+      return res.json(cached);
+    }
+    const result = await dashboardRequest('/api/voting/sessions');
+    if (result.status !== 200 || !result.body.sessions) {
+      return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
+    }
+    const sessions = result.body.sessions || [];
+    const open = sessions.filter(s => s.status === 'open');
+    const closed = sessions.filter(s => s.status === 'closed');
+    const withVotes = sessions.filter(s => {
+      const votes = s.votes || {};
+      return Object.values(votes).some(v => v !== null);
+    });
+
+    const response = {
+      ok: true,
+      voting: {
+        total: sessions.length,
+        open: open.length,
+        closed: closed.length,
+        voted: withVotes.length,
+        sessions: sessions.slice(0, 20)
+      }
+    };
+    cache.set(CACHE_KEYS.voting, response, config.DB.cacheTTL.voting);
+    res.json(response);
+  } catch (e) {
+    console.error('[LunaTools] voting error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DASHBOARD STATS API → aggregate from Dashboard PRO
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.get('/api/tools/stats', async (req, res) => {
   try {
-    const [leadsRes, tasksRes] = await Promise.all([
+    const cached = cache.get(CACHE_KEYS.stats);
+    if (cached) {
+      return res.json(cached);
+    }
+    const [leadsRes, tasksRes, financeRes, votingRes] = await Promise.all([
       dashboardRequest('/api/leads'),
-      dashboardRequest('/api/tasks')
+      dashboardRequest('/api/tasks'),
+      dashboardRequest('/api/finance/summary'),
+      dashboardRequest('/api/voting/sessions')
     ]);
 
     const leads = (leadsRes.status === 200 && leadsRes.body.success) ? (leadsRes.body.leads || []) : [];
     const tasks = (tasksRes.status === 200 && Array.isArray(tasksRes.body)) ? tasksRes.body : [];
+    const finance = (financeRes.status === 200) ? financeRes.body : {};
+    const votingSessions = (votingRes.status === 200 && votingRes.body.sessions) ? votingRes.body.sessions : [];
 
-    res.json({
+    const response = {
       ok: true,
       stats: {
         leads: {
@@ -209,8 +325,21 @@ router.get('/api/tools/stats', async (req, res) => {
           completed: tasks.filter(t => t.status === 'completed').length,
           highPriority: tasks.filter(t => t.priority === 'Alta' || t.priority === 'high').length,
         },
+        finance: {
+          balance: finance.cashBoxBalance || finance.balance?.value || 0,
+          monthlyIncome: finance.monthlyIncome || 0,
+          monthlyExpenses: finance.monthlyExpenses || 0,
+          activeClients: finance.activeClients || 0,
+          overduePayments: finance.overduePayments || 0,
+        },
+        voting: {
+          total: votingSessions.length,
+          open: votingSessions.filter(s => s.status === 'open').length,
+        }
       }
-    });
+    };
+    cache.set(CACHE_KEYS.stats, response, config.DB.cacheTTL.stats);
+    res.json(response);
   } catch (e) {
     console.error('[LunaTools] stats error:', e.message);
     res.status(502).json({ ok: false, error: e.message });

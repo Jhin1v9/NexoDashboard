@@ -1,11 +1,1 @@
-[
-  {
-    "id": "alert-1780286402258-9dqk",
-    "type": "low_cash",
-    "severity": "high",
-    "message": "Caixa baixo: €-139.44 < €300.00 (2x gastos mensais)",
-    "relatedId": "cash-box",
-    "relatedType": "cashbox",
-    "createdAt": "2026-06-01T04:00:02.258Z"
-  }
-]
+[]

@@ -1,7 +1,23 @@
 {
   "versao": "1.0",
-  "ultimaAtualizacao": "2026-06-01T04:29:50.209Z",
+  "ultimaAtualizacao": "2026-06-01T14:00:24.085Z",
   "clientes": [
+    {
+      "id": "lead-mpugd3mh",
+      "nome": "Lead Teste Playwright",
+      "caminho": "lead-mpugd3mh",
+      "status": "ativo",
+      "cor": "#22C55E",
+      "responsavel": "todos",
+      "tipo": "cliente",
+      "dataInicio": "2026-05-31T22:00:00.000Z",
+      "orcamentoTotal": 0,
+      "moeda": "EUR",
+      "tags": [],
+      "anotacoes": "",
+      "criadoEm": "2026-06-01T04:29:50.452Z",
+      "atualizadoEm": "2026-06-01T04:29:50.452Z"
+    },
     {
       "id": "lead-1780256971002-o0as",
       "nome": "Lead E2E Render",
@@ -51,9 +67,9 @@
       "atualizadoEm": "2026-05-27T12:50:22.440Z"
     },
     {
-      "id": "lead-mpugd3mh",
-      "nome": "Lead Teste Playwright",
-      "caminho": "lead-mpugd3mh",
+      "id": "lead-1780322399993-26kh",
+      "nome": "Jess",
+      "caminho": "lead-1780322399993-26kh",
       "status": "ativo",
       "cor": "#22C55E",
       "responsavel": "todos"

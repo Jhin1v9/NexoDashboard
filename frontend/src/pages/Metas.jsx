@@ -52,7 +52,7 @@ export default function Metas() {
           loading={loading}
           onSelect={handleSelect}
           activeId={selectedId}
-          onCreate={() => {}}
+          onCreate={handleCreate}
         />
       </div>
 

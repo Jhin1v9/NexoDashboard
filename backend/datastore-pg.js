@@ -103,6 +103,7 @@ async function getCompanyTasks() {
     id: r.id, title: r.title, description: r.description, status: r.status,
     priority: r.priority, taskType: r.task_type, dueDate: r.due_date,
     addedBy: r.added_by, assignedTo: r.assigned_to, source: r.source,
+    linkedRoadmapId: r.source_roadmap_id, linkedTimelineId: r.source_timeline_id,
     comments: r.comments || [], createdAt: r.created_at, updatedAt: r.updated_at,
     startedAt: r.started_at, completedAt: r.completed_at
   }));
@@ -110,14 +111,16 @@ async function getCompanyTasks() {
 
 async function saveCompanyTask(task) {
   await db.run(
-    `INSERT INTO company_tasks (id, title, description, status, priority, task_type, due_date, added_by, assigned_to, source, comments, created_at, updated_at, started_at, completed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+    `INSERT INTO company_tasks (id, title, description, status, priority, task_type, due_date, added_by, assigned_to, source, source_roadmap_id, source_timeline_id, metadata, comments, created_at, updated_at, started_at, completed_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
      ON CONFLICT (id) DO UPDATE SET
        title=$2, description=$3, status=$4, priority=$5, task_type=$6,
-       due_date=$7, added_by=$8, assigned_to=$9, source=$10, comments=$11,
-       updated_at=$13, started_at=$14, completed_at=$15`,
+       due_date=$7, added_by=$8, assigned_to=$9, source=$10, source_roadmap_id=$11, source_timeline_id=$12,
+       metadata=$13, comments=$14, updated_at=$16, started_at=$17, completed_at=$18`,
     [task.id, task.title, task.description, task.status, task.priority, task.taskType,
      task.dueDate, task.addedBy, task.assignedTo, task.source,
+     task.linkedRoadmapId || null, task.linkedTimelineId || null,
+     JSON.stringify(task.metadata || {}),
      JSON.stringify(task.comments || []), task.createdAt, task.updatedAt,
      task.startedAt, task.completedAt]
   );
@@ -145,6 +148,7 @@ async function getPayments() {
     paymentTerms: r.payment_terms, methodPreferred: r.method_preferred,
     methodAccepted: r.method_accepted, revenueSplit: r.revenue_split,
     transactions: r.transactions, notes: r.notes, links: r.links,
+    linkedRoadmapId: r.linked_roadmap_id, linkedTimelineId: r.linked_timeline_id,
     companySharePercent: parseFloat(r.company_share_percent) || 25,
     createdAt: r.created_at, updatedAt: r.updated_at
   }));
@@ -152,13 +156,14 @@ async function getPayments() {
 
 async function savePayment(payment) {
   await db.run(
-    `INSERT INTO payments (payment_id, id, client_id, client_name, client_short_name, project_name, project_id, description, total_amount, equivalent_eur, status, payment_terms, method_preferred, method_accepted, revenue_split, transactions, notes, links, company_share_percent, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+    `INSERT INTO payments (payment_id, id, client_id, client_name, client_short_name, project_name, project_id, description, total_amount, equivalent_eur, status, payment_terms, method_preferred, method_accepted, revenue_split, transactions, notes, links, linked_roadmap_id, company_share_percent, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
      ON CONFLICT (payment_id) DO UPDATE SET
        id=$2, client_id=$3, client_name=$4, client_short_name=$5, project_name=$6,
        project_id=$7, description=$8, total_amount=$9, equivalent_eur=$10, status=$11,
        payment_terms=$12, method_preferred=$13, method_accepted=$14, revenue_split=$15,
-       transactions=$16, notes=$17, links=$18, company_share_percent=$19, updated_at=$21`,
+       transactions=$16, notes=$17, links=$18, linked_roadmap_id=$19,
+       company_share_percent=$20, updated_at=$22`,
     [
       payment.paymentId || payment.id, payment.id || payment.paymentId,
       payment.clientId, payment.clientName, payment.clientShortName || '',
@@ -170,6 +175,7 @@ async function savePayment(payment) {
       JSON.stringify(payment.revenueSplit || []),
       JSON.stringify(payment.transactions || []),
       payment.notes || '', JSON.stringify(payment.links || {}),
+      payment.linkedRoadmapId || null,
       payment.companySharePercent || 25, payment.createdAt, payment.updatedAt
     ]
   );

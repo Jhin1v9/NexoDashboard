@@ -321,16 +321,15 @@ module.exports = function(app, { requireAuth, dataStore }) {
             status: 'completed',
             priority: 'high',
             source: 'roadmap_review',
-            assigned_to: resultSession.createdBy,
+            assignedTo: resultSession.createdBy,
             addedBy: 'voting-auto',
             comments: [],
-            tags: ['revisão', 'aprovada'],
+            linkedRoadmapId: resultSession.linkedRoadmapId,
+            linkedTimelineId: resultSession.linkedTimelineId,
             metadata: {
-              linked_roadmap_id: resultSession.linkedRoadmapId,
-              linked_timeline_id: resultSession.linkedTimelineId,
               voting_session_id: resultSession.id
             },
-            completed_at: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
             createdAt: new Date().toISOString()
           };
           await dataStore.saveCompanyTask(task);

@@ -198,5 +198,35 @@
       "nonoke": null,
       "elias": null
     }
+  },
+  {
+    "id": "vote_test_1780287407865",
+    "title": "Revisão: Discovery & Design",
+    "description": "Revisão em grupo da fase de Discovery",
+    "type": "review",
+    "toolName": null,
+    "toolParams": null,
+    "linkedTimelineId": "timeline_test_coder_1780287407211",
+    "linkedRoadmapId": "roadmap_test_1780287407029",
+    "reviewMeetingAt": "2026-06-02T04:16:47.865Z",
+    "status": "approved",
+    "quorumRequired": 2,
+    "createdBy": "test-e2e",
+    "createdAt": "2026-06-01T04:16:47.865Z",
+    "closedAt": "2026-06-01T04:16:47.865Z",
+    "result": "approved",
+    "executionResult": null,
+    "votes": {
+      "abner": {
+        "vote": "yes",
+        "votedAt": "2026-06-01T04:16:47.865Z",
+        "comment": "Aprovado!"
+      },
+      "nonoke": {
+        "vote": "yes",
+        "votedAt": "2026-06-01T04:16:47.865Z",
+        "comment": "OK"
+      }
+    }
   }
 ]

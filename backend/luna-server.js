@@ -12,10 +12,13 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
+// v5.2: Centralized config
+const config = require('../../.luna-kernel/config/luna-config');
+
 const app = express();
-const PORT = process.env.LUNA_PORT || 3458;
-const LUNA_DIR = path.resolve(__dirname, '../../.luna-kernel');
-const RUNTIME_PATH = path.join(LUNA_DIR, '.luna-runtime.json');
+const PORT = config.PORTS.luna;
+const LUNA_DIR = config.LUNA_KERNEL_DIR;
+const RUNTIME_PATH = config.PATHS.runtime;
 
 // ── Load Luna Kernel .env (same as old config-server.cjs) ──
 const lunaEnvPath = path.join(LUNA_DIR, '.env');
@@ -32,8 +35,8 @@ if (fs.existsSync(lunaEnvPath)) {
 
 // Write runtime config so frontend dev server can discover our port
 fs.writeFileSync(RUNTIME_PATH, JSON.stringify({ apiPort: PORT, apiUrl: `http://localhost:${PORT}` }));
-const JWT_SECRET = process.env.JWT_SECRET || 'nexo-test-secret-2026';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
+const JWT_SECRET = config.AUTH.jwtSecret;
+const JWT_EXPIRES_IN = config.AUTH.jwtExpiresIn;
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 
 // ── Auth helpers (copied from Dashboard server.js) ──
@@ -104,7 +107,7 @@ const lunaToolsRouter = require('./routes/luna-tools');
 app.use(lunaToolsRouter);
 
 // Static files
-const STATIC_DIR = path.join(__dirname, '../../.luna-kernel/luna-web/dist');
+const STATIC_DIR = config.PATHS.lunaDist;
 console.log('[Luna Server] Serving static from:', STATIC_DIR, 'exists:', fs.existsSync(STATIC_DIR));
 console.log('[Luna Server] Assets exists:', fs.existsSync(path.join(STATIC_DIR, 'assets')));
 console.log('[Luna Server] __dirname:', __dirname);
@@ -127,7 +130,7 @@ app.get('/config.html', (req, res) => {
 
 // SPA fallback — MUST be after all API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../.luna-kernel/luna-web/dist/index.html'));
+  res.sendFile(path.join(config.PATHS.lunaDist, 'index.html'));
 });
 
 app.listen(PORT, () => {

@@ -10,12 +10,15 @@ const router = express.Router();
 const db = require('./db');
 const JSZip = require('jszip');
 
+// v5.2: Centralized config
+const config = require('../../.luna-kernel/config/luna-config');
+
 // ============================================================
 // Luna Soul lazy initialization
 // ============================================================
-const LUNA_DIR = path.resolve(__dirname, '../../.luna-kernel');
+const LUNA_DIR = config.LUNA_KERNEL_DIR;
 const SOUL_PATH = path.join(LUNA_DIR, 'luna-soul.cjs');
-const ENV_PATH = path.join(LUNA_DIR, '.env');
+const ENV_PATH = config.PATHS.env;
 let lunaSoul = null;
 let lunaReady = false;
 
@@ -44,7 +47,7 @@ const sseConnections = new Map(); // sessionId -> Set of {res, keepAlive, checkI
 // Periodic cleanup of orphaned activeStreams (e.g. client disconnect without close event)
 setInterval(() => {
   const now = Date.now();
-  const maxAge = 10 * 60 * 1000; // 10 minutes
+  const maxAge = config.TIMEOUTS.orphanStreamCleanup;
   for (const [id, meta] of activeStreams) {
     if (meta.createdAt && (now - meta.createdAt > maxAge)) {
       console.warn(`[WEB] Cleaning orphaned stream ${id} (age ${Math.round((now - meta.createdAt) / 1000)}s)`);
@@ -73,12 +76,13 @@ function generateWebSessionId() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-function createWebSession(title = 'Nova conversa', mode = 'thinking') {
+function createWebSession(title = 'Nova conversa', mode = 'thinking', persona = 'default') {
   const id = generateWebSessionId();
   const session = {
     id,
     title,
     mode,
+    persona,
     messages: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -86,9 +90,9 @@ function createWebSession(title = 'Nova conversa', mode = 'thinking') {
   webSessions.set(id, session);
   // Persistir no PostgreSQL (fire-and-forget with retry)
   dbRunWithRetry(
-    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, messages, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, NOW(), NOW())`,
-    [id, 'anonymous', title, mode, JSON.stringify([])]
+    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())`,
+    [id, 'anonymous', title, mode, persona, JSON.stringify([])]
   ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
   return session;
 }
@@ -96,7 +100,7 @@ function createWebSession(title = 'Nova conversa', mode = 'thinking') {
 async function loadSessionFromDB(id) {
   try {
     const row = await db.get(
-      `SELECT id, title, mode, messages, created_at, updated_at 
+      `SELECT id, title, mode, persona, messages, created_at, updated_at 
        FROM luna_chat_sessions WHERE id = $1`,
       [id]
     );
@@ -105,6 +109,7 @@ async function loadSessionFromDB(id) {
       id: row.id,
       title: row.title,
       mode: row.mode,
+      persona: row.persona || 'default',
       messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -296,6 +301,7 @@ router.post('/api/chat', async (req, res) => {
       sessionId: session.id,
       userId: 'web-' + session.id,
       mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'thinking',
+      persona: session.persona || 'default',
     });
 
     for await (const ev of stream) {
@@ -481,7 +487,7 @@ router.get('/api/chat/session/:id/messages', async (req, res) => {
 
 // POST /api/chat/session — create/rename/delete
 router.post('/api/chat/session', async (req, res) => {
-  const { action, sessionId, title } = req.body;
+  const { action, sessionId, title, persona } = req.body;
 
   switch (action) {
     case 'create': {
@@ -500,6 +506,23 @@ router.post('/api/chat/session', async (req, res) => {
       }
       break;
     }
+    case 'setPersona': {
+      if (!sessionId || !persona) return res.status(400).json({ ok: false, error: 'sessionId e persona obrigatórios' });
+      let session = getWebSession(sessionId);
+      if (!session) session = await loadSessionFromDB(sessionId);
+      if (session) {
+        session.persona = persona;
+        session.updatedAt = new Date().toISOString();
+        dbRunWithRetry(
+          `UPDATE luna_chat_sessions SET persona = $1, updated_at = NOW() WHERE id = $2`,
+          [persona, sessionId]
+        ).catch(e => console.error('[DB] Erro ao atualizar persona:', e.message));
+        res.json({ ok: true, persona });
+      } else {
+        res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
+      }
+      break;
+    }
     case 'delete': {
       if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
       if (deleteWebSession(sessionId)) {
@@ -510,7 +533,7 @@ router.post('/api/chat/session', async (req, res) => {
       break;
     }
     default:
-      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, delete' });
+      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, setPersona, delete' });
   }
 });
 
@@ -1273,5 +1296,82 @@ function setupAuth({ validateCredentials, generateToken, requireAuth }) {
     res.json({ ok: true, user: req.user });
   });
 }
+
+// GET /api/personas — list available personas
+router.get('/api/personas', (req, res) => {
+  try {
+    const fs = require('fs');
+    const personasDir = config.PATHS.personas;
+    const personas = [];
+    if (fs.existsSync(personasDir)) {
+      const files = fs.readdirSync(personasDir).filter(f => f.endsWith('.md'));
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(personasDir, file), 'utf8');
+        const nameMatch = content.match(/name:\s*(.+)/);
+        const descMatch = content.match(/description:\s*(.+)/);
+        personas.push({
+          id: file.replace('.md', ''),
+          name: nameMatch ? nameMatch[1].trim() : file.replace('.md', ''),
+          description: descMatch ? descMatch[1].trim() : '',
+        });
+      }
+    }
+    res.json({ ok: true, personas });
+  } catch (e) {
+    console.error('[PERSONAS] Error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ============================================================
+// System Routes — heartbeat, turnoff, health
+// ============================================================
+
+// POST /api/system/heartbeat — keep the agent page alive
+router.post('/api/system/heartbeat', async (req, res) => {
+  const { userId } = req.body;
+  try {
+    const luna = await getLunaSoul();
+    if (luna.kimiBridge) {
+      const uid = userId || 'web-default';
+      luna.kimiBridge.setPersistent(uid);
+      // Update lastActivity to prevent idle cleanup
+      const session = luna.kimiBridge.userSessions.get(uid);
+      if (session) {
+        session.lastActivity = Date.now();
+      }
+    }
+    res.json({ ok: true, persistent: true });
+  } catch (e) {
+    console.error('[HEARTBEAT] Error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /api/system/turnoff — explicitly close the agent page
+router.post('/api/system/turnoff', async (req, res) => {
+  const { userId } = req.body;
+  try {
+    const luna = await getLunaSoul();
+    if (luna.kimiBridge) {
+      const uid = userId || 'web-default';
+      luna.kimiBridge.unsetPersistent(uid);
+      const session = luna.kimiBridge.userSessions.get(uid);
+      if (session && session.page && !session.page.isClosed()) {
+        await session.page.close().catch(() => {});
+      }
+      luna.kimiBridge.userSessions.delete(uid);
+      const ctx = luna.kimiBridge.userContexts.get(uid);
+      if (ctx && typeof ctx.close === 'function') {
+        await ctx.close().catch(() => {});
+        luna.kimiBridge.userContexts.delete(uid);
+      }
+    }
+    res.json({ ok: true, message: 'Luna desligada. Envie uma mensagem para acordar.' });
+  } catch (e) {
+    console.error('[TURNOFF] Error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 module.exports = { router, setupAuth, getLunaSoul };
