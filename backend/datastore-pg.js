@@ -895,6 +895,153 @@ async function deleteWorkspaceClient(id) {
 }
 
 // ============================================================
+// PROJECT ROADMAPS
+// ============================================================
+async function getRoadmaps(filters = {}) {
+  let sql = 'SELECT * FROM project_roadmaps WHERE deleted_at IS NULL';
+  const params = [];
+  let idx = 1;
+  if (filters.status) { sql += ` AND status=$${idx++}`; params.push(filters.status); }
+  if (filters.client_id) { sql += ` AND client_id=$${idx++}`; params.push(filters.client_id); }
+  if (filters.project_type) { sql += ` AND project_type=$${idx++}`; params.push(filters.project_type); }
+  sql += ' ORDER BY updated_at DESC';
+  return await db.query(sql, params);
+}
+
+async function getRoadmapById(id) {
+  return await db.get('SELECT * FROM project_roadmaps WHERE id=$1 AND deleted_at IS NULL', [id]);
+}
+
+async function saveRoadmap(data) {
+  const existing = await db.get('SELECT id FROM project_roadmaps WHERE id=$1', [data.id]);
+  if (existing) {
+    await db.run(
+      `UPDATE project_roadmaps SET title=$2, client_id=$3, lead_id=$4, project_type=$5,
+       status=$6, total_value=$7, currency=$8, payment_schedule=$9, github_repo=$10,
+       subdomain=$11, current_phase_index=$12, phases=$13, expected_end_date=$14,
+       onboarding_answers=$15, updated_at=NOW() WHERE id=$1`,
+      [data.id, data.title, data.client_id, data.lead_id, data.project_type,
+       data.status, data.total_value, data.currency, JSON.stringify(data.payment_schedule || []),
+       data.github_repo, data.subdomain, data.current_phase_index,
+       JSON.stringify(data.phases || []), data.expected_end_date,
+       JSON.stringify(data.onboarding_answers || {})]
+    );
+  } else {
+    await db.run(
+      `INSERT INTO project_roadmaps (id, title, client_id, lead_id, project_type, status,
+       total_value, currency, payment_schedule, github_repo, subdomain, current_phase_index,
+       phases, expected_end_date, onboarding_answers, created_by, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())`,
+      [data.id, data.title, data.client_id, data.lead_id, data.project_type,
+       data.status, data.total_value, data.currency, JSON.stringify(data.payment_schedule || []),
+       data.github_repo, data.subdomain, data.current_phase_index,
+       JSON.stringify(data.phases || []), data.expected_end_date,
+       JSON.stringify(data.onboarding_answers || {}), data.created_by]
+    );
+  }
+  notifyChange('roadmaps', await getRoadmaps());
+  return data;
+}
+
+async function deleteRoadmap(id) {
+  await db.run('UPDATE project_roadmaps SET deleted_at=NOW() WHERE id=$1', [id]);
+  notifyChange('roadmaps', await getRoadmaps());
+  return true;
+}
+
+// ============================================================
+// PROJECT TIMELINES
+// ============================================================
+async function getTimelines(roadmapId) {
+  return await db.query('SELECT * FROM project_timelines WHERE roadmap_id=$1 ORDER BY created_at', [roadmapId]);
+}
+
+async function getTimelineById(id) {
+  return await db.get('SELECT * FROM project_timelines WHERE id=$1', [id]);
+}
+
+async function saveTimeline(data) {
+  const existing = await db.get('SELECT id FROM project_timelines WHERE id=$1', [data.id]);
+  if (existing) {
+    await db.run(
+      `UPDATE project_timelines SET title=$2, role=$3, assigned_to=$4, parent_timeline_id=$5,
+       steps=$6, current_step_index=$7, status=$8, version=version+1, updated_at=NOW()
+       WHERE id=$1 AND version=$9`,
+      [data.id, data.title, data.role, data.assigned_to, data.parent_timeline_id,
+       JSON.stringify(data.steps || []), data.current_step_index, data.status, data.version || 1]
+    );
+  } else {
+    await db.run(
+      `INSERT INTO project_timelines (id, roadmap_id, title, role, assigned_to, parent_timeline_id,
+       steps, current_step_index, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())`,
+      [data.id, data.roadmap_id, data.title, data.role, data.assigned_to,
+       data.parent_timeline_id, JSON.stringify(data.steps || []),
+       data.current_step_index, data.status]
+    );
+  }
+  notifyChange('timelines', await getTimelines(data.roadmap_id));
+  return data;
+}
+
+// ============================================================
+// TIMELINE COLLABORATORS
+// ============================================================
+async function getTimelineCollaborators(timelineId) {
+  return await db.query(
+    'SELECT * FROM timeline_collaborators WHERE timeline_id=$1 AND is_active=true ORDER BY joined_at',
+    [timelineId]
+  );
+}
+
+async function joinTimeline(timelineId, user) {
+  await db.run(
+    `INSERT INTO timeline_collaborators (id, timeline_id, user_id, user_name, user_color, joined_at, is_active)
+     VALUES ($1,$2,$3,$4,$5,NOW(),true)
+     ON CONFLICT (timeline_id, user_id) DO UPDATE SET left_at=NULL, is_active=true, joined_at=NOW()`,
+    [`collab_${timelineId}_${user.id}`, timelineId, user.id, user.name, user.color]
+  );
+  notifyChange('timelineCollaborators', await getTimelineCollaborators(timelineId));
+  return true;
+}
+
+async function leaveTimeline(timelineId, userId) {
+  await db.run(
+    'UPDATE timeline_collaborators SET left_at=NOW(), is_active=false WHERE timeline_id=$1 AND user_id=$2',
+    [timelineId, userId]
+  );
+  notifyChange('timelineCollaborators', await getTimelineCollaborators(timelineId));
+  return true;
+}
+
+// ============================================================
+// ROADMAP PHASE HISTORY
+// ============================================================
+async function getPhaseHistory(roadmapId) {
+  return await db.query('SELECT * FROM roadmap_phase_history WHERE roadmap_id=$1 ORDER BY changed_at DESC', [roadmapId]);
+}
+
+async function savePhaseHistory(data) {
+  await db.run(
+    `INSERT INTO roadmap_phase_history (id, roadmap_id, from_index, to_index, changed_by, changed_at, reason)
+     VALUES ($1,$2,$3,$4,$5,NOW(),$6)`,
+    [data.id, data.roadmap_id, data.from_index, data.to_index, data.changed_by, data.reason]
+  );
+  return data;
+}
+
+// ============================================================
+// PROJECT TYPE TEMPLATES
+// ============================================================
+async function getProjectTypeTemplates() {
+  return await db.query('SELECT * FROM project_type_templates ORDER BY name');
+}
+
+async function getProjectTypeTemplate(projectType) {
+  return await db.get('SELECT * FROM project_type_templates WHERE project_type=$1', [projectType]);
+}
+
+// ============================================================
 // EXPORTS
 // ============================================================
 module.exports = {
@@ -919,4 +1066,9 @@ module.exports = {
   getLunaThreads, saveLunaThread, saveLunaThreads, deleteLunaThread,
   getLunaBuffer, saveLunaBuffer,
   getWorkspaceClients, saveWorkspaceClient, deleteWorkspaceClient,
+  getRoadmaps, getRoadmapById, saveRoadmap, deleteRoadmap,
+  getTimelines, getTimelineById, saveTimeline,
+  getTimelineCollaborators, joinTimeline, leaveTimeline,
+  getPhaseHistory, savePhaseHistory,
+  getProjectTypeTemplates, getProjectTypeTemplate,
 };

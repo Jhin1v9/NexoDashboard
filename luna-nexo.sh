@@ -6,7 +6,7 @@ set -e
 
 NEXO_DIR="/home/jhin/NEXO_DASHBOARD_PRO"
 LUNA_KERNEL="/home/jhin/.luna-kernel"
-LUNA_WEB="$NEXO_DIR/agents/luna-web"
+LUNA_WEB="$HOME/.luna-kernel/luna-web"
 PID_DIR="/tmp/luna-nexo-pids"
 
 mkdir -p "$PID_DIR"

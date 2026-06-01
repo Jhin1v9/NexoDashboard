@@ -6,7 +6,7 @@ import {
   CheckSquare, Folder, Target, Bell, Cpu, Settings,
   DollarSign, Wallet, Receipt, ChevronDown, HardDrive,
   Shield, Lightbulb, Bot, Terminal, FolderOpen, FileText,
-  Sparkles, Vote
+  Sparkles, Vote, Flag
 } from 'lucide-react'
 
 const navItems = [
@@ -36,6 +36,7 @@ const navItems = [
   { path: '/tarefas', icon: CheckSquare, label: 'Tarefas' },
   { path: '/ideias', icon: Lightbulb, label: 'Ideias', badge: 'beta' },
   { path: '/leads', icon: Target, label: 'Leads' },
+  { path: '/metas', icon: Flag, label: 'Metas', badge: 'Novo' },
   { path: '/operacoes', icon: Bell, label: 'Operacoes' },
   { path: '/sistema', icon: HardDrive, label: 'Sistema' },
   { path: '/seguranca', icon: Shield, label: 'Seguranca' },

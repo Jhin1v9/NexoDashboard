@@ -79,6 +79,9 @@ async function validateCredentials(username, password) {
 // ── Luna Chat Routes ──
 const { router: lunaChatRouter, setupAuth: setupLunaAuth } = require('./luna-chat-routes');
 
+// ── Dashboard Routes (shared with Luna Web tools) ──
+const leadsRouter = require('./routes/leads');
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -95,8 +98,17 @@ app.use((req, res, next) => {
 setupLunaAuth({ validateCredentials, generateToken, requireAuth });
 app.use(lunaChatRouter);
 
+// Dashboard tool routes (available to Luna Web)
+app.use('/api/leads', leadsRouter);
+const lunaToolsRouter = require('./routes/luna-tools');
+app.use(lunaToolsRouter);
+
 // Static files
-app.use(express.static(path.join(__dirname, '../../.luna-kernel/luna-web/dist')));
+const STATIC_DIR = path.join(__dirname, '../../.luna-kernel/luna-web/dist');
+console.log('[Luna Server] Serving static from:', STATIC_DIR, 'exists:', fs.existsSync(STATIC_DIR));
+console.log('[Luna Server] Assets exists:', fs.existsSync(path.join(STATIC_DIR, 'assets')));
+console.log('[Luna Server] __dirname:', __dirname);
+app.use(express.static(STATIC_DIR));
 
 // Health — MUST be before SPA fallback
 app.get('/health', (req, res) => {

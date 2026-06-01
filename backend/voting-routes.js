@@ -131,7 +131,7 @@ async function executeVotingTool(toolName, toolParams) {
   return await tool(toolParams);
 }
 
-module.exports = function(app, { requireAuth }) {
+module.exports = function(app, { requireAuth, dataStore }) {
   // GET /api/voting/sessions
   app.get('/api/voting/sessions', requireAuth, async (req, res) => {
     try {
@@ -179,9 +179,9 @@ module.exports = function(app, { requireAuth }) {
   // POST /api/voting/sessions
   app.post('/api/voting/sessions', requireAuth, async (req, res) => {
     try {
-      const { title, description, type = 'generic', toolName, toolParams, quorumRequired = 3 } = req.body;
+      const { title, description, type = 'generic', toolName, toolParams, quorumRequired = 3, linkedTimelineId, linkedRoadmapId, reviewMeetingAt } = req.body;
       if (!title) return res.status(400).json({ error: 'Title is required' });
-      if (!['tool_action', 'generic'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+      if (!['tool_action', 'generic', 'review'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
       if (type === 'tool_action' && !toolName) return res.status(400).json({ error: 'toolName required for tool_action type' });
       if (![2, 3].includes(parseInt(quorumRequired))) return res.status(400).json({ error: 'quorumRequired must be 2 or 3' });
 
@@ -195,6 +195,9 @@ module.exports = function(app, { requireAuth }) {
         type,
         toolName: type === 'tool_action' ? toolName : null,
         toolParams: type === 'tool_action' ? (toolParams || {}) : null,
+        linkedTimelineId: linkedTimelineId || null,
+        linkedRoadmapId: linkedRoadmapId || null,
+        reviewMeetingAt: reviewMeetingAt || null,
         status: 'open',
         quorumRequired: parseInt(quorumRequired),
         createdBy: req.user.userId,
@@ -306,6 +309,66 @@ module.exports = function(app, { requireAuth }) {
         });
         resultSession.executionResult = autoExecuteResult;
         delete resultSession._pendingAutoExecute;
+      }
+
+      // If review vote approved, create completed task and update timeline
+      if (resultSession && resultSession._pendingReviewTask && dataStore) {
+        try {
+          const task = {
+            id: generateId('task'),
+            title: `[REVISÃO APROVADA] ${resultSession.title}`,
+            description: resultSession.description || 'Revisão em grupo aprovada por unanimidade.',
+            status: 'completed',
+            priority: 'high',
+            source: 'roadmap_review',
+            assigned_to: resultSession.createdBy,
+            addedBy: 'voting-auto',
+            comments: [],
+            tags: ['revisão', 'aprovada'],
+            metadata: {
+              linked_roadmap_id: resultSession.linkedRoadmapId,
+              linked_timeline_id: resultSession.linkedTimelineId,
+              voting_session_id: resultSession.id
+            },
+            completed_at: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          };
+          await dataStore.saveCompanyTask(task);
+
+          // Update timeline step if linked
+          if (resultSession.linkedTimelineId) {
+            const timeline = await dataStore.getTimelineById(resultSession.linkedTimelineId);
+            if (timeline) {
+              const steps = timeline.steps || [];
+              const currentIdx = timeline.current_step_index || 0;
+              if (steps[currentIdx]) {
+                steps[currentIdx] = { ...steps[currentIdx], status: 'approved', vote_pending: false };
+              }
+              await dataStore.saveTimeline({
+                ...timeline,
+                steps,
+                current_step_index: currentIdx,
+                status: currentIdx >= steps.length - 1 ? 'completed' : timeline.status
+              });
+            }
+          }
+
+          autoExecuteResult = { success: true, taskCreated: task.id };
+        } catch (reviewErr) {
+          console.error('[REVIEW-AUTO] Error:', reviewErr.message);
+          autoExecuteResult = { success: false, error: reviewErr.message };
+        }
+        // Update session
+        await withJSONFile(VOTING_SESSIONS_FILE, [], (sessions) => {
+          const idx = sessions.findIndex(s => s.id === resultSession.id);
+          if (idx !== -1) {
+            sessions[idx].executionResult = autoExecuteResult;
+            delete sessions[idx]._pendingReviewTask;
+          }
+          return sessions;
+        });
+        resultSession.executionResult = autoExecuteResult;
+        delete resultSession._pendingReviewTask;
       }
 
       // Write audit log

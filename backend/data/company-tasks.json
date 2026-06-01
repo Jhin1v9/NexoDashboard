@@ -1,8 +1,25 @@
 [
   {
+    "id": "TSK-MPUGEGYM",
+    "title": "Testar integração Luna Web",
+    "description": "Verificar se os modais de dashboard funcionam corretamente",
+    "status": "pending",
+    "priority": "Alta",
+    "taskType": "one_time",
+    "dueDate": null,
+    "addedBy": "Luna Web",
+    "assignedTo": "Abner",
+    "source": "luna-web",
+    "comments": [],
+    "createdAt": "2026-06-01T00:11:42.814Z",
+    "updatedAt": null,
+    "startedAt": null,
+    "completedAt": null
+  },
+  {
     "id": "OP-001",
     "title": "Documentar arquitetura de projetos",
-    "description": "Criar/manter README t\u00e9cnico, stack, deploy, vari\u00e1veis de ambiente",
+    "description": "Criar/manter README técnico, stack, deploy, variáveis de ambiente",
     "status": "pending",
     "priority": "Alta",
     "taskType": "monthly",
@@ -12,8 +29,8 @@
     "source": "manual",
     "comments": [
       "Atualizar README de projetos ativos",
-      "Documentar vari\u00e1veis de ambiente",
-      "Mapear depend\u00eancias"
+      "Documentar variáveis de ambiente",
+      "Mapear dependências"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -23,7 +40,7 @@
   {
     "id": "OP-002",
     "title": "Criar templates de projeto (boilerplate)",
-    "description": "Template React+Vite+Tailwind+Supabase reutiliz\u00e1vel para novos clientes",
+    "description": "Template React+Vite+Tailwind+Supabase reutilizável para novos clientes",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_quarterly",
@@ -35,7 +52,7 @@
       "Criar repo boilerplate",
       "Configurar ESLint/Prettier",
       "Adicionar Supabase client",
-      "Template de autentica\u00e7\u00e3o"
+      "Template de autenticação"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -45,7 +62,7 @@
   {
     "id": "OP-003",
     "title": "Definir coding standards",
-    "description": "ESLint, Prettier, conven\u00e7\u00f5es de nomea\u00e7\u00e3o, estrutura de pastas",
+    "description": "ESLint, Prettier, convenções de nomeação, estrutura de pastas",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_semester",
@@ -89,9 +106,9 @@
   {
     "id": "OP-005",
     "title": "Criar SOP de deploy (CI/CD)",
-    "description": "GitHub Actions \u2192 Vercel, vari\u00e1veis, rollback, checklist pr\u00e9-deploy",
+    "description": "GitHub Actions → Vercel, variáveis, rollback, checklist pré-deploy",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time_monthly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -101,7 +118,7 @@
       "Configurar GitHub Actions",
       "Setup Vercel deploy",
       "Documentar rollback",
-      "Criar checklist pr\u00e9-deploy"
+      "Criar checklist pré-deploy"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -111,16 +128,16 @@
   {
     "id": "OP-006",
     "title": "Manter wiki interna (Notion/.brain)",
-    "description": "Atualizar pensamentos, decis\u00f5es t\u00e9cnicas, aprendizados",
+    "description": "Atualizar pensamentos, decisões técnicas, aprendizados",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "weekly",
     "dueDate": null,
     "addedBy": "Elias",
     "assignedTo": "Elias",
     "source": "manual",
     "comments": [
-      "Documentar decis\u00f5es t\u00e9cnicas",
+      "Documentar decisões técnicas",
       "Registrar aprendizados",
       "Atualizar .brain"
     ],
@@ -131,10 +148,10 @@
   },
   {
     "id": "OP-007",
-    "title": "Documentar APIs e integra\u00e7\u00f5es",
-    "description": "Endpoints, autentica\u00e7\u00e3o, limites, exemplos de requisi\u00e7\u00e3o",
+    "title": "Documentar APIs e integrações",
+    "description": "Endpoints, autenticação, limites, exemplos de requisição",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "per_project",
     "dueDate": null,
     "addedBy": "Abner",
@@ -143,7 +160,7 @@
     "comments": [
       "Listar endpoints",
       "Documentar auth",
-      "Criar exemplos de requisi\u00e7\u00e3o",
+      "Criar exemplos de requisição",
       "Definir rate limits"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -153,8 +170,8 @@
   },
   {
     "id": "OP-008",
-    "title": "Criar templates de proposta/or\u00e7amento",
-    "description": "Template padronizado com escopo, prazos, pre\u00e7os, termos",
+    "title": "Criar templates de proposta/orçamento",
+    "description": "Template padronizado com escopo, prazos, preços, termos",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_ongoing",
@@ -164,8 +181,8 @@
     "source": "manual",
     "comments": [
       "Template de proposta",
-      "Template de or\u00e7amento",
-      "Termos e condi\u00e7\u00f5es",
+      "Template de orçamento",
+      "Termos e condições",
       "Escopo de trabalho"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -219,7 +236,7 @@
   {
     "id": "OP-011",
     "title": "Calcular split de receitas (25% cada)",
-    "description": "Planilha de distribui\u00e7\u00e3o: Abner/Nonoke/Elias/NEXO",
+    "description": "Planilha de distribuição: Abner/Nonoke/Elias/NEXO",
     "status": "pending",
     "priority": "Alta",
     "taskType": "monthly",
@@ -230,7 +247,7 @@
     "comments": [
       "Calcular receitas totais",
       "Aplicar split 25%",
-      "Gerar relat\u00f3rio de distribui\u00e7\u00e3o",
+      "Gerar relatório de distribuição",
       "Compartilhar com equipe"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -241,9 +258,9 @@
   {
     "id": "OP-012",
     "title": "Controlar despesas da empresa",
-    "description": "Vercel, Supabase, dom\u00ednios, ferramentas, impostos",
+    "description": "Vercel, Supabase, domínios, ferramentas, impostos",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -262,10 +279,10 @@
   },
   {
     "id": "OP-013",
-    "title": "Previs\u00e3o de caixa (3 meses)",
+    "title": "Previsão de caixa (3 meses)",
     "description": "Projetar receitas vs despesas para antecipar problemas",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -284,10 +301,10 @@
   },
   {
     "id": "OP-014",
-    "title": "Revisar pre\u00e7os e margens",
-    "description": "Analisar se pre\u00e7os cobrem custos + margem de lucro",
+    "title": "Revisar preços e margens",
+    "description": "Analisar se preços cobrem custos + margem de lucro",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "quarterly",
     "dueDate": null,
     "addedBy": "Todos",
@@ -297,7 +314,7 @@
       "Calcular custo por hora",
       "Analisar margem atual",
       "Comparar com mercado",
-      "Ajustar pre\u00e7os se necess\u00e1rio"
+      "Ajustar preços se necessário"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -306,7 +323,7 @@
   },
   {
     "id": "OP-015",
-    "title": "Modelo de contrato de servi\u00e7os",
+    "title": "Modelo de contrato de serviços",
     "description": "Contrato base: escopo, prazos, pagamento, propriedade intelectual",
     "status": "pending",
     "priority": "Alta",
@@ -328,7 +345,7 @@
   },
   {
     "id": "OP-016",
-    "title": "Termos de uso e pol\u00edtica de privacidade (site)",
+    "title": "Termos de uso e política de privacidade (site)",
     "description": "LGPD/GDPR compliance para site e apps dos clientes",
     "status": "pending",
     "priority": "Alta",
@@ -339,7 +356,7 @@
     "source": "manual",
     "comments": [
       "Termos de uso",
-      "Pol\u00edtica de privacidade",
+      "Política de privacidade",
       "Cookie policy",
       "LGPD compliance"
     ],
@@ -351,9 +368,9 @@
   {
     "id": "OP-017",
     "title": "Registro de propriedade intelectual",
-    "description": "Definir quem det\u00e9m c\u00f3digo, licenciamento, reutiliza\u00e7\u00e3o",
+    "description": "Definir quem detém código, licenciamento, reutilização",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "per_project",
     "dueDate": null,
     "addedBy": "Abner",
@@ -362,8 +379,8 @@
     "comments": [
       "Definir ownership",
       "Licenciamento",
-      "Reutiliza\u00e7\u00e3o",
-      "NDA se necess\u00e1rio"
+      "Reutilização",
+      "NDA se necessário"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -372,7 +389,7 @@
   },
   {
     "id": "OP-018",
-    "title": "Backup e recupera\u00e7\u00e3o de dados",
+    "title": "Backup e recuperação de dados",
     "description": "Testar backups Supabase, GitHub, verificar integridade",
     "status": "pending",
     "priority": "Alta",
@@ -416,8 +433,8 @@
   },
   {
     "id": "OP-020",
-    "title": "Reuni\u00e3o semanal de alinhamento",
-    "description": "Review da semana, pr\u00f3ximos passos, decis\u00f5es, prioridades",
+    "title": "Reunião semanal de alinhamento",
+    "description": "Review da semana, próximos passos, decisões, prioridades",
     "status": "pending",
     "priority": "Alta",
     "taskType": "weekly",
@@ -428,8 +445,8 @@
     "comments": [
       "Review semanal",
       "Prioridades",
-      "Decis\u00f5es",
-      "A\u00e7\u00f5es"
+      "Decisões",
+      "Ações"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -439,9 +456,9 @@
   {
     "id": "OP-021",
     "title": "Sprint planning (se usar agile)",
-    "description": "Definir tarefas do sprint, pontua\u00e7\u00e3o, capacidade",
+    "description": "Definir tarefas do sprint, pontuação, capacidade",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "biweekly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -461,9 +478,9 @@
   {
     "id": "OP-022",
     "title": "Retrospectiva de projeto",
-    "description": "O que funcionou, o que n\u00e3o funcionou, a\u00e7\u00f5es",
+    "description": "O que funcionou, o que não funcionou, ações",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "per_project",
     "dueDate": null,
     "addedBy": "Todos",
@@ -471,9 +488,9 @@
     "source": "manual",
     "comments": [
       "O que funcionou",
-      "O que n\u00e3o funcionou",
-      "A\u00e7\u00f5es de melhoria",
-      "Li\u00e7\u00f5es aprendidas"
+      "O que não funcionou",
+      "Ações de melhoria",
+      "Lições aprendidas"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -482,8 +499,8 @@
   },
   {
     "id": "OP-023",
-    "title": "Code review obrigat\u00f3rio",
-    "description": "Nenhum c\u00f3digo entra em produ\u00e7\u00e3o sem revis\u00e3o de outro membro",
+    "title": "Code review obrigatório",
+    "description": "Nenhum código entra em produção sem revisão de outro membro",
     "status": "pending",
     "priority": "Alta",
     "taskType": "per_pr",
@@ -505,9 +522,9 @@
   {
     "id": "OP-024",
     "title": "Atualizar status no Dashboard",
-    "description": "Manter tasks atualizadas no sistema de gest\u00e3o",
+    "description": "Manter tasks atualizadas no sistema de gestão",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "daily",
     "dueDate": null,
     "addedBy": "Todos",
@@ -515,7 +532,7 @@
     "source": "manual",
     "comments": [
       "Atualizar tarefas",
-      "Marcar conclu\u00eddas",
+      "Marcar concluídas",
       "Adicionar novas"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -525,8 +542,8 @@
   },
   {
     "id": "GR-001",
-    "title": "Keyword research (ag\u00eancia web Sabadell/Barcelona)",
-    "description": "Identificar termos: desenvolvimento web Sabadell, app para neg\u00f3cio Barcelona, etc.",
+    "title": "Keyword research (agência web Sabadell/Barcelona)",
+    "description": "Identificar termos: desenvolvimento web Sabadell, app para negócio Barcelona, etc.",
     "status": "pending",
     "priority": "Alta",
     "taskType": "monthly",
@@ -547,8 +564,8 @@
   },
   {
     "id": "GR-002",
-    "title": "Otimizar p\u00e1gina de servi\u00e7os",
-    "description": "T\u00edtulo H1, meta description, CTAs, schema markup Service",
+    "title": "Otimizar página de serviços",
+    "description": "Título H1, meta description, CTAs, schema markup Service",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_monthly",
@@ -569,8 +586,8 @@
   },
   {
     "id": "GR-003",
-    "title": "Criar p\u00e1gina por servi\u00e7o (LP dedicada)",
-    "description": "P\u00e1ginas: Desenvolvimento Web, Apps Mobile, Sistemas de Gest\u00e3o, E-commerce",
+    "title": "Criar página por serviço (LP dedicada)",
+    "description": "Páginas: Desenvolvimento Web, Apps Mobile, Sistemas de Gestão, E-commerce",
     "status": "pending",
     "priority": "Alta",
     "taskType": "weekly",
@@ -581,7 +598,7 @@
     "comments": [
       "LP Desenvolvimento Web",
       "LP Apps Mobile",
-      "LP Sistemas de Gest\u00e3o",
+      "LP Sistemas de Gestão",
       "LP E-commerce"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -591,7 +608,7 @@
   },
   {
     "id": "GR-004",
-    "title": "Blog t\u00e9cnico \u2014 publicar artigos",
+    "title": "Blog técnico — publicar artigos",
     "description": "Artigos: Como escolher TPV para restaurante, App para sorveteria, etc.",
     "status": "pending",
     "priority": "Alta",
@@ -601,7 +618,7 @@
     "assignedTo": "Elias",
     "source": "manual",
     "comments": [
-      "Escolher t\u00f3picos",
+      "Escolher tópicos",
       "Escrever artigo",
       "Publicar",
       "Compartilhar redes"
@@ -614,7 +631,7 @@
   {
     "id": "GR-005",
     "title": "Otimizar Core Web Vitals (site < 2.5s)",
-    "description": "LCP, FID, CLS \u2014 comprimir imagens, lazy loading, CDN",
+    "description": "LCP, FID, CLS — comprimir imagens, lazy loading, CDN",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_ongoing",
@@ -660,7 +677,7 @@
     "title": "Sitemap XML + robots.txt",
     "description": "Submeter no Google Search Console",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time_monthly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -670,7 +687,7 @@
       "Gerar sitemap",
       "Configurar robots.txt",
       "Submeter Search Console",
-      "Verificar indexa\u00e7\u00e3o"
+      "Verificar indexação"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -682,7 +699,7 @@
     "title": "Schema markup (LocalBusiness, Organization)",
     "description": "JSON-LD para rich snippets no Google",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Abner",
@@ -701,17 +718,17 @@
   },
   {
     "id": "GR-009",
-    "title": "Link building (parceiros, diret\u00f3rios)",
-    "description": "Clutch, GoodFirms, c\u00e2maras de com\u00e9rcio, parceiros locais",
+    "title": "Link building (parceiros, diretórios)",
+    "description": "Clutch, GoodFirms, câmaras de comércio, parceiros locais",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Abner",
     "assignedTo": "Abner",
     "source": "manual",
     "comments": [
-      "Listar diret\u00f3rios",
+      "Listar diretórios",
       "Criar perfis",
       "Buscar parceiros",
       "Solicitar links"
@@ -723,10 +740,10 @@
   },
   {
     "id": "GR-010",
-    "title": "An\u00e1lise de concorrentes locais",
-    "description": "Quem ranqueia para ag\u00eancia web Sabadell? O que eles t\u00eam?",
+    "title": "Análise de concorrentes locais",
+    "description": "Quem ranqueia para agência web Sabadell? O que eles têm?",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "quarterly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -736,7 +753,7 @@
       "Identificar concorrentes",
       "Analisar sites",
       "Identificar gaps",
-      "Plano de a\u00e7\u00e3o"
+      "Plano de ação"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -745,19 +762,19 @@
   },
   {
     "id": "GR-011",
-    "title": "Local SEO \u2014 p\u00e1ginas por cidade",
-    "description": "Desenvolvimento web em Sabadell, Apps para neg\u00f3cios em Barcelona",
+    "title": "Local SEO — páginas por cidade",
+    "description": "Desenvolvimento web em Sabadell, Apps para negócios em Barcelona",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Nonoke",
     "assignedTo": "Nonoke",
     "source": "manual",
     "comments": [
-      "Criar p\u00e1gina Sabadell",
-      "Criar p\u00e1gina Barcelona",
-      "Criar p\u00e1gina Terrassa",
+      "Criar página Sabadell",
+      "Criar página Barcelona",
+      "Criar página Terrassa",
       "Otimizar local"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -768,7 +785,7 @@
   {
     "id": "GR-012",
     "title": "Criar case study do TPV Sorveteria (Juan)",
-    "description": "Story-driven: desafio, solu\u00e7\u00e3o, stack, resultados, depoimento",
+    "description": "Story-driven: desafio, solução, stack, resultados, depoimento",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time",
@@ -811,8 +828,8 @@
   },
   {
     "id": "GR-014",
-    "title": "Adicionar projetos ao portf\u00f3lio do site",
-    "description": "Screenshots, descri\u00e7\u00e3o, stack, link, depoimento do cliente",
+    "title": "Adicionar projetos ao portfólio do site",
+    "description": "Screenshots, descrição, stack, link, depoimento do cliente",
     "status": "pending",
     "priority": "Alta",
     "taskType": "per_project",
@@ -822,7 +839,7 @@
     "source": "manual",
     "comments": [
       "Screenshots",
-      "Descri\u00e7\u00e3o",
+      "Descrição",
       "Stack",
       "Depoimento"
     ],
@@ -833,10 +850,10 @@
   },
   {
     "id": "GR-015",
-    "title": "Criar p\u00e1gina Nosso Processo",
-    "description": "Passo a passo: descoberta \u2192 design \u2192 desenvolvimento \u2192 entrega \u2192 suporte",
+    "title": "Criar página Nosso Processo",
+    "description": "Passo a passo: descoberta → design → desenvolvimento → entrega → suporte",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -844,7 +861,7 @@
     "source": "manual",
     "comments": [
       "Definir fases",
-      "Criar conte\u00fado",
+      "Criar conteúdo",
       "Design",
       "Publicar"
     ],
@@ -855,7 +872,7 @@
   },
   {
     "id": "GR-016",
-    "title": "V\u00eddeo demonstrativo de projetos",
+    "title": "Vídeo demonstrativo de projetos",
     "description": "Screencast curto mostrando apps funcionando",
     "status": "pending",
     "priority": "Baixa",
@@ -877,8 +894,8 @@
   },
   {
     "id": "GR-017",
-    "title": "LinkedIn \u2014 perfil da empresa",
-    "description": "Descri\u00e7\u00e3o completa, logo, banner, posts sobre projetos/dicas",
+    "title": "LinkedIn — perfil da empresa",
+    "description": "Descrição completa, logo, banner, posts sobre projetos/dicas",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_weekly",
@@ -899,10 +916,10 @@
   },
   {
     "id": "GR-018",
-    "title": "Instagram \u2014 mostrar bastidores",
-    "description": "Stories de desenvolvimento, prints de c\u00f3digo, resultados de clientes",
+    "title": "Instagram — mostrar bastidores",
+    "description": "Stories de desenvolvimento, prints de código, resultados de clientes",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "weekly",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -921,7 +938,7 @@
   },
   {
     "id": "GR-019",
-    "title": "YouTube \u2014 tutoriais t\u00e9cnicos",
+    "title": "YouTube — tutoriais técnicos",
     "description": "Como criar app com React + Supabase, Deploy na Vercel",
     "status": "pending",
     "priority": "Baixa",
@@ -931,7 +948,7 @@
     "assignedTo": "Elias",
     "source": "manual",
     "comments": [
-      "Escolher t\u00f3pico",
+      "Escolher tópico",
       "Gravar",
       "Editar",
       "Publicar"
@@ -944,9 +961,9 @@
   {
     "id": "GR-020",
     "title": "Participar em comunidades (Reddit, grupos)",
-    "description": "Responder d\u00favidas, mostrar expertise, linkar portf\u00f3lio quando relevante",
+    "description": "Responder dúvidas, mostrar expertise, linkar portfólio quando relevante",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "weekly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -954,8 +971,8 @@
     "source": "manual",
     "comments": [
       "Encontrar comunidades",
-      "Responder d\u00favidas",
-      "Linkar portf\u00f3lio",
+      "Responder dúvidas",
+      "Linkar portfólio",
       "Construir autoridade"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -965,8 +982,8 @@
   },
   {
     "id": "GR-021",
-    "title": "Guest post em blogs t\u00e9cnicos",
-    "description": "Artigos t\u00e9cnicos em blogs de tecnologia com link para NEXO",
+    "title": "Guest post em blogs técnicos",
+    "description": "Artigos técnicos em blogs de tecnologia com link para NEXO",
     "status": "pending",
     "priority": "Baixa",
     "taskType": "quarterly",
@@ -987,8 +1004,8 @@
   },
   {
     "id": "LD-001",
-    "title": "Formul\u00e1rio de or\u00e7amento (site)",
-    "description": "Nome, email, telefone, tipo de projeto, or\u00e7amento estimado, prazo",
+    "title": "Formulário de orçamento (site)",
+    "description": "Nome, email, telefone, tipo de projeto, orçamento estimado, prazo",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time",
@@ -997,10 +1014,10 @@
     "assignedTo": "Abner",
     "source": "manual",
     "comments": [
-      "Design do formul\u00e1rio",
-      "Valida\u00e7\u00e3o",
-      "Integra\u00e7\u00e3o Supabase",
-      "Notifica\u00e7\u00e3o WhatsApp"
+      "Design do formulário",
+      "Validação",
+      "Integração Supabase",
+      "Notificação WhatsApp"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -1009,8 +1026,8 @@
   },
   {
     "id": "LD-002",
-    "title": "WhatsApp Business \u2014 bot\u00e3o flutuante",
-    "description": "Bot\u00e3o direto para WhatsApp no site",
+    "title": "WhatsApp Business — botão flutuante",
+    "description": "Botão direto para WhatsApp no site",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time",
@@ -1019,8 +1036,8 @@
     "assignedTo": "Nonoke",
     "source": "manual",
     "comments": [
-      "Criar bot\u00e3o",
-      "Configurar n\u00famero",
+      "Criar botão",
+      "Configurar número",
       "Testar",
       "Deploy"
     ],
@@ -1034,7 +1051,7 @@
     "title": "Chat ao vivo (crisp/chatwoot)",
     "description": "Widget de chat para capturar leads em tempo real",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Abner",
@@ -1053,10 +1070,10 @@
   },
   {
     "id": "LD-004",
-    "title": "Calendly para agendar reuni\u00e3o",
+    "title": "Calendly para agendar reunião",
     "description": "Link para agendar call de descoberta",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Abner",
@@ -1064,7 +1081,7 @@
     "source": "manual",
     "comments": [
       "Criar conta",
-      "Configurar hor\u00e1rios",
+      "Configurar horários",
       "Integrar no site",
       "Testar"
     ],
@@ -1075,8 +1092,8 @@
   },
   {
     "id": "LD-005",
-    "title": "Testar e monitorar convers\u00e3o dos formul\u00e1rios",
-    "description": "Taxa de convers\u00e3o: visitas \u2192 preenchimentos \u2192 contatos",
+    "title": "Testar e monitorar conversão dos formulários",
+    "description": "Taxa de conversão: visitas → preenchimentos → contatos",
     "status": "pending",
     "priority": "Alta",
     "taskType": "weekly",
@@ -1086,7 +1103,7 @@
     "source": "manual",
     "comments": [
       "Verificar analytics",
-      "Calcular convers\u00e3o",
+      "Calcular conversão",
       "Identificar problemas",
       "Otimizar"
     ],
@@ -1098,7 +1115,7 @@
   {
     "id": "LD-006",
     "title": "Landing page: App para Restaurantes e Lojas",
-    "description": "LP focada em TPV/POS, benef\u00edcios, depoimento Juan, CTA WhatsApp",
+    "description": "LP focada em TPV/POS, benefícios, depoimento Juan, CTA WhatsApp",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time",
@@ -1108,7 +1125,7 @@
     "source": "manual",
     "comments": [
       "Design",
-      "Conte\u00fado",
+      "Conteúdo",
       "CTAs",
       "Deploy"
     ],
@@ -1119,7 +1136,7 @@
   },
   {
     "id": "LD-007",
-    "title": "Landing page: Sites Profissionais para Neg\u00f3cios",
+    "title": "Landing page: Sites Profissionais para Negócios",
     "description": "LP para sites institucionais, e-commerce, portfolio",
     "status": "pending",
     "priority": "Alta",
@@ -1130,7 +1147,7 @@
     "source": "manual",
     "comments": [
       "Design",
-      "Conte\u00fado",
+      "Conteúdo",
       "CTAs",
       "Deploy"
     ],
@@ -1141,10 +1158,10 @@
   },
   {
     "id": "LD-008",
-    "title": "Landing page: Automa\u00e7\u00e3o para Pequenos Neg\u00f3cios",
-    "description": "LP para sistemas internos, dashboards, gest\u00e3o",
+    "title": "Landing page: Automação para Pequenos Negócios",
+    "description": "LP para sistemas internos, dashboards, gestão",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -1152,7 +1169,7 @@
     "source": "manual",
     "comments": [
       "Design",
-      "Conte\u00fado",
+      "Conteúdo",
       "CTAs",
       "Deploy"
     ],
@@ -1174,7 +1191,7 @@
     "source": "manual",
     "comments": [
       "Escolher tema",
-      "Criar conte\u00fado",
+      "Criar conteúdo",
       "Design PDF",
       "Configurar entrega"
     ],
@@ -1185,10 +1202,10 @@
   },
   {
     "id": "LD-010",
-    "title": "P\u00e1gina de agradecimento + pr\u00f3ximo passo",
-    "description": "Ap\u00f3s preencher formul\u00e1rio, mostrar valor e CTA secund\u00e1rio",
+    "title": "Página de agradecimento + próximo passo",
+    "description": "Após preencher formulário, mostrar valor e CTA secundário",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "one_time",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -1196,8 +1213,8 @@
     "source": "manual",
     "comments": [
       "Design",
-      "Conte\u00fado",
-      "CTA secund\u00e1rio",
+      "Conteúdo",
+      "CTA secundário",
       "Deploy"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -1207,7 +1224,7 @@
   },
   {
     "id": "LD-011",
-    "title": "Sequ\u00eancia de boas-vindas (automa\u00e7\u00e3o)",
+    "title": "Sequência de boas-vindas (automação)",
     "description": "Email 1: agradecimento | Email 2: case study | Email 3: CTA call",
     "status": "pending",
     "priority": "Alta",
@@ -1220,7 +1237,7 @@
       "Email 1",
       "Email 2",
       "Email 3",
-      "Configurar automa\u00e7\u00e3o"
+      "Configurar automação"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -1229,10 +1246,10 @@
   },
   {
     "id": "LD-012",
-    "title": "Newsletter mensal t\u00e9cnica",
+    "title": "Newsletter mensal técnica",
     "description": "Dicas de tech, novidades da empresa, projetos entregues",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Elias",
@@ -1252,7 +1269,7 @@
   {
     "id": "LD-013",
     "title": "CRM simples (Notion/Supabase)",
-    "description": "Cadastrar leads, status, \u00faltimo contato, pr\u00f3ximo passo",
+    "description": "Cadastrar leads, status, último contato, próximo passo",
     "status": "pending",
     "priority": "Alta",
     "taskType": "one_time_daily",
@@ -1274,9 +1291,9 @@
   {
     "id": "LD-014",
     "title": "Reativar leads frios (follow-up)",
-    "description": "Email para leads que n\u00e3o responderam em 30+ dias",
+    "description": "Email para leads que não responderam em 30+ dias",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "monthly",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -1295,8 +1312,8 @@
   },
   {
     "id": "LD-015",
-    "title": "Google Ads \u2014 desenvolvimento web Sabadell",
-    "description": "Campanha local com or\u00e7amento pequeno (~\u20ac100/m\u00eas)",
+    "title": "Google Ads — desenvolvimento web Sabadell",
+    "description": "Campanha local com orçamento pequeno (~€100/mês)",
     "status": "pending",
     "priority": "Baixa",
     "taskType": "budget_dependent",
@@ -1317,8 +1334,8 @@
   },
   {
     "id": "LD-016",
-    "title": "Meta Ads (Facebook/Instagram) \u2014 lookalike",
-    "description": "An\u00fancios para donos de neg\u00f3cios na regi\u00e3o",
+    "title": "Meta Ads (Facebook/Instagram) — lookalike",
+    "description": "Anúncios para donos de negócios na região",
     "status": "pending",
     "priority": "Baixa",
     "taskType": "budget_dependent",
@@ -1328,7 +1345,7 @@
     "source": "manual",
     "comments": [
       "Criar campanha",
-      "Definir p\u00fablico",
+      "Definir público",
       "Configurar budget",
       "Monitorar"
     ],
@@ -1339,8 +1356,8 @@
   },
   {
     "id": "LD-017",
-    "title": "Remarketing \u2014 visitantes do site",
-    "description": "Pixel Meta + Google para quem visitou mas n\u00e3o converteu",
+    "title": "Remarketing — visitantes do site",
+    "description": "Pixel Meta + Google para quem visitou mas não converteu",
     "status": "pending",
     "priority": "Baixa",
     "taskType": "budget_dependent",
@@ -1350,8 +1367,8 @@
     "source": "manual",
     "comments": [
       "Instalar pixel",
-      "Criar audi\u00eancia",
-      "Criar an\u00fancios",
+      "Criar audiência",
+      "Criar anúncios",
       "Monitorar"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
@@ -1361,7 +1378,7 @@
   },
   {
     "id": "CR-001",
-    "title": "Check-in p\u00f3s-entrega (7 dias)",
+    "title": "Check-in pós-entrega (7 dias)",
     "description": "Tudo funcionando? Algum bug? Precisa de ajuda?",
     "status": "pending",
     "priority": "Alta",
@@ -1374,7 +1391,7 @@
       "Enviar mensagem",
       "Coletar feedback",
       "Registrar bugs",
-      "Agendar corre\u00e7\u00f5es"
+      "Agendar correções"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -1384,7 +1401,7 @@
   {
     "id": "CR-002",
     "title": "Check-in mensal com clientes ativos",
-    "description": "Ligar/mensagem: Como est\u00e1 indo? Precisa de algo?",
+    "description": "Ligar/mensagem: Como está indo? Precisa de algo?",
     "status": "pending",
     "priority": "Alta",
     "taskType": "monthly",
@@ -1405,18 +1422,18 @@
   },
   {
     "id": "CR-003",
-    "title": "Check-in trimestral (relat\u00f3rio de uso)",
-    "description": "M\u00e9tricas de uso, sugest\u00f5es de melhoria, oportunidades",
+    "title": "Check-in trimestral (relatório de uso)",
+    "description": "Métricas de uso, sugestões de melhoria, oportunidades",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "quarterly",
     "dueDate": null,
     "addedBy": "Abner",
     "assignedTo": "Abner",
     "source": "manual",
     "comments": [
-      "Coletar m\u00e9tricas",
-      "Criar relat\u00f3rio",
+      "Coletar métricas",
+      "Criar relatório",
       "Apresentar",
       "Identificar upsell"
     ],
@@ -1427,8 +1444,8 @@
   },
   {
     "id": "CR-004",
-    "title": "Anivers\u00e1rio do projeto \u2014 mensagem",
-    "description": "Hoje faz 1 ano que entregamos seu app! Obrigado pela confian\u00e7a",
+    "title": "Aniversário do projeto — mensagem",
+    "description": "Hoje faz 1 ano que entregamos seu app! Obrigado pela confiança",
     "status": "pending",
     "priority": "Baixa",
     "taskType": "yearly",
@@ -1437,7 +1454,7 @@
     "assignedTo": "Nonoke",
     "source": "manual",
     "comments": [
-      "Identificar anivers\u00e1rios",
+      "Identificar aniversários",
       "Preparar mensagem",
       "Enviar",
       "Registrar"
@@ -1449,10 +1466,10 @@
   },
   {
     "id": "CR-005",
-    "title": "Monitorar m\u00e9tricas dos clientes",
-    "description": "Verificar se apps est\u00e3o online, erros no Supabase, uptime",
+    "title": "Monitorar métricas dos clientes",
+    "description": "Verificar se apps estão online, erros no Supabase, uptime",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "weekly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -1462,7 +1479,7 @@
       "Verificar uptime",
       "Checar erros Supabase",
       "Monitorar uso",
-      "Alertar se necess\u00e1rio"
+      "Alertar se necessário"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -1481,7 +1498,7 @@
     "assignedTo": "Nonoke",
     "source": "manual",
     "comments": [
-      "Criar formul\u00e1rio",
+      "Criar formulário",
       "Enviar",
       "Coletar respostas",
       "Analisar"
@@ -1494,7 +1511,7 @@
   {
     "id": "CR-007",
     "title": "Coletar depoimento/testemunho",
-    "description": "Pedir review em texto, v\u00eddeo, ou Google Reviews",
+    "description": "Pedir review em texto, vídeo, ou Google Reviews",
     "status": "pending",
     "priority": "Alta",
     "taskType": "per_project",
@@ -1515,17 +1532,17 @@
   },
   {
     "id": "CR-008",
-    "title": "Pesquisa de satisfa\u00e7\u00e3o p\u00f3s-projeto",
-    "description": "Formul\u00e1rio curto: qualidade, comunica\u00e7\u00e3o, prazo, pre\u00e7o",
+    "title": "Pesquisa de satisfação pós-projeto",
+    "description": "Formulário curto: qualidade, comunicação, prazo, preço",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "per_project",
     "dueDate": null,
     "addedBy": "Nonoke",
     "assignedTo": "Nonoke",
     "source": "manual",
     "comments": [
-      "Criar formul\u00e1rio",
+      "Criar formulário",
       "Enviar",
       "Coletar",
       "Analisar"
@@ -1537,8 +1554,8 @@
   },
   {
     "id": "CR-009",
-    "title": "Revis\u00e3o de contrato/renova\u00e7\u00e3o",
-    "description": "Renovar manuten\u00e7\u00e3o, revisar escopo, ajustar pre\u00e7os",
+    "title": "Revisão de contrato/renovação",
+    "description": "Renovar manutenção, revisar escopo, ajustar preços",
     "status": "pending",
     "priority": "Alta",
     "taskType": "yearly",
@@ -1550,7 +1567,7 @@
       "Revisar contrato",
       "Ajustar escopo",
       "Renovar",
-      "Atualizar pre\u00e7os"
+      "Atualizar preços"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,
@@ -1559,8 +1576,8 @@
   },
   {
     "id": "CR-010",
-    "title": "Propor manuten\u00e7\u00e3o mensal",
-    "description": "Oferecemos plano de manuten\u00e7\u00e3o \u20acX/m\u00eas: backups, updates, suporte",
+    "title": "Propor manutenção mensal",
+    "description": "Oferecemos plano de manutenção €X/mês: backups, updates, suporte",
     "status": "pending",
     "priority": "Alta",
     "taskType": "per_project",
@@ -1582,7 +1599,7 @@
   {
     "id": "CR-011",
     "title": "Identificar novas necessidades do cliente",
-    "description": "Est\u00e1 pensando em expandir? Novo PDV? App para clientes?",
+    "description": "Está pensando em expandir? Novo PDV? App para clientes?",
     "status": "pending",
     "priority": "Alta",
     "taskType": "monthly",
@@ -1604,9 +1621,9 @@
   {
     "id": "CR-012",
     "title": "Propor melhorias/features extras",
-    "description": "Com base no uso, sugerir: relat\u00f3rios avan\u00e7ados, integra\u00e7\u00f5es, novo m\u00f3dulo",
+    "description": "Com base no uso, sugerir: relatórios avançados, integrações, novo módulo",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "quarterly",
     "dueDate": null,
     "addedBy": "Abner",
@@ -1625,10 +1642,10 @@
   },
   {
     "id": "CR-013",
-    "title": "Pacote de servi\u00e7os (bundle)",
+    "title": "Pacote de serviços (bundle)",
     "description": "Se contratar site + app junto, 15% de desconto",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "opportunity",
     "dueDate": null,
     "addedBy": "Abner",
@@ -1647,10 +1664,10 @@
   },
   {
     "id": "CR-014",
-    "title": "Programa de indica\u00e7\u00e3o",
-    "description": "Indique um amigo e ganhe 1 m\u00eas de manuten\u00e7\u00e3o gr\u00e1tis",
+    "title": "Programa de indicação",
+    "description": "Indique um amigo e ganhe 1 mês de manutenção grátis",
     "status": "pending",
-    "priority": "M\u00e9dia",
+    "priority": "Média",
     "taskType": "ongoing",
     "dueDate": null,
     "addedBy": "Nonoke",
@@ -1660,7 +1677,7 @@
       "Definir regras",
       "Criar material",
       "Comunicar clientes",
-      "Rastrear indica\u00e7\u00f5es"
+      "Rastrear indicações"
     ],
     "createdAt": "2026-05-01T00:00:00.000Z",
     "updatedAt": null,

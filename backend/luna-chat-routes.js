@@ -8,6 +8,7 @@ const path = require('path');
 const { execSync, exec } = require('child_process');
 const router = express.Router();
 const db = require('./db');
+const JSZip = require('jszip');
 
 // ============================================================
 // Luna Soul lazy initialization
@@ -370,6 +371,7 @@ router.get('/api/chat/stream', async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
     'Access-Control-Allow-Origin': '*',
   });
 
@@ -523,6 +525,134 @@ router.post('/api/chat/cancel', (req, res) => {
     res.json({ ok: true, message: 'Stream cancelado' });
   } else {
     res.json({ ok: true, message: 'Nenhum stream ativo' });
+  }
+});
+
+// ============================================================
+// Export API — JSON / Markdown / TXT (single or ZIP batch)
+// ============================================================
+
+function formatSessionAsJSON(session) {
+  return JSON.stringify({
+    id: session.id,
+    title: session.title,
+    mode: session.mode,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    messages: session.messages || [],
+  }, null, 2);
+}
+
+function formatSessionAsMarkdown(session) {
+  let md = `# ${session.title || 'Sem título'}\n\n`;
+  md += `- **ID:** ${session.id}\n`;
+  md += `- **Modo:** ${session.mode || 'thinking'}\n`;
+  md += `- **Criado em:** ${session.createdAt || '-'}\n`;
+  md += `- **Atualizado em:** ${session.updatedAt || '-'}\n\n`;
+  md += `---\n\n`;
+  const msgs = session.messages || [];
+  for (const msg of msgs) {
+    if (msg.type === 'text' || msg.type === 'response_delta') {
+      const role = msg.role === 'user' ? '👤 Usuário' : '🤖 Luna';
+      const time = msg.timestamp ? new Date(msg.timestamp).toLocaleString('pt-BR') : '';
+      md += `### ${role}${time ? ` · ${time}` : ''}\n\n`;
+      md += msg.content || '';
+      md += '\n\n---\n\n';
+    }
+  }
+  return md;
+}
+
+function formatSessionAsTXT(session) {
+  let txt = `=== ${session.title || 'Sem titulo'} ===\n`;
+  txt += `ID: ${session.id}\n`;
+  txt += `Modo: ${session.mode || 'thinking'}\n`;
+  txt += `Criado: ${session.createdAt || '-'}\n`;
+  txt += `Atualizado: ${session.updatedAt || '-'}\n`;
+  txt += `========================\n\n`;
+  const msgs = session.messages || [];
+  for (const msg of msgs) {
+    if (msg.type === 'text' || msg.type === 'response_delta') {
+      const role = msg.role === 'user' ? '[Usuario]' : '[Luna]';
+      txt += `${role} ${msg.content || ''}\n\n`;
+    }
+  }
+  return txt;
+}
+
+router.post('/api/chat/export', async (req, res) => {
+  const { sessionIds, format = 'json' } = req.body;
+  if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+    return res.status(400).json({ ok: false, error: 'sessionIds deve ser um array não vazio' });
+  }
+  if (!['json', 'markdown', 'txt'].includes(format)) {
+    return res.status(400).json({ ok: false, error: 'Formato inválido. Use json, markdown ou txt' });
+  }
+
+  try {
+    // Load sessions from DB or memory cache
+    const sessions = [];
+    for (const id of sessionIds) {
+      let session = webSessions.get(id);
+      if (!session) {
+        session = await loadSessionFromDB(id);
+      }
+      if (session) sessions.push(session);
+    }
+
+    if (sessions.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Nenhuma sessão encontrada' });
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (sessions.length === 1) {
+      // Single session — return file directly
+      const session = sessions[0];
+      let content, filename, mime;
+      if (format === 'json') {
+        content = formatSessionAsJSON(session);
+        filename = `luna-chat-${session.id}-${timestamp}.json`;
+        mime = 'application/json';
+      } else if (format === 'markdown') {
+        content = formatSessionAsMarkdown(session);
+        filename = `luna-chat-${session.id}-${timestamp}.md`;
+        mime = 'text/markdown';
+      } else {
+        content = formatSessionAsTXT(session);
+        filename = `luna-chat-${session.id}-${timestamp}.txt`;
+        mime = 'text/plain';
+      }
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', mime);
+      res.send(content);
+    } else {
+      // Multiple sessions — return ZIP
+      const zip = new JSZip();
+      for (const session of sessions) {
+        let content, ext;
+        if (format === 'json') {
+          content = formatSessionAsJSON(session);
+          ext = 'json';
+        } else if (format === 'markdown') {
+          content = formatSessionAsMarkdown(session);
+          ext = 'md';
+        } else {
+          content = formatSessionAsTXT(session);
+          ext = 'txt';
+        }
+        const safeTitle = (session.title || 'sem-titulo').replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '-').slice(0, 40);
+        zip.file(`${safeTitle}-${session.id.slice(-6)}.${ext}`, content);
+      }
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      const filename = `luna-export-${timestamp}.zip`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/zip');
+      res.send(zipBuffer);
+    }
+  } catch (e) {
+    console.error('[EXPORT] Erro:', e.message);
+    res.status(500).json({ ok: false, error: 'Erro ao exportar conversas' });
   }
 });
 

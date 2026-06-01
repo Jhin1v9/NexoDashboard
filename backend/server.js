@@ -3510,8 +3510,12 @@ app.use('/api/ideas', ideasRouter(requireAuth));
 const leadsRouter = require('./routes/leads');
 app.use('/api/demo-leads', leadsRouter);
 
+// ── Roadmaps & Metas Routes ──
+const roadmapsRouter = require('./routes/roadmaps');
+app.use('/api/roadmaps', roadmapsRouter(dataStore, { requireAuth }));
+
 // ── Voting Routes ──
-setupVotingRoutes(app, { requireAuth });
+setupVotingRoutes(app, { requireAuth, dataStore });
 
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──
