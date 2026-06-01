@@ -1,185 +1,220 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * Luna Tools API — Dashboard data exposed to Luna Web
+ * Luna Tools API — Proxy to Dashboard PRO (port 3456)
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * Reads from dashboard JSON files (fallback when PostgreSQL unavailable)
+ * All reads/writes go to Dashboard PRO via HTTP. No local JSON files.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const http = require('http');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3456';
+const JWT_SECRET = process.env.JWT_SECRET || 'nexo-test-secret-2026';
 
-function readJSON(filename, defaultVal = []) {
-  try {
-    const file = path.join(DATA_DIR, filename);
-    if (!fs.existsSync(file)) return defaultVal;
-    return JSON.parse(fs.readFileSync(file, 'utf-8'));
-  } catch (e) {
-    console.error(`[LunaTools] Error reading ${filename}:`, e.message);
-    return defaultVal;
-  }
+// Service token for Dashboard PRO authentication
+function getServiceToken() {
+  return jwt.sign(
+    { userId: 'luna-web', name: 'Luna Web', role: 'Admin' },
+    JWT_SECRET,
+    { expiresIn: '1h' }
+  );
 }
 
-function writeJSON(filename, data) {
-  try {
-    const file = path.join(DATA_DIR, filename);
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
-    return true;
-  } catch (e) {
-    console.error(`[LunaTools] Error writing ${filename}:`, e.message);
-    return false;
-  }
+function dashboardRequest(path, method = 'GET', body = null) {
+  return new Promise((resolve, reject) => {
+    const token = getServiceToken();
+    const options = {
+      hostname: 'localhost',
+      port: 3456,
+      path,
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve({ status: res.statusCode, body: json });
+        } catch {
+          resolve({ status: res.statusCode, body: data });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
 }
 
-// ── MOCK LEADS (rich demo data since leads.json is empty) ──
-const MOCK_LEADS = [
-  { id: 'lead-001', name: 'Carlos Silva', email: 'carlos@techbrasil.com', phone: '+55 11 98765-4321', source: 'site', status: 'negociacao', value: 12500, notes: 'Interessado em dashboard customizado para ERP', createdAt: '2026-05-28T10:00:00Z', updatedAt: '2026-05-30T14:30:00Z' },
-  { id: 'lead-002', name: 'Maria Oliveira', email: 'maria@inovacaodigital.com.br', phone: '+55 21 99876-5432', source: 'indicacao', status: 'proposta_enviada', value: 8500, notes: 'Precisa de integração WhatsApp + CRM', createdAt: '2026-05-27T09:00:00Z', updatedAt: '2026-05-29T11:00:00Z' },
-  { id: 'lead-003', name: 'João Pedro Santos', email: 'joao@startupsp.com', phone: '+55 11 91234-5678', source: 'social', status: 'novo', value: 5000, notes: 'Startup de fintech, quer automação de leads', createdAt: '2026-06-01T08:00:00Z', updatedAt: '2026-06-01T08:00:00Z' },
-  { id: 'lead-004', name: 'Ana Costa', email: 'ana@agenciamarketing.com', phone: '+55 31 97654-3210', source: 'anuncio', status: 'contatado', value: 15000, notes: 'Agência quer white-label do Luna', createdAt: '2026-05-25T14:00:00Z', updatedAt: '2026-05-28T16:00:00Z' },
-  { id: 'lead-005', name: 'Bruno Mendes', email: 'bruno@ecommerceplus.com', phone: '+55 11 94567-8901', source: 'site', status: 'ganho', value: 22000, notes: 'Contrato fechado — implementação em 30 dias', createdAt: '2026-05-20T10:00:00Z', updatedAt: '2026-05-30T09:00:00Z' },
-  { id: 'lead-006', name: 'Fernanda Lima', email: 'fernanda@consultoriahr.com', phone: '+55 21 93456-7890', source: 'outro', status: 'perdido', value: 6000, notes: 'Orçamento muito acima do esperado', createdAt: '2026-05-22T11:00:00Z', updatedAt: '2026-05-26T15:00:00Z' },
-  { id: 'lead-007', name: 'Ricardo Almeida', email: 'ricardo@logisticafast.com', phone: '+55 11 92345-6789', source: 'indicacao', status: 'novo', value: 18000, notes: 'Empresa de logística, precisa de rastreamento em tempo real', createdAt: '2026-06-01T07:00:00Z', updatedAt: '2026-06-01T07:00:00Z' },
-  { id: 'lead-008', name: 'Patrícia Souza', email: 'patricia@edtechbrasil.com', phone: '+55 31 98765-1234', source: 'social', status: 'contatado', value: 9500, notes: 'Plataforma EAD, quer chatbot integrado', createdAt: '2026-05-29T13:00:00Z', updatedAt: '2026-05-31T10:00:00Z' },
-];
-
 // ═══════════════════════════════════════════════════════════════════════════
-// LEADS API
+// LEADS API → proxy to Dashboard PRO /api/leads
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get('/api/tools/leads', (req, res) => {
-  const stored = readJSON('leads.json');
-  const leads = stored.length > 0 ? stored : MOCK_LEADS;
-  
-  // Compute stats
-  const stats = {
-    total: leads.length,
-    totalValue: leads.reduce((s, l) => s + (l.value || 0), 0),
-    byStatus: {},
-    bySource: {},
-    recent: leads.filter(l => {
-      const d = new Date(l.createdAt);
-      return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
-    }).length,
-  };
-  
-  leads.forEach(l => {
-    stats.byStatus[l.status] = (stats.byStatus[l.status] || 0) + 1;
-    stats.bySource[l.source] = (stats.bySource[l.source] || 0) + 1;
-  });
-  
-  res.json({ ok: true, leads, stats });
-});
-
-router.post('/api/tools/leads', (req, res) => {
-  const { name, email, phone, source, status, value, notes } = req.body;
-  if (!name?.trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
-  
-  const leads = readJSON('leads.json');
-  const newLead = {
-    id: 'lead-' + Date.now().toString(36),
-    name: name.trim(),
-    email: email?.trim() || null,
-    phone: phone?.trim() || null,
-    source: source || 'site',
-    status: status || 'novo',
-    value: value ? parseFloat(value) : 0,
-    notes: notes?.trim() || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  leads.unshift(newLead);
-  writeJSON('leads.json', leads);
-  res.json({ ok: true, lead: newLead });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TASKS API
-// ═══════════════════════════════════════════════════════════════════════════
-
-router.get('/api/tools/tasks', (req, res) => {
-  const tasks = readJSON('company-tasks.json');
-  
-  const stats = {
-    total: tasks.length,
-    byStatus: {},
-    byPriority: {},
-    overdue: 0,
-    highPriority: 0,
-  };
-  
-  const now = new Date();
-  tasks.forEach(t => {
-    stats.byStatus[t.status] = (stats.byStatus[t.status] || 0) + 1;
-    stats.byPriority[t.priority] = (stats.byPriority[t.priority] || 0) + 1;
-    if (t.priority === 'Alta') stats.highPriority++;
-    if (t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed') {
-      stats.overdue++;
+router.get('/api/tools/leads', async (req, res) => {
+  try {
+    const result = await dashboardRequest('/api/leads');
+    if (result.status !== 200 || !result.body.success) {
+      return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
     }
-  });
-  
-  res.json({ ok: true, tasks, stats });
+    const leads = result.body.leads || [];
+
+    // Compute stats in Luna Web format
+    const stats = {
+      total: leads.length,
+      totalValue: leads.reduce((s, l) => s + (l.estimatedValue || l.value || 0), 0),
+      byStatus: {},
+      bySource: {},
+      recent: leads.filter(l => {
+        const d = new Date(l.createdAt);
+        return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+      }).length,
+    };
+    leads.forEach(l => {
+      const st = l.pipelineStatus || l.status || 'novo';
+      stats.byStatus[st] = (stats.byStatus[st] || 0) + 1;
+      stats.bySource[l.source || 'outro'] = (stats.bySource[l.source || 'outro'] || 0) + 1;
+    });
+
+    res.json({ ok: true, leads, stats });
+  } catch (e) {
+    console.error('[LunaTools] leads GET error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
 });
 
-router.post('/api/tools/tasks', (req, res) => {
-  const { title, description, priority, taskType, dueDate, assignedTo } = req.body;
-  if (!title?.trim()) return res.status(400).json({ ok: false, error: 'Título obrigatório' });
-  
-  const tasks = readJSON('company-tasks.json');
-  const newTask = {
-    id: 'TSK-' + Date.now().toString(36).toUpperCase(),
-    title: title.trim(),
-    description: description?.trim() || '',
-    status: 'pending',
-    priority: priority || 'Média',
-    taskType: taskType || 'one_time',
-    dueDate: dueDate || null,
-    addedBy: 'Luna Web',
-    assignedTo: assignedTo || 'Abner',
-    source: 'luna-web',
-    comments: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: null,
-    startedAt: null,
-    completedAt: null,
-  };
-  tasks.unshift(newTask);
-  writeJSON('company-tasks.json', tasks);
-  res.json({ ok: true, task: newTask });
-});
+router.post('/api/tools/leads', async (req, res) => {
+  try {
+    const { name, email, phone, source, status, value, notes } = req.body;
+    if (!name?.trim()) return res.status(400).json({ ok: false, error: 'Nome obrigatório' });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DASHBOARD STATS API
-// ═══════════════════════════════════════════════════════════════════════════
+    const result = await dashboardRequest('/api/leads', 'POST', {
+      displayName: name.trim(),
+      name: name.trim(),
+      email: email || '',
+      phone: phone || '',
+      source: source || 'luna-web',
+      estimatedValue: value ? parseFloat(value) : 0,
+      notes: notes || '',
+      assignedTo: 'abner'
+    });
 
-router.get('/api/tools/stats', (req, res) => {
-  const leads = readJSON('leads.json');
-  const leadsData = leads.length > 0 ? leads : MOCK_LEADS;
-  const tasks = readJSON('company-tasks.json');
-  
-  res.json({
-    ok: true,
-    stats: {
-      leads: {
-        total: leadsData.length,
-        value: leadsData.reduce((s, l) => s + (l.value || 0), 0),
-        recent: leadsData.filter(l => {
-          const d = new Date(l.createdAt);
-          return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
-        }).length,
-      },
-      tasks: {
-        total: tasks.length,
-        pending: tasks.filter(t => t.status === 'pending').length,
-        inProgress: tasks.filter(t => t.status === 'in_progress').length,
-        completed: tasks.filter(t => t.status === 'completed').length,
-        highPriority: tasks.filter(t => t.priority === 'Alta').length,
-      },
+    if (result.status !== 200 || !result.body.success) {
+      return res.status(502).json({ ok: false, error: result.body.error || 'Erro ao criar lead no Dashboard' });
     }
-  });
+    res.json({ ok: true, lead: result.body.lead });
+  } catch (e) {
+    console.error('[LunaTools] leads POST error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TASKS API → proxy to Dashboard PRO /api/tasks
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get('/api/tools/tasks', async (req, res) => {
+  try {
+    const result = await dashboardRequest('/api/tasks');
+    if (result.status !== 200 || !Array.isArray(result.body)) {
+      return res.status(502).json({ ok: false, error: 'Dashboard PRO indisponível' });
+    }
+    const tasks = result.body;
+
+    const stats = {
+      total: tasks.length,
+      byStatus: {},
+      byPriority: {},
+      overdue: 0,
+      highPriority: 0,
+    };
+    const now = new Date();
+    tasks.forEach(t => {
+      stats.byStatus[t.status] = (stats.byStatus[t.status] || 0) + 1;
+      stats.byPriority[t.priority] = (stats.byPriority[t.priority] || 0) + 1;
+      if (t.priority === 'high' || t.priority === 'Alta') stats.highPriority++;
+      if (t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed') {
+        stats.overdue++;
+      }
+    });
+
+    res.json({ ok: true, tasks, stats });
+  } catch (e) {
+    console.error('[LunaTools] tasks GET error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+router.post('/api/tools/tasks', async (req, res) => {
+  try {
+    const { title, description, priority, taskType, dueDate, assignedTo } = req.body;
+    if (!title?.trim()) return res.status(400).json({ ok: false, error: 'Título obrigatório' });
+
+    const result = await dashboardRequest('/api/tasks', 'POST', {
+      title: title.trim(),
+      description: description || '',
+      priority: priority === 'Alta' ? 'high' : (priority === 'Baixa' ? 'low' : 'high'),
+      taskType: taskType || 'one_time',
+      dueDate: dueDate || null,
+      assignedTo: assignedTo || 'abner'
+    });
+
+    if (result.status !== 200 || !result.body.id) {
+      return res.status(502).json({ ok: false, error: 'Erro ao criar tarefa no Dashboard' });
+    }
+    res.json({ ok: true, task: result.body });
+  } catch (e) {
+    console.error('[LunaTools] tasks POST error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD STATS API → aggregate from Dashboard PRO
+// ═══════════════════════════════════════════════════════════════════════════
+
+router.get('/api/tools/stats', async (req, res) => {
+  try {
+    const [leadsRes, tasksRes] = await Promise.all([
+      dashboardRequest('/api/leads'),
+      dashboardRequest('/api/tasks')
+    ]);
+
+    const leads = (leadsRes.status === 200 && leadsRes.body.success) ? (leadsRes.body.leads || []) : [];
+    const tasks = (tasksRes.status === 200 && Array.isArray(tasksRes.body)) ? tasksRes.body : [];
+
+    res.json({
+      ok: true,
+      stats: {
+        leads: {
+          total: leads.length,
+          value: leads.reduce((s, l) => s + (l.estimatedValue || l.value || 0), 0),
+          recent: leads.filter(l => {
+            const d = new Date(l.createdAt);
+            return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+          }).length,
+        },
+        tasks: {
+          total: tasks.length,
+          pending: tasks.filter(t => t.status === 'pending').length,
+          inProgress: tasks.filter(t => t.status === 'in_progress').length,
+          completed: tasks.filter(t => t.status === 'completed').length,
+          highPriority: tasks.filter(t => t.priority === 'Alta' || t.priority === 'high').length,
+        },
+      }
+    });
+  } catch (e) {
+    console.error('[LunaTools] stats error:', e.message);
+    res.status(502).json({ ok: false, error: e.message });
+  }
 });
 
 module.exports = router;
