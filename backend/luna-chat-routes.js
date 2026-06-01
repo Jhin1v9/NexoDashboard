@@ -76,7 +76,7 @@ function generateWebSessionId() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-function createWebSession(title = 'Nova conversa', mode = 'thinking', persona = 'default') {
+function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default') {
   const id = generateWebSessionId();
   const session = {
     id,
@@ -272,7 +272,7 @@ function sendSSE(res, event, data) {
 
 // POST /api/chat — send message
 router.post('/api/chat', async (req, res) => {
-  const { message, sessionId, mode = 'thinking', files } = req.body;
+  const { message, sessionId, mode = 'instant', files } = req.body;
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
   let session = sessionId ? getWebSession(sessionId) : null;
@@ -300,7 +300,7 @@ router.post('/api/chat', async (req, res) => {
     const stream = luna.processMessageStream(message, {
       sessionId: session.id,
       userId: 'web-' + session.id,
-      mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'thinking',
+      mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'instant',
       persona: session.persona || 'default',
     });
 
@@ -452,7 +452,7 @@ router.get('/api/chat/sessions', async (req, res) => {
     const sessions = rows.map(row => ({
       id: row.id,
       title: row.title,
-      mode: row.mode || 'thinking',
+      mode: row.mode || 'instant',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       messageCount: Array.isArray(row.messages) ? row.messages.length : 0,
@@ -466,7 +466,7 @@ router.get('/api/chat/sessions', async (req, res) => {
       .map(s => ({
         id: s.id,
         title: s.title,
-        mode: s.mode || 'thinking',
+        mode: s.mode || 'instant',
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
         messageCount: s.messages.length,
@@ -538,17 +538,25 @@ router.post('/api/chat/session', async (req, res) => {
 });
 
 // POST /api/chat/cancel
-router.post('/api/chat/cancel', (req, res) => {
+router.post('/api/chat/cancel', async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
   const stream = activeStreams.get(sessionId);
   if (stream) {
     stream.cancelled = true;
     activeStreams.delete(sessionId);
-    res.json({ ok: true, message: 'Stream cancelado' });
-  } else {
-    res.json({ ok: true, message: 'Nenhum stream ativo' });
   }
+  // v5.3-fix: REAL cancellation — also stop generation on Kimi Web and reset bridge state
+  try {
+    const luna = await getLunaSoul();
+    if (luna && luna.kimiBridge) {
+      const userId = 'web-' + sessionId;
+      await luna.kimiBridge.cancelStream(userId);
+    }
+  } catch (e) {
+    console.warn('[CANCEL] Kimi bridge cancel failed:', e.message);
+  }
+  res.json({ ok: true, message: 'Stream cancelado' });
 });
 
 // ============================================================
@@ -569,7 +577,7 @@ function formatSessionAsJSON(session) {
 function formatSessionAsMarkdown(session) {
   let md = `# ${session.title || 'Sem título'}\n\n`;
   md += `- **ID:** ${session.id}\n`;
-  md += `- **Modo:** ${session.mode || 'thinking'}\n`;
+  md += `- **Modo:** ${session.mode || 'instant'}\n`;
   md += `- **Criado em:** ${session.createdAt || '-'}\n`;
   md += `- **Atualizado em:** ${session.updatedAt || '-'}\n\n`;
   md += `---\n\n`;
@@ -589,7 +597,7 @@ function formatSessionAsMarkdown(session) {
 function formatSessionAsTXT(session) {
   let txt = `=== ${session.title || 'Sem titulo'} ===\n`;
   txt += `ID: ${session.id}\n`;
-  txt += `Modo: ${session.mode || 'thinking'}\n`;
+  txt += `Modo: ${session.mode || 'instant'}\n`;
   txt += `Criado: ${session.createdAt || '-'}\n`;
   txt += `Atualizado: ${session.updatedAt || '-'}\n`;
   txt += `========================\n\n`;

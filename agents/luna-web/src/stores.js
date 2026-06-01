@@ -3,7 +3,7 @@ import { writable, derived } from 'svelte/store';
 export const sessions = writable([]);
 export const currentSessionId = writable(null);
 export const isStreaming = writable(false);
-export const currentMode = writable('thinking');
+export const currentMode = writable('instant');
 export const messages = writable([]);
 export const lunaConfig = writable({});
 export const connectionStatus = writable('connected');

@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
 
   export let title = 'Nova Conversa';
-  export let mode = 'thinking';
+  export let mode = 'instant';
   export let isStreaming = false;
 
   const dispatch = createEventDispatcher();
