@@ -1032,8 +1032,17 @@ async function addMessageToThread(threadId, message) {
   thread.updatedAt = new Date().toISOString();
   // Limita a 500 mensagens por thread (sliding window)
   if (thread.messages.length > 500) {
+    const removed = thread.messages.length - 500;
     thread.messages = thread.messages.slice(-500);
     thread.messageCount = thread.messages.length;
+    // Adiciona mensagem de sistema informando sobre a compactação
+    thread.messages.unshift({
+      id: `sys_${Date.now()}`,
+      role: 'system',
+      type: 'context_compact',
+      text: `🔄 Contexto compactado. ${removed} mensagens antigas foram arquivadas para manter a conversa fluida. A Luna ainda lembra do essencial.`,
+      timestamp: new Date().toISOString()
+    });
   }
   await saveThreads(data);
   return message;
@@ -1041,8 +1050,14 @@ async function addMessageToThread(threadId, message) {
 async function clearThreadMessages(threadId) {
   const data = await loadThreads();
   if (!data.threads[threadId]) return false;
-  data.threads[threadId].messages = [];
-  data.threads[threadId].messageCount = 0;
+  data.threads[threadId].messages = [{
+    id: `sys_${Date.now()}`,
+    role: 'system',
+    type: 'new_session',
+    text: `🌙 Nova sessão iniciada. Histórico anterior foi limpo. Como posso ajudar?`,
+    timestamp: new Date().toISOString()
+  }];
+  data.threads[threadId].messageCount = 1;
   data.threads[threadId].updatedAt = new Date().toISOString();
   await saveThreads(data);
   return true;

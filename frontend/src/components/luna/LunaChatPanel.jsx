@@ -827,6 +827,28 @@ export default function LunaChatPanel({ isOpen, onClose }) {
               </div>
             </div>
 
+            {/* Context Indicator */}
+            {currentMessages.length > 0 && (
+              <div className="px-4 pt-2">
+                <div className={`flex items-center justify-between px-2.5 py-1 rounded-lg text-[10px] font-mono border ${
+                  currentMessages.length >= 450
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                    : currentMessages.length >= 400
+                    ? 'bg-yellow-500/5 border-yellow-500/20 text-yellow-400'
+                    : 'bg-nexo-card/30 border-nexo-border/30 text-nexo-muted'
+                }`}>
+                  <span className="flex items-center gap-1">
+                    <Activity className="w-3 h-3" />
+                    Contexto: {currentMessages.length}/500
+                    {currentMessages.length >= 450 && ' ⚠️ Limite próximo'}
+                  </span>
+                  {currentMessages.length >= 450 && (
+                    <span className="text-[9px] opacity-70">Compactação automática em breve</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
               {currentMessages.length === 0 && (
@@ -850,9 +872,20 @@ export default function LunaChatPanel({ isOpen, onClose }) {
 
               {currentMessages.map((msg, i) => {
                 const isUser = msg.role === 'user'
+                const isSystem = msg.role === 'system'
                 const showAuthor = isGroup && isUser && msg.authorName
                 const authorColor = msg.authorColor || getUserColor(msg.author)
-                const isTyping = msg.id === typingMsgId && !isUser
+                const isTyping = msg.id === typingMsgId && !isUser && !isSystem
+                if (isSystem) {
+                  return (
+                    <div key={msg.id || i} className="flex justify-center my-2">
+                      <div className="px-3 py-1.5 rounded-full text-[11px] text-nexo-muted bg-nexo-card/60 border border-nexo-border/50 flex items-center gap-1.5">
+                        <Activity className="w-3 h-3 text-nexo-info" />
+                        <span className="font-mono">{msg.text}</span>
+                      </div>
+                    </div>
+                  )
+                }
                 return (
                   <div key={msg.id || i} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
                     {/* Avatar */}
