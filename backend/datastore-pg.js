@@ -811,6 +811,7 @@ async function getLunaBuffer() {
     newIdeas: [], newDecisions: [], newLinks: [],
     newLeads: [], newFinance: [], ignoredMessages: [],
     newMentions: [], sentiment: { positive: 0, negative: 0, urgent: 0 },
+    newNews: [], silenceCount: 0, fullExtractDone: false,
     lastBufferUpdate: new Date().toISOString()
   };
   return {
@@ -825,18 +826,22 @@ async function getLunaBuffer() {
     ignoredMessages: row.ignored_messages || [],
     newMentions: row.new_mentions || [],
     sentiment: row.sentiment || { positive: 0, negative: 0, urgent: 0 },
+    newNews: row.new_news || [],
+    silenceCount: row.silence_count || 0,
+    fullExtractDone: row.full_extract_done || false,
     lastBufferUpdate: row.last_buffer_update
   };
 }
 
 async function saveLunaBuffer(data) {
   await db.run(
-    `INSERT INTO luna_buffer (id, new_messages, new_tasks, new_tasks_done, new_ideas, new_decisions, new_links, new_leads, new_finance, ignored_messages, new_mentions, sentiment, last_buffer_update)
-     VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    `INSERT INTO luna_buffer (id, new_messages, new_tasks, new_tasks_done, new_ideas, new_decisions, new_links, new_leads, new_finance, ignored_messages, new_mentions, sentiment, new_news, silence_count, full_extract_done, last_buffer_update)
+     VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      ON CONFLICT (id) DO UPDATE SET
        new_messages=$1, new_tasks=$2, new_tasks_done=$3, new_ideas=$4,
        new_decisions=$5, new_links=$6, new_leads=$7, new_finance=$8,
-       ignored_messages=$9, new_mentions=$10, sentiment=$11, last_buffer_update=$12`,
+       ignored_messages=$9, new_mentions=$10, sentiment=$11, new_news=$12,
+       silence_count=$13, full_extract_done=$14, last_buffer_update=$15`,
     [
       JSON.stringify(data.newMessages || []),
       JSON.stringify(data.newTasks || []),
@@ -849,10 +854,37 @@ async function saveLunaBuffer(data) {
       JSON.stringify(data.ignoredMessages || []),
       JSON.stringify(data.newMentions || []),
       JSON.stringify(data.sentiment || { positive: 0, negative: 0, urgent: 0 }),
+      JSON.stringify(data.newNews || []),
+      data.silenceCount || 0,
+      data.fullExtractDone || false,
       data.lastBufferUpdate || new Date().toISOString()
     ]
   );
   notifyChange('lunaBuffer', await getLunaBuffer());
+  return data;
+}
+
+// ============================================================
+// LUNA CHECKPOINT
+// ============================================================
+async function getLunaCheckpoint() {
+  const row = await db.get('SELECT * FROM luna_checkpoint WHERE id=1');
+  if (!row) return { knownMessageHashes: [], lastScan: null, version: '14.1' };
+  return {
+    knownMessageHashes: row.known_message_hashes || [],
+    lastScan: row.last_scan,
+    version: row.version || '14.1'
+  };
+}
+
+async function saveLunaCheckpoint(data) {
+  await db.run(
+    `INSERT INTO luna_checkpoint (id, known_message_hashes, last_scan, version, updated_at)
+     VALUES (1, $1, $2, $3, NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       known_message_hashes = $1, last_scan = $2, version = $3, updated_at = NOW()`,
+    [JSON.stringify(data.knownMessageHashes || []), data.lastScan || null, data.version || '14.1']
+  );
   return data;
 }
 
@@ -1273,6 +1305,7 @@ module.exports = {
   getWhatsappHistory, saveWhatsappMessage, saveWhatsappHistory, deleteWhatsappMessage,
   getLunaThreads, saveLunaThread, saveLunaThreads, deleteLunaThread,
   getLunaBuffer, saveLunaBuffer,
+  getLunaCheckpoint, saveLunaCheckpoint,
   getWorkspaceClients, saveWorkspaceClient, deleteWorkspaceClient,
   getRoadmaps, getRoadmapById, saveRoadmap, deleteRoadmap,
   getTimelines, getTimelineById, saveTimeline,
