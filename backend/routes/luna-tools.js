@@ -12,10 +12,20 @@ const NodeCache = require('node-cache');
 const router = express.Router();
 
 // v5.2: Centralized config
-const config = require('../../../.luna-kernel/config/luna-config');
+let config;
+try {
+  config = require('../../../.luna-kernel/config/luna-config');
+} catch (e) {
+  config = {
+    URLS: { dashboard: 'http://localhost:3456' },
+    AUTH: { jwtSecret: process.env.JWT_SECRET || 'nexo-default-secret-change-me' },
+    PORTS: { dashboard: 3456 },
+    DB: { cacheTTL: { stats: 30, leads: 30, tasks: 30, finance: 30, voting: 30 } }
+  };
+}
 
 // v5.2: In-memory cache for read-heavy endpoints
-const cache = new NodeCache({ stdTTL: config.DB.cacheTTL.stats, checkperiod: 60 });
+const cache = new NodeCache({ stdTTL: config?.DB?.cacheTTL?.stats || 30, checkperiod: 60 });
 const CACHE_KEYS = {
   leads: 'tools:leads',
   tasks: 'tools:tasks',
