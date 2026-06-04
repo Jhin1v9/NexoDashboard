@@ -15,7 +15,7 @@ const dataStore = require('../datastore-pg');
 const TOOLS = {
   // ── Tarefas ──
   listTasks: {
-    description: 'Lista tarefas do dashboard com filtros opcionais',
+    description: 'Lista tarefas do dashboard com filtros opcionais. Retorna cada tarefa com ID e título para referência.',
     parameters: {
       status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'archived'], optional: true },
       assignedTo: { type: 'string', optional: true },
@@ -27,7 +27,15 @@ const TOOLS = {
       if (params.status) tasks = tasks.filter(t => t.status === params.status);
       if (params.assignedTo) tasks = tasks.filter(t => t.assignedTo === params.assignedTo);
       if (params.priority) tasks = tasks.filter(t => t.priority === params.priority);
-      return { success: true, count: tasks.length, tasks: tasks.slice(0, params.limit || 10) };
+      const formattedTasks = tasks.slice(0, params.limit || 10).map(t => ({
+        id: t.id,
+        title: t.title,
+        display: `ID: ${t.id} | Título: ${t.title}`,
+        status: t.status,
+        priority: t.priority,
+        assignedTo: t.assignedTo
+      }));
+      return { success: true, count: formattedTasks.length, tasks: formattedTasks };
     }
   },
 
@@ -59,7 +67,7 @@ const TOOLS = {
   },
 
   updateTask: {
-    description: 'Atualiza uma tarefa existente',
+    description: 'Atualiza uma tarefa existente. Use listTasks para obter o ID (formato: ID: X | Título: Y).',
     parameters: {
       id: { type: 'string', required: true },
       title: { type: 'string', optional: true },
@@ -79,7 +87,7 @@ const TOOLS = {
   },
 
   deleteTask: {
-    description: 'Deleta uma tarefa pelo ID. ⚠️ Ação irreversível.',
+    description: 'Deleta uma tarefa pelo ID. ⚠️ Ação irreversível. Use listTasks para ver o ID de cada tarefa (formato: ID: X | Título: Y).',
     parameters: {
       id: { type: 'string', required: true }
     },
@@ -109,7 +117,7 @@ const TOOLS = {
 
   // ── Leads ──
   listLeads: {
-    description: 'Lista leads do CRM',
+    description: 'Lista leads do CRM. Retorna cada lead com ID e nome para referência.',
     parameters: {
       status: { type: 'string', optional: true },
       limit: { type: 'number', default: 10, optional: true }
@@ -118,7 +126,15 @@ const TOOLS = {
       const leadsData = await dataStore.getLeads();
       let leads = leadsData?.leads || [];
       if (params.status) leads = leads.filter(l => l.status === params.status);
-      return { success: true, count: leads.length, leads: leads.slice(0, params.limit || 10) };
+      const formattedLeads = leads.slice(0, params.limit || 10).map(l => ({
+        id: l.id,
+        name: l.name,
+        display: `ID: ${l.id} | Nome: ${l.name}`,
+        status: l.status,
+        email: l.email,
+        phone: l.phone
+      }));
+      return { success: true, count: formattedLeads.length, leads: formattedLeads };
     }
   },
 
@@ -148,7 +164,7 @@ const TOOLS = {
   },
 
   updateLead: {
-    description: 'Atualiza um lead existente',
+    description: 'Atualiza um lead existente. Use listLeads para obter o ID (formato: ID: X | Nome: Y).',
     parameters: {
       id: { type: 'string', required: true },
       status: { type: 'string', optional: true },
@@ -166,7 +182,7 @@ const TOOLS = {
   },
 
   deleteLead: {
-    description: 'Deleta um lead pelo ID. ⚠️ Ação irreversível.',
+    description: 'Deleta um lead pelo ID. ⚠️ Ação irreversível. Use listLeads para ver o ID de cada lead (formato: ID: X | Nome: Y).',
     parameters: {
       id: { type: 'string', required: true }
     },
@@ -247,14 +263,20 @@ const TOOLS = {
 
   // ── Ideias ──
   listIdeas: {
-    description: 'Lista ideias do dashboard',
+    description: 'Lista ideias do dashboard. Retorna cada ideia com ID e título para referência.',
     parameters: {
       limit: { type: 'number', default: 10, optional: true }
     },
     execute: async (params) => {
       const ideasData = await dataStore.getIdeas();
       const ideas = ideasData?.ideas ? Object.values(ideasData.ideas) : [];
-      return { success: true, count: ideas.length, ideas: ideas.slice(0, params.limit || 10) };
+      const formattedIdeas = ideas.slice(0, params.limit || 10).map(i => ({
+        id: i.id,
+        title: i.title,
+        display: `ID: ${i.id} | Título: ${i.title}`,
+        status: i.status
+      }));
+      return { success: true, count: formattedIdeas.length, ideas: formattedIdeas };
     }
   },
 
