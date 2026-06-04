@@ -348,4 +348,54 @@ curl -s -X POST http://localhost:3456/api/auth/login \
 
 ---
 
-*Atualizado: 2026-05-31 | Commit: arquitetura-luna-web-documentada | Status: Backend ✅ Frontend ✅ Luna Web ✅ Plan Mode ✅ Auto-Health ✅*
+## 🔌 Luna Extension v8.1 (Chrome Extension — PRIMARY DOM Source)
+
+### Arquitetura
+- **Content Script** (`content.js`): Injetado no contexto isolado da página kimi.com. Escuta `window.postMessage` do `injected.js` e encaminha para o background SW via `chrome.runtime.sendMessage`.
+- **Injected Script** (`injected.js`): Injetado no MAIN world via `<script src="...">`. Executa `MutationObserver` no DOM da página e envia eventos via `window.postMessage` para o content script.
+- **Background Service Worker** (`background.js`): Recebe eventos do content script e envia para o servidor Luna via **HTTP POST polling** (`fetch`). Também faz polling periódico (`chrome.alarms`) para receber respostas do servidor.
+- **Servidor Luna** (`luna-extension-handler.cjs`): Endpoints HTTP `/ext/register`, `/ext/event`, `/ext/poll` gerenciam sessões da extensão e roteiam eventos para a Luna Soul.
+
+### Por que HTTP polling em vez de WebSocket?
+O Chrome MV3 não permite WebSockets persistentes no Service Worker. A solução anterior (offscreen document + WebSocket) sofria de problemas de lifecycle (SW cache, offscreen doc duplicado). O polling HTTP é mais robusto e não depende de documentos offscreen.
+
+### Arquivos
+- Extensão: `~/.luna-kernel/luna-extension/`
+- Handler servidor: `NEXO_DASHBOARD_PRO/backend/luna-extension-handler.cjs`
+- Integração servidor: `NEXO_DASHBOARD_PRO/backend/luna-server.js` (linha ~160)
+
+### Comandos
+```bash
+# 🚀 Deploy automático da extensão (limpa cache + atualiza versão + reload via CDP)
+bash ~/.luna-kernel/luna-extension/deploy.sh
+
+# Reiniciar servidor Luna após mudanças no handler
+cd ~/NEXO_DASHBOARD_PRO/backend && pm2 restart luna-server
+
+# Reiniciar Chrome com extensão (só se necessário)
+ps -ef | grep chrome | grep remote-debugging-port | awk '{print $2}' | xargs kill -9
+nohup /opt/google/chrome/chrome --remote-debugging-port=9222 --no-first-run \
+  --no-default-browser-check --user-data-dir=/home/jhin/.luna/chrome-profile \
+  --disable-background-timer-throttling --disable-backgrounding-occluded-windows \
+  --disable-renderer-backgrounding \
+  --load-extension=/home/jhin/.luna-kernel/luna-extension \
+  https://www.kimi.com/ > /dev/null 2>&1 &
+```
+
+### Caminho de volta: injeção de tool results
+Quando o servidor detecta uma `tool_call` via extensão, executa a tool e envia o resultado de volta via `/ext/poll`. O SW recebe e encaminha para o content script, que:
+1. Recebe o payload `tool_result` ou `inject_text`
+2. Usa `document.execCommand('insertText', ...)` para inserir no `contenteditable` do Kimi
+3. Simula `Enter` ou clica no botão de enviar
+
+### Cache do Service Worker
+O Chrome MV3 cacheia o SW agressivamente. O `deploy.sh` já lida com isso automaticamente:
+1. Apaga cache: `rm -rf ~/.luna/chrome-profile/Default/Service\ Worker/`
+2. Incrementa versão no `manifest.json`
+3. Chama `chrome.runtime.reload()` via CDP
+
+Se precisar fazer manualmente: mate o Chrome, apague o cache, mude a versão, e reinicie.
+
+---
+
+*Atualizado: 2026-06-03 | Commit: luna-extension-v8.1-complete | Status: Backend ✅ Frontend ✅ Luna Web ✅ Extension v8.1 ✅ Plan Mode ✅ Auto-Health ✅*

@@ -144,12 +144,51 @@ app.get('/config.html', (req, res) => {
   }
 });
 
+// v8.0: Create HTTP server so WebSocket can share the same port
+const http = require('http');
+const server = http.createServer(app);
+
+// v8.1: Initialize Extension HTTP handler — MUST be before SPA fallback
+const { LunaExtensionHandler } = require('./luna-extension-handler.cjs');
+let extHandler = null;
+try {
+  extHandler = new LunaExtensionHandler(server, app);
+  console.log('[Luna Server] Extension handler initialized');
+} catch (e) {
+  console.error('[Luna Server] Failed to initialize extension handler:', e.message);
+}
+
+// Export for other modules to use
+app.locals.extensionHandler = extHandler;
+global.__lunaApp = app;
+
+// v8.2-fix: Auto-wire tool executor immediately so extension tools work
+// even before any chat HTTP route is hit. getLunaSoul() is lazy but safe to call.
+if (extHandler) {
+  const lunaChatModule = require('./luna-chat-routes');
+  if (lunaChatModule.getLunaSoul) {
+    lunaChatModule.getLunaSoul().then(lunaSoul => {
+      extHandler.setToolExecutor(async (tool, params, sessionId) => {
+        const result = await lunaSoul._handleAction(
+          { tool, params, mode: 'ACTION' },
+          sessionId?.replace('web-', '') || sessionId,
+          { userId: sessionId }
+        );
+        return result;
+      });
+      console.log('[LunaExt] Tool executor auto-wired from luna-server');
+    }).catch(e => {
+      console.warn('[LunaExt] Auto-wire failed (will retry on first chat request):', e.message);
+    });
+  }
+}
+
 // SPA fallback — MUST be after all API routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(config.PATHS.lunaDist, 'index.html'));
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🌙 Luna Web rodando em http://localhost:${PORT}`);
   console.log(`   luna-dir: ${LUNA_DIR}`);
   console.log(`   runtime:  ${RUNTIME_PATH}`);
@@ -160,8 +199,11 @@ app.listen(PORT, () => {
   console.log('   - Config:  GET/POST /api/config');
   console.log('   - Tests:   GET /api/test/* | POST /api/system/*');
   console.log('   - Legacy:  GET /config.html');
+  console.log('   - Ext WS:  ws://localhost:' + PORT + '/ext/ws');
   console.log('');
   console.log('   Frontend:');
   console.log('   - Serves luna-web/dist/ (SPA fallback)');
   console.log('');
 });
+
+module.exports = { app };

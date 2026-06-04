@@ -687,8 +687,10 @@
   }
   .hidden-input {
     position: absolute;
-    width: 0;
-    height: 0;
+    left: -9999px;
+    top: -9999px;
+    width: 1px;
+    height: 1px;
     opacity: 0;
     pointer-events: none;
   }

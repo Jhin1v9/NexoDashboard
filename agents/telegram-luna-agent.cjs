@@ -688,7 +688,7 @@ class TelegramLunaAgent {
       const chatId = msg.chat.id;
 
       if (!question) {
-        await this.bot.sendMessage(chatId, '🌙 Use: `/kimi [sua pergunta]`\n\nModos disponíveis:\n• `/kimi_instant` — resposta rápida\n• `/kimi_thinking` — raciocínio profundo', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        await this.bot.sendMessage(chatId, '🌙 Use: `/kimi [sua pergunta]`\n\nModo: ⚡ Instant (resposta rápida)', { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
         return;
       }
 
@@ -718,7 +718,7 @@ class TelegramLunaAgent {
           ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}${noGreeting}`
           : `${replyContext}${namePrefix}${question}${noGreeting}`;
 
-        const result = await askBridge(userId, enrichedQuestion, null, null);
+        const result = await askBridge(userId, enrichedQuestion, 'instant', null);
 
         await finalize(result.response, result.mode || 'instant');
       } catch (err) {
@@ -823,7 +823,7 @@ class TelegramLunaAgent {
         const enrichedQuestion = context
           ? `${context}\n\n${replyContext}--- PERGUNTA DO USUÁRIO ---\n${namePrefix}${question}${noGreeting}`
           : `${replyContext}${namePrefix}${question}${noGreeting}`;
-        const result = await askBridge(userId, enrichedQuestion, 'thinking', null);
+        const result = await askBridge(userId, enrichedQuestion, 'instant', null);
         await finalize(result.response, 'thinking');
       } catch (err) {
         log('error', `Kimi thinking error: ${err.message}`);

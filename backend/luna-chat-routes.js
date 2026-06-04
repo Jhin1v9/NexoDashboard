@@ -30,6 +30,27 @@ async function getLunaSoul() {
     await lunaSoul.init();
     lunaReady = true;
     console.log('🧠 Luna Soul inicializado para web chat');
+
+    // v8.0: Wire extension handler to LunaSoul for tool execution
+    try {
+      const expressApp = require('./luna-server').app || global.__lunaApp;
+      if (expressApp && expressApp.locals && expressApp.locals.extensionHandler) {
+        expressApp.locals.extensionHandler.setToolExecutor(async (tool, params, sessionId) => {
+          // Map web session to Luna Soul session
+          const webSessionId = sessionId?.replace('web-', '') || sessionId;
+          const result = await lunaSoul._handleAction(
+            { tool, params, mode: 'ACTION' },
+            webSessionId,
+            { userId: sessionId }
+          );
+          return result;
+        });
+        console.log('[LunaExt] Tool executor wired to Luna Soul');
+      }
+    } catch (e) {
+      console.warn('[LunaExt] Failed to wire tool executor:', e.message);
+    }
+
     return lunaSoul;
   } catch (e) {
     console.error('❌ Erro ao inicializar Luna Soul:', e.message);
@@ -272,7 +293,7 @@ function sendSSE(res, event, data) {
 
 // POST /api/chat — send message
 router.post('/api/chat', async (req, res) => {
-  const { message, sessionId, mode = 'instant', files } = req.body;
+  const { message, sessionId, mode = 'instant', files, messageId: clientMessageId } = req.body;
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
   let session = sessionId ? getWebSession(sessionId) : null;
@@ -281,36 +302,92 @@ router.post('/api/chat', async (req, res) => {
   }
   session.mode = mode;
 
+  // v5.3-fix: If message > 3KB, convert to .txt file to optimize Kimi input
+  let finalMessage = message;
+  let finalFiles = files || [];
+  const messageBytes = Buffer.byteLength(message, 'utf8');
+  if (messageBytes > 3072) {
+    const tmpDir = path.join(require('os').tmpdir(), 'luna-txt-uploads');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpFile = path.join(tmpDir, `message-${session.id || Date.now()}.txt`);
+    fs.writeFileSync(tmpFile, message, 'utf8');
+    const base64 = fs.readFileSync(tmpFile, 'base64');
+    finalFiles = [...finalFiles, {
+      name: 'message.txt',
+      type: 'text/plain',
+      size: messageBytes,
+      data: `data:text/plain;base64,${base64}`,
+    }];
+    finalMessage = `[Arquivo anexado: message.txt (${messageBytes} bytes)]`;
+    console.log(`[WEB] Message ${messageBytes} bytes converted to message.txt for session ${session.id}`);
+    setTimeout(() => { try { fs.unlinkSync(tmpFile); } catch {} }, 60000);
+  }
+
+  // v6.1-fix: Use client-provided messageId for deduplication, or generate one
+  const messageId = clientMessageId || ('msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7));
+
   addMessageToSession(session.id, {
     id: 'msg-' + Date.now(),
     role: 'user',
     type: 'text',
-    content: message,
-    files: files || [],
+    content: message, // original message in history
+    files: finalFiles,
     timestamp: new Date().toISOString(),
   });
 
-  activeStreams.set(session.id, { cancelled: false, createdAt: Date.now() });
+  // v5.3-fix: Cancel any existing stream for this session before starting a new one.
+  // If user sends a new message while Luna is still "thinking", we abort the old
+  // stream so it doesn't block forever.
+  const existingStream = activeStreams.get(session.id);
+  if (existingStream) {
+    existingStream.cancelled = true;
+    try {
+      const luna = await getLunaSoul();
+      if (luna && luna.kimiBridge) {
+        const userId = 'web-' + session.id;
+        await luna.kimiBridge.cancelStream(userId);
+        console.log(`[WEB] Cancelled previous stream for session ${session.id} before new message`);
+      }
+    } catch (e) {
+      console.warn('[WEB] Failed to cancel previous stream:', e.message);
+    }
+  }
+
+  activeStreams.set(session.id, { cancelled: false, createdAt: Date.now(), messageId });
 
   res.json({ ok: true, sessionId: session.id, status: 'processing' });
 
   // Process in background
   try {
     const luna = await getLunaSoul();
-    const stream = luna.processMessageStream(message, {
+    const stream = luna.processMessageStream(finalMessage, {
       sessionId: session.id,
       userId: 'web-' + session.id,
       mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'instant',
       persona: session.persona || 'default',
+      files: finalFiles,
     });
+
+    // v5.4-fix: Deduplicate events before adding to session history
+    const emittedEventHashes = new Set();
 
     for await (const ev of stream) {
       const streamMeta = activeStreams.get(session.id);
       if (!streamMeta || streamMeta.cancelled) break;
 
-      if (['response_delta', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta', 'login_required'].includes(ev.type)) {
+      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
         const content = ev.type === 'done' ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '') : (ev.text || ev.fullResponse || '');
+        
+        // v5.4-fix: Skip duplicate events (same type + content within 5s window)
+        // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
+        const dedupKey = `${ev.type}:${content.slice(0, 200)}:${ev.tool || ''}`;
+        if (ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
+          continue;
+        }
+        emittedEventHashes.add(dedupKey);
+        
+        // v6.1-fix: Attach messageId so frontend can validate against stale events
         addMessageToSession(session.id, {
           id: 'ev-' + Date.now(),
           role: 'assistant',
@@ -320,8 +397,22 @@ router.post('/api/chat', async (req, res) => {
           tool: ev.tool,
           params: ev.params,
           result: ev.result,
+          messageId: messageId,
           timestamp: new Date().toISOString(),
         });
+
+        // v6.3-fix: luna-soul emits 'response_done' instead of 'done' — translate it
+        if (ev.type === 'response_done') {
+          addMessageToSession(session.id, {
+            id: 'done-' + Date.now(),
+            role: 'assistant',
+            type: 'done',
+            content: content,
+            result: { response: content },
+            messageId: messageId,
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
     }
   } catch (e) {
@@ -337,7 +428,24 @@ router.post('/api/chat', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } finally {
-    activeStreams.delete(session.id);
+    // v5.7-fix: Guarantee a final event so frontend knows streaming is done
+    const session = getWebSession(sessionId);
+    if (session) {
+      const hasFinalEvent = session.messages.some(m => 
+        m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit'
+      );
+      if (!hasFinalEvent) {
+        addMessageToSession(sessionId, {
+          id: 'done-' + Date.now(),
+          role: 'assistant',
+          type: 'done',
+          content: '',
+          result: { response: '' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+    activeStreams.delete(sessionId);
   }
 });
 
@@ -412,6 +520,7 @@ router.get('/api/chat/stream', async (req, res) => {
       if (msg.tool) eventData.tool = msg.tool;
       if (msg.params) eventData.params = msg.params;
       if (msg.result) eventData.result = msg.result;
+      if (msg.messageId) eventData.messageId = msg.messageId;
       if (msg.type === 'error') eventData.error = msg.content;
       if (msg.role === 'user') {
         eventData.content = msg.content;
@@ -546,12 +655,13 @@ router.post('/api/chat/cancel', async (req, res) => {
     stream.cancelled = true;
     activeStreams.delete(sessionId);
   }
-  // v5.3-fix: REAL cancellation — also stop generation on Kimi Web and reset bridge state
+  // v7.0: SOFT cancel when user clicks red button — agent keeps running in background.
+  // Only frees the input. The agent continues sending events to frontend.
   try {
     const luna = await getLunaSoul();
     if (luna && luna.kimiBridge) {
       const userId = 'web-' + sessionId;
-      await luna.kimiBridge.cancelStream(userId);
+      await luna.kimiBridge.cancelStream(userId, true); // soft = true
     }
   } catch (e) {
     console.warn('[CANCEL] Kimi bridge cancel failed:', e.message);
