@@ -928,7 +928,7 @@ class ActionExecutor {
     }
     this.writeJson(cashFile, cash);
 
-    return { type: 'payment_deleted', id: removed.id, amount: removed.amount, source: 'file' };
+    return { type: 'payment_deleted', id: removed.id, description: removed.description || removed.source || undefined, amount: removed.amount, source: 'file' };
   }
 
   async deleteExpense(params, authorName) {
@@ -953,7 +953,7 @@ class ActionExecutor {
     }
     this.writeJson(cashFile, cash);
 
-    return { type: 'expense_deleted', id: removed.id, amount: removed.amount, source: 'file' };
+    return { type: 'expense_deleted', id: removed.id, description: removed.description || removed.source || undefined, amount: removed.amount, source: 'file' };
   }
 
   async deleteLead(params, authorName) {
@@ -1439,11 +1439,12 @@ class ActionExecutor {
   async listClients(params) {
     const apiResult = await this.apiGet('/workspace/clients');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'clients', items: apiResult, source: 'api' };
+      const items = apiResult.map(c => ({ ...c, display: `ID: ${c.id} | Nome: ${c.name || c.displayName || 'Sem nome'}` }));
+      return { type: 'clients', items, source: 'api' };
     }
     const clientsFile = path.join(this.dataDir, 'schema', 'clients-registry.json');
     const data = this.readJson(clientsFile, { clients: {} });
-    const items = Object.values(data.clients || {});
+    const items = Object.values(data.clients || {}).map(c => ({ ...c, display: `ID: ${c.id} | Nome: ${c.name || c.displayName || 'Sem nome'}` }));
     return { type: 'clients', items, source: 'file' };
   }
 
@@ -1518,11 +1519,13 @@ class ActionExecutor {
   async listProjects(params) {
     const apiResult = await this.apiGet('/projects');
     if (apiResult && !apiResult.error && apiResult.projects) {
-      return { type: 'projects', items: apiResult.projects, source: 'api' };
+      const items = apiResult.projects.map(p => ({ ...p, display: `ID: ${p.id} | Nome: ${p.name || p.title || 'Sem nome'}` }));
+      return { type: 'projects', items, source: 'api' };
     }
     const projectsFile = path.join(this.dataDir, 'schema', 'projects-registry.json');
     const data = this.readJson(projectsFile, { projects: {} });
-    return { type: 'projects', items: Object.values(data.projects || {}), source: 'file' };
+    const items = Object.values(data.projects || {}).map(p => ({ ...p, display: `ID: ${p.id} | Nome: ${p.name || p.title || 'Sem nome'}` }));
+    return { type: 'projects', items, source: 'file' };
   }
 
   // ============================================================
@@ -1617,11 +1620,13 @@ class ActionExecutor {
   async listIdeas(params) {
     const apiResult = await this.apiGet('/ideas');
     if (apiResult && apiResult.success && apiResult.data?.ideas) {
-      return { type: 'ideas', items: apiResult.data.ideas, source: 'api' };
+      const items = apiResult.data.ideas.map(i => ({ ...i, display: `ID: ${i.id} | Título: ${i.title || 'Sem título'}` }));
+      return { type: 'ideas', items, source: 'api' };
     }
     const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
     const data = this.readJson(ideasFile, { ideas: [] });
-    return { type: 'ideas', items: data.ideas || [], source: 'file' };
+    const items = (data.ideas || []).map(i => ({ ...i, display: `ID: ${i.id} | Título: ${i.title || 'Sem título'}` }));
+    return { type: 'ideas', items, source: 'file' };
   }
 
   async updateIdea(params, authorName) {
@@ -1723,7 +1728,8 @@ class ActionExecutor {
         id: m.id,
         from: m.from,
         subject: m.subject,
-        unread: m.labelIds?.includes('UNREAD') || m.unread
+        unread: m.labelIds?.includes('UNREAD') || m.unread,
+        display: `ID: ${m.id} | Assunto: ${m.subject || 'Sem assunto'} | De: ${m.from || 'N/A'}`
       }));
       const naoLidos = items.filter(i => i.unread).length;
       return { type: 'emails', total: items.length, naoLidos, items, source: 'api' };
@@ -1772,11 +1778,13 @@ class ActionExecutor {
   async listQuotes(params) {
     const apiResult = await this.apiGet('/quotes');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'quotes', items: apiResult, source: 'api' };
+      const items = apiResult.map(q => ({ ...q, display: `ID: ${q.id} | Cliente: ${q.client || q.title || 'N/A'} | Valor: ${q.amount || q.value || 0}` }));
+      return { type: 'quotes', items, source: 'api' };
     }
     const quotesFile = path.join(this.dataDir, 'quotes.json');
     const data = this.readJson(quotesFile, []);
-    return { type: 'quotes', items: data, source: 'file' };
+    const items = data.map(q => ({ ...q, display: `ID: ${q.id} | Cliente: ${q.client || q.title || 'N/A'} | Valor: ${q.amount || q.value || 0}` }));
+    return { type: 'quotes', items, source: 'file' };
   }
 
   async updateQuote(params, authorName) {
@@ -1811,15 +1819,17 @@ class ActionExecutor {
 
     const apiResult = await this.apiDelete(`/quotes/${id}`);
     if (apiResult && !apiResult.error) {
-      return { type: 'quote_deleted', id, source: 'api' };
+      return { type: 'quote_deleted', id, title: apiResult.title || apiResult.name || undefined, source: 'api' };
     }
 
     const quotesFile = path.join(this.dataDir, 'quotes.json');
     const data = this.readJson(quotesFile, []);
+    const quote = data.find(q => q.id === id);
+    const title = quote?.title || quote?.name || undefined;
     const filtered = data.filter(q => q.id !== id);
     if (filtered.length === data.length) throw new Error(`Orçamento ${id} não encontrado`);
     this.writeJson(quotesFile, filtered);
-    return { type: 'quote_deleted', id, source: 'file' };
+    return { type: 'quote_deleted', id, title, source: 'file' };
   }
 
   // ============================================================
@@ -2051,7 +2061,8 @@ class ActionExecutor {
     if (dateFrom) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') >= dateFrom);
     if (dateTo) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') <= dateTo);
 
-    return { type: 'tasks_filtered', total: items.length, items: items.slice(0, 20), source: 'api' };
+    const formattedItems = items.slice(0, 20).map(t => ({ ...t, display: `ID: ${t.id} | Título: ${t.title || 'Sem título'}` }));
+    return { type: 'tasks_filtered', total: formattedItems.length, items: formattedItems, source: 'api' };
   }
 
   // ============================================================
@@ -2075,11 +2086,13 @@ class ActionExecutor {
   async listPayments(params) {
     const apiResult = await this.apiGet('/payments');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'payments', items: apiResult, total: apiResult.length, source: 'api' };
+      const items = apiResult.map(p => ({ ...p, display: `ID: ${p.id} | De: ${p.from || p.client || 'N/A'} | Valor: ${p.amount || 0}` }));
+      return { type: 'payments', items, total: items.length, source: 'api' };
     }
     const paymentsFile = path.join(this.dataDir, 'payments.json');
     const data = this.readJson(paymentsFile, []);
-    return { type: 'payments', items: data, total: data.length, source: 'file' };
+    const items = data.map(p => ({ ...p, display: `ID: ${p.id} | De: ${p.from || p.client || 'N/A'} | Valor: ${p.amount || 0}` }));
+    return { type: 'payments', items, total: items.length, source: 'file' };
   }
 
   async updatePayment(params, authorName) {
@@ -2164,11 +2177,13 @@ class ActionExecutor {
   async listExpenses(params) {
     const apiResult = await this.apiGet('/expenses');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'expenses', items: apiResult, total: apiResult.length, source: 'api' };
+      const items = apiResult.map(e => ({ ...e, display: `ID: ${e.id} | Para: ${e.to || e.description || 'N/A'} | Valor: ${e.amount || 0}` }));
+      return { type: 'expenses', items, total: items.length, source: 'api' };
     }
     const expensesFile = path.join(this.dataDir, 'expenses.json');
     const data = this.readJson(expensesFile, []);
-    return { type: 'expenses', items: data, total: data.length, source: 'file' };
+    const items = data.map(e => ({ ...e, display: `ID: ${e.id} | Para: ${e.to || e.description || 'N/A'} | Valor: ${e.amount || 0}` }));
+    return { type: 'expenses', items, total: items.length, source: 'file' };
   }
 
   async updateExpense(params, authorName) {
@@ -2284,12 +2299,14 @@ class ActionExecutor {
 
     const apiResult = await this.apiGet('/cash-box/history');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'cash_history', items: apiResult.slice(0, limit), total: apiResult.length, source: 'api' };
+      const items = apiResult.map(h => ({ ...h, display: `ID: ${h.id} | Descrição: ${h.description || h.type || 'N/A'} | Valor: ${h.amount || h.value || 0}` })).slice(0, limit);
+      return { type: 'cash_history', items, total: apiResult.length, source: 'api' };
     }
 
     const cashFile = path.join(this.dataDir, 'cash-box.json');
     const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
-    return { type: 'cash_history', items: cash.history.slice(0, limit), total: cash.history.length, source: 'file' };
+    const items = cash.history.map(h => ({ ...h, display: `ID: ${h.id} | Descrição: ${h.description || h.type || 'N/A'} | Valor: ${h.amount || h.value || 0}` })).slice(0, limit);
+    return { type: 'cash_history', items, total: cash.history.length, source: 'file' };
   }
 
   async projectCashBox(params) {
@@ -2381,7 +2398,8 @@ class ActionExecutor {
   async listIdeaTemplates(params) {
     const templatesFile = path.join(this.dataDir, 'idea-templates.json');
     const data = this.readJson(templatesFile, []);
-    return { type: 'idea_templates', items: data, total: data.length, source: 'file' };
+    const items = data.map(t => ({ ...t, display: `ID: ${t.id} | Título: ${t.title || 'Sem título'}` }));
+    return { type: 'idea_templates', items, total: items.length, source: 'file' };
   }
 
   // ============================================================
@@ -2551,7 +2569,9 @@ class ActionExecutor {
   async listInstagramMessages(params) {
     const apiResult = await this.apiGet('/instagram/messages');
     if (apiResult && !apiResult.error) {
-      return { type: 'instagram_messages', items: apiResult.messages || apiResult, source: 'api' };
+      const raw = apiResult.messages || apiResult;
+      const items = Array.isArray(raw) ? raw.map(m => ({ ...m, display: `ID: ${m.id} | De: ${m.sender || m.from || 'N/A'} | Texto: ${(m.text || m.message || '').slice(0, 40)}` })) : raw;
+      return { type: 'instagram_messages', items, source: 'api' };
     }
     throw new Error('Não foi possível listar mensagens do Instagram');
   }
@@ -2572,11 +2592,13 @@ class ActionExecutor {
   async listLinks(params) {
     const apiResult = await this.apiGet('/links');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'links', items: apiResult, total: apiResult.length, source: 'api' };
+      const items = apiResult.map(l => ({ ...l, display: `ID: ${l.id} | Título: ${l.title || 'Sem título'} | URL: ${l.url || 'N/A'}` }));
+      return { type: 'links', items, total: items.length, source: 'api' };
     }
     const linksFile = path.join(this.dataDir, 'links.json');
     const data = this.readJson(linksFile, []);
-    return { type: 'links', items: data, total: data.length, source: 'file' };
+    const items = data.map(l => ({ ...l, display: `ID: ${l.id} | Título: ${l.title || 'Sem título'} | URL: ${l.url || 'N/A'}` }));
+    return { type: 'links', items, total: items.length, source: 'file' };
   }
 
   async addLink(params, authorName) {
@@ -2609,15 +2631,17 @@ class ActionExecutor {
 
     const apiResult = await this.apiDelete(`/links/${id}`);
     if (apiResult && !apiResult.error) {
-      return { type: 'link_deleted', id, source: 'api' };
+      return { type: 'link_deleted', id, title: apiResult.title || apiResult.name || undefined, source: 'api' };
     }
 
     const linksFile = path.join(this.dataDir, 'links.json');
     const data = this.readJson(linksFile, []);
+    const link = data.find(l => l.id === id);
+    const title = link?.title || link?.name || undefined;
     const filtered = data.filter(l => l.id !== id);
     if (filtered.length === data.length) throw new Error(`Link ${id} não encontrado`);
     this.writeJson(linksFile, filtered);
-    return { type: 'link_deleted', id, source: 'file' };
+    return { type: 'link_deleted', id, title, source: 'file' };
   }
 
   async enrichLink(params) {
@@ -2669,15 +2693,17 @@ class ActionExecutor {
 
     const apiResult = await this.apiDelete(`/ops/alerts/${id}`);
     if (apiResult && !apiResult.error) {
-      return { type: 'ops_alert_deleted', id, source: 'api' };
+      return { type: 'ops_alert_deleted', id, title: apiResult.title || apiResult.name || undefined, source: 'api' };
     }
 
     const opsFile = path.join(this.dataDir, 'ops-alerts.json');
     const data = this.readJson(opsFile, []);
+    const alert = data.find(a => a.id === id);
+    const title = alert?.title || alert?.name || undefined;
     const filtered = data.filter(a => a.id !== id);
     if (filtered.length === data.length) throw new Error(`Alerta ${id} não encontrado`);
     this.writeJson(opsFile, filtered);
-    return { type: 'ops_alert_deleted', id, source: 'file' };
+    return { type: 'ops_alert_deleted', id, title, source: 'file' };
   }
 
   async registerChange(params, authorName) {
@@ -2763,11 +2789,13 @@ class ActionExecutor {
   async listNotifications(params) {
     const apiResult = await this.apiGet('/notifications');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      return { type: 'notifications', items: apiResult, total: apiResult.length, source: 'api' };
+      const items = apiResult.map(n => ({ ...n, display: `ID: ${n.id} | Título: ${n.title || n.message || 'Sem título'}` }));
+      return { type: 'notifications', items, total: items.length, source: 'api' };
     }
     const notifFile = path.join(this.dataDir, 'notifications.json');
     const data = this.readJson(notifFile, []);
-    return { type: 'notifications', items: data, total: data.length, source: 'file' };
+    const items = data.map(n => ({ ...n, display: `ID: ${n.id} | Título: ${n.title || n.message || 'Sem título'}` }));
+    return { type: 'notifications', items, total: items.length, source: 'file' };
   }
 
   async markNotificationRead(params) {
@@ -2808,15 +2836,17 @@ class ActionExecutor {
 
     const apiResult = await this.apiDelete(`/notifications/${id}`);
     if (apiResult && !apiResult.error) {
-      return { type: 'notification_deleted', id, source: 'api' };
+      return { type: 'notification_deleted', id, title: apiResult.title || apiResult.name || undefined, source: 'api' };
     }
 
     const notifFile = path.join(this.dataDir, 'notifications.json');
     const data = this.readJson(notifFile, []);
+    const notif = data.find(n => n.id === id);
+    const title = notif?.title || notif?.name || undefined;
     const filtered = data.filter(n => n.id !== id);
     if (filtered.length === data.length) throw new Error(`Notificação ${id} não encontrada`);
     this.writeJson(notifFile, filtered);
-    return { type: 'notification_deleted', id, source: 'file' };
+    return { type: 'notification_deleted', id, title, source: 'file' };
   }
 
   // ============================================================
@@ -2825,11 +2855,13 @@ class ActionExecutor {
   async listUsers(params) {
     const apiResult = await this.apiGet('/state');
     if (apiResult && !apiResult.error && apiResult.users) {
-      return { type: 'users', items: apiResult.users, total: apiResult.users.length, source: 'api' };
+      const items = apiResult.users.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || u.email || 'Sem nome'}` }));
+      return { type: 'users', items, total: items.length, source: 'api' };
     }
     const usersFile = path.join(this.dataDir, 'users.json');
     const data = this.readJson(usersFile, []);
-    return { type: 'users', items: data, total: data.length, source: 'file' };
+    const items = data.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || u.email || 'Sem nome'}` }));
+    return { type: 'users', items, total: items.length, source: 'file' };
   }
 
   async switchUser(params) {
@@ -2868,7 +2900,9 @@ class ActionExecutor {
   async listBugReports(params) {
     const apiResult = await this.apiGet('/bugdetector/reports');
     if (apiResult && !apiResult.error) {
-      return { type: 'bug_reports', items: apiResult.reports || apiResult, source: 'api' };
+      const raw = apiResult.reports || apiResult;
+      const items = Array.isArray(raw) ? raw.map(r => ({ ...r, display: `ID: ${r.id || r.filename} | Título: ${r.title || r.message || 'Sem título'}` })) : raw;
+      return { type: 'bug_reports', items, source: 'api' };
     }
     throw new Error('Não foi possível listar relatórios de bug');
   }
@@ -2879,7 +2913,7 @@ class ActionExecutor {
 
     const apiResult = await this.apiDelete(`/bugdetector/reports/${filename}`);
     if (apiResult && !apiResult.error) {
-      return { type: 'bug_report_deleted', filename, source: 'api' };
+      return { type: 'bug_report_deleted', id: filename, filename, source: 'api' };
     }
     throw new Error('Não foi possível excluir relatório de bug');
   }
