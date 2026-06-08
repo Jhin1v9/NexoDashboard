@@ -8,6 +8,7 @@ const path = require('path');
 const { execSync, exec } = require('child_process');
 const router = express.Router();
 const db = require('./db');
+const dataStore = require('./datastore');
 const JSZip = require('jszip');
 
 // v8.5-fix: auth middleware reference (injected via setupAuth)
@@ -1731,16 +1732,31 @@ router.post('/api/system/heartbeat', async (req, res) => {
 // GET /api/users/active — list active users with presence status
 router.get('/api/users/active', requireAuthProxy, async (req, res) => {
   const now = Date.now();
+  let usersData = { users: {} };
+  try {
+    usersData = await dataStore.getUsers();
+  } catch (e) {
+    console.warn('[UsersActive] dataStore.getUsers falhou:', e.message);
+  }
+
   const users = [];
-  for (const [uid, data] of activeUsers) {
-    const lastSeenMs = now - data.lastSeen;
+  for (const [uid, user] of Object.entries(usersData.users || {})) {
+    const active = activeUsers.get(uid);
+    const lastSeenMs = active ? now - active.lastSeen : Infinity;
+    let status = 'offline';
+    if (active && lastSeenMs <= 2 * 60 * 1000) status = 'online';
+    else if (active && lastSeenMs <= 10 * 60 * 1000) status = 'away';
+
     users.push({
       userId: uid,
-      name: data.name || uid,
-      status: lastSeenMs > 120000 ? 'away' : 'online',
-      lastSeen: new Date(data.lastSeen).toISOString(),
+      name: user.name || uid,
+      role: user.role || 'user',
+      color: user.color || null,
+      status,
+      lastSeen: active ? new Date(active.lastSeen).toISOString() : null,
     });
   }
+
   res.json({ ok: true, users });
 });
 
