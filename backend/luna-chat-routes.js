@@ -417,11 +417,14 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
         
         // v5.4-fix: Skip duplicate events (same type + content within 5s window)
         // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
+        // v10.1-fix: Never deduplicate incremental events (delta/progress) — they are
+        // inherently sequential and dropping them causes content loss.
+        const isIncremental = ['response_delta', 'thinking_delta', 'action_progress'].includes(ev.type);
         const dedupKey = `${ev.type}:${content.slice(0, 200)}:${ev.tool || ''}`;
-        if (ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
+        if (!isIncremental && ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
           continue;
         }
-        emittedEventHashes.add(dedupKey);
+        if (!isIncremental) emittedEventHashes.add(dedupKey);
         
         // v8.4-fix: response_done is translated to 'done' below — don't add original
         if (ev.type !== 'response_done') {
@@ -541,7 +544,10 @@ router.get('/api/chat/stream', requireAuthProxy, async (req, res) => {
   sendSSE(res, 'connected', { type: 'connected', sessionId });
 
   // v8.5-fix: send full history on connect so reconnecting clients don't miss messages
-  for (const msg of currentSession.messages) {
+  // v10.1-fix: snapshot messages atomically to prevent race condition where
+  // a new message is added between the loop and lastMsgIndex assignment
+  const initialMessages = [...currentSession.messages];
+  for (const msg of initialMessages) {
     const eventData = {
       id: msg.id,
       type: msg.type,
@@ -569,7 +575,7 @@ router.get('/api/chat/stream', requireAuthProxy, async (req, res) => {
     res.write(':keepalive\n\n');
   }, 15000);
 
-  let lastMsgIndex = currentSession.messages.length; // Start from current position, not beginning
+  let lastMsgIndex = initialMessages.length; // Start from snapshot position, not current
 
   const checkInterval = setInterval(() => {
     const session = getWebSession(sessionId);
