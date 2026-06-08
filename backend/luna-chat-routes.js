@@ -75,6 +75,17 @@ async function getLunaSoul() {
 const webSessions = new Map();
 const activeStreams = new Map();
 const sseConnections = new Map(); // sessionId -> Set of {res, keepAlive, checkInterval}
+const activeUsers = new Map(); // userId -> { lastSeen: timestamp, name: string }
+
+// Periodic cleanup of inactive users (after 10 min of no heartbeat)
+setInterval(() => {
+  const now = Date.now();
+  for (const [uid, data] of activeUsers) {
+    if (now - data.lastSeen > 10 * 60 * 1000) {
+      activeUsers.delete(uid);
+    }
+  }
+}, 60 * 1000);
 
 // Periodic cleanup of orphaned activeStreams (e.g. client disconnect without close event)
 setInterval(() => {
@@ -1691,9 +1702,14 @@ router.get('/api/personas', (req, res) => {
 // System Routes — heartbeat, turnoff, health
 // ============================================================
 
-// POST /api/system/heartbeat — keep the agent page alive
+// POST /api/system/heartbeat — keep the agent page alive + track active users
 router.post('/api/system/heartbeat', async (req, res) => {
   const { userId } = req.body;
+  // v10.2: Track active users for presence panel
+  const realUserId = req.user?.id || userId || 'anonymous';
+  const userName = req.user?.name || realUserId;
+  activeUsers.set(realUserId, { lastSeen: Date.now(), name: userName });
+
   try {
     const luna = await getLunaSoul();
     if (luna.kimiBridge) {
@@ -1710,6 +1726,22 @@ router.post('/api/system/heartbeat', async (req, res) => {
     console.error('[HEARTBEAT] Error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
+});
+
+// GET /api/users/active — list active users with presence status
+router.get('/api/users/active', requireAuthProxy, async (req, res) => {
+  const now = Date.now();
+  const users = [];
+  for (const [uid, data] of activeUsers) {
+    const lastSeenMs = now - data.lastSeen;
+    users.push({
+      userId: uid,
+      name: data.name || uid,
+      status: lastSeenMs > 120000 ? 'away' : 'online',
+      lastSeen: new Date(data.lastSeen).toISOString(),
+    });
+  }
+  res.json({ ok: true, users });
 });
 
 // POST /api/system/turnoff — explicitly close the agent page
