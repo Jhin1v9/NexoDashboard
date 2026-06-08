@@ -10,6 +10,17 @@ const router = express.Router();
 const db = require('./db');
 const JSZip = require('jszip');
 
+// v8.5-fix: auth middleware reference (injected via setupAuth)
+let requireAuth = (req, res, next) => next();
+// Proxy that resolves to the latest requireAuth at request time
+function requireAuthProxy(req, res, next) {
+  // SSE/EventSource cannot send custom headers, so accept token via query param as fallback
+  if (!req.headers.authorization && req.query && req.query.token) {
+    req.headers.authorization = 'Bearer ' + req.query.token;
+  }
+  return requireAuth(req, res, next);
+}
+
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
 
@@ -97,10 +108,11 @@ function generateWebSessionId() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default') {
+function createWebSession(userId = 'anonymous', title = 'Nova conversa', mode = 'instant', persona = 'default') {
   const id = generateWebSessionId();
   const session = {
     id,
+    userId,
     title,
     mode,
     persona,
@@ -113,7 +125,7 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
   dbRunWithRetry(
     `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())`,
-    [id, 'anonymous', title, mode, persona, JSON.stringify([])]
+    [id, userId, title, mode, persona, JSON.stringify([])]
   ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
   return session;
 }
@@ -177,10 +189,23 @@ function renameWebSession(id, title) {
   return false;
 }
 
+const MAX_MESSAGES_PER_SESSION = 500;
+
 function addMessageToSession(sessionId, message) {
   const session = webSessions.get(sessionId);
   if (session) {
     session.messages.push(message);
+    // v8.5-fix: sliding window to prevent unbounded memory growth
+    if (session.messages.length > MAX_MESSAGES_PER_SESSION) {
+      session.messages = session.messages.slice(-MAX_MESSAGES_PER_SESSION);
+      session.messages.unshift({
+        id: 'compact-' + Date.now(),
+        role: 'system',
+        type: 'system',
+        content: '💾 Contexto compactado automaticamente. Mensagens mais antigas foram resumidas.',
+        timestamp: new Date().toISOString(),
+      });
+    }
     session.updatedAt = new Date().toISOString();
     // Persistir no PostgreSQL (fire-and-forget with retry)
     dbRunWithRetry(
@@ -292,13 +317,18 @@ function sendSSE(res, event, data) {
 // ============================================================
 
 // POST /api/chat — send message
-router.post('/api/chat', async (req, res) => {
+router.post('/api/chat', requireAuthProxy, async (req, res) => {
   const { message, sessionId, mode = 'instant', files, messageId: clientMessageId } = req.body;
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
+  const userId = req.user?.id || 'anonymous';
   let session = sessionId ? getWebSession(sessionId) : null;
   if (!session) {
-    session = createWebSession(message.slice(0, 40), mode);
+    session = createWebSession(userId, message.slice(0, 40), mode);
+  }
+  // v8.5-fix: validate session ownership
+  if (session.userId && session.userId !== userId) {
+    return res.status(403).json({ ok: false, error: 'Acesso negado a esta sessão' });
   }
   session.mode = mode;
 
@@ -362,7 +392,10 @@ router.post('/api/chat', async (req, res) => {
     const luna = await getLunaSoul();
     const stream = luna.processMessageStream(finalMessage, {
       sessionId: session.id,
-      userId: 'web-' + session.id,
+      userId: 'web-' + session.id,          // bridge page isolation key
+      userName: req.user?.name || 'Usuário', // for system prompt personalization
+      userRealId: req.user?.id || 'anonymous',
+      userRole: req.user?.role || 'User',
       mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'instant',
       persona: session.persona || 'default',
       files: finalFiles,
@@ -375,9 +408,12 @@ router.post('/api/chat', async (req, res) => {
       const streamMeta = activeStreams.get(session.id);
       if (!streamMeta || streamMeta.cancelled) break;
 
-      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required'].includes(ev.type)) {
+      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'action_progress', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
-        const content = ev.type === 'done' ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '') : (ev.text || ev.fullResponse || '');
+        // v9.5-fix: Include ev.error for error events so the message is not lost
+        const content = ev.type === 'done'
+          ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
+          : (ev.error || ev.text || ev.fullResponse || '');
         
         // v5.4-fix: Skip duplicate events (same type + content within 5s window)
         // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
@@ -387,19 +423,21 @@ router.post('/api/chat', async (req, res) => {
         }
         emittedEventHashes.add(dedupKey);
         
-        // v6.1-fix: Attach messageId so frontend can validate against stale events
-        addMessageToSession(session.id, {
-          id: 'ev-' + Date.now(),
-          role: 'assistant',
-          type: ev.type,
-          content: content,
-          fullThinking: ev.fullThinking || undefined,
-          tool: ev.tool,
-          params: ev.params,
-          result: ev.result,
-          messageId: messageId,
-          timestamp: new Date().toISOString(),
-        });
+        // v8.4-fix: response_done is translated to 'done' below — don't add original
+        if (ev.type !== 'response_done') {
+          addMessageToSession(session.id, {
+            id: 'ev-' + Date.now(),
+            role: 'assistant',
+            type: ev.type,
+            content: content,
+            fullThinking: ev.fullThinking || undefined,
+            tool: ev.tool,
+            params: ev.params,
+            result: ev.result,
+            messageId: messageId,
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         // v6.3-fix: luna-soul emits 'response_done' instead of 'done' — translate it
         if (ev.type === 'response_done') {
@@ -417,6 +455,7 @@ router.post('/api/chat', async (req, res) => {
     }
   } catch (e) {
     console.error('[WEB] Erro no processamento:', e.message);
+    console.error('[WEB] Stack trace:', e.stack);
     const isLoginRequired = e.message === 'KIMI_LOGIN_REQUIRED' || e.message?.includes('login');
     addMessageToSession(session.id, {
       id: 'err-' + Date.now(),
@@ -428,29 +467,32 @@ router.post('/api/chat', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } finally {
-    // v5.7-fix: Guarantee a final event so frontend knows streaming is done
-    const session = getWebSession(sessionId);
-    if (session) {
-      const hasFinalEvent = session.messages.some(m => 
-        m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit'
-      );
-      if (!hasFinalEvent) {
-        addMessageToSession(sessionId, {
-          id: 'done-' + Date.now(),
-          role: 'assistant',
-          type: 'done',
-          content: '',
-          result: { response: '' },
-          timestamp: new Date().toISOString(),
-        });
+    // v8.5-fix: Use session.id (the effective session) instead of sessionId from body (which may be undefined for new conversations)
+    const effectiveSessionId = session ? session.id : sessionId;
+    if (effectiveSessionId) {
+      const finalSession = getWebSession(effectiveSessionId);
+      if (finalSession) {
+        const hasFinalEvent = finalSession.messages.some(m =>
+          m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit'
+        );
+        if (!hasFinalEvent) {
+          addMessageToSession(effectiveSessionId, {
+            id: 'done-' + Date.now(),
+            role: 'assistant',
+            type: 'done',
+            content: '',
+            result: { response: '' },
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
+      activeStreams.delete(effectiveSessionId);
     }
-    activeStreams.delete(sessionId);
   }
 });
 
 // GET /api/chat/stream — SSE streaming
-router.get('/api/chat/stream', async (req, res) => {
+router.get('/api/chat/stream', requireAuthProxy, async (req, res) => {
   const sessionId = req.query.sessionId;
   if (!sessionId) {
     return res.status(400).send('sessionId obrigatório');
@@ -465,20 +507,27 @@ router.get('/api/chat/stream', async (req, res) => {
     return res.status(404).send('Sessão não encontrada');
   }
 
-  // v4.1-fix: Close existing SSE connections for this session to prevent duplicates
+  // v8.5-fix: validate session ownership
+  const userId = req.user?.id || 'anonymous';
+  if (currentSession.userId && currentSession.userId !== userId) {
+    return res.status(403).send('Acesso negado a esta sessão');
+  }
+
+  // v8.5-fix: Do NOT close existing SSE connections automatically.
+  // Allow multiple connections per session (e.g. reconnects, multiple tabs).
+  // Only close stale connections older than 2 minutes.
   const existingConnections = sseConnections.get(sessionId);
   if (existingConnections) {
-    console.log(`[SSE] Closing ${existingConnections.size} existing connection(s) for session ${sessionId}`);
+    const now = Date.now();
     for (const conn of existingConnections) {
-      clearInterval(conn.keepAlive);
-      clearInterval(conn.checkInterval);
-      try {
-        conn.res.end();
-      } catch (e) {
-        // ignore
+      if (conn.createdAt && (now - conn.createdAt > 120000)) {
+        console.log(`[SSE] Closing stale connection for session ${sessionId}`);
+        clearInterval(conn.keepAlive);
+        clearInterval(conn.checkInterval);
+        try { conn.res.end(); } catch (e) {}
+        existingConnections.delete(conn);
       }
     }
-    sseConnections.delete(sessionId);
   }
 
   res.set({
@@ -490,6 +539,31 @@ router.get('/api/chat/stream', async (req, res) => {
   });
 
   sendSSE(res, 'connected', { type: 'connected', sessionId });
+
+  // v8.5-fix: send full history on connect so reconnecting clients don't miss messages
+  for (const msg of currentSession.messages) {
+    const eventData = {
+      id: msg.id,
+      type: msg.type,
+      role: msg.role,
+      sessionId,
+      timestamp: msg.timestamp,
+    };
+    if (msg.content) eventData.text = msg.content;
+    if (msg.content) eventData.fullResponse = msg.content;
+    if (msg.content) eventData.response = msg.content;
+    if (msg.fullThinking) eventData.fullThinking = msg.fullThinking;
+    if (msg.tool) eventData.tool = msg.tool;
+    if (msg.params) eventData.params = msg.params;
+    if (msg.result) eventData.result = msg.result;
+    if (msg.messageId) eventData.messageId = msg.messageId;
+    if (msg.type === 'error') eventData.error = msg.content;
+    if (msg.role === 'user') {
+      eventData.content = msg.content;
+      if (msg.files && msg.files.length > 0) eventData.files = msg.files;
+    }
+    sendSSE(res, msg.type, eventData);
+  }
 
   const keepAlive = setInterval(() => {
     res.write(':keepalive\n\n');
@@ -538,7 +612,7 @@ router.get('/api/chat/stream', async (req, res) => {
     connSet = new Set();
     sseConnections.set(sessionId, connSet);
   }
-  const conn = { res, keepAlive, checkInterval };
+  const conn = { res, keepAlive, checkInterval, createdAt: Date.now() };
   connSet.add(conn);
 
   req.on('close', () => {
@@ -552,11 +626,13 @@ router.get('/api/chat/stream', async (req, res) => {
 });
 
 // GET /api/chat/sessions — busca do PostgreSQL (persistência entre reinícios)
-router.get('/api/chat/sessions', async (req, res) => {
+router.get('/api/chat/sessions', requireAuthProxy, async (req, res) => {
+  const userId = req.user?.id || 'anonymous';
   try {
     const rows = await db.query(
-      `SELECT id, title, mode, messages, created_at, updated_at 
-       FROM luna_chat_sessions ORDER BY updated_at DESC LIMIT 100`
+      `SELECT id, title, mode, messages, created_at, updated_at
+       FROM luna_chat_sessions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 100`,
+      [userId]
     );
     const sessions = rows.map(row => ({
       id: row.id,
@@ -569,8 +645,9 @@ router.get('/api/chat/sessions', async (req, res) => {
     res.json({ ok: true, sessions });
   } catch (e) {
     console.error('[DB] Erro ao listar sessões:', e.message);
-    // Fallback para memória
+    // Fallback para memória — filtrar por userId
     const sessions = Array.from(webSessions.values())
+      .filter(s => !s.userId || s.userId === userId)
       .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       .map(s => ({
         id: s.id,
@@ -585,7 +662,7 @@ router.get('/api/chat/sessions', async (req, res) => {
 });
 
 // GET /api/chat/session/:id/messages
-router.get('/api/chat/session/:id/messages', async (req, res) => {
+router.get('/api/chat/session/:id/messages', requireAuthProxy, async (req, res) => {
   let session = getWebSession(req.params.id);
   if (!session) {
     session = await loadSessionFromDB(req.params.id);
@@ -595,12 +672,13 @@ router.get('/api/chat/session/:id/messages', async (req, res) => {
 });
 
 // POST /api/chat/session — create/rename/delete
-router.post('/api/chat/session', async (req, res) => {
+router.post('/api/chat/session', requireAuthProxy, async (req, res) => {
   const { action, sessionId, title, persona } = req.body;
 
   switch (action) {
     case 'create': {
-      const session = createWebSession(title || 'Nova conversa');
+      const userId = req.user?.id || 'anonymous';
+      const session = createWebSession(userId, title || 'Nova conversa');
       res.json({ ok: true, session: { id: session.id, title: session.title } });
       break;
     }
@@ -647,7 +725,7 @@ router.post('/api/chat/session', async (req, res) => {
 });
 
 // POST /api/chat/cancel
-router.post('/api/chat/cancel', async (req, res) => {
+router.post('/api/chat/cancel', requireAuthProxy, async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
   const stream = activeStreams.get(sessionId);
@@ -721,7 +799,7 @@ function formatSessionAsTXT(session) {
   return txt;
 }
 
-router.post('/api/chat/export', async (req, res) => {
+router.post('/api/chat/export', requireAuthProxy, async (req, res) => {
   const { sessionIds, format = 'json' } = req.body;
   if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
     return res.status(400).json({ ok: false, error: 'sessionIds deve ser um array não vazio' });
@@ -901,13 +979,18 @@ const planModeSessions = new Map(); // sessionId -> { status, plan, planPath, cr
 // ============================================================
 
 // POST /api/plan — start plan mode investigation
-router.post('/api/plan', async (req, res) => {
+router.post('/api/plan', requireAuthProxy, async (req, res) => {
   const { message, sessionId } = req.body;
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
+  const userId = req.user?.id || 'anonymous';
   let session = sessionId ? getWebSession(sessionId) : null;
   if (!session) {
-    session = createWebSession('🔍 Plano: ' + message.slice(0, 30), 'thinking');
+    session = createWebSession(userId, '🔍 Plano: ' + message.slice(0, 30), 'thinking');
+  }
+  // v8.5-fix: validate session ownership
+  if (session.userId && session.userId !== userId) {
+    return res.status(403).json({ ok: false, error: 'Acesso negado a esta sessão' });
   }
 
   // Mark session in plan mode
@@ -921,6 +1004,9 @@ router.post('/api/plan', async (req, res) => {
     const stream = luna.processPlanModeStream(message, {
       sessionId: session.id,
       userId: 'web-plan-' + session.id,
+      userName: req.user?.name || 'Usuário',
+      userRealId: req.user?.id || 'anonymous',
+      userRole: req.user?.role || 'User',
     });
 
     for await (const ev of stream) {
@@ -935,7 +1021,7 @@ router.post('/api/plan', async (req, res) => {
         planMeta.status = 'awaiting_approval';
         planMeta.plan = ev.plan || '';
         planMeta.planPath = ev.planPath || null;
-      } else if (['thinking_delta', 'action_start', 'action_end', 'error', 'login_required'].includes(ev.type)) {
+      } else if (['thinking_delta', 'action_start', 'action_end', 'action_progress', 'error', 'login_required'].includes(ev.type)) {
         // Forward to SSE via session messages
         addMessageToSession(session.id, {
           id: 'plan-ev-' + Date.now(),
@@ -977,7 +1063,7 @@ router.post('/api/plan', async (req, res) => {
 });
 
 // POST /api/plan/approve — approve plan and switch to execution
-router.post('/api/plan/approve', (req, res) => {
+router.post('/api/plan/approve', requireAuthProxy, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
 
@@ -1005,7 +1091,7 @@ router.post('/api/plan/approve', (req, res) => {
 });
 
 // POST /api/plan/reject — reject plan
-router.post('/api/plan/reject', (req, res) => {
+router.post('/api/plan/reject', requireAuthProxy, (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
 
@@ -1032,7 +1118,7 @@ router.post('/api/plan/reject', (req, res) => {
 });
 
 // POST /api/plan/revise — revise plan
-router.post('/api/plan/revise', (req, res) => {
+router.post('/api/plan/revise', requireAuthProxy, (req, res) => {
   const { sessionId, revisedPlan } = req.body;
   if (!sessionId) return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
 
@@ -1143,13 +1229,39 @@ router.get('/api/system/status', async (req, res) => {
 });
 
 router.get('/api/system/health', async (req, res) => {
+  const start = Date.now();
   const status = getServiceStatus();
   const allRunning = Object.values(status).every(s => s.status === 'running' || s.status === 'connected');
+
+  // v10.0-fix: Enhanced health check with bridge metrics
+  let bridgeMetrics = null;
+  try {
+    if (lunaSoul && lunaSoul.kimiBridge) {
+      const kb = lunaSoul.kimiBridge;
+      const memUsage = process.memoryUsage();
+      bridgeMetrics = {
+        browserConnected: !!kb.browser,
+        pages: kb.userSessions?.size || 0,
+        contexts: kb.userContexts?.size || 0,
+        cdpUrl: kb.cdpUrl || null,
+        memory: {
+          rssMB: Math.round(memUsage.rss / 1024 / 1024),
+          heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+          externalMB: Math.round(memUsage.external / 1024 / 1024),
+        },
+      };
+    }
+  } catch (e) {
+    bridgeMetrics = { error: e.message };
+  }
+
   res.json({
     ok: allRunning,
     status,
     timestamp: new Date().toISOString(),
     lunaSoulReady: lunaReady,
+    latencyMs: Date.now() - start,
+    bridge: bridgeMetrics,
   });
 });
 
@@ -1241,13 +1353,24 @@ router.post('/api/selfhost/download', async (req, res) => {
     const tmpDir = `/tmp/luna-selfhost-${Date.now()}`;
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    // Copy install.sh
-    const installSrc = path.join(LUNA_DIR, 'install.sh');
-    if (fs.existsSync(installSrc)) {
-      fs.copyFileSync(installSrc, path.join(tmpDir, 'install.sh'));
-    }
+    // ── Copy core Luna Kernel files (no clone needed — works offline) ──
+    const copyRecursive = (src, dest) => {
+      if (!fs.existsSync(src)) return;
+      const stat = fs.statSync(src);
+      if (stat.isDirectory()) {
+        fs.mkdirSync(dest, { recursive: true });
+        for (const entry of fs.readdirSync(src)) {
+          // Skip node_modules, logs, backups, temp, sensitive cookies
+          if (['node_modules', '.git', 'logs', 'backup', 'backups', '.tmp', 'tmp', 'cookies', '.old', 'luna-web', 'plans', 'config-server.cjs.BAK'].includes(entry)) continue;
+          copyRecursive(path.join(src, entry), path.join(dest, entry));
+        }
+      } else {
+        fs.copyFileSync(src, dest);
+      }
+    };
+    copyRecursive(LUNA_DIR, tmpDir);
 
-    // Generate pre-configured .env
+    // ── Generate pre-configured .env ──
     const env = readEnv();
     const envContent = `# Luna Kernel v5.0 — Self-Host Package
 # Generated by Luna Config Panel
@@ -1276,55 +1399,170 @@ LUNA_CONFIG_PORT=3458
 `;
     fs.writeFileSync(path.join(tmpDir, '.env'), envContent, 'utf-8');
 
-    // Generate README
-    const readme = `# 🌙 Luna Kernel v5.0 — Self-Host Package
+    // ── Generate README.md with full tutorial ──
+    const readme = `# 🌙 Luna Kernel v5.0 — Pacote Self-Host
 
-## Pré-requisitos
-- Node.js v20+
-- Git
-- Google Chrome ou Chromium
+> Pacote gerado pela Luna Config Panel — pronto para instalar em outro PC.
 
-## Instalação Rápida
+---
+
+## 📋 Pré-requisitos
+
+| Software | Versão | Como verificar |
+|----------|--------|----------------|
+| Node.js  | v20+   | \`node -v\` |
+| Git      | qualquer | \`git --version\` |
+| Chrome / Chromium | qualquer | \`google-chrome --version\` |
+
+Se não tiver o Node.js v20+:
 \`\`\`bash
-cd luna-selfhost
-bash install.sh
+# Ubuntu/Debian
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Verifique
+node -v  # deve mostrar v20.x ou superior
 \`\`\`
 
-## Iniciar
+Se não tiver o Chrome:
 \`\`\`bash
-cd ~/.luna-kernel
+sudo apt-get install -y google-chrome-stable
+\`\`\`
+
+---
+
+## 🚀 Instalação (3 passos)
+
+### 1. Descompacte o pacote
+\`\`\`bash
+cd ~/Downloads   # ou onde salvou o zip
+unzip luna-selfhost.zip -d luna-kernel
+cd luna-kernel
+\`\`\`
+
+### 2. Instale as dependências
+\`\`\`bash
+npm install
+\`\`\`
+
+### 3. Inicie a Luna
+
+**Opção A — Interface Web (recomendado):**
+\`\`\`bash
 node luna-server.js
-# ou
+# Acesse: http://localhost:3458
+\`\`\`
+
+**Opção B — Bot do Telegram:**
+\`\`\`bash
 node telegram-luna-adapter.cjs
 \`\`\`
 
-## Acessar
-- Web: http://localhost:3458
-- Telegram: envie mensagem para o bot configurado
-
-## Configurações
-O arquivo \`.env\` já vem pré-configurado com seus tokens.
-Para editar, use o painel web em Configurações.
+**Opção C — PM2 (roda em background, não fecha ao fechar o terminal):**
+\`\`\`bash
+npm install -g pm2
+pm2 start luna-server.js --name luna-web
+pm2 start telegram-luna-adapter.cjs --name luna-telegram
+pm2 save
+pm2 startup
+\`\`\`
 
 ---
+
+## 🔐 Login
+
+O arquivo \`.env\` já vem pré-configurado com os tokens.
+
+Para acessar a web interface:
+1. Abra http://localhost:3458
+2. Login: \`abner\`
+3. Senha: \`7741\`
+
+> ⚠️  O \`.env\` deste pacote já contém os tokens do bot do Telegram e da API. **Não compartilhe este arquivo publicamente.**
+
+---
+
+## 🧠 Como Usar
+
+### Interface Web
+- Clique em **"Nova Sessão"** para começar
+- Escolha o modo: \`instant\` (rápido) ou \`thinking\` (mais preciso)
+- A Luna pode criar arquivos, executar comandos, navegar na web, etc.
+
+### Telegram
+- Adicione o bot ao seu grupo ou converse diretamente
+- Use \`/kimi on\` para a Luna responder todas as mensagens
+- Use \`/kimi off\` para desligar
+
+---
+
+## 📁 O que está neste pacote
+
+| Arquivo / Pasta | Descrição |
+|-----------------|-----------|
+| \`luna-soul.cjs\` | Cérebro da Luna (AI + ferramentas) |
+| \`luna-tools.cjs\` | Ferramentas: criar arquivos, executar comandos, etc. |
+| \`kimi-bridge.cjs\` | Conexão com o Kimi AI via Chrome |
+| \`luna-server.js\` | Servidor web com chat em tempo real |
+| \`telegram-luna-adapter.cjs\` | Bot do Telegram |
+| \`.env\` | Configurações pré-preenchidas |
+| \`luna-extension/\` | Extensão do Chrome para o Kimi Bridge |
+
+---
+
+## 🔧 Problemas comuns
+
+**\`npm install\` falha?**
+\`\`\`bash
+# Limpe o cache e tente de novo
+rm -rf node_modules package-lock.json
+npm install
+\`\`\`
+
+**Chrome não encontrado?**
+Edite o \`.env\` e adicione:
+\`\`\`
+LUNA_CHROME_PATH=/usr/bin/google-chrome
+\`\`\`
+
+**Porta 3458 já em uso?**
+Edite o \`.env\` e mude:
+\`\`\`
+LUNA_CONFIG_PORT=3459
+\`\`\`
+
+---
+
+## 👨‍👦 Compartilhando com a família
+
+Este pacote pode ser copiado para **qualquer PC Linux** (ou WSL no Windows) com Node.js v20+.
+
+1. Copie o \`luna-selfhost.zip\` para o PC do seu pai/mãe/irmão
+2. Siga os 3 passos de instalação acima
+3. Pronto! Todos usam a **mesma conta** e acessam o mesmo histórico.
+
+---
+
 NEXO DIGITAL S.L. — Private Use Only
 `;
     fs.writeFileSync(path.join(tmpDir, 'README.md'), readme, 'utf-8');
 
-    // Generate start.sh
+    // ── Generate quick-start.sh ──
     const startSh = `#!/bin/bash
+# Luna Kernel — Quick Start
 cd "\$(dirname "\$0")"
-echo "🌙 Iniciando Luna Kernel..."
-cd ~/.luna-kernel 2>/dev/null || { bash install.sh; cd ~/.luna-kernel; }
+echo "🌙 Instalando dependências..."
 npm install
+echo "🌙 Iniciando Luna Web Server..."
 node luna-server.js
 `;
-    fs.writeFileSync(path.join(tmpDir, 'start.sh'), startSh, 'utf-8');
+    fs.writeFileSync(path.join(tmpDir, 'quick-start.sh'), startSh, 'utf-8');
+    fs.chmodSync(path.join(tmpDir, 'quick-start.sh'), 0o755);
 
-    // Create zip
+    // ── Create zip ──
     const zipPath = `${tmpDir}.zip`;
     await new Promise((resolve, reject) => {
-      exec(`cd ${tmpDir} && zip -r ${zipPath} .`, { timeout: 30000 }, (err) => {
+      exec(`cd ${tmpDir} && zip -r ${zipPath} .`, { timeout: 60000 }, (err) => {
         if (err) reject(err);
         else resolve();
       });
@@ -1339,6 +1577,7 @@ node luna-server.js
       if (err) console.error('Download error:', err.message);
     });
   } catch (e) {
+    console.error('[SELFHOST] Erro ao gerar pacote:', e);
     res.status(500).json({ ok: false, error: 'Erro ao gerar pacote: ' + e.message });
   }
 });
@@ -1396,7 +1635,8 @@ setInterval(async () => {
 // from server.js via router.locals or passed as options.
 // For now, we export a function that accepts these dependencies.
 
-function setupAuth({ validateCredentials, generateToken, requireAuth }) {
+function setupAuth({ validateCredentials, generateToken, requireAuth: injectedRequireAuth }) {
+  requireAuth = injectedRequireAuth || requireAuth;
   router.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -1410,7 +1650,7 @@ function setupAuth({ validateCredentials, generateToken, requireAuth }) {
     res.json({ ok: true, token, user });
   });
 
-  router.get('/api/auth/me', requireAuth, (req, res) => {
+  router.get('/api/auth/me', requireAuthProxy, (req, res) => {
     res.json({ ok: true, user: req.user });
   });
 }
