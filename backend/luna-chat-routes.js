@@ -686,7 +686,14 @@ router.get('/api/chat/session/:id/messages', requireAuthProxy, async (req, res) 
     session = await loadSessionFromDB(req.params.id);
   }
   if (!session) return res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
-  res.json({ ok: true, messages: session.messages });
+
+  const total = session.messages.length;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+  const before = parseInt(req.query.before, 10) || total;
+  const start = Math.max(0, before - limit);
+  const paginated = session.messages.slice(start, before);
+
+  res.json({ ok: true, messages: paginated, total, hasMore: start > 0 });
 });
 
 // POST /api/chat/session — create/rename/delete
