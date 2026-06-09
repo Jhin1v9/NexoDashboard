@@ -1307,6 +1307,35 @@ router.get('/api/system/status', async (req, res) => {
   res.json({ ok: true, status });
 });
 
+// POST /api/system/bridge-start — force KimiBridge reconnect (manual override when bridge drops)
+router.post('/api/system/bridge-start', async (req, res) => {
+  try {
+    const luna = await getLunaSoul();
+    if (!luna) {
+      return res.status(503).json({ ok: false, error: 'Luna Soul não inicializado' });
+    }
+    if (!luna.kimiBridge) {
+      const { KimiBridge } = require(path.join(LUNA_DIR, 'kimi-bridge.cjs'));
+      luna.kimiBridge = new KimiBridge();
+    }
+    if (luna.kimiBridge.browser) {
+      return res.json({ ok: true, message: '✅ Kimi Bridge já está conectado', alreadyConnected: true });
+    }
+    console.log('[BRIDGE-START] Forçando conexão do Kimi Bridge...');
+    await luna.kimiBridge.connect();
+    console.log('[BRIDGE-START] Kimi Bridge conectado com sucesso');
+    res.json({
+      ok: true,
+      message: '🔌 Kimi Bridge conectado com sucesso!',
+      pages: luna.kimiBridge.userSessions?.size || 0,
+      contexts: luna.kimiBridge.userContexts?.size || 0,
+    });
+  } catch (e) {
+    console.error('[BRIDGE-START] Erro ao conectar bridge:', e.message);
+    res.status(500).json({ ok: false, error: `Falha ao conectar bridge: ${e.message}` });
+  }
+});
+
 router.get('/api/system/health', async (req, res) => {
   const start = Date.now();
   const status = getServiceStatus();
