@@ -424,12 +424,12 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
       const streamMeta = activeStreams.get(session.id);
       if (!streamMeta || streamMeta.cancelled) break;
 
-      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'action_progress', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit'].includes(ev.type)) {
+      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'action_progress', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
         // v9.5-fix: Include ev.error for error events so the message is not lost
         let content = ev.type === 'done'
           ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
-          : (ev.error || ev.text || ev.fullResponse || '');
+          : (ev.message || ev.error || ev.text || ev.fullResponse || '');
 
         // v10.3-fix: Strip tool JSON blocks from response_delta before persisting
         if (ev.type === 'response_delta' && content) {
