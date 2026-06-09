@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import VotingQuorumBar from './VotingQuorumBar'
-import { ThumbsUp, ThumbsDown, Trash2, Clock, CheckCircle2, XCircle, Zap, MessageSquare } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Trash2, Edit3, Save, X, Clock, CheckCircle2, XCircle, Zap, MessageSquare } from 'lucide-react'
 
 const CEOs = ['abner', 'nonoke', 'elias']
 
@@ -10,11 +10,15 @@ const statusConfig = {
   approved: { label: 'Aprovada', color: 'bg-nexo-success/10 text-nexo-success border-nexo-success/20', icon: CheckCircle2 },
   rejected: { label: 'Rejeitada', color: 'bg-nexo-danger/10 text-nexo-danger border-nexo-danger/20', icon: XCircle },
   closed: { label: 'Fechada', color: 'bg-nexo-muted/10 text-nexo-muted border-nexo-muted/20', icon: Clock },
+  deleted: { label: 'Cancelada', color: 'bg-nexo-muted/10 text-nexo-muted border-nexo-muted/20', icon: XCircle },
 }
 
-export default function VotingSessionCard({ session, currentUser, onVote, onDelete }) {
+export default function VotingSessionCard({ session, currentUser, onVote, onDelete, onUpdate }) {
   const status = statusConfig[session.status]
   const StatusIcon = status.icon
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(session.title)
+  const [editDesc, setEditDesc] = useState(session.description || '')
 
   const yesVotes = Object.values(session.votes).filter(v => v?.vote === 'yes').length
   const noVotes = Object.values(session.votes).filter(v => v?.vote === 'no').length
@@ -22,7 +26,13 @@ export default function VotingSessionCard({ session, currentUser, onVote, onDele
   const userVote = session.votes[currentUser]
   const canVote = (session.status === 'open' || session.status === 'voting') && !userVote
   const canDelete = session.createdBy === currentUser && (session.status === 'open' || session.status === 'voting')
+  const canEdit = session.createdBy === currentUser && (session.status === 'open' || session.status === 'voting')
   const isCEO = CEOs.includes(currentUser)
+
+  const handleSave = async () => {
+    await onUpdate(session.id, { title: editTitle, description: editDesc })
+    setEditing(false)
+  }
 
   const getVoteBadge = (username) => {
     const v = session.votes[username]
@@ -51,21 +61,51 @@ export default function VotingSessionCard({ session, currentUser, onVote, onDele
                 Auto
               </span>
             )}
+            {session.type === 'review' && (
+              <span className="inline-flex items-center gap-1 text-xs bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">
+                <MessageSquare className="w-3 h-3" />
+                Revisão
+              </span>
+            )}
           </div>
-          <h3 className="text-base font-semibold leading-tight">{session.title}</h3>
-          {session.description && (
-            <p className="text-xs text-nexo-muted mt-1 line-clamp-2">{session.description}</p>
+          {editing ? (
+            <div className="space-y-2">
+              <input className="w-full bg-nexo-card border border-nexo-border rounded px-2 py-1 text-sm" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+              <input className="w-full bg-nexo-card border border-nexo-border rounded px-2 py-1 text-sm" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Descrição" />
+              <div className="flex gap-2">
+                <button onClick={handleSave} className="text-xs px-2 py-1 bg-nexo-success rounded flex items-center gap-1"><Save className="w-3 h-3" /> Salvar</button>
+                <button onClick={() => setEditing(false)} className="text-xs px-2 py-1 bg-nexo-card rounded flex items-center gap-1"><X className="w-3 h-3" /> Cancelar</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-base font-semibold leading-tight">{session.title}</h3>
+              {session.description && (
+                <p className="text-xs text-nexo-muted mt-1 line-clamp-2">{session.description}</p>
+              )}
+            </>
           )}
         </div>
-        {canDelete && (
-          <button
-            className="p-1.5 text-nexo-muted hover:text-nexo-danger transition-colors shrink-0"
-            onClick={() => onDelete(session.id)}
-            title="Cancelar votação"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {canEdit && !editing && (
+            <button
+              className="p-1.5 text-nexo-muted hover:text-nexo-info transition-colors"
+              onClick={() => setEditing(true)}
+              title="Editar votação"
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              className="p-1.5 text-nexo-muted hover:text-nexo-danger transition-colors"
+              onClick={() => onDelete(session.id)}
+              title="Cancelar votação"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">

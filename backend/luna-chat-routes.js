@@ -335,6 +335,10 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
 
   const userId = req.user?.id || 'anonymous';
   let session = sessionId ? getWebSession(sessionId) : null;
+  // v10.3-fix: Load from DB if not in memory (survives server restarts)
+  if (!session && sessionId) {
+    session = await loadSessionFromDB(sessionId);
+  }
   if (!session) {
     session = createWebSession(userId, message.slice(0, 40), mode);
   }
@@ -423,20 +427,68 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
       if (['response_delta', 'response_detected', 'action_start', 'action_end', 'action_progress', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
         // v9.5-fix: Include ev.error for error events so the message is not lost
-        const content = ev.type === 'done'
+        let content = ev.type === 'done'
           ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
           : (ev.error || ev.text || ev.fullResponse || '');
+
+        // v10.3-fix: Strip tool JSON blocks from response_delta before persisting
+        if (ev.type === 'response_delta' && content) {
+          const hasToolJson = /"tool"\s*:/.test(content) || /"params"\s*:\s*\{/.test(content);
+          if (hasToolJson) {
+            // Attempt to strip inline JSON blocks with brace counting
+            let stripped = '';
+            let i = 0;
+            while (i < content.length) {
+              if (content[i] === '{') {
+                let depth = 1, j = i + 1;
+                let inString = false, escape = false;
+                while (j < content.length && depth > 0) {
+                  const c = content[j];
+                  if (escape) { escape = false; }
+                  else if (c === '\\') { escape = true; }
+                  else if (c === '"') { inString = !inString; }
+                  else if (!inString) { if (c === '{') depth++; else if (c === '}') depth--; }
+                  j++;
+                }
+                if (depth === 0) {
+                  const block = content.slice(i, j);
+                  if (!/"tool"\s*:/.test(block)) {
+                    stripped += block;
+                  }
+                  i = j;
+                  continue;
+                }
+              }
+              stripped += content[i];
+              i++;
+            }
+            content = stripped;
+          }
+          // Skip empty deltas after stripping
+          if (!content.trim()) continue;
+        }
+
+        // v10.3-fix: Deduplicate done events per messageId — luna-soul emits both response_done and done
+        const existingDoneForMessage = (type) => {
+          const sess = getWebSession(session.id);
+          return sess && sess.messages.some(m => m.type === type && m.messageId === messageId);
+        };
+
+        if (ev.type === 'done' && existingDoneForMessage('done')) {
+          continue; // Skip duplicate done for same message
+        }
         
         // v5.4-fix: Skip duplicate events (same type + content within 5s window)
-        // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
         // v10.1-fix: Never deduplicate incremental events (delta/progress) — they are
         // inherently sequential and dropping them causes content loss.
+        // v10.3-fix: response_delta may carry the FULL accumulated text instead of a delta.
+        // Deduplicate by content hash to prevent duplicate history entries.
         const isIncremental = ['response_delta', 'thinking_delta', 'action_progress'].includes(ev.type);
         const dedupKey = `${ev.type}:${content.slice(0, 200)}:${ev.tool || ''}`;
-        if (!isIncremental && ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
+        if ((!isIncremental || ev.type === 'response_delta') && ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
           continue;
         }
-        if (!isIncremental) emittedEventHashes.add(dedupKey);
+        if (!isIncremental || ev.type === 'response_delta') emittedEventHashes.add(dedupKey);
         
         // v8.4-fix: response_done is translated to 'done' below — don't add original
         if (ev.type !== 'response_done') {
@@ -455,7 +507,7 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
         }
 
         // v6.3-fix: luna-soul emits 'response_done' instead of 'done' — translate it
-        if (ev.type === 'response_done') {
+        if (ev.type === 'response_done' && !existingDoneForMessage('done')) {
           addMessageToSession(session.id, {
             id: 'done-' + Date.now(),
             role: 'assistant',
@@ -487,16 +539,18 @@ router.post('/api/chat', requireAuthProxy, async (req, res) => {
     if (effectiveSessionId) {
       const finalSession = getWebSession(effectiveSessionId);
       if (finalSession) {
-        const hasFinalEvent = finalSession.messages.some(m =>
-          m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit'
+        // v10.3-fix: Only add fallback done if NO done exists for THIS messageId
+        const hasFinalEventForMessage = finalSession.messages.some(m =>
+          m.messageId === messageId && (m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit')
         );
-        if (!hasFinalEvent) {
+        if (!hasFinalEventForMessage) {
           addMessageToSession(effectiveSessionId, {
             id: 'done-' + Date.now(),
             role: 'assistant',
             type: 'done',
             content: '',
             result: { response: '' },
+            messageId: messageId,
             timestamp: new Date().toISOString(),
           });
         }

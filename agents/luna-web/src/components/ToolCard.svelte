@@ -6,6 +6,34 @@
   export let result = undefined;
   export let duration = 0;
 
+  // v8.6-fix: Auto-timeout stuck tool cards after 60s to prevent infinite animations
+  let isStalled = false;
+  const TOOL_TIMEOUT_MS = 60000;
+
+  // Use onMount lifecycle to manage timeout without cyclical reactivity
+  import { onMount, onDestroy } from 'svelte';
+  let timeoutId = null;
+
+  onMount(() => {
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  });
+
+  $: {
+    if (result) {
+      // Tool completed — clear any pending timeout
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+      isStalled = false;
+    } else if (!timeoutId && !isStalled) {
+      // Tool is running — start timeout
+      timeoutId = setTimeout(() => {
+        isStalled = true;
+        timeoutId = null;
+      }, TOOL_TIMEOUT_MS);
+    }
+  }
+
   const TOOL_COLORS = {
     writeFile: '#3b82f6', readFile: '#22c55e', executeShell: '#a855f7',
     searchWeb: '#f97316', searchFiles: '#f97316', gitStatus: '#6b7280',
@@ -24,7 +52,7 @@
     dashboardGetFinanceSummary: '💰', replaceInFile: '✏️',
   };
 
-  $: status = result ? (result.success !== false ? 'success' : 'error') : 'running';
+  $: status = result ? (result.success !== false ? 'success' : 'error') : (isStalled ? 'stalled' : 'running');
   $: color = TOOL_COLORS[tool] || '#6b7280';
   $: icon = TOOL_ICONS[tool] || '🔧';
   $: displayPath = params?.path || params?.file || params?.dir || params?.url || '';
@@ -54,6 +82,15 @@
             <circle cx="12" cy="12" r="10" stroke-dasharray="40 20" stroke-linecap="round"/>
           </svg>
           {formatDuration(duration)}
+        </span>
+      {:else if status === 'stalled'}
+        <span class="status-badge stalled">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Timeout
         </span>
       {:else if status === 'success'}
         <span class="status-badge success">
@@ -111,6 +148,10 @@
     border-color: var(--tool-color);
     animation: springIn 300ms cubic-bezier(0.34, 1.56, 0.64, 1),
                pulseGlow 2s infinite;
+  }
+  .status-badge.stalled {
+    background: rgba(234, 179, 8, 0.12);
+    color: #facc15;
   }
   .tool-card.success {
     border-left-color: #22c55e;

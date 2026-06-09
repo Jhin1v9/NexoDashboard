@@ -17,6 +17,45 @@ class LunaExtensionHandler extends EventEmitter {
     console.log('[LunaExt] HTTP extension endpoints ready at /ext/*');
   }
 
+  // v8.6: Global event buffer for bridge Layer 0 consumption
+  _ensureEventBuffer() {
+    if (!global.__lunaExtensionEventBuffers) {
+      global.__lunaExtensionEventBuffers = new Map(); // sessionId -> [{eventType, data, ts}]
+    }
+  }
+
+  _bufferEvent(sessionId, event) {
+    this._ensureEventBuffer();
+    const buf = global.__lunaExtensionEventBuffers.get(sessionId) || [];
+    buf.push({ ...event, bufferedAt: Date.now() });
+    // Keep only last 200 events to prevent unbounded growth
+    if (buf.length > 200) buf.splice(0, buf.length - 200);
+    global.__lunaExtensionEventBuffers.set(sessionId, buf);
+  }
+
+  // Called by bridge to consume buffered events
+  getEvents(sessionId, clear = true) {
+    this._ensureEventBuffer();
+    const buf = global.__lunaExtensionEventBuffers.get(sessionId);
+    if (!buf || buf.length === 0) return [];
+    const events = buf.slice();
+    if (clear) global.__lunaExtensionEventBuffers.set(sessionId, []);
+    return events;
+  }
+
+  // Get events from all active extension sessions (for bridge when userId mapping is unknown)
+  getAllEvents(clear = true) {
+    this._ensureEventBuffer();
+    const all = [];
+    for (const [sessionId, session] of this.sessions) {
+      if (this.isExtensionConnected(sessionId)) {
+        const events = this.getEvents(sessionId, clear);
+        for (const ev of events) all.push({ ...ev, _extSessionId: sessionId });
+      }
+    }
+    return all;
+  }
+
   setupHttpRoutes(appOrServer) {
     const express = require('express');
     const app = appOrServer;
@@ -104,10 +143,21 @@ class LunaExtensionHandler extends EventEmitter {
       session.tabId = tabId;
     }
 
+    // v8.6: Buffer DOM events for bridge Layer 0 consumption
+    const bufferableTypes = ['stream_state', 'stream_end', 'tool_call_detected', 'tool_response_detected', 'segment_complete', 'json_block_added', 'button_state'];
+    if (bufferableTypes.includes(eventType)) {
+      this._bufferEvent(sessionId, { eventType, data, timestamp, url, tabId, tabUrl });
+    }
+
     if (eventType === 'tool_call_detected') {
       console.log(`[LunaExt] Tool call detected: ${data.tool} (session=${sessionId})`);
     } else if (eventType === 'stream_end') {
       console.log(`[LunaExt] Stream ended (session=${sessionId})`);
+    } else if (eventType === 'stream_state') {
+      // Debug logging only — actual consumption is via buffer
+      if (data && data.response !== undefined) {
+        console.log(`[LunaExt] Stream state: thinking=${(data.thinking||'').length} response=${(data.response||'').length} isStreaming=${data.isStreaming} (session=${sessionId})`);
+      }
     }
 
     this.emit('event', {

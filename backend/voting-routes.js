@@ -86,6 +86,21 @@ module.exports = function(app, { requireAuth, dataStore }) {
     return { ...session, votes: buildVotesObject(votesArray) };
   }
 
+  // GET /api/voting/stats
+  app.get('/api/voting/stats', requireAuth, async (req, res) => {
+    try {
+      const sessions = await dataStore.getVotingSessions();
+      const active = sessions.filter(s => s.status === 'open' || s.status === 'voting').length;
+      const approved = sessions.filter(s => s.status === 'approved').length;
+      const rejected = sessions.filter(s => s.status === 'rejected').length;
+      const closed = sessions.filter(s => s.status === 'closed' || s.status === 'closed_without_quorum').length;
+      res.json({ total: sessions.length, active, approved, rejected, closed });
+    } catch (err) {
+      console.error('[API] Error getting stats:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // GET /api/voting/sessions
   app.get('/api/voting/sessions', requireAuth, async (req, res) => {
     try {
@@ -170,6 +185,36 @@ module.exports = function(app, { requireAuth, dataStore }) {
       res.status(201).json({ ...newSession, votes: buildVotesObject([]) });
     } catch (err) {
       console.error('[API] Error creating session:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /api/voting/sessions/:id
+  app.put('/api/voting/sessions/:id', requireAuth, async (req, res) => {
+    try {
+      const session = await dataStore.getVotingSessionById(req.params.id);
+      if (!session) return res.status(404).json({ error: 'Session not found' });
+      if (session.createdBy !== req.user.userId) {
+        return res.status(403).json({ error: 'Only the creator can edit this session' });
+      }
+      if (session.status !== 'open' && session.status !== 'voting') {
+        return res.status(400).json({ error: 'Cannot edit a closed session' });
+      }
+      const updates = req.body;
+      const updated = {
+        ...session,
+        title: updates.title !== undefined ? updates.title : session.title,
+        description: updates.description !== undefined ? updates.description : session.description,
+        type: updates.type !== undefined ? updates.type : session.type,
+        toolName: updates.toolName !== undefined ? updates.toolName : session.toolName,
+        toolParams: updates.toolParams !== undefined ? updates.toolParams : session.toolParams,
+        quorumRequired: updates.quorumRequired !== undefined ? updates.quorumRequired : session.quorumRequired,
+        updatedAt: new Date().toISOString()
+      };
+      await dataStore.saveVotingSession(updated);
+      res.json({ ...updated, votes: buildVotesObject(await dataStore.getVotingVotes(req.params.id)) });
+    } catch (err) {
+      console.error('[API] Error updating session:', err);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

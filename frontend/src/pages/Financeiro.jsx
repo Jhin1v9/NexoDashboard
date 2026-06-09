@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Wallet,
@@ -299,8 +299,20 @@ function SummarySection({ summary, payments, expenses }) {
   )
 }
 
-function RevenuesSection({ payments }) {
+function RevenuesSection({ payments, onRefresh }) {
   const [filter, setFilter] = useState('all')
+  const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState('create')
+  const [editingId, setEditingId] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({
+    clientName: '',
+    projectName: '',
+    totalAmount: '',
+    currency: 'EUR',
+    description: '',
+    status: 'pending'
+  })
 
   const filteredPayments = useMemo(() => {
     if (!payments) return []
@@ -310,34 +322,98 @@ function RevenuesSection({ payments }) {
 
   const totalByStatus = (status) => payments?.filter((p) => p.status === status).length ?? 0
 
+  const openCreate = () => {
+    setModalMode('create')
+    setEditingId(null)
+    setForm({ clientName: '', projectName: '', totalAmount: '', currency: 'EUR', description: '', status: 'pending' })
+    setShowModal(true)
+  }
+
+  const openEdit = (payment) => {
+    setModalMode('edit')
+    setEditingId(payment.id || payment.paymentId)
+    setForm({
+      clientName: payment.clientName || '',
+      projectName: payment.projectName || '',
+      totalAmount: String(payment.totalAmount?.value || ''),
+      currency: payment.totalAmount?.currency || 'EUR',
+      description: payment.description || '',
+      status: payment.status || 'pending'
+    })
+    setShowModal(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.clientName.trim() || !form.totalAmount) {
+      alert('Preencha cliente e valor')
+      return
+    }
+    setLoading(true)
+    try {
+      const payload = {
+        clientName: form.clientName.trim(),
+        projectName: form.projectName.trim(),
+        totalAmount: { value: parseFloat(form.totalAmount), currency: form.currency },
+        description: form.description.trim(),
+        status: form.status
+      }
+      if (modalMode === 'create') {
+        await axios.post('/api/payments', payload)
+      } else {
+        await axios.put(`/api/payments/${editingId}`, payload)
+      }
+      setShowModal(false)
+      onRefresh?.()
+    } catch (e) {
+      alert('Erro: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Tem certeza que deseja apagar esta receita?')) return
+    try {
+      await axios.delete(`/api/payments/${id}`)
+      onRefresh?.()
+    } catch (e) {
+      alert('Erro: ' + (e.response?.data?.error || e.message))
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        {PAYMENT_FILTERS.map((f) => {
-          const isActive = filter === f.key
-          const count = f.key === 'all' ? (payments?.length ?? 0) : totalByStatus(f.key)
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-nexo-info text-white shadow-lg shadow-nexo-info/20'
-                  : 'bg-nexo-card text-nexo-muted hover:text-white hover:bg-nexo-border'
-              }`}
-            >
-              {f.label}
-              <span className={`ml-1.5 text-xs ${isActive ? 'text-white/70' : 'text-nexo-muted'}`}>
-                ({count})
-              </span>
-            </button>
-          )
-        })}
+      {/* Header + New Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {PAYMENT_FILTERS.map((f) => {
+            const isActive = filter === f.key
+            const count = f.key === 'all' ? (payments?.length ?? 0) : totalByStatus(f.key)
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-nexo-info text-white shadow-lg shadow-nexo-info/20'
+                    : 'bg-nexo-card text-nexo-muted hover:text-white hover:bg-nexo-border'
+                }`}
+              >
+                {f.label}
+                <span className={`ml-1.5 text-xs ${isActive ? 'text-white/70' : 'text-nexo-muted'}`}>
+                  ({count})
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <button onClick={openCreate} className="btn-primary inline-flex items-center gap-2 text-sm">
+          <Plus size={16} /> Nova Receita
+        </button>
       </div>
 
       {/* Payment Cards */}
@@ -350,10 +426,11 @@ function RevenuesSection({ payments }) {
           const total = payment.totalAmount?.value ?? 0
           const currency = payment.totalAmount?.currency || 'EUR'
           const statusCfg = PAYMENT_STATUS_CONFIG[payment.status] || PAYMENT_STATUS_CONFIG.pending
+          const pid = payment.id || payment.paymentId
 
           return (
             <motion.div
-              key={payment.id}
+              key={pid}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
@@ -435,6 +512,12 @@ function RevenuesSection({ payments }) {
 
                 <div className="flex-1" />
 
+                <button onClick={() => openEdit(payment)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-nexo-card text-nexo-muted hover:text-white hover:bg-nexo-border transition-all">
+                  <Edit3 size={12} /> Editar
+                </button>
+                <button onClick={() => handleDelete(pid)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-nexo-danger/10 text-nexo-danger hover:bg-nexo-danger/20 transition-all">
+                  <Trash2 size={12} /> Apagar
+                </button>
                 <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-nexo-info/10 text-nexo-info hover:bg-nexo-info/20 transition-all">
                   <Plus size={12} />
                   Transação
@@ -451,6 +534,54 @@ function RevenuesSection({ payments }) {
           </div>
         )}
       </div>
+
+      {/* Modal CRUD Receita */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="glass-card w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">{modalMode === 'create' ? 'Nova Receita' : 'Editar Receita'}</h3>
+              <button onClick={() => setShowModal(false)} className="p-1 hover:bg-nexo-border rounded"><X size={16} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-nexo-muted">Cliente</label>
+                <input value={form.clientName} onChange={e => setForm(v => ({ ...v, clientName: e.target.value }))} className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm" placeholder="Nome do cliente" />
+              </div>
+              <div>
+                <label className="text-xs text-nexo-muted">Projeto</label>
+                <input value={form.projectName} onChange={e => setForm(v => ({ ...v, projectName: e.target.value }))} className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm" placeholder="Nome do projeto" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-nexo-muted">Valor (€)</label>
+                  <input type="number" step="0.01" value={form.totalAmount} onChange={e => setForm(v => ({ ...v, totalAmount: e.target.value }))} className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm" placeholder="0,00" />
+                </div>
+                <div>
+                  <label className="text-xs text-nexo-muted">Status</label>
+                  <select value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value }))} className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm">
+                    <option value="pending">Pendente</option>
+                    <option value="partial">Parcial</option>
+                    <option value="paid">Pago</option>
+                    <option value="overdue">Atrasado</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-nexo-muted">Descrição</label>
+                <input value={form.description} onChange={e => setForm(v => ({ ...v, description: e.target.value }))} className="mt-1 w-full bg-nexo-card border border-nexo-border rounded-md px-3 py-2 text-sm" placeholder="Detalhes..." />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-nexo-card rounded-lg text-xs hover:bg-nexo-border">Cancelar</button>
+              <button onClick={handleSave} disabled={loading} className="px-4 py-2 bg-nexo-primary rounded-lg text-xs hover:opacity-90 disabled:opacity-50">
+                {loading ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -852,7 +983,7 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState('resumo')
 
   const { data: summaryData, loading: summaryLoading } = useRealtime('/api/finance/summary', 30000)
-  const { data: paymentsData, loading: paymentsLoading } = useRealtime('/api/payments', 30000)
+  const { data: paymentsData, loading: paymentsLoading, refetch: refetchPayments } = useRealtime('/api/payments', 30000)
   const { data: expensesData, loading: expensesLoading } = useRealtime('/api/expenses', 30000)
   const { data: cashBoxData, loading: cashBoxLoading } = useRealtime('/api/cash-box', 30000)
 
@@ -931,7 +1062,7 @@ export default function Financeiro() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <RevenuesSection payments={payments} />
+              <RevenuesSection payments={payments} onRefresh={refetchPayments} />
             </motion.div>
           )}
 

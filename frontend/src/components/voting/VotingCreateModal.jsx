@@ -112,6 +112,21 @@ export default function VotingCreateModal({ onCreate, children }) {
                     <div className="text-xs text-nexo-muted">Executa tool se aprovada</div>
                   </div>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setType('review')}
+                  className={`flex-1 flex items-center gap-2 p-3 rounded-lg border transition-all text-left ${
+                    type === 'review'
+                      ? 'border-nexo-info bg-nexo-info/5 text-nexo-info'
+                      : 'border-nexo-border hover:border-nexo-muted/30'
+                  }`}
+                >
+                  <Users className="w-4 h-4 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium">Revisão</div>
+                    <div className="text-xs text-nexo-muted">Revisão de roadmap</div>
+                  </div>
+                </button>
               </div>
             </div>
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import VotingSessionCard from './VotingSessionCard'
 
-export default function VotingSessionList({ sessions, currentUser, loading, onVote, onDelete }) {
+export default function VotingSessionList({ sessions, currentUser, loading, onVote, onDelete, onUpdate }) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -38,6 +38,7 @@ export default function VotingSessionList({ sessions, currentUser, loading, onVo
           currentUser={currentUser}
           onVote={onVote}
           onDelete={onDelete}
+          onUpdate={onUpdate}
         />
       ))}
     </div>

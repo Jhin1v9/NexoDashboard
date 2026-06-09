@@ -264,8 +264,8 @@ module.exports = function(dataStore, { requireAuth }) {
       });
 
       // Se última fase, marcar como completed
-      if (nextIdx === phases.length - 1 && nextPhase.status === 'completed') {
-        await dataStore.saveRoadmap({ ...roadmap, status: 'completed' });
+      if (nextIdx === phases.length - 1) {
+        await dataStore.saveRoadmap({ ...roadmap, status: 'completed', current_phase_index: nextIdx, phases });
       }
 
       res.json({ success: true, current_phase_index: nextIdx, phases });

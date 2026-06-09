@@ -1116,7 +1116,7 @@ async function deleteEmailDraft(id) {
 // VOTING
 // ============================================================
 async function getVotingSessions() {
-  const rows = await db.query('SELECT * FROM voting_sessions ORDER BY created_at DESC');
+  const rows = await db.query("SELECT * FROM voting_sessions WHERE status != 'deleted' ORDER BY created_at DESC");
   return rows.map(r => ({
     id: r.id,
     title: r.title,

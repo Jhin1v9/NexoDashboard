@@ -1620,12 +1620,12 @@ class ActionExecutor {
   async listIdeas(params) {
     const apiResult = await this.apiGet('/ideas');
     if (apiResult && apiResult.success && apiResult.data?.ideas) {
-      const items = apiResult.data.ideas.map(i => ({ ...i, display: `ID: ${i.id} | Título: ${i.title || 'Sem título'}` }));
+      const items = apiResult.data.ideas.map(i => ({ ...i, display: `ID: ${i.id} | Nome: ${i.title || 'Sem nome'}` }));
       return { type: 'ideas', items, source: 'api' };
     }
     const ideasFile = path.join(this.dataDir, 'ideas-registry.json');
     const data = this.readJson(ideasFile, { ideas: [] });
-    const items = (data.ideas || []).map(i => ({ ...i, display: `ID: ${i.id} | Título: ${i.title || 'Sem título'}` }));
+    const items = (data.ideas || []).map(i => ({ ...i, display: `ID: ${i.id} | Nome: ${i.title || 'Sem nome'}` }));
     return { type: 'ideas', items, source: 'file' };
   }
 
@@ -1729,7 +1729,7 @@ class ActionExecutor {
         from: m.from,
         subject: m.subject,
         unread: m.labelIds?.includes('UNREAD') || m.unread,
-        display: `ID: ${m.id} | Assunto: ${m.subject || 'Sem assunto'} | De: ${m.from || 'N/A'}`
+        display: `ID: ${m.id} | Nome: ${m.subject || 'Sem nome'}`
       }));
       const naoLidos = items.filter(i => i.unread).length;
       return { type: 'emails', total: items.length, naoLidos, items, source: 'api' };
@@ -1778,12 +1778,12 @@ class ActionExecutor {
   async listQuotes(params) {
     const apiResult = await this.apiGet('/quotes');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(q => ({ ...q, display: `ID: ${q.id} | Cliente: ${q.client || q.title || 'N/A'} | Valor: ${q.amount || q.value || 0}` }));
+      const items = apiResult.map(q => ({ ...q, display: `ID: ${q.id} | Nome: ${q.title || q.client || 'Sem nome'}` }));
       return { type: 'quotes', items, source: 'api' };
     }
     const quotesFile = path.join(this.dataDir, 'quotes.json');
     const data = this.readJson(quotesFile, []);
-    const items = data.map(q => ({ ...q, display: `ID: ${q.id} | Cliente: ${q.client || q.title || 'N/A'} | Valor: ${q.amount || q.value || 0}` }));
+    const items = data.map(q => ({ ...q, display: `ID: ${q.id} | Nome: ${q.title || q.client || 'Sem nome'}` }));
     return { type: 'quotes', items, source: 'file' };
   }
 
@@ -2061,7 +2061,7 @@ class ActionExecutor {
     if (dateFrom) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') >= dateFrom);
     if (dateTo) items = items.filter(t => (t.dueDate || t.prazo || t.createdAt || '') <= dateTo);
 
-    const formattedItems = items.slice(0, 20).map(t => ({ ...t, display: `ID: ${t.id} | Título: ${t.title || 'Sem título'}` }));
+    const formattedItems = items.slice(0, 20).map(t => ({ ...t, display: `ID: ${t.id} | Nome: ${t.title || 'Sem nome'}` }));
     return { type: 'tasks_filtered', total: formattedItems.length, items: formattedItems, source: 'api' };
   }
 
@@ -2086,12 +2086,12 @@ class ActionExecutor {
   async listPayments(params) {
     const apiResult = await this.apiGet('/payments');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(p => ({ ...p, display: `ID: ${p.id} | De: ${p.from || p.client || 'N/A'} | Valor: ${p.amount || 0}` }));
+      const items = apiResult.map(p => ({ ...p, display: `ID: ${p.id} | Nome: ${p.description || p.from || 'Sem nome'}` }));
       return { type: 'payments', items, total: items.length, source: 'api' };
     }
     const paymentsFile = path.join(this.dataDir, 'payments.json');
     const data = this.readJson(paymentsFile, []);
-    const items = data.map(p => ({ ...p, display: `ID: ${p.id} | De: ${p.from || p.client || 'N/A'} | Valor: ${p.amount || 0}` }));
+    const items = data.map(p => ({ ...p, display: `ID: ${p.id} | Nome: ${p.description || p.from || 'Sem nome'}` }));
     return { type: 'payments', items, total: items.length, source: 'file' };
   }
 
@@ -2177,12 +2177,12 @@ class ActionExecutor {
   async listExpenses(params) {
     const apiResult = await this.apiGet('/expenses');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(e => ({ ...e, display: `ID: ${e.id} | Para: ${e.to || e.description || 'N/A'} | Valor: ${e.amount || 0}` }));
+      const items = apiResult.map(e => ({ ...e, display: `ID: ${e.id} | Nome: ${e.description || e.to || 'Sem nome'}` }));
       return { type: 'expenses', items, total: items.length, source: 'api' };
     }
     const expensesFile = path.join(this.dataDir, 'expenses.json');
     const data = this.readJson(expensesFile, []);
-    const items = data.map(e => ({ ...e, display: `ID: ${e.id} | Para: ${e.to || e.description || 'N/A'} | Valor: ${e.amount || 0}` }));
+    const items = data.map(e => ({ ...e, display: `ID: ${e.id} | Nome: ${e.description || e.to || 'Sem nome'}` }));
     return { type: 'expenses', items, total: items.length, source: 'file' };
   }
 
@@ -2299,13 +2299,13 @@ class ActionExecutor {
 
     const apiResult = await this.apiGet('/cash-box/history');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(h => ({ ...h, display: `ID: ${h.id} | Descrição: ${h.description || h.type || 'N/A'} | Valor: ${h.amount || h.value || 0}` })).slice(0, limit);
+      const items = apiResult.map(h => ({ ...h, display: `ID: ${h.id} | Nome: ${h.description || 'Sem nome'}` })).slice(0, limit);
       return { type: 'cash_history', items, total: apiResult.length, source: 'api' };
     }
 
     const cashFile = path.join(this.dataDir, 'cash-box.json');
     const cash = this.readJson(cashFile, { balance: { value: 0, currency: 'EUR' }, history: [] });
-    const items = cash.history.map(h => ({ ...h, display: `ID: ${h.id} | Descrição: ${h.description || h.type || 'N/A'} | Valor: ${h.amount || h.value || 0}` })).slice(0, limit);
+    const items = cash.history.map(h => ({ ...h, display: `ID: ${h.id} | Nome: ${h.description || 'Sem nome'}` })).slice(0, limit);
     return { type: 'cash_history', items, total: cash.history.length, source: 'file' };
   }
 
@@ -2398,7 +2398,7 @@ class ActionExecutor {
   async listIdeaTemplates(params) {
     const templatesFile = path.join(this.dataDir, 'idea-templates.json');
     const data = this.readJson(templatesFile, []);
-    const items = data.map(t => ({ ...t, display: `ID: ${t.id} | Título: ${t.title || 'Sem título'}` }));
+    const items = data.map(t => ({ ...t, display: `ID: ${t.id} | Nome: ${t.title || 'Sem nome'}` }));
     return { type: 'idea_templates', items, total: items.length, source: 'file' };
   }
 
@@ -2570,7 +2570,7 @@ class ActionExecutor {
     const apiResult = await this.apiGet('/instagram/messages');
     if (apiResult && !apiResult.error) {
       const raw = apiResult.messages || apiResult;
-      const items = Array.isArray(raw) ? raw.map(m => ({ ...m, display: `ID: ${m.id} | De: ${m.sender || m.from || 'N/A'} | Texto: ${(m.text || m.message || '').slice(0, 40)}` })) : raw;
+      const items = Array.isArray(raw) ? raw.map(m => ({ ...m, display: `ID: ${m.id} | Nome: ${m.sender || m.text || 'Sem nome'}` })) : raw;
       return { type: 'instagram_messages', items, source: 'api' };
     }
     throw new Error('Não foi possível listar mensagens do Instagram');
@@ -2592,12 +2592,12 @@ class ActionExecutor {
   async listLinks(params) {
     const apiResult = await this.apiGet('/links');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(l => ({ ...l, display: `ID: ${l.id} | Título: ${l.title || 'Sem título'} | URL: ${l.url || 'N/A'}` }));
+      const items = apiResult.map(l => ({ ...l, display: `ID: ${l.id} | Nome: ${l.title || l.url || 'Sem nome'}` }));
       return { type: 'links', items, total: items.length, source: 'api' };
     }
     const linksFile = path.join(this.dataDir, 'links.json');
     const data = this.readJson(linksFile, []);
-    const items = data.map(l => ({ ...l, display: `ID: ${l.id} | Título: ${l.title || 'Sem título'} | URL: ${l.url || 'N/A'}` }));
+    const items = data.map(l => ({ ...l, display: `ID: ${l.id} | Nome: ${l.title || l.url || 'Sem nome'}` }));
     return { type: 'links', items, total: items.length, source: 'file' };
   }
 
@@ -2789,12 +2789,12 @@ class ActionExecutor {
   async listNotifications(params) {
     const apiResult = await this.apiGet('/notifications');
     if (apiResult && !apiResult.error && Array.isArray(apiResult)) {
-      const items = apiResult.map(n => ({ ...n, display: `ID: ${n.id} | Título: ${n.title || n.message || 'Sem título'}` }));
+      const items = apiResult.map(n => ({ ...n, display: `ID: ${n.id} | Nome: ${n.title || n.message || 'Sem nome'}` }));
       return { type: 'notifications', items, total: items.length, source: 'api' };
     }
     const notifFile = path.join(this.dataDir, 'notifications.json');
     const data = this.readJson(notifFile, []);
-    const items = data.map(n => ({ ...n, display: `ID: ${n.id} | Título: ${n.title || n.message || 'Sem título'}` }));
+    const items = data.map(n => ({ ...n, display: `ID: ${n.id} | Nome: ${n.title || n.message || 'Sem nome'}` }));
     return { type: 'notifications', items, total: items.length, source: 'file' };
   }
 
@@ -2855,12 +2855,12 @@ class ActionExecutor {
   async listUsers(params) {
     const apiResult = await this.apiGet('/state');
     if (apiResult && !apiResult.error && apiResult.users) {
-      const items = apiResult.users.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || u.email || 'Sem nome'}` }));
+      const items = apiResult.users.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || 'Sem nome'}` }));
       return { type: 'users', items, total: items.length, source: 'api' };
     }
     const usersFile = path.join(this.dataDir, 'users.json');
     const data = this.readJson(usersFile, []);
-    const items = data.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || u.email || 'Sem nome'}` }));
+    const items = data.map(u => ({ ...u, display: `ID: ${u.id} | Nome: ${u.name || u.username || 'Sem nome'}` }));
     return { type: 'users', items, total: items.length, source: 'file' };
   }
 
@@ -2901,7 +2901,7 @@ class ActionExecutor {
     const apiResult = await this.apiGet('/bugdetector/reports');
     if (apiResult && !apiResult.error) {
       const raw = apiResult.reports || apiResult;
-      const items = Array.isArray(raw) ? raw.map(r => ({ ...r, display: `ID: ${r.id || r.filename} | Título: ${r.title || r.message || 'Sem título'}` })) : raw;
+      const items = Array.isArray(raw) ? raw.map(r => ({ ...r, display: `ID: ${r.id} | Nome: ${r.title || 'Sem nome'}` })) : raw;
       return { type: 'bug_reports', items, source: 'api' };
     }
     throw new Error('Não foi possível listar relatórios de bug');

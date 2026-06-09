@@ -98,7 +98,7 @@ export default function CreateRoadmapModal({ templates, onCreate, children }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 pb-8 px-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Target, Search, Filter, ArrowUpDown, Plus } from 'lucide-react'
+import { Target, Search, Filter, ArrowUpDown, Plus, Trash2 } from 'lucide-react'
 
 const STATUS_COLORS = {
   active: 'bg-nexo-info/10 text-nexo-info border-nexo-info/30',
@@ -26,7 +26,7 @@ const TYPE_ICONS = {
   outro: '📦'
 }
 
-export default function RoadmapList({ roadmaps, loading, onSelect, activeId, onCreate }) {
+export default function RoadmapList({ roadmaps, loading, onSelect, activeId, onCreate, onDelete }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [sortBy, setSortBy] = useState('updated_at')
@@ -157,9 +157,20 @@ export default function RoadmapList({ roadmaps, loading, onSelect, activeId, onC
                     ? `€ ${parseFloat(roadmap.total_value).toLocaleString('pt-PT', { minimumFractionDigits: 0 })}`
                     : 'Sem valor'}
                 </span>
-                <span className="text-nexo-muted">
-                  Fase {roadmap.current_phase_index + 1}/{(roadmap.phases || []).length}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-nexo-muted">
+                    Fase {roadmap.current_phase_index + 1}/{(roadmap.phases || []).length}
+                  </span>
+                  {onDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(roadmap.id) }}
+                      className="p-1 text-nexo-muted hover:text-nexo-danger transition-colors shrink-0"
+                      title="Apagar projeto"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             </button>
           )

@@ -22,7 +22,8 @@ export default function RoadmapDetailPanel({
   timelines,
   onJoinTimeline,
   onLeaveTimeline,
-  onCreateVote
+  onCreateVote,
+  onAdvanceStep
 }) {
   const [client, setClient] = useState(null)
   const [lead, setLead] = useState(null)
@@ -182,11 +183,42 @@ export default function RoadmapDetailPanel({
         )}
       </div>
 
+      {/* Timelines / Steps */}
+      <div className="p-4 border-b border-nexo-border">
+        <h3 className="text-[10px] font-semibold text-nexo-muted uppercase tracking-wider mb-2">Timelines</h3>
+        <div className="space-y-2">
+          {timelines.map(t => {
+            const currentStep = t.steps?.[t.current_step_index]
+            const canAdvance = currentStep && t.current_step_index < (t.steps?.length || 0) - 1
+            return (
+              <div key={t.id} className="p-2 rounded-lg bg-nexo-card/60 border border-nexo-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-medium text-nexo-text">{t.title}</span>
+                  <span className="text-[9px] text-nexo-muted">{t.current_step_index + 1}/{t.steps?.length || 0}</span>
+                </div>
+                {currentStep && (
+                  <div className="text-[10px] text-nexo-muted mb-1">{currentStep.title}</div>
+                )}
+                {canAdvance && onAdvanceStep && (
+                  <button
+                    onClick={() => onAdvanceStep(t.id)}
+                    className="w-full text-[9px] px-2 py-1 rounded bg-nexo-info/10 text-nexo-info border border-nexo-info/20 hover:bg-nexo-info/20 transition-colors"
+                  >
+                    Avançar Step
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {timelines.length === 0 && <p className="text-[10px] text-nexo-muted">Sem timelines</p>}
+        </div>
+      </div>
+
       {/* Ações rápidas */}
       <div className="p-4">
         <h3 className="text-[10px] font-semibold text-nexo-muted uppercase tracking-wider mb-2">Ações</h3>
         <div className="space-y-1.5">
-          {currentPhase?.review_required && (
+          {(currentPhase?.review_required || timelines.some(t => t.steps?.[t.current_step_index]?.creates_vote)) && (
             <button
               onClick={() => onCreateVote && onCreateVote(currentPhase)}
               className="w-full text-[10px] px-2 py-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500/20 transition-colors flex items-center justify-center gap-1"

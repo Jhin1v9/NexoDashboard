@@ -10,26 +10,38 @@
  */
 
 require('dotenv').config();
-const TelegramBot = require('node-telegram-bot-api');
+const getTelegramBot = require('./telegram-bot-client.cjs');
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_NOTIFICATION_CHAT_ID;
 
-let bot = null;
-let botInitialized = false;
-
 function getBot() {
-  if (!botInitialized && TOKEN) {
-    try {
-      bot = new TelegramBot(TOKEN, { polling: false });
-      botInitialized = true;
-      console.log('[TelegramNotify] Bot inicializado (polling: false)');
-    } catch (e) {
-      console.error('[TelegramNotify] Falha ao inicializar bot:', e.message);
-      bot = null;
-    }
+  if (!TOKEN) return null;
+  try {
+    return getTelegramBot(TOKEN);
+  } catch (e) {
+    console.error('[TelegramNotify] Falha ao obter bot:', e.message);
+    return null;
   }
-  return bot;
+}
+
+// v10.3: deduplication cache
+const sentNotifications = new Map();
+const NOTIFICATION_TTL_MS = 5 * 60 * 1000;
+
+function dedupedSend(key, sendFn) {
+  const now = Date.now();
+  for (const [k, t] of sentNotifications) {
+    if (now - t > NOTIFICATION_TTL_MS) sentNotifications.delete(k);
+  }
+  if (sentNotifications.has(key)) {
+    console.log('[TelegramNotify] Dedup skipped:', key);
+    return Promise.resolve({ skipped: true });
+  }
+  return sendFn().then((result) => {
+    sentNotifications.set(key, now);
+    return result;
+  });
 }
 
 function escapeMarkdown(text) {
@@ -112,7 +124,8 @@ async function notifyNewLead(lead) {
   }
 
   const text = formatLeadMessage(lead);
-  return await safeSend(CHAT_ID, text, { disable_web_page_preview: true });
+  const key = `notifyNewLead:${lead.id || lead.email || Date.now()}:${CHAT_ID}`;
+  return dedupedSend(key, () => safeSend(CHAT_ID, text, { disable_web_page_preview: true }));
 }
 
 async function sendCustomMessage(text, options = {}) {
@@ -122,8 +135,178 @@ async function sendCustomMessage(text, options = {}) {
   return await safeSend(CHAT_ID, escapeMarkdown(text), options);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD CARD NOTIFICATIONS (v8.5)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const USER_EMOJI = {
+  luna: '🌙 Luna',
+  abner: '👤 Abner',
+  nonoke: '👤 Nonoke',
+  elias: '👤 Elias',
+  sistema: '🤖 Sistema',
+};
+
+function getUserLabel(user) {
+  const key = String(user || '').toLowerCase().trim();
+  return USER_EMOJI[key] || `👤 ${escapeMarkdown(user || 'Sistema')}`;
+}
+
+function formatDashboardCard(type, data, user) {
+  const u = getUserLabel(user);
+  const now = escapeMarkdown(new Date().toLocaleString('pt-BR'));
+
+  switch (type) {
+    case 'lead': {
+      const action = data._action === 'convert' ? 'LEAD CONVERTIDO' : data._action === 'update' ? 'LEAD ATUALIZADO' : 'NOVO LEAD';
+      const lines = [
+        `🎯 *${action}*`,
+        '━━━━━━━━━━━━━━',
+        `👤 ${escapeMarkdown(data.name || data.displayName || '—')}`,
+      ];
+      if (data.email) lines.push(`📧 ${escapeMarkdown(data.email)}`);
+      if (data.phone) lines.push(`📱 ${escapeMarkdown(data.phone)}`);
+      if (data.value) lines.push(`💰 Valor: €${escapeMarkdown(String(data.value))}`);
+      if (data.status) lines.push(`🏷️ Status: *${escapeMarkdown(data.status)}*`);
+      lines.push('');
+      lines.push(`🕐 ${data._action === 'convert' ? 'Convertido' : data._action === 'update' ? 'Atualizado' : 'Criado'} por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'task': {
+      const action = data._action === 'complete' ? 'TAREFA CONCLUÍDA' : data._action === 'update' ? 'TAREFA ATUALIZADA' : 'NOVA TAREFA';
+      const lines = [
+        `📋 *${action}*`,
+        '━━━━━━━━━━━━━━',
+        `✅ ${escapeMarkdown(data.title || '—')}`,
+      ];
+      if (data.description) lines.push(`📝 ${escapeMarkdown(data.description.substring(0, 200))}`);
+      if (data.priority) {
+        const p = data.priority.toLowerCase();
+        const emoji = p === 'alta' || p === 'high' ? '🔴' : p === 'média' || p === 'medium' ? '🟡' : '🟢';
+        lines.push(`${emoji} Prioridade: *${escapeMarkdown(data.priority)}*`);
+      }
+      if (data.status) lines.push(`📊 Status: *${escapeMarkdown(data.status)}*`);
+      if (data.deadline || data.dueDate) lines.push(`📅 Deadline: ${escapeMarkdown(data.deadline || data.dueDate)}`);
+      lines.push('');
+      lines.push(`🕐 ${data._action === 'complete' ? 'Concluída' : data._action === 'update' ? 'Atualizada' : 'Criada'} por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'payment': {
+      const action = data._action === 'update' ? 'PAGAMENTO ATUALIZADO' : 'PAGAMENTO REGISTRADO';
+      const lines = [
+        `💰 *${action}*`,
+        '━━━━━━━━━━━━━━',
+        `💵 €${escapeMarkdown(String(data.amount || 0))}`,
+      ];
+      if (data.description) lines.push(`📝 ${escapeMarkdown(data.description)}`);
+      if (data.clientName || data.client) lines.push(`👤 Cliente: ${escapeMarkdown(data.clientName || data.client)}`);
+      if (data.dueDate) lines.push(`📅 Vencimento: ${escapeMarkdown(data.dueDate)}`);
+      if (data.status) lines.push(`🏷️ Status: *${escapeMarkdown(data.status)}*`);
+      lines.push('');
+      lines.push(`🕐 ${data._action === 'update' ? 'Atualizado' : 'Registrado'} por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'expense': {
+      const action = data._action === 'pay' ? 'DESPESA PAGA' : data._action === 'update' ? 'DESPESA ATUALIZADA' : 'NOVA DESPESA';
+      const lines = [
+        `💸 *${action}*`,
+        '━━━━━━━━━━━━━━',
+        `💵 €${escapeMarkdown(String(data.amount || 0))}`,
+      ];
+      if (data.description) lines.push(`📝 ${escapeMarkdown(data.description)}`);
+      if (data.category) lines.push(`🏷️ Categoria: ${escapeMarkdown(data.category)}`);
+      if (data.dueDate) lines.push(`📅 Vencimento: ${escapeMarkdown(data.dueDate)}`);
+      if (data.status) lines.push(`📊 Status: *${escapeMarkdown(data.status)}*`);
+      lines.push('');
+      lines.push(`🕐 ${data._action === 'pay' ? 'Paga' : data._action === 'update' ? 'Atualizada' : 'Criada'} por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'idea': {
+      const lines = [
+        `💡 *NOVA IDEIA*`,
+        '━━━━━━━━━━━━━━',
+        `📝 ${escapeMarkdown(data.title || '—')}`,
+      ];
+      if (data.description) lines.push(`📄 ${escapeMarkdown(data.description.substring(0, 200))}`);
+      if (data.type) lines.push(`🏷️ Tipo: ${escapeMarkdown(data.type)}`);
+      if (data.priority) lines.push(`🔥 Prioridade: *${escapeMarkdown(data.priority)}*`);
+      lines.push('');
+      lines.push(`🕐 Criada por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'quote': {
+      const lines = [
+        `📄 *ORÇAMENTO CRIADO*`,
+        '━━━━━━━━━━━━━━',
+        `📝 ${escapeMarkdown(data.title || data.clientName || '—')}`,
+      ];
+      if (data.description) lines.push(`📄 ${escapeMarkdown(data.description.substring(0, 200))}`);
+      if (data.estimatedValue || data.value) lines.push(`💰 Valor: €${escapeMarkdown(String(data.estimatedValue || data.value || 0))}`);
+      if (data.status) lines.push(`🏷️ Status: *${escapeMarkdown(data.status)}*`);
+      lines.push('');
+      lines.push(`🕐 Criado por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'link': {
+      const action = data._action === 'delete' ? 'LINK REMOVIDO' : 'LINK ADICIONADO';
+      const lines = [
+        `🔗 *${action}*`,
+        '━━━━━━━━━━━━━━',
+      ];
+      if (data.title) lines.push(`📝 ${escapeMarkdown(data.title)}`);
+      if (data.url) lines.push(`🌐 ${escapeMarkdown(data.url)}`);
+      if (data.description) lines.push(`📄 ${escapeMarkdown(data.description.substring(0, 200))}`);
+      lines.push('');
+      lines.push(`🕐 ${data._action === 'delete' ? 'Removido' : 'Adicionado'} por ${u}`);
+      return lines.join('\n');
+    }
+
+    case 'finance_summary': {
+      const lines = [
+        `📊 *RESUMO FINANCEIRO*`,
+        '━━━━━━━━━━━━━━',
+        `💰 Caixa: €${escapeMarkdown(String(data.cashBox || 0))}`,
+        `📥 Receitas: €${escapeMarkdown(String(data.income || 0))}`,
+        `📤 Despesas: €${escapeMarkdown(String(data.expenses || 0))}`,
+        `📈 Saldo: €${escapeMarkdown(String(data.balance || 0))}`,
+        '',
+        `🕐 Atualizado por ${u}`,
+      ];
+      return lines.join('\n');
+    }
+
+    default: {
+      const lines = [
+        `📢 *${escapeMarkdown(type.toUpperCase())}*`,
+        '━━━━━━━━━━━━━━',
+        escapeMarkdown(JSON.stringify(data, null, 2).substring(0, 400)),
+        '',
+        `🕐 Por ${u}`,
+      ];
+      return lines.join('\n');
+    }
+  }
+}
+
+async function notifyDashboardChange(type, data, user = 'luna') {
+  if (!TOKEN || !CHAT_ID) {
+    return { sent: false, reason: 'not_configured' };
+  }
+  const text = formatDashboardCard(type, data, user);
+  const key = `dashboard:${type}:${data?.id || data?._id || Date.now()}:${CHAT_ID}`;
+  return dedupedSend(key, () => safeSend(CHAT_ID, text, { disable_web_page_preview: true }));
+}
+
 module.exports = {
   notifyNewLead,
   sendCustomMessage,
+  notifyDashboardChange,
+  formatDashboardCard,
   isConfigured: !!TOKEN && !!CHAT_ID,
 };

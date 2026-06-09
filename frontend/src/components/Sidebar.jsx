@@ -42,7 +42,7 @@ const navItems = [
   { path: '/votacao', icon: Vote, label: 'Votacoes', badge: 'CEO' },
   { path: '/changelog', icon: FileText, label: 'Atualizacoes', badge: 'v3.2' },
   { path: '/settings', icon: Settings, label: 'Configuracoes' },
-  { path: '/luna-web', icon: Sparkles, label: 'Luna Web', badge: 'Chat', external: 'http://localhost:3458' },
+  { path: '/luna-web', icon: Sparkles, label: 'Luna Web', badge: 'Chat', external: 'https://luna-app.duckdns.org:5173/' },
 ]
 
 function isSectionActive(children, pathname) {

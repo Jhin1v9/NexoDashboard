@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const TelegramBot = require('node-telegram-bot-api');
+const getTelegramBot = require('./telegram-bot-client.cjs');
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID || process.env.TELEGRAM_NOTIFICATION_CHAT_ID || '';
@@ -21,9 +21,32 @@ if (!GROUP_CHAT_ID) {
 
 let bot = null;
 if (TOKEN) {
-  bot = new TelegramBot(TOKEN, { polling: false });
+  try {
+    bot = getTelegramBot(TOKEN);
+  } catch (e) {
+    console.warn('[TelegramNotifier] Falha ao obter bot:', e.message);
+  }
 } else {
   console.warn('[TelegramNotifier] TELEGRAM_BOT_TOKEN não configurado');
+}
+
+// v10.3: deduplication cache for notifications
+const sentNotifications = new Map();
+const NOTIFICATION_TTL_MS = 5 * 60 * 1000;
+
+function dedupedSend(key, sendFn) {
+  const now = Date.now();
+  for (const [k, t] of sentNotifications) {
+    if (now - t > NOTIFICATION_TTL_MS) sentNotifications.delete(k);
+  }
+  if (sentNotifications.has(key)) {
+    console.log('[TelegramNotifier] Dedup skipped:', key);
+    return Promise.resolve({ skipped: true });
+  }
+  return sendFn().then((result) => {
+    sentNotifications.set(key, now);
+    return result;
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -274,43 +297,26 @@ async function sendVotingNotification({ type, session, voter, voteValue, baseUrl
       return { sent: false, reason: 'unknown_type' };
   }
 
-  const results = [];
+  if (!GROUP_CHAT_ID) {
+    console.warn('[TelegramNotifier] GROUP_CHAT_ID não configurado');
+    return { sent: false, reason: 'group_chat_id_not_set' };
+  }
 
-  // ── ENVIAR PARA O GRUPO ──
-  if (GROUP_CHAT_ID) {
+  const key = `voting:${type}:${session.id}:${GROUP_CHAT_ID}`;
+  return dedupedSend(key, async () => {
     try {
       const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
         parse_mode: 'Markdown',
         reply_markup: inlineKeyboard,
         disable_web_page_preview: true
       });
-      results.push({ chat: 'group', messageId: msg.message_id, sent: true });
       console.log(`[TelegramNotifier] ✅ Notificação ${type} enviada para o grupo`);
+      return { sent: true, messageId: msg.message_id };
     } catch (err) {
       console.error('[TelegramNotifier] Erro ao enviar para grupo:', err.message);
-      results.push({ chat: 'group', sent: false, error: err.message });
+      return { sent: false, error: err.message };
     }
-  }
-
-  // ── ENVIAR DM PARA CEOs ──
-  for (const ceo of ['abner', 'nonoke', 'elias']) {
-    const user = users[ceo];
-    if (user?.telegramId) {
-      try {
-        const msg = await bot.sendMessage(user.telegramId, text, {
-          parse_mode: 'Markdown',
-          reply_markup: inlineKeyboard,
-          disable_web_page_preview: true
-        });
-        results.push({ chat: 'dm', user: ceo, messageId: msg.message_id, sent: true });
-      } catch (err) {
-        console.error(`[TelegramNotifier] Erro ao enviar DM para ${ceo}:`, err.message);
-        results.push({ chat: 'dm', user: ceo, sent: false, error: err.message });
-      }
-    }
-  }
-
-  return { sent: results.some(r => r.sent), results };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -376,7 +382,7 @@ function buildTaskNotification(task) {
     tagsText + '\n\n' +
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
     '📊 *Atividade:* ' + commentsText + '  |  🕐 Criada em ' + formatDate(task.createdAt) + '\n\n' +
-    '🔗 [▸ ABRIR NO DASHBOARD](' + escapeMdV2(baseUrl + '/tarefas') + ')'
+    '🔗 [▸ ABRIR NO DASHBOARD](' + baseUrl + '/tarefas)'
   );
 }
 
@@ -391,30 +397,33 @@ async function sendTaskNotification(task) {
   }
 
   const baseUrl = process.env.DASHBOARD_PUBLIC_URL || 'https://nexodashboard.onrender.com';
-  
-  try {
-    const text = buildTaskNotification(task);
-    const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
-      parse_mode: 'Markdown',
-      disable_web_page_preview: true,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Concluir', callback_data: 'task:' + task.id + ':complete' },
-            { text: '👤 Assumir', callback_data: 'task:' + task.id + ':assign' }
-          ],
-          [
-            { text: '🔗 Abrir Dashboard', url: baseUrl + '/tarefas' }
+  const key = `task:${task.id || JSON.stringify(task)}:${GROUP_CHAT_ID}`;
+
+  return dedupedSend(key, async () => {
+    try {
+      const text = buildTaskNotification(task);
+      const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Concluir', callback_data: 'task:' + task.id + ':complete' },
+              { text: '👤 Assumir', callback_data: 'task:' + task.id + ':assign' }
+            ],
+            [
+              { text: '🔗 Abrir Dashboard', url: baseUrl + '/tarefas' }
+            ]
           ]
-        ]
-      }
-    });
-    console.log('[TelegramNotifier] ✅ Notificação de tarefa enviada: ' + task.id);
-    return { sent: true, messageId: msg.message_id };
-  } catch (err) {
-    console.error('[TelegramNotifier] Erro ao enviar notificação de tarefa:', err.message);
-    return { sent: false, error: err.message };
-  }
+        }
+      });
+      console.log('[TelegramNotifier] ✅ Notificação de tarefa enviada: ' + task.id);
+      return { sent: true, messageId: msg.message_id };
+    } catch (err) {
+      console.error('[TelegramNotifier] Erro ao enviar notificação de tarefa:', err.message);
+      return { sent: false, error: err.message };
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -689,38 +698,20 @@ async function sendRoadmapNotification(roadmap) {
   const creator = users[roadmap.created_by]?.name || roadmap.created_by || 'Sistema';
 
   const { text, inlineKeyboard } = buildRoadmapNotification(roadmap, creator, baseUrl);
+  const key = `roadmap:${roadmap.id}:${GROUP_CHAT_ID}`;
 
-  const results = [];
-
-  // Grupo
-  try {
-    const res = await safeSendHtml(GROUP_CHAT_ID, text, {
-      reply_markup: inlineKeyboard,
-      disable_web_page_preview: true
-    });
-    results.push({ chat: 'group', ...res });
-    if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de projeto enviada para o grupo');
-  } catch (err) {
-    results.push({ chat: 'group', sent: false, error: err.message });
-  }
-
-  // DMs CEOs
-  for (const ceo of ['abner', 'nonoke', 'elias']) {
-    const user = users[ceo];
-    if (user?.telegramId) {
-      try {
-        const res = await safeSendV2(user.telegramId, text, {
-          reply_markup: inlineKeyboard,
-          disable_web_page_preview: true
-        });
-        results.push({ chat: 'dm', user: ceo, ...res });
-      } catch (err) {
-        results.push({ chat: 'dm', user: ceo, sent: false, error: err.message });
-      }
+  return dedupedSend(key, async () => {
+    try {
+      const res = await safeSendHtml(GROUP_CHAT_ID, text, {
+        reply_markup: inlineKeyboard,
+        disable_web_page_preview: true
+      });
+      if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de projeto enviada para o grupo');
+      return res;
+    } catch (err) {
+      return { sent: false, error: err.message };
     }
-  }
-
-  return { sent: results.some(r => r.sent), results };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -743,38 +734,20 @@ async function sendLeadNotification(lead) {
   const creator = users[lead.addedBy]?.name || lead.addedBy || lead.createdBy || 'Sistema';
 
   const { text, inlineKeyboard } = buildLeadNotification(lead, creator, baseUrl);
+  const key = `lead:${lead.id}:${GROUP_CHAT_ID}`;
 
-  const results = [];
-
-  // Grupo
-  try {
-    const res = await safeSendHtml(GROUP_CHAT_ID, text, {
-      reply_markup: inlineKeyboard,
-      disable_web_page_preview: true
-    });
-    results.push({ chat: 'group', ...res });
-    if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de lead enviada para o grupo');
-  } catch (err) {
-    results.push({ chat: 'group', sent: false, error: err.message });
-  }
-
-  // DMs CEOs
-  for (const ceo of ['abner', 'nonoke', 'elias']) {
-    const user = users[ceo];
-    if (user?.telegramId) {
-      try {
-        const res = await safeSendV2(user.telegramId, text, {
-          reply_markup: inlineKeyboard,
-          disable_web_page_preview: true
-        });
-        results.push({ chat: 'dm', user: ceo, ...res });
-      } catch (err) {
-        results.push({ chat: 'dm', user: ceo, sent: false, error: err.message });
-      }
+  return dedupedSend(key, async () => {
+    try {
+      const res = await safeSendHtml(GROUP_CHAT_ID, text, {
+        reply_markup: inlineKeyboard,
+        disable_web_page_preview: true
+      });
+      if (res.sent) console.log('[TelegramNotifier] ✅ Notificação de lead enviada para o grupo');
+      return res;
+    } catch (err) {
+      return { sent: false, error: err.message };
     }
-  }
-
-  return { sent: results.some(r => r.sent), results };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -91,6 +91,18 @@ export function useVoting() {
     setSessions(prev => prev.filter(s => s.id !== sessionId))
   }, [])
 
+  const updateSession = useCallback(async (sessionId, data) => {
+    const res = await fetch(`${API_BASE}/voting/sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const updated = await res.json()
+    setSessions(prev => prev.map(s => s.id === sessionId ? updated : s))
+    return updated
+  }, [])
+
   useEffect(() => {
     fetchSessions()
     fetchStats()
@@ -98,6 +110,6 @@ export function useVoting() {
 
   return {
     sessions, stats, loading, error, pagination, filters,
-    fetchSessions, fetchStats, createSession, vote, deleteSession, setFilters
+    fetchSessions, fetchStats, createSession, vote, deleteSession, updateSession, setFilters
   }
 }

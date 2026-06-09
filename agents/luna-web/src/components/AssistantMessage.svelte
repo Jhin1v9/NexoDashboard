@@ -64,9 +64,38 @@
     }
   };
 
+  /**
+   * v8.6-fix: Strip JSON tool/action blocks from assistant text.
+   * These are rendered as beautiful ToolCards by MessagesList,
+   * so showing them as raw text creates visual pollution.
+   */
+  function stripToolBlocks(text) {
+    if (!text) return text;
+    let cleaned = text;
+
+    // Remove markdown code blocks that contain tool calls (```json ... ```)
+    cleaned = cleaned.replace(/```(?:json)?\s*\n?\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*\n?```/gi, '');
+    cleaned = cleaned.replace(/```(?:json)?\s*\n?\s*(\{[\s\S]*?"action"[\s\S]*?\})\s*\n?```/gi, '');
+
+    // Remove inline JSON tool calls that appear as plain text
+    // Pattern: {"tool":"...","params":{...}} or {"action":"...","params":{...}}
+    cleaned = cleaned.replace(/\{[\s\S]*?"tool"\s*:\s*"[^"]+"[\s\S]*?"params"\s*:\s*\{[\s\S]*?\}\s*\}/gi, '');
+    cleaned = cleaned.replace(/\{[\s\S]*?"action"\s*:\s*"[^"]+"[\s\S]*?"params"\s*:\s*\{[\s\S]*?\}\s*\}/gi, '');
+
+    // Remove lines that are just tool call signatures like "readFile (path)" or "executeShell (command)"
+    cleaned = cleaned.replace(/^[\s]*(?:readFile|writeFile|executeShell|searchWeb|searchFiles|gitStatus|gitDiff|gitLog|gitCommit|replaceInFile)\s*\([^)]+\)[\s]*$/gim, '');
+
+    // Clean up multiple consecutive blank lines left behind
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    cleaned = cleaned.trim();
+
+    return cleaned;
+  }
+
   function renderMarkdown(text) {
     if (!text) return '';
-    let html = text
+    const cleanedText = stripToolBlocks(text);
+    let html = cleanedText
       .replace(/^### (.*$)/gim, '<h3 class="md-h3">$1</h3>')
       .replace(/^## (.*$)/gim, '<h2 class="md-h2">$1</h2>')
       .replace(/^# (.*$)/gim, '<h1 class="md-h1">$1</h1>')

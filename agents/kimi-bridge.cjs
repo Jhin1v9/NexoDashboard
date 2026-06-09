@@ -449,10 +449,22 @@ class KimiBridge {
       page = await this.context.newPage();
 
       // Register crash listener
-      page.on('crash', () => {
-        log.error(`Page crashed for user ${hashUserId(userId)}`);
+      page.on('crash', async () => {
+        log.error(`[CRASH-RECOVERY] Page crashed for user ${hashUserId(userId)}`);
         this.userSessions.delete(userId);
         this.semaphore.release();
+        
+        // 🆕 Auto-recovery — recria sessão automaticamente
+        try {
+          log.info(`[CRASH-RECOVERY] Attempting auto-recovery for user ${hashUserId(userId)}...`);
+          await this.recoverSession(userId);
+          log.info(`[CRASH-RECOVERY] Session recovered successfully for user ${hashUserId(userId)}`);
+        } catch (recoveryError) {
+          log.error(`[CRASH-RECOVERY] Failed to recover session for user ${hashUserId(userId)}: ${recoveryError.message}`);
+          // Fallback: marca usuário para recovery na próxima requisição
+          this._pendingRecoveries = this._pendingRecoveries || new Set();
+          this._pendingRecoveries.add(userId);
+        }
       });
 
       // Inject stream interceptor BEFORE navigation so it captures the chat API calls

@@ -71,6 +71,15 @@ export default function Votacao() {
     }
   }, [])
 
+  const handleUpdate = useCallback(async (sessionId, data) => {
+    try {
+      await voting.updateSession(sessionId, data)
+      voting.fetchStats()
+    } catch (err) {
+      console.error('Update error:', err)
+    }
+  }, [])
+
   const handleCreate = useCallback(async (data) => {
     await voting.createSession(data)
     voting.fetchStats()
@@ -169,6 +178,7 @@ export default function Votacao() {
             loading={voting.loading}
             onVote={handleVote}
             onDelete={handleDelete}
+            onUpdate={handleUpdate}
           />
 
           {voting.pagination.pages > 1 && (

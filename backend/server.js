@@ -86,6 +86,26 @@ const lunaActionExecutor = new ActionExecutor({
   dataDir: DATA_DIR,
   undoService: lunaUndoService
 });
+
+// ── Luna Soul (Kimi Bridge) — lazy singleton para chat inteligente ──
+let lunaSoulInstance = null;
+let lunaSoulReady = false;
+async function getLunaSoul() {
+  if (lunaSoulInstance && lunaSoulReady) return lunaSoulInstance;
+  try {
+    const { LunaSoul } = require('../../.luna-kernel/luna-soul.cjs');
+    lunaSoulInstance = new LunaSoul({});
+    await lunaSoulInstance.init();
+    lunaSoulReady = true;
+    console.log('🧠 Luna Soul (Kimi Bridge) inicializado para dashboard chat');
+    return lunaSoulInstance;
+  } catch (e) {
+    console.error('❌ Erro ao inicializar Luna Soul:', e.message);
+    lunaSoulReady = false;
+    return null;
+  }
+}
+
 // Helper para identificar o CEO logado pelo datastore
 async function resolveDashboardAuthor(reqBodyAuthor) {
   try {
@@ -1359,6 +1379,17 @@ app.put('/api/tasks/:id', async (req, res) => {
   if (updates.status && updates.status !== 'completed') updates.completedAt = null;
   const updated = { ...existing, ...updates };
   await dataStore.saveTask(updated);
+
+  // Notificar Telegram
+  if (taskNotifier?.sendSimpleMessage) {
+    taskNotifier.sendSimpleMessage(
+      `✏️ *Tarefa Editada*\n\n` +
+      `🎯 ${escapeMarkdown(updated.title || existing.title)}\n` +
+      `👤 Por: ${req.body.updatedBy || req.body.addedBy || 'sistema'}\n` +
+      `📝 Status: ${updated.status || existing.status}`
+    ).catch(() => {});
+  }
+
   res.json(updated);
 });
 
@@ -1799,6 +1830,16 @@ app.put('/api/payments/:id', async (req, res) => {
     const updated = { ...existing, ...req.body, updatedAt: nowISO() };
     await dataStore.savePayment(updated);
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE payment
+app.delete('/api/payments/:id', async (req, res) => {
+  try {
+    await dataStore.deletePayment(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2361,6 +2402,11 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return String(text).replace(/([_\*\[\]\(\)~`>#+\-=|{}.!])/g, '\\$1');
+}
+
 // POST /api/cash-box/entries — Criar entrada manual
 app.post('/api/cash-box/entries', async (req, res) => {
   try {
@@ -2406,6 +2452,20 @@ app.post('/api/cash-box/entries', async (req, res) => {
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
     await dataStore.saveCashBox(cashBox);
+
+    // Notificar Telegram
+    if (taskNotifier?.sendSimpleMessage) {
+      const typeLabel = type === 'income' ? 'Receita' : type === 'expense' ? 'Despesa' : type === 'payment_received' ? 'Pagamento' : 'Ajuste';
+      const sign = (type === 'income' || type === 'payment_received') ? '+' : '-';
+      taskNotifier.sendSimpleMessage(
+        `💰 *${typeLabel} no Caixa*\n\n` +
+        `${sign}€ ${amountVal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n` +
+        `📝 ${escapeMarkdown(description || 'Entrada manual')}\n` +
+        `👤 Por: ${recordedBy || 'system'}\n` +
+        `💳 Saldo: € ${newBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+      ).catch(() => {});
+    }
+
     res.json({ success: true, entry, newBalance });
   } catch (err) {
     console.error('[CASH-BOX] Error creating entry:', err.message);
@@ -2652,6 +2712,18 @@ app.post('/api/cash-box/payments', async (req, res) => {
     if (cashBox.auditLog.length > 50) cashBox.auditLog = cashBox.auditLog.slice(-50);
 
     await dataStore.saveCashBox(cashBox);
+
+    // Notificar Telegram
+    if (taskNotifier?.sendSimpleMessage) {
+      taskNotifier.sendSimpleMessage(
+        `💰 *Pagamento Recebido*\n\n` +
+        `+€ ${amountVal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n` +
+        `📝 ${escapeMarkdown(description || 'Pagamento recebido')}\n` +
+        `👤 Fonte: ${source || 'client'}\n` +
+        `💳 Saldo: € ${cashBox.balance.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`
+      ).catch(() => {});
+    }
+
     broadcast({ type: 'cashbox', data: cashBox });
     res.json({ success: true, entry, newBalance: cashBox.balance.value, applied: !!applyImmediately });
   } catch (err) {
@@ -3561,9 +3633,34 @@ app.post('/api/luna/control', (req, res) => {
 // 8. Forçar relatório
 // 9. Checkpoint
 
-// 11. Configurações
+// 11. Configurações de Prompt da Luna
+const LUNA_PROMPT_CONFIG_PATH = path.join(os.homedir(), '.luna-kernel', 'config', 'luna-prompt-config.json');
+
+app.get('/api/luna/config', (req, res) => {
+    try {
+        if (fs.existsSync(LUNA_PROMPT_CONFIG_PATH)) {
+            const raw = fs.readFileSync(LUNA_PROMPT_CONFIG_PATH, 'utf8');
+            const config = JSON.parse(raw);
+            res.json({ success: true, config });
+        } else {
+            res.json({ success: true, config: null, message: 'Config não encontrada' });
+        }
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.post('/api/luna/config', (req, res) => {
-    res.json({ success: true, config: req.body, message: 'Configurações salvas (requer reinício do daemon para aplicar)' });
+    try {
+        const configDir = path.dirname(LUNA_PROMPT_CONFIG_PATH);
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
+        }
+        fs.writeFileSync(LUNA_PROMPT_CONFIG_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+        res.json({ success: true, message: 'Configurações salvas com sucesso' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 // 12. Diagnóstico
@@ -5170,6 +5267,33 @@ async function processLunaChatRequest(body, authHeader = null) {
       parsed = await lunaIntentParser.parse(msg, parseContext);
     }
 
+    // 2C. SE NLU reconheceu mas ação é desconhecida → tenta regex/LLM como fallback
+    if (parsed && parsed.actions.length > 0 && nluUsed) {
+      const filteredNLU = parsed.actions.filter(a => knownActions.includes(a.type));
+      if (filteredNLU.length === 0) {
+        console.log(`[LunaChat] NLU reconheceu intent desconhecido: ${parsed.intent}, tentando regex/LLM fallback...`);
+        const buffer = await readLunaBuffer();
+        const parseContext = {
+          authorName,
+          contextModule,
+          contextId,
+          dashboardContext,
+          bufferSummary: {
+            tasks: (buffer.newTasks || []).length,
+            ideas: (buffer.newIdeas || []).length,
+            links: (buffer.newLinks || []).length,
+            leads: (buffer.newLeads || []).length,
+            finance: (buffer.newFinance || []).length
+          }
+        };
+        const fallbackParsed = await lunaIntentParser.parse(msg, parseContext);
+        if (fallbackParsed && fallbackParsed.actions.some(a => knownActions.includes(a.type))) {
+          parsed = fallbackParsed;
+          nluUsed = false;
+        }
+      }
+    }
+
     // Filtra ações desconhecidas — se sobrar nenhuma, cai no fallback LLM
     const knownActions = [
       // Tarefas
@@ -5202,6 +5326,11 @@ async function processLunaChatRequest(body, authHeader = null) {
       'marcar_email_lido', 'marcar_email_nao_lido', 'favoritar_email', 'arquivar_email',
       'mover_para_lixeira', 'marcar_spam', 'aprovar_rascunho', 'rejeitar_rascunho',
       'sugerir_resposta_email', 'resumir_thread_email', 'analizar_email',
+      // WhatsApp
+      'consultar_whatsapp', 'verificar_mencoes', 'enviar_mensagem_whatsapp',
+      'escanear_whatsapp', 'limpar_buffer_whatsapp', 'ver_historico_whatsapp',
+      // Financeiro geral
+      'consultar_financeiro',
       // Links
       'listar_links', 'adicionar_link', 'excluir_link', 'enriquecer_link', 'sincronizar_links',
       // Operações
@@ -5276,8 +5405,12 @@ async function processLunaChatRequest(body, authHeader = null) {
     }
 
     // ── 4. SAUDAÇÃO SOCIAL → resposta instantânea (sem LLM)
-    const isGreeting = parsed.intent === 'social' ||
-      (parsed.actions.length === 1 && parsed.actions[0].type === 'social');
+    // v8.4: Diferenciar saudação simples de pergunta de conhecimento geral.
+    // Saudações simples → resposta instantânea. Conhecimento geral → Kimi Bridge.
+    const socialType = parsed.actions?.[0]?.params?.tipo;
+    const isGreeting = parsed.intent === 'social' && socialType === 'saudacao';
+    const isKnowledge = parsed.intent === 'social' && socialType === 'conhecimento_geral';
+
     if (isGreeting) {
       const greetings = [
         `Oi, ${authorName.split(' ')[0]}! 👋 Tô por aqui, pronta pra ajudar.`,
@@ -5288,6 +5421,7 @@ async function processLunaChatRequest(body, authHeader = null) {
       const reply = greetings[Math.floor(Math.random() * greetings.length)];
       return { success: true, reply, intent: 'social', timestamp: new Date().toISOString() };
     }
+    // Se for conhecimento geral, não retorna aqui — cai no Kimi Bridge fallback abaixo
 
     // ── 5. CONSULTA DE STATUS → dados reais do sistema ──
     if (parsed.intent === 'consultar_status' || parsed.actions.some(a => a.type === 'consultar_status')) {
@@ -5539,8 +5673,42 @@ ${dataContext}`;
     let usedModel = 'gemini-2.5-flash-lite';
     let isFallback = false;
 
-    // LLM desabilitado (Ollama removido, API será integrada depois)
-    // Usa fallback estático para respostas sociais
+    // v8.4: Tenta Luna Soul (Kimi Bridge) antes do fallback estático
+    let kimiReply = '';
+    let kimiUsed = false;
+    try {
+      const lunaSoul = await getLunaSoul();
+      if (lunaSoul) {
+        const stream = lunaSoul.processMessageStream(msg.trim(), {
+          sessionId: threadId || `dash-${Date.now()}`,
+          mode: 'thinking',
+          userId: authorName,
+        });
+        for await (const ev of stream) {
+          if (ev.type === 'response_delta' && ev.text) {
+            kimiReply += ev.text;
+          }
+          if (ev.type === 'done') {
+            kimiReply = ev.result?.response || ev.response || kimiReply;
+            break;
+          }
+          if (ev.type === 'error') {
+            throw new Error(ev.error || 'Kimi Bridge error');
+          }
+        }
+        if (kimiReply && kimiReply.trim().length > 0) {
+          kimiUsed = true;
+        }
+      }
+    } catch (kimiErr) {
+      console.warn('[CONCIERGE] Kimi Bridge falhou, usando fallback:', kimiErr.message);
+    }
+
+    if (kimiUsed) {
+      return { success: true, reply: kimiReply, model: 'kimi-bridge', intent: parsed?.intent || 'chat', fallback: false, timestamp: new Date().toISOString() };
+    }
+
+    // Fallback estático se Kimi Bridge não disponível ou falhou
     usedModel = 'fallback';
     isFallback = true;
     reply = await buildChatFallbackReply(msg.trim());

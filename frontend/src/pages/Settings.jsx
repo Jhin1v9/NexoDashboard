@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import axios from 'axios'
 import {
   Settings as SettingsIcon, User, Shield, Bell, Lock,
-  Save, AlertTriangle, CheckCircle, Users
+  Save, AlertTriangle, CheckCircle, Users, Brain
 } from 'lucide-react'
 
 export default function Settings() {
@@ -14,12 +14,21 @@ export default function Settings() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
 
+  // Luna prompt config states
+  const [lunaConfig, setLunaConfig] = useState({
+    systemPrompt: '',
+    miniReminder: '',
+    toolResultPrompt: '',
+  })
+  const [lunaConfigLoading, setLunaConfigLoading] = useState(false)
+
   // Form states
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
 
   useEffect(() => {
     fetchUsers()
     fetchSecuritySettings()
+    fetchLunaConfig()
   }, [])
 
   const fetchUsers = async () => {
@@ -34,6 +43,22 @@ export default function Settings() {
       const res = await axios.get('/api/security/settings')
       setSecuritySettings(res.data.settings || {})
     } catch (e) {}
+  }
+
+  const fetchLunaConfig = async () => {
+    try {
+      const res = await axios.get('/api/luna/config')
+      if (res.data.success && res.data.config) {
+        const c = res.data.config
+        setLunaConfig({
+          systemPrompt: c.systemPrompt || '',
+          miniReminder: c.miniReminder || '',
+          toolResultPrompt: c.toolResultPrompt || '',
+        })
+      }
+    } catch (e) {
+      console.error('Erro ao carregar config Luna:', e)
+    }
   }
 
   const showMessage = (text, type = 'success') => {
@@ -77,16 +102,41 @@ export default function Settings() {
     }
   }
 
+  const handleSaveLunaConfig = async () => {
+    setLunaConfigLoading(true)
+    try {
+      const res = await axios.post('/api/luna/config', {
+        ...lunaConfig,
+        version: '1.0.0',
+        loopRules: {
+          chatModeNeverLoops: true,
+          actionModeAlwaysLoops: true,
+          planModeAlwaysLoops: true,
+          maxAutoContinues: 9007199254740991,
+          maxLoops: 9007199254740991,
+        }
+      })
+      if (res.data.success) {
+        showMessage('Prompts da Luna salvos! Reinicie o luna-server para aplicar.')
+      }
+    } catch (e) {
+      showMessage(e.response?.data?.error || 'Erro ao salvar prompts', 'error')
+    } finally {
+      setLunaConfigLoading(false)
+    }
+  }
+
   const tabs = [
     { id: 'perfil', label: 'Perfil', icon: User },
     { id: 'seguranca', label: 'Segurança', icon: Shield },
     { id: 'usuarios', label: 'Usuários', icon: Users },
+    { id: 'prompts', label: 'Prompts Luna', icon: Brain },
   ]
 
   const currentUser = users[user?.id] || {}
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <SettingsIcon className="w-6 h-6 text-nexo-primary" />
         <h1 className="text-2xl font-bold">Configurações</h1>
@@ -103,7 +153,7 @@ export default function Settings() {
 
       <div className="flex gap-6">
         {/* Sidebar tabs */}
-        <div className="w-48 space-y-1">
+        <div className="w-48 space-y-1 shrink-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -119,7 +169,7 @@ export default function Settings() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-6 min-w-0">
           {/* TAB: PERFIL */}
           {activeTab === 'perfil' && (
             <>
@@ -267,6 +317,78 @@ export default function Settings() {
               <p className="text-xs text-nexo-muted mt-4">
                 Todos os usuários são Admin e podem se modificar livremente.
               </p>
+            </div>
+          )}
+
+          {/* TAB: PROMPTS LUNA */}
+          {activeTab === 'prompts' && (
+            <div className="space-y-6">
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-nexo-primary" />
+                    Prompts da Luna
+                  </h2>
+                  <button
+                    onClick={handleSaveLunaConfig}
+                    disabled={lunaConfigLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-nexo-primary rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    {lunaConfigLoading ? 'Salvando...' : 'Salvar Prompts'}
+                  </button>
+                </div>
+                <p className="text-xs text-nexo-muted mb-4">
+                  Edite os prompts que a Luna envia para a Kimi. As alterações são salvas em <code className="bg-nexo-bg px-1 rounded">~/.luna-kernel/config/luna-prompt-config.json</code>. Reinicie o luna-server para aplicar.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-nexo-muted uppercase mb-1 block font-medium">
+                      System Prompt (mensagem inicial)
+                    </label>
+                    <textarea
+                      value={lunaConfig.systemPrompt}
+                      onChange={e => setLunaConfig(c => ({ ...c, systemPrompt: e.target.value }))}
+                      className="w-full px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-primary text-sm font-mono leading-relaxed"
+                      rows={10}
+                      placeholder="Prompt de sistema que define a personalidade e regras da Luna..."
+                    />
+                    <p className="text-[10px] text-nexo-muted mt-1">
+                      Variáveis disponíveis: {'{{skillCount}}'} {'{{personaCount}}'} {'{{agentsMd}}'} {'{{memoryContext}}'} {'{{personaContent}}'} {'{{masterPrompt}}'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-nexo-muted uppercase mb-1 block font-medium">
+                      Mini Reminder (mensagens de continuação)
+                    </label>
+                    <textarea
+                      value={lunaConfig.miniReminder}
+                      onChange={e => setLunaConfig(c => ({ ...c, miniReminder: e.target.value }))}
+                      className="w-full px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-primary text-sm font-mono leading-relaxed"
+                      rows={10}
+                      placeholder="Lembrete enxuto enviado nas mensagens seguintes..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-nexo-muted uppercase mb-1 block font-medium">
+                      Tool Result Prompt (resultado de ferramentas)
+                    </label>
+                    <textarea
+                      value={lunaConfig.toolResultPrompt}
+                      onChange={e => setLunaConfig(c => ({ ...c, toolResultPrompt: e.target.value }))}
+                      className="w-full px-3 py-2 bg-nexo-bg rounded-lg border border-nexo-border outline-none focus:border-nexo-primary text-sm font-mono leading-relaxed"
+                      rows={10}
+                      placeholder="Template do prompt enviado após executar uma ferramenta..."
+                    />
+                    <p className="text-[10px] text-nexo-muted mt-1">
+                      Variáveis disponíveis: {'{{toolsUsed}}'} {'{{successCount}}'} {'{{totalCount}}'} {'{{outputText}}'} {'{{statusEmoji}}'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
