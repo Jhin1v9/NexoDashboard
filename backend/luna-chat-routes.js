@@ -743,11 +743,27 @@ router.get('/api/chat/session/:id/messages', requireAuthProxy, async (req, res) 
 
   const total = session.messages.length;
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-  const before = parseInt(req.query.before, 10) || total;
-  const start = Math.max(0, before - limit);
-  const paginated = session.messages.slice(start, before);
+  const beforeTimestamp = req.query.before; // ISO timestamp cursor (optional)
 
-  res.json({ ok: true, messages: paginated, total, hasMore: start > 0 });
+  let paginated;
+  let hasMore;
+
+  if (beforeTimestamp && beforeTimestamp !== 'null' && beforeTimestamp !== 'undefined') {
+    // v10.3-fix: Timestamp-based pagination — find messages BEFORE the given timestamp
+    const beforeDate = new Date(beforeTimestamp);
+    const beforeIdx = session.messages.findIndex(m => m.timestamp && new Date(m.timestamp).getTime() >= beforeDate.getTime());
+    const endIdx = beforeIdx >= 0 ? beforeIdx : total;
+    const startIdx = Math.max(0, endIdx - limit);
+    paginated = session.messages.slice(startIdx, endIdx);
+    hasMore = startIdx > 0;
+  } else {
+    // No cursor — return the last `limit` messages (most recent)
+    const startIdx = Math.max(0, total - limit);
+    paginated = session.messages.slice(startIdx, total);
+    hasMore = startIdx > 0;
+  }
+
+  res.json({ ok: true, messages: paginated, total, hasMore });
 });
 
 // POST /api/chat/session — create/rename/delete
