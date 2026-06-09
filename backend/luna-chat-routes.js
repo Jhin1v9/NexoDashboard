@@ -1892,4 +1892,87 @@ router.post('/api/system/turnoff', async (req, res) => {
   }
 });
 
+// ============================================================
+// Skills API
+// ============================================================
+
+// GET /api/skills — list available skills
+router.get('/api/skills', requireAuthProxy, async (req, res) => {
+  try {
+    const skillsDir = path.join(config.LUNA_KERNEL_DIR, 'skills');
+    const skills = [];
+    if (fs.existsSync(skillsDir)) {
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const skillPath = path.join(skillsDir, entry.name);
+          const skillMd = path.join(skillPath, 'SKILL.md');
+          let name = entry.name;
+          let description = '';
+          if (fs.existsSync(skillMd)) {
+            const content = fs.readFileSync(skillMd, 'utf8');
+            const titleMatch = content.match(/^#\s+(.+)/m);
+            if (titleMatch) name = titleMatch[1].trim();
+            const descMatch = content.match(/\n\n([^\n#].{0,200})/);
+            if (descMatch) description = descMatch[1].trim();
+          }
+          skills.push({ id: entry.name, name, description, path: skillPath });
+        }
+      }
+    }
+    res.json({ ok: true, skills });
+  } catch (e) {
+    console.error('[Skills] Error listing skills:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /api/skills/validate — validate a skill path
+router.post('/api/skills/validate', requireAuthProxy, async (req, res) => {
+  try {
+    const { path: skillPath } = req.body;
+    if (!skillPath) return res.status(400).json({ ok: false, error: 'path obrigatório' });
+    const exists = fs.existsSync(skillPath) && fs.existsSync(path.join(skillPath, 'SKILL.md'));
+    res.json({ ok: true, valid: exists });
+  } catch (e) {
+    console.error('[Skills] Error validating skill:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /api/chat/session/:id/skills — get active skills for session
+router.get('/api/chat/session/:id/skills', requireAuthProxy, async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    let session = getWebSession(sessionId);
+    if (!session) session = await loadSessionFromDB(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
+    res.json({ ok: true, activeSkills: session.activeSkills || [] });
+  } catch (e) {
+    console.error('[Skills] Error getting session skills:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /api/chat/session/:id/skills — set active skills for session
+router.post('/api/chat/session/:id/skills', requireAuthProxy, async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const { activeSkills } = req.body;
+    let session = getWebSession(sessionId);
+    if (!session) session = await loadSessionFromDB(sessionId);
+    if (!session) return res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
+    session.activeSkills = activeSkills || [];
+    session.updatedAt = new Date().toISOString();
+    dbRunWithRetry(
+      `UPDATE luna_chat_sessions SET active_skills = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(session.activeSkills), sessionId]
+    ).catch(e => console.error('[DB] Erro ao salvar activeSkills:', e.message));
+    res.json({ ok: true, activeSkills: session.activeSkills });
+  } catch (e) {
+    console.error('[Skills] Error setting session skills:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 module.exports = { router, setupAuth, getLunaSoul };
