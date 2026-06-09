@@ -11,9 +11,10 @@ module.exports = function getTelegramBot(token) {
   botInstance.on('polling_error', (err) => {
     console.error('[TG] Polling error:', err.message);
     if (err.message?.includes('409 Conflict')) {
-      console.error('[TG] 409 Conflict detectado. Outra instância está rodando. Encerrando para evitar loop.');
+      console.error('[TG] 409 Conflict detectado. Outra instância está rodando. Parando polling local (servidor continua rodando).');
       try { botInstance.stopPolling(); } catch (_) {}
-      process.exit(1);
+      // v10.3-fix: NUNCA chamar process.exit(1) aqui — isso mata o luna-server inteiro
+      // e causa loop infinito de reinicialização pelo PM2. O chat da Luna não depende do Telegram.
     }
   });
 
