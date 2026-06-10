@@ -109,10 +109,12 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
     updatedAt: new Date().toISOString(),
   };
   webSessions.set(sessionId, session);
-  // Persistir no PostgreSQL (fire-and-forget with retry)
+  // Persistir no PostgreSQL (fire-and-forget with retry). Usa ON CONFLICT
+  // para não falhar quando o client fornece um sessionId que já existe.
   dbRunWithRetry(
     `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())`,
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())
+     ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
     [sessionId, 'anonymous', title, mode, persona, JSON.stringify([])]
   ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
   return session;
