@@ -25,7 +25,7 @@ const SESSION_DIR = path.join(__dirname, '..', 'data', 'telegram-sessions');
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 
 const LUNA_API_URL = process.env.LUNA_API_URL || 'http://localhost:3458';
-const STREAM_TIMEOUT_MS = 5 * 60 * 1000;
+const STREAM_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — algumas respostas do Kimi demoram
 
 function sanitizeChatId(chatId) {
   return String(chatId).replace(/[^a-zA-Z0-9_-]/g, '');
@@ -255,7 +255,14 @@ class TelegramLunaAdapter {
 
     sse.onmessage = (msg) => {
       try {
-        events.push(JSON.parse(msg.data));
+        const ev = JSON.parse(msg.data);
+        events.push(ev);
+        if (ev.type === 'response_delta' || ev.type === 'thinking_delta') {
+          // log a cada ~20 eventos para não poluir
+          if (events.length % 20 === 0) {
+            console.log(`[TG] SSE progress: ${ev.type} (events=${events.length})`);
+          }
+        }
       } catch (e) {
         console.warn('[TG] SSE parse error:', e.message);
       }
@@ -524,11 +531,14 @@ class TelegramLunaAdapter {
     if (now - meta.lastEdit < 2000) return;
 
     try {
-      await this.bot.editMessageText(safe, {
-        chat_id: chatId,
-        message_id: meta.messageId,
-        parse_mode: 'Markdown',
-      });
+      await Promise.race([
+        this.bot.editMessageText(safe, {
+          chat_id: chatId,
+          message_id: meta.messageId,
+          parse_mode: 'Markdown',
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('editMessageText timeout')), 8000)),
+      ]);
       meta.lastText = safe;
       meta.lastEdit = now;
       meta.editCount++;
