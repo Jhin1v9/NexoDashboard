@@ -66,7 +66,9 @@ module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 
 const { IntentParser } = require('../agents/core/IntentParser.js');
 const { ActionExecutor } = require('../agents/core/ActionExecutor.js');
-const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
+// v10.11-fix: Agente legado desativado. O bot Telegram roda via PM2 'telegram-bot'
+// e consome a API do luna-server. Não iniciar agente legado evita 409 Conflict.
+// const { startAgent: startTelegramAgent, stopAgent: stopTelegramAgent, getAgentStatus: getTelegramStatus } = require('../agents/telegram-luna-agent.cjs');
 // Ollama REMOVIDO — será substituído por API externa
 // const { OllamaClient } = require('./services/ollama-client.js');
 
@@ -3749,34 +3751,35 @@ app.post('/api/luna/stop', (req, res) => {
 });
 
 // ============================================================================
-// === TELEGRAM BOT CONTROL ==================================================
+// === TELEGRAM BOT CONTROL (LEGADO — DESATIVADO v10.11) =====================
 // ============================================================================
+// O bot do Telegram agora roda como processo separado via PM2 'telegram-bot'
+// e consome a API do luna-server (porta 3458). Esses endpoints permanecem
+// como compatibilidade, retornando informação útil.
 
 app.get('/api/telegram/status', (req, res) => {
-  const status = getTelegramStatus();
-  res.json({ success: true, ...status });
+  res.json({
+    success: true,
+    mode: 'pm2-telegram-bot',
+    message: 'Bot do Telegram roda via PM2. Use "pm2 logs telegram-bot" para acompanhar.',
+    legacyAgent: false,
+  });
 });
 
 app.post('/api/telegram/start', async (req, res) => {
-  try {
-    const started = await startTelegramAgent();
-    if (started) {
-      res.json({ success: true, message: 'Bot do Telegram iniciado', status: getTelegramStatus() });
-    } else {
-      res.status(500).json({ success: false, error: 'Falha ao iniciar bot (verifique TELEGRAM_BOT_TOKEN no .env)' });
-    }
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
+  res.status(410).json({
+    success: false,
+    error: 'Agente legado desativado. Inicie o bot via PM2: pm2 start telegram-bot',
+    mode: 'pm2-telegram-bot',
+  });
 });
 
 app.post('/api/telegram/stop', (req, res) => {
-  try {
-    stopTelegramAgent();
-    res.json({ success: true, message: 'Bot do Telegram parado' });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
+  res.status(410).json({
+    success: false,
+    error: 'Agente legado desativado. Pare o bot via PM2: pm2 stop telegram-bot',
+    mode: 'pm2-telegram-bot',
+  });
 });
 
 app.post('/api/luna/scan', (req, res) => {
@@ -8890,8 +8893,9 @@ startServer();
 async function gracefulShutdown(signal) {
   console.log(`\n[Shutdown] Recebido ${signal}. Encerrando serviços...`);
   try {
-    stopTelegramAgent();
-    console.log('[Shutdown] Bot do Telegram parado.');
+    // v10.11-fix: Agente legado desativado. O PM2 'telegram-bot' gerencia seu próprio ciclo de vida.
+    // stopTelegramAgent();
+    console.log('[Shutdown] Bot do Telegram gerenciado pelo PM2 — não requer shutdown aqui.');
   } catch (e) {
     console.error('[Shutdown] Erro ao parar Telegram:', e.message);
   }

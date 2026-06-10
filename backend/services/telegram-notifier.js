@@ -20,14 +20,21 @@ if (!GROUP_CHAT_ID) {
 }
 
 let bot = null;
-if (TOKEN) {
+function getBot() {
+  if (bot) return bot;
+  if (!TOKEN) {
+    console.warn('[TelegramNotifier] TELEGRAM_BOT_TOKEN não configurado');
+    return null;
+  }
   try {
-    bot = getTelegramBot(TOKEN);
+    // v10.11-fix: Notificações outbound NUNCA devem fazer polling.
+    // Apenas o PM2 telegram-bot faz polling. Isso evita 409 Conflict.
+    bot = getTelegramBot(TOKEN, { polling: false });
+    return bot;
   } catch (e) {
     console.warn('[TelegramNotifier] Falha ao obter bot:', e.message);
+    return null;
   }
-} else {
-  console.warn('[TelegramNotifier] TELEGRAM_BOT_TOKEN não configurado');
 }
 
 // v10.3: deduplication cache for notifications
@@ -253,7 +260,7 @@ function resultButtons(sessionId, url) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function sendVotingNotification({ type, session, voter, voteValue, baseUrl }) {
-  if (!bot) {
+  if (!getBot()) {
     console.warn('[TelegramNotifier] Bot não inicializado');
     return { sent: false, reason: 'bot_not_initialized' };
   }
@@ -305,7 +312,7 @@ async function sendVotingNotification({ type, session, voter, voteValue, baseUrl
   const key = `voting:${type}:${session.id}:${GROUP_CHAT_ID}`;
   return dedupedSend(key, async () => {
     try {
-      const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
+      const msg = await getBot()?.sendMessage(GROUP_CHAT_ID, text, {
         parse_mode: 'Markdown',
         reply_markup: inlineKeyboard,
         disable_web_page_preview: true
@@ -387,7 +394,7 @@ function buildTaskNotification(task) {
 }
 
 async function sendTaskNotification(task) {
-  if (!bot) {
+  if (!getBot()) {
     console.warn('[TelegramNotifier] Bot não inicializado');
     return { sent: false, reason: 'bot_not_initialized' };
   }
@@ -402,7 +409,7 @@ async function sendTaskNotification(task) {
   return dedupedSend(key, async () => {
     try {
       const text = buildTaskNotification(task);
-      const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
+      const msg = await getBot()?.sendMessage(GROUP_CHAT_ID, text, {
         parse_mode: 'Markdown',
         disable_web_page_preview: true,
         reply_markup: {
@@ -431,14 +438,14 @@ async function sendTaskNotification(task) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function sendSimpleMessage(text, options = {}) {
-  if (!bot) {
+  if (!getBot()) {
     return { sent: false, reason: 'bot_not_initialized' };
   }
   if (!GROUP_CHAT_ID) {
     return { sent: false, reason: 'group_chat_id_not_set' };
   }
   try {
-    const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
+    const msg = await getBot()?.sendMessage(GROUP_CHAT_ID, text, {
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       ...options
@@ -527,9 +534,9 @@ function escapeHtml(text) {
 
 /** Envia com HTML, fallback para texto plano */
 async function safeSendHtml(chatId, text, extra = {}) {
-  if (!bot) return { sent: false, reason: 'bot_not_initialized' };
+  if (!getBot()) return { sent: false, reason: 'bot_not_initialized' };
   try {
-    const msg = await bot.sendMessage(chatId, text, { ...extra, parse_mode: 'HTML' });
+    const msg = await getBot()?.sendMessage(chatId, text, { ...extra, parse_mode: 'HTML' });
     return { sent: true, messageId: msg.message_id };
   } catch (e) {
     console.warn('[TelegramNotifier] HTML falhou, enviando sem formatação:', e.message);
@@ -537,7 +544,7 @@ async function safeSendHtml(chatId, text, extra = {}) {
       const safeExtra = { ...extra };
       delete safeExtra.parse_mode;
       const plain = text.replace(/<[^>]+>/g, '');
-      const msg = await bot.sendMessage(chatId, plain, safeExtra);
+      const msg = await getBot()?.sendMessage(chatId, plain, safeExtra);
       return { sent: true, messageId: msg.message_id, fallback: true };
     } catch (e2) {
       return { sent: false, error: e2.message };
@@ -683,7 +690,7 @@ function buildLeadNotification(lead, creatorName, baseUrl) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function sendRoadmapNotification(roadmap) {
-  if (!bot) {
+  if (!getBot()) {
     console.warn('[TelegramNotifier] Bot não inicializado');
     return { sent: false, reason: 'bot_not_initialized' };
   }
@@ -719,7 +726,7 @@ async function sendRoadmapNotification(roadmap) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function sendLeadNotification(lead) {
-  if (!bot) {
+  if (!getBot()) {
     console.warn('[TelegramNotifier] Bot não inicializado');
     return { sent: false, reason: 'bot_not_initialized' };
   }
@@ -765,5 +772,5 @@ module.exports = {
   sendSimpleMessage,
   resolveMentions,
   escapeMarkdown,
-  bot
+  getBot,
 };

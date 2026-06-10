@@ -97,10 +97,10 @@ function generateWebSessionId() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default') {
-  const id = generateWebSessionId();
+function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default', id = null) {
+  const sessionId = id || generateWebSessionId();
   const session = {
-    id,
+    id: sessionId,
     title,
     mode,
     persona,
@@ -108,12 +108,12 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  webSessions.set(id, session);
+  webSessions.set(sessionId, session);
   // Persistir no PostgreSQL (fire-and-forget with retry)
   dbRunWithRetry(
     `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())`,
-    [id, 'anonymous', title, mode, persona, JSON.stringify([])]
+    [sessionId, 'anonymous', title, mode, persona, JSON.stringify([])]
   ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
   return session;
 }
@@ -297,8 +297,11 @@ router.post('/api/chat', async (req, res) => {
   if (!message) return res.status(400).json({ ok: false, error: 'message obrigatório' });
 
   let session = sessionId ? getWebSession(sessionId) : null;
+  if (!session && sessionId) {
+    session = await loadSessionFromDB(sessionId);
+  }
   if (!session) {
-    session = createWebSession(message.slice(0, 40), mode);
+    session = createWebSession(message.slice(0, 40), mode, 'default', sessionId || undefined);
   }
   session.mode = mode;
 
@@ -601,7 +604,7 @@ router.post('/api/chat/session', async (req, res) => {
 
   switch (action) {
     case 'create': {
-      const session = createWebSession(title || 'Nova conversa');
+      const session = createWebSession(title || 'Nova conversa', 'instant', persona || 'default', sessionId || undefined);
       res.json({ ok: true, session: { id: session.id, title: session.title } });
       break;
     }

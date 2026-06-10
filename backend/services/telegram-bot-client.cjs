@@ -2,26 +2,33 @@ const TelegramBot = require('node-telegram-bot-api');
 
 let botInstance = null;
 
-module.exports = function getTelegramBot(token) {
+module.exports = function getTelegramBot(token, options = {}) {
   if (botInstance) return botInstance;
   if (!token) throw new Error('[TelegramBotClient] token is required');
 
-  botInstance = new TelegramBot(token, { polling: true });
+  // v10.11-fix: polling é opt-in. Apenas o PM2 telegram-bot deve fazer polling.
+  // O dashboard usa este cliente somente para envio de notificações (polling: false).
+  const polling = options.polling === true;
 
-  botInstance.on('polling_error', (err) => {
-    console.error('[TG] Polling error:', err.message);
-    if (err.message?.includes('409 Conflict')) {
-      console.error('[TG] 409 Conflict detectado. Outra instância está rodando. Parando polling local (servidor continua rodando).');
-      try { botInstance.stopPolling(); } catch (_) {}
-      // v10.3-fix: NUNCA chamar process.exit(1) aqui — isso mata o luna-server inteiro
-      // e causa loop infinito de reinicialização pelo PM2. O chat da Luna não depende do Telegram.
-    }
-  });
+  botInstance = new TelegramBot(token, { polling });
+
+  if (polling) {
+    botInstance.on('polling_error', (err) => {
+      // 409 Conflict pode ocorrer transientemente após restart (Telegram ainda
+      // vê a conexão anterior). Não paramos o polling; deixamos o cliente
+      // reconectar automaticamente.
+      if (err.message?.includes('409 Conflict')) {
+        console.warn('[TG] Polling 409 (transitório):', err.message);
+        return;
+      }
+      console.error('[TG] Polling error:', err.message);
+    });
+  }
 
   botInstance.on('error', (err) => {
     console.error('[TG] Bot error:', err.message);
   });
 
-  console.log('[TelegramBotClient] Singleton inicializado com polling');
+  console.log(`[TelegramBotClient] Singleton inicializado (polling=${polling})`);
   return botInstance;
 };

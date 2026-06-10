@@ -18,7 +18,7 @@ const CHAT_ID = process.env.TELEGRAM_NOTIFICATION_CHAT_ID;
 function getBot() {
   if (!TOKEN) return null;
   try {
-    return getTelegramBot(TOKEN);
+    return getTelegramBot(TOKEN, { polling: false });
   } catch (e) {
     console.error('[TelegramNotify] Falha ao obter bot:', e.message);
     return null;

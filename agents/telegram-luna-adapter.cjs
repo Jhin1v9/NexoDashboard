@@ -1,31 +1,31 @@
 // ============================================================
-// LUNA TELEGRAM ADAPTER v4.0 — Kernel Unificado
-// Adapter fino: apenas transport layer. Toda inteligência vive no Luna Soul.
+// LUNA TELEGRAM ADAPTER v4.1 — Cliente do Luna Web
+// Adapter fino: não roda Luna Soul local. Consome a API do luna-server:3458.
 // ============================================================
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const http = require('http');
 
-// Load .env manually before any module that needs env vars
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envPath)) {
-  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
-    const eq = line.indexOf('=');
-    if (eq > 0 && !line.startsWith('#')) {
-      const key = line.slice(0, eq).trim();
-      const val = line.slice(eq + 1).trim();
-      if (key && process.env[key] === undefined) process.env[key] = val;
-    }
-  });
-}
+// v10.11-fix: Garantir que node_modules do projeto principal seja encontrado
+// quando o PM2 roda com cwd=.../agents/
+module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 
-const TelegramBot = require('node-telegram-bot-api');
-const { LunaSoul } = require(path.join(os.homedir(), '.luna-kernel', 'luna-soul.cjs'));
+const { EventSource } = require('eventsource');
+
+// v10.11-fix: Carrega .env do diretório correto.
+// O .env real fica em ~/.luna-kernel/.env (compartilhado entre kernel e dashboard).
+require('dotenv').config({ path: path.join(os.homedir(), '.luna-kernel', '.env') });
+
+const getTelegramBot = require('../backend/services/telegram-bot-client.cjs');
 const { SessionManager } = require('./session-manager.cjs');
 
 const SESSION_DIR = path.join(__dirname, '..', 'data', 'telegram-sessions');
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
+
+const LUNA_API_URL = process.env.LUNA_API_URL || 'http://localhost:3458';
+const STREAM_TIMEOUT_MS = 5 * 60 * 1000;
 
 function sanitizeChatId(chatId) {
   return String(chatId).replace(/[^a-zA-Z0-9_-]/g, '');
@@ -41,8 +41,9 @@ if (!TOKEN) {
 // ── ADAPTER ──
 class TelegramLunaAdapter {
   constructor() {
-    this.bot = new TelegramBot(TOKEN, { polling: true });
-    this.luna = null;
+    // v10.11-fix: Usa singleton do telegram-bot-client com polling=true.
+    // Isso evita 409 Conflict com o dashboard (que usa polling=false).
+    this.bot = getTelegramBot(TOKEN, { polling: true });
     this.activeStreams = new Map(); // chatId → { messageId, lastEdit }
     this.activeUsers = new Set();   // evita overlapping requests
     this.awakeChats = new Set();    // chats em modo persistente (wake)
@@ -50,12 +51,17 @@ class TelegramLunaAdapter {
   }
 
   async start() {
-    console.log('🚀 Iniciando Luna Telegram Adapter v4.0...');
+    console.log('🚀 Iniciando Luna Telegram Adapter v4.1...');
 
     this.sessionManager = new SessionManager();
-    this.luna = new LunaSoul({});
-    await this.luna.init();
-    console.log('✅ Luna Soul inicializado');
+
+    // v10.11-fix: Health-check no luna-server antes de aceitar mensagens
+    const healthy = await this._healthCheck();
+    if (!healthy) {
+      console.warn('⚠️  luna-server não respondeu no health-check. O bot subiu, mas mensagens podem falhar até o server voltar.');
+    } else {
+      console.log('✅ luna-server respondendo em', LUNA_API_URL);
+    }
 
     this._setupHandlers();
     console.log('✅ Telegram polling ativo');
@@ -67,6 +73,14 @@ class TelegramLunaAdapter {
   stop() {
     if (this.bot) this.bot.stopPolling();
     console.log('🛑 Telegram Adapter parado');
+  }
+
+  async _healthCheck() {
+    return new Promise((resolve) => {
+      http.get(`${LUNA_API_URL}/health`, { timeout: 5000 }, (res) => {
+        resolve(res.statusCode === 200);
+      }).on('error', () => resolve(false));
+    });
   }
 
   _setupHandlers() {
@@ -98,280 +112,69 @@ class TelegramLunaAdapter {
   async _handleCallbackQuery(query) {
     const data = query.data || '';
     const chatId = query.message?.chat?.id;
-    const messageId = query.message?.message_id;
-    const voter = query.from?.username?.toLowerCase() || query.from?.first_name?.toLowerCase();
+    if (!chatId) return;
 
-    // Votação: vote:<sessionId>:<yes|no>
-    if (data.startsWith('vote:')) {
-      const parts = data.split(':');
-      if (parts.length === 3) {
-        const sessionId = parts[1];
-        const vote = parts[2]; // 'yes' or 'no'
-        await this._handleVoteCallback(chatId, messageId, query.id, sessionId, vote, voter);
-        return;
-      }
-    }
-
-    // Tarefa: task:<taskId>:complete | task:<taskId>:assign
-    if (data.startsWith('task:')) {
-      const parts = data.split(':');
-      if (parts.length === 3) {
-        const taskId = parts[1];
-        const action = parts[2]; // 'complete' or 'assign'
-        await this._handleTaskCallback(chatId, messageId, query.id, taskId, action, voter);
-        return;
-      }
-    }
-
-    // Callback não reconhecido
-    await this.bot.answerCallbackQuery(query.id, { text: 'Ação não reconhecida' });
-  }
-
-  async _handleTaskCallback(chatId, messageId, queryId, taskId, action, voter) {
-    try {
-      const voterMap = {
-        'abner': 'abner',
-        'nonoke': 'nonoke',
-        'elias': 'elias',
-        'elias israel mendes': 'elias',
-        'jhinofour': 'abner',
-        'jhino four': 'abner',
-        'jhin four': 'abner',
-        'jhino': 'abner',
-      };
-      const internalUser = voterMap[voter] || voter;
-      const baseUrl = 'http://localhost:3456';
-      const apiToken = process.env.INTERNAL_API_TOKEN;
-
-      if (action === 'complete') {
-        const res = await fetch(`${baseUrl}/api/tasks/${taskId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
-          body: JSON.stringify({ status: 'completed' }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          await this.bot.answerCallbackQuery(queryId, { text: `❌ ${err.error || 'Erro ao concluir'}` });
-          return;
-        }
-        await this.bot.answerCallbackQuery(queryId, { text: '✅ Tarefa concluída!' });
-        // Update message buttons
-        try {
-          await this.bot.editMessageReplyMarkup({ inline_keyboard: [[
-            { text: '✅ Concluída', callback_data: 'noop' },
-            { text: '🔗 Abrir Dashboard', url: `${baseUrl}/tarefas` }
-          ]] }, { chat_id: chatId, message_id: messageId });
-        } catch {}
-      } else if (action === 'assign') {
-        const res = await fetch(`${baseUrl}/api/tasks/${taskId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
-          body: JSON.stringify({ assignee: internalUser }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          await this.bot.answerCallbackQuery(queryId, { text: `❌ ${err.error || 'Erro ao assumir'}` });
-          return;
-        }
-        await this.bot.answerCallbackQuery(queryId, { text: `👤 Tarefa atribuída a ${internalUser}` });
-        // Update message buttons
-        try {
-          await this.bot.editMessageReplyMarkup({ inline_keyboard: [[
-            { text: '✅ Concluir', callback_data: `task:${taskId}:complete` },
-            { text: `👤 ${internalUser}`, callback_data: 'noop' }
-          ], [
-            { text: '🔗 Abrir Dashboard', url: `${baseUrl}/tarefas` }
-          ]] }, { chat_id: chatId, message_id: messageId });
-        } catch {}
-      }
-    } catch (err) {
-      console.error('[TG] Erro no callback de tarefa:', err.message);
-      await this.bot.answerCallbackQuery(queryId, { text: '❌ Erro ao processar ação' });
+    if (data === 'kimi_on') {
+      this.awakeChats.add(chatId);
+      this._saveAwakeState();
+      await this.bot.answerCallbackQuery(query.id, { text: 'Luna acordou!' });
+      await this.bot.sendMessage(chatId,
+        `🌙 *Luna acordou!*\n\nModo persistente ativo. Mande \`/kimi off\` para eu dormir.`,
+        { parse_mode: 'Markdown' }
+      );
+    } else if (data === 'kimi_off') {
+      this.awakeChats.delete(chatId);
+      this._saveAwakeState();
+      await this.bot.answerCallbackQuery(query.id, { text: 'Luna dormindo...' });
+      await this.bot.sendMessage(chatId,
+        `😴 *Luna dormindo...*\n\nNão vou mais responder mensagens automáticas. Mande \`/kimi on\` quando quiser!`,
+        { parse_mode: 'Markdown' }
+      );
     }
   }
-
-  async _handleVoteCallback(chatId, messageId, queryId, sessionId, vote, voter) {
-    try {
-      // Mapear username/nome do Telegram para ID interno
-      const voterMap = {
-        'abner': 'abner',
-        'nonoke': 'nonoke',
-        'elias': 'elias',
-        'elias israel mendes': 'elias',
-        'jhinofour': 'abner',
-        'jhino four': 'abner',
-        'jhin four': 'abner',
-        'jhino': 'abner',
-      };
-      const internalVoter = voterMap[voter] || voter;
-      console.log(`[VOTE] Received voter='${voter}' -> internal='${internalVoter}'`);
-
-      const secret = process.env.TELEGRAM_BOT_TOKEN;
-      const baseUrl = `http://localhost:3456`;
-
-      const res = await fetch(`${baseUrl}/api/voting/telegram-vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, voter: internalVoter, vote, secret }),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        // Verificar se é voto duplicado
-        const isDuplicate = (result.error || '').toLowerCase().includes('já votou') || (result.error || '').toLowerCase().includes('already voted');
-        if (isDuplicate) {
-          await this.bot.answerCallbackQuery(queryId, { 
-            text: '⚠️ VOCÊ JÁ VOTOU!\nNão é possível alterar o voto.',
-            show_alert: true 
-          });
-        } else {
-          await this.bot.answerCallbackQuery(queryId, { text: `❌ ${result.error || 'Erro ao votar'}`, show_alert: true });
-        }
-        return;
-      }
-
-      const session = result.session;
-      const yesVotes = Object.values(session.votes).filter(v => v && v.vote === 'yes').length;
-      const noVotes = Object.values(session.votes).filter(v => v && v.vote === 'no').length;
-      const pending = 3 - yesVotes - noVotes;
-
-      // Determinar emoji de status
-      const statusConfig = {
-        open:    { emoji: '🟢', label: 'ABERTA' },
-        voting:  { emoji: '🔵', label: 'EM VOTAÇÃO' },
-        approved:{ emoji: '🎉', label: 'APROVADA!' },
-        rejected:{ emoji: '💀', label: 'REJEITADA' },
-        closed:  { emoji: '⚪', label: 'ENCERRADA' },
-      };
-      const st = statusConfig[session.status] || { emoji: '⚪', label: session.status.toUpperCase() };
-
-      // Barra de progresso visual
-      const barYes = '█'.repeat(yesVotes);
-      const barNo = '▒'.repeat(noVotes);
-      const barPending = '░'.repeat(pending);
-      const progressBar = `${barYes}${barNo}${barPending}`;
-
-      // Montar mensagem PREMIUM
-      let text = `╔══════════════════════╗\n`;
-      text += `👑 *SESSÃO DE VOTAÇÃO*\n`;
-      text += `╚══════════════════════╝\n\n`;
-      text += `🗳️ *${this._escapeMarkdown(session.title)}*\n\n`;
-      text += `${st.emoji} *Status:* ${st.label}\n`;
-      text += `📊 *Progresso:* ${progressBar}\n`;
-      text += `   ✅ SIM: ${yesVotes}  ❌ NÃO: ${noVotes}  ⏳ Faltam: ${pending}\n\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `*Votos dos CEOs:*\n`;
-
-      for (const [ceo, v] of Object.entries(session.votes)) {
-        const voteEmoji = v ? (v.vote === 'yes' ? '✅' : '❌') : '⏳';
-        const voteLabel = v ? (v.vote === 'yes' ? 'APROVOU' : 'REJEITOU') : 'AGUARDANDO';
-        text += `${voteEmoji} *${ceo.toUpperCase()}* — ${voteLabel}\n`;
-      }
-
-      // Mensagem de resultado
-      if (session.status === 'approved') {
-        text += `\n🎉 *QUÓRUM ALCANÇADO!*\n`;
-        if (session.executionResult?.success) {
-          text += `🚀 Ação executada *automaticamente*!\n`;
-        } else {
-          text += `⚙️ Ação será executada em breve.\n`;
-        }
-      } else if (session.status === 'rejected') {
-        text += `\n💀 *PROPOSTA VETADA*\n`;
-        text += `🛡️ A ação NÃO será executada.\n`;
-      } else if (yesVotes >= session.quorumRequired) {
-        text += `\n🔥 *FALTAM 0 VOTOS!* Aguardando encerramento...\n`;
-      } else {
-        text += `\n⏱️ *Faltam:* ${session.quorumRequired - yesVotes} voto(s) para aprovação\n`;
-      }
-
-      text += `\n🔗 [▸ ABRIR DASHBOARD](http://192.168.1.33:3456/votacao)`;
-
-      // Atualizar mensagem original
-      await this.bot.editMessageText(text, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: 'Markdown',
-        reply_markup: session.status === 'open' || session.status === 'voting' ? {
-          inline_keyboard: [[
-            { text: '✅ APROVAR', callback_data: `vote:${session.id}:yes` },
-            { text: '❌ REJEITAR', callback_data: `vote:${session.id}:no` }
-          ]]
-        } : undefined,
-        disable_web_page_preview: true,
-      });
-
-      // Feedback claro no popup
-      const voteText = vote === 'yes' ? '✅ APROVAR' : '❌ REJEITAR';
-      await this.bot.answerCallbackQuery(queryId, { 
-        text: `${voteText}\nVoto registrado com sucesso!\n${yesVotes}/${session.quorumRequired} votos para aprovação.`,
-        show_alert: true 
-      });
-    } catch (err) {
-      console.error('[TG] Erro no callback de votação:', err.message);
-      await this.bot.answerCallbackQuery(queryId, { text: '❌ Erro ao processar voto', show_alert: true });
-    }
-  }
-
-  _escapeMarkdown(text) {
-    return String(text || '').replace(/[_*\[\]()~`>#+=|{}.!-]/g, '\\$&');
-  }
-
-  // ── COMANDOS ──
 
   async _cmdStart(msg) {
     const chatId = msg.chat.id;
     const name = msg.from?.first_name || 'usuário';
+
     await this.bot.sendMessage(chatId,
-      `🌙 *Olá, ${name}!* Sou Luna, sua agente autônoma unificada.\n\n` +
-      `Posso ajudar com:\n` +
-      `• 💻 Código e arquivos no seu PC\n` +
-      `• 📋 Tarefas e leads no dashboard\n` +
-      `• 🔍 Pesquisa na internet\n\n` +
-      `*Comandos:*\n` +
-      `/kimi — ativar modo persistente (respondo todas as msgs)\n` +
-      `/kimi off — desativar modo persistente\n` +
-      `/modo [engenheiro|arquiteto|produto|devops|default] — trocar persona\n` +
-      `/newaba — nova sessão de chat\n` +
-      `/status — status do sistema`,
+      `🌙 *Oi ${name}! Sou a Luna.*\n\n` +
+      `Comandos:\n` +
+      `• \`/kimi on\` — eu acordo e respondo todas as mensagens\n` +
+      `• \`/kimi off\` — eu durmo e ignoro mensagens automáticas\n` +
+      `• \`/status\` — ver status atual\n` +
+      `• \`/newaba\` — nova sessão de chat`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  async _cmdStatus(msg) {
+    const chatId = msg.chat.id;
+    const awake = this.awakeChats.has(chatId);
+    const serverOk = await this._healthCheck();
+    await this.bot.sendMessage(chatId,
+      `📊 *Status*\n\n` +
+      `Luna: ${awake ? '🌙 Acordada' : '😴 Dormindo'}\n` +
+      `Server: ${serverOk ? '✅ Online' : '❌ Offline'}\n\n` +
+      `Mande \`/kimi ${awake ? 'off' : 'on'}\` para alternar.`,
       { parse_mode: 'Markdown' }
     );
   }
 
   async _cmdModo(msg, match) {
     const chatId = msg.chat.id;
-    const persona = match[1].trim().toLowerCase();
-    const valid = ['engenheiro', 'arquiteto', 'produto', 'devops', 'default', 'dev'];
-
-    if (!valid.includes(persona)) {
-      await this.bot.sendMessage(chatId,
-        `⚠️ Persona desconhecida: *${persona}*\n` +
-        `Disponíveis: ${valid.join(', ')}`,
-        { parse_mode: 'Markdown' }
-      );
+    const mode = match[1].trim().toLowerCase();
+    const validModes = ['instant', 'thinking', 'agent'];
+    if (!validModes.includes(mode)) {
+      await this.bot.sendMessage(chatId, `❌ Modo inválido. Use: ${validModes.join(', ')}`);
       return;
     }
-
-    // Persiste preferência
     const prefPath = path.join(SESSION_DIR, `${sanitizeChatId(chatId)}-persona.json`);
-    fs.writeFileSync(prefPath, JSON.stringify({ persona, updatedAt: new Date().toISOString() }));
-
-    await this.bot.sendMessage(chatId, `✅ Persona alterada para: *${persona}*`, { parse_mode: 'Markdown' });
-  }
-
-  async _cmdStatus(msg) {
-    const chatId = msg.chat.id;
-    const status = this.luna?.kimiBridge?.getStatus?.() || { running: false };
-    const isAwake = this.awakeChats.has(chatId);
-    await this.bot.sendMessage(chatId,
-      `📊 *Status Luna*\n\n` +
-      `Chrome: ${status.running ? '🟢 Conectado' : '🔴 Desconectado'}\n` +
-      `Modo persistente: ${isAwake ? '🟢 Ativo (respondo todas as msgs)' : '🔴 Inativo'}\n` +
-      `Sessões ativas: ${this.activeStreams.size}\n` +
-      `Usuários processando: ${this.activeUsers.size}`,
-      { parse_mode: 'Markdown' }
-    );
+    let pref = {};
+    try { pref = JSON.parse(fs.readFileSync(prefPath, 'utf8')); } catch {}
+    pref.persona = mode;
+    fs.writeFileSync(prefPath, JSON.stringify(pref));
+    await this.bot.sendMessage(chatId, `✅ Modo alterado para *${mode}*`, { parse_mode: 'Markdown' });
   }
 
   async _cmdNewAba(msg) {
@@ -379,8 +182,9 @@ class TelegramLunaAdapter {
     const userId = `telegram-${chatId}`;
     const sessionId = userId;
     try {
-      await this.luna.newThread(userId);
       this.sessionManager.clearContext(sessionId);
+      this.activeStreams.delete(chatId);
+      this.activeUsers.delete(userId);
       await this.bot.sendMessage(chatId, '🆕 *Nova sessão iniciada!*', { parse_mode: 'Markdown' });
     } catch (e) {
       await this.bot.sendMessage(chatId, `❌ Erro: ${e.message}`);
@@ -395,7 +199,7 @@ class TelegramLunaAdapter {
       this.awakeChats.delete(chatId);
       this._saveAwakeState();
       await this.bot.sendMessage(chatId,
-        `😴 *Luna dormindo...*\n\nNão vou mais responder mensagens automáticas.\nMande \`/kimi\` quando quiser me acordar!`,
+        `😴 *Luna dormindo...*\n\nNão vou mais responder mensagens automáticas.\nMande \`/kimi on\` quando quiser me acordar!`,
         { parse_mode: 'Markdown' }
       );
       return;
@@ -434,16 +238,126 @@ class TelegramLunaAdapter {
     } catch (e) { console.warn('[TG] Erro ao salvar awake state:', e.message); }
   }
 
+  // ── CLIENTE HTTP+SSE DO LUNA SERVER ──
+
+  async *_callLunaStream(sessionId, text, { mode = 'thinking', persona = 'default' }) {
+    const events = [];
+    let done = false;
+    let error = null;
+
+    // v10.11-fix: Garante que a sessão exista antes de abrir SSE.
+    // O Telegram usa sessionId determinístico (telegram-<chatId>), que pode
+    // ainda não existir no servidor.
+    await this._ensureSession(sessionId);
+
+    // Abre SSE *antes* de postar para não perder eventos iniciais
+    const sse = new EventSource(`${LUNA_API_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}`);
+
+    sse.onmessage = (msg) => {
+      try {
+        events.push(JSON.parse(msg.data));
+      } catch (e) {
+        console.warn('[TG] SSE parse error:', e.message);
+      }
+    };
+    sse.onerror = (e) => {
+      error = e;
+    };
+    sse.addEventListener('close', () => {
+      done = true;
+    });
+
+    // Envia a mensagem
+    const postBody = JSON.stringify({ message: text, sessionId, mode, persona });
+    const postRes = await new Promise((resolve, reject) => {
+      const req = http.request(`${LUNA_API_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postBody),
+        },
+        timeout: 10000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => resolve({ status: res.statusCode, data }));
+      });
+      req.on('error', reject);
+      req.on('timeout', () => reject(new Error('POST timeout')));
+      req.write(postBody);
+      req.end();
+    });
+
+    if (postRes.status !== 200) {
+      sse.close();
+      throw new Error(`Luna API respondeu ${postRes.status}: ${postRes.data}`);
+    }
+
+    // Consome até ver done/error ou timeout
+    const deadline = Date.now() + STREAM_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      while (events.length) {
+        yield events.shift();
+      }
+      if (done) break;
+      if (error) {
+        sse.close();
+        throw new Error('Erro na conexão SSE com Luna');
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    sse.close();
+  }
+
+  /** Garante que a sessão exista no luna-server (cria se não existir). */
+  async _ensureSession(sessionId) {
+    const body = JSON.stringify({ action: 'create', sessionId });
+    return new Promise((resolve, reject) => {
+      const req = http.request(`${LUNA_API_URL}/api/chat/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: 5000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => resolve({ status: res.statusCode, data }));
+      });
+      req.on('error', (e) => {
+        // Não falha fatalmente; o POST /api/chat também cria sessão
+        console.warn('[TG] _ensureSession warning:', e.message);
+        resolve({ status: 0, data: '' });
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ status: 0, data: '' });
+      });
+      req.write(body);
+      req.end();
+    });
+  }
+
   // ── MENSAGEM PRINCIPAL ──
 
   async _handleUserMessage(msg) {
     const chatId = msg.chat.id;
     const userId = `telegram-${chatId}`;
     const text = msg.text;
-    const name = msg.from?.first_name || 'usuário';
 
     // Se o chat NÃO está no modo persistente, ignora mensagens genéricas
     if (!this.awakeChats.has(chatId)) {
+      return;
+    }
+
+    // Health-check rápido
+    const serverOk = await this._healthCheck();
+    if (!serverOk) {
+      await this.bot.sendMessage(chatId,
+        '🌙 *Luna offline.*\n\nO servidor Luna não está respondendo agora. Tente novamente em alguns instantes.',
+        { parse_mode: 'Markdown', reply_to_message_id: msg.message_id }
+      );
       return;
     }
 
@@ -464,18 +378,8 @@ class TelegramLunaAdapter {
       persona = pref.persona;
     } catch {}
 
-    // Cria/recupera sessão persistente por chat
+    // Sessão persistente por chat
     const sessionId = `telegram-${chatId}`;
-    let session = this.sessionManager.loadSession(sessionId);
-    if (!session) {
-      session = this.sessionManager.createSession({
-        id: sessionId,
-        title: `Telegram ${chatId}`,
-        mode: 'CHAT',
-        persona,
-        metadata: { source: 'telegram', chatId },
-      });
-    }
 
     // Envia "Pensando..."
     const thinkingMsg = await this.bot.sendMessage(chatId, '🧠 *Pensando...*', {
@@ -489,20 +393,20 @@ class TelegramLunaAdapter {
       editCount: 0,
     });
 
-    const STREAM_TIMEOUT = 5 * 60 * 1000; // 5 minutos
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       console.warn(`[TG] Stream timeout for ${userId}, forcing cleanup`);
       this.activeUsers.delete(userId);
       this.activeStreams.delete(chatId);
-    }, STREAM_TIMEOUT);
+      try {
+        await this.bot.editMessageText(
+          '⏱️ *Tempo esgotado.* A Luna não conseguiu responder a tempo.\nTente `/kimi off` e depois `/kimi on`.',
+          { chat_id: chatId, message_id: thinkingMsg.message_id, parse_mode: 'Markdown' }
+        );
+      } catch {}
+    }, STREAM_TIMEOUT_MS);
 
     try {
-      const stream = this.luna.processMessageStream(text, {
-        sessionId: session.id,
-        userId,
-        mode: session.mode,
-        persona,
-      });
+      const stream = this._callLunaStream(sessionId, text, { mode: 'thinking', persona });
 
       let fullResponse = '';
       let hasStartedResponding = false;
@@ -518,7 +422,14 @@ class TelegramLunaAdapter {
             break;
 
           case 'response_delta': {
-            fullResponse = ev.fullResponse || '';
+            fullResponse = ev.fullResponse || ev.text || fullResponse;
+            hasStartedResponding = true;
+            await this._updateMessage(chatId, fullResponse);
+            break;
+          }
+
+          case 'response_done': {
+            fullResponse = ev.response || ev.text || fullResponse;
             hasStartedResponding = true;
             await this._updateMessage(chatId, fullResponse);
             break;
@@ -552,7 +463,6 @@ class TelegramLunaAdapter {
           }
 
           case 'done': {
-            // Mensagem final já foi editada pelo response_delta
             const meta = this.activeStreams.get(chatId);
             if (meta && fullResponse) {
               await this._finalizeMessage(chatId, fullResponse);
@@ -565,15 +475,22 @@ class TelegramLunaAdapter {
       // Se nunca chegou response_delta, edita com o que temos
       if (!hasStartedResponding && fullResponse) {
         await this._finalizeMessage(chatId, fullResponse);
+      } else if (!hasStartedResponding && !fullResponse) {
+        await this.bot.editMessageText(
+          '😶 A Luna não retornou nenhuma resposta. Tente novamente.',
+          { chat_id: chatId, message_id: thinkingMsg.message_id }
+        );
       }
 
     } catch (e) {
       console.error('[TG] Erro no stream:', e);
-      // Robust error delivery: never let a stuck sendMessage keep activeUsers locked
       try {
         await Promise.race([
-          this.bot.sendMessage(chatId, `❌ Erro interno: ${e.message}`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('send timeout')), 10000)),
+          this.bot.editMessageText(
+            `❌ Erro: ${e.message}`,
+            { chat_id: chatId, message_id: thinkingMsg.message_id }
+          ),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('edit timeout')), 10000)),
         ]);
       } catch (sendErr) {
         console.warn('[TG] Failed to send error message:', sendErr.message);
@@ -589,8 +506,6 @@ class TelegramLunaAdapter {
 
   _sanitizeText(text) {
     if (!text) return '';
-    // Converte \n literal (dois chars: backslash + n) em quebra de linha real
-    // Isso acontece quando o Kimi retorna texto com newlines escapados
     return text
       .replace(/\\n/g, '\n')
       .replace(/\\t/g, '\t')
@@ -601,14 +516,10 @@ class TelegramLunaAdapter {
     const meta = this.activeStreams.get(chatId);
     if (!meta) return;
 
-    // Sanitiza newlines escapados antes de enviar pro Telegram
     text = this._sanitizeText(text);
-
-    // Telegram limit: 4096 chars. Trunca para edição.
     const safe = text.slice(0, 4000);
-    if (safe === meta.lastText) return; // evita edições desnecessárias
+    if (safe === meta.lastText) return;
 
-    // Rate limit: no máximo 1 edição a cada 2s
     const now = Date.now();
     if (now - meta.lastEdit < 2000) return;
 
@@ -622,7 +533,6 @@ class TelegramLunaAdapter {
       meta.lastEdit = now;
       meta.editCount++;
     } catch (e) {
-      // Edit conflicts (message not modified) são normais
       if (!e.message?.includes('not modified')) {
         console.warn('[TG] Edit error:', e.message);
       }
@@ -635,40 +545,37 @@ class TelegramLunaAdapter {
 
     text = this._sanitizeText(text);
     const safe = text.slice(0, 4000);
-    try {
-      await this.bot.editMessageText(safe, {
-        chat_id: chatId,
-        message_id: meta.messageId,
-        parse_mode: 'Markdown',
-      });
-    } catch {
-      // Se edit falhar, manda nova mensagem
-      await this.bot.sendMessage(chatId, safe, { parse_mode: 'Markdown' });
+    if (safe !== meta.lastText) {
+      try {
+        await this.bot.editMessageText(safe, {
+          chat_id: chatId,
+          message_id: meta.messageId,
+          parse_mode: 'Markdown',
+        });
+      } catch (e) {
+        console.warn('[TG] Finalize edit error:', e.message);
+      }
     }
   }
 }
 
-// ── CLI / SINGLETON ──
-let instance = null;
+module.exports = { TelegramLunaAdapter };
 
-async function start() {
-  if (!instance) instance = new TelegramLunaAdapter();
-  await instance.start();
-  return instance;
-}
-
-function stop() {
-  if (instance) instance.stop();
-  instance = null;
-}
-
-module.exports = { TelegramLunaAdapter, start, stop };
-
-// Se executado diretamente
+// ── BOOTSTRAP (somente quando executado diretamente) ──
 if (require.main === module) {
-  start().catch(e => {
-    console.error('❌ Falha ao iniciar:', e);
+  const adapter = new TelegramLunaAdapter();
+  adapter.start().catch((err) => {
+    console.error('❌ Erro fatal no adapter:', err);
     process.exit(1);
   });
-  process.on('SIGINT', () => { stop(); process.exit(0); });
+
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    adapter.stop();
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    adapter.stop();
+    process.exit(0);
+  });
 }
