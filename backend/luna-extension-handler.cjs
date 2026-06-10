@@ -189,8 +189,24 @@ class LunaExtensionHandler extends EventEmitter {
         }
       }
 
+      // v10.7-fix: Emit tool execution events so frontend can show tool cards
+      this.emit('tool_executed', {
+        sessionId,
+        tool: data.tool,
+        params: data.params,
+        timestamp: Date.now()
+      });
+
       this.toolExecutor(data.tool, data.params, sessionId)
         .then(result => {
+          // v10.7-fix: Emit tool completion event
+          this.emit('tool_completed', {
+            sessionId,
+            tool: data.tool,
+            params: data.params,
+            result,
+            timestamp: Date.now()
+          });
           this._sendToSession(sessionId, {
             type: 'tool_result',
             tool: data.tool,
@@ -201,6 +217,14 @@ class LunaExtensionHandler extends EventEmitter {
         })
         .catch(e => {
           console.error(`[LunaExt] Tool execution failed:`, e.message);
+          // v10.7-fix: Emit tool error event
+          this.emit('tool_completed', {
+            sessionId,
+            tool: data.tool,
+            params: data.params,
+            result: { success: false, error: e.message },
+            timestamp: Date.now()
+          });
           this._sendToSession(sessionId, {
             type: 'tool_error',
             tool: data.tool,
