@@ -105,6 +105,8 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
     mode,
     persona,
     messages: [],
+    eventLedger: [], // v10.13: Unacked events for reliable delivery
+    lastAckedEventId: null, // v10.13: Last event ID acknowledged by frontend
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -183,6 +185,13 @@ function addMessageToSession(sessionId, message) {
   const session = webSessions.get(sessionId);
   if (session) {
     session.messages.push(message);
+    // v10.13: Add to event ledger for ACK-based reliable delivery
+    if (!session.eventLedger) session.eventLedger = [];
+    session.eventLedger.push(message);
+    // Prune ledger if it grows too large (keep last 200 unacked)
+    if (session.eventLedger.length > 200) {
+      session.eventLedger = session.eventLedger.slice(-200);
+    }
     session.updatedAt = new Date().toISOString();
     // Persistir no PostgreSQL (fire-and-forget with retry)
     dbRunWithRetry(
@@ -284,8 +293,12 @@ function writeSystemPrompt(newPrompt) {
 // ============================================================
 // SSE helper
 // ============================================================
-function sendSSE(res, event, data) {
+// v10.13: SSE with id + retry for resilient reconnection
+function sendSSE(res, event, data, options = {}) {
+  const { id, retry = 3000 } = options;
   res.write(`event: message\n`);
+  if (id) res.write(`id: ${id}\n`);
+  if (retry) res.write(`retry: ${retry}\n`);
   res.write(`data: ${JSON.stringify({ ...data, type: event })}\n\n`);
 }
 
@@ -381,7 +394,7 @@ router.post('/api/chat', async (req, res) => {
       const streamMeta = activeStreams.get(session.id);
       if (!streamMeta || streamMeta.cancelled) break;
 
-      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required'].includes(ev.type)) {
+      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
         const content = ev.type === 'done' ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '') : (ev.text || ev.fullResponse || '');
         
@@ -455,7 +468,7 @@ router.post('/api/chat', async (req, res) => {
   }
 });
 
-// GET /api/chat/stream — SSE streaming
+// GET /api/chat/stream — SSE streaming (v10.13: resilient reconnection with Last-Event-ID + ledger replay)
 router.get('/api/chat/stream', async (req, res) => {
   const sessionId = req.query.sessionId;
   if (!sessionId) {
@@ -495,7 +508,48 @@ router.get('/api/chat/stream', async (req, res) => {
     'Access-Control-Allow-Origin': '*',
   });
 
-  sendSSE(res, 'connected', { type: 'connected', sessionId });
+  // v10.13: Read Last-Event-ID header for reconnection resume
+  const lastEventId = req.headers['last-event-id'];
+  let replayedCount = 0;
+
+  // v10.13: Replay missed events from ledger before starting live polling
+  if (lastEventId && currentSession.eventLedger && currentSession.eventLedger.length > 0) {
+    const ledger = currentSession.eventLedger;
+    const lastIdx = ledger.findIndex(ev => ev.id === lastEventId);
+    const startIdx = lastIdx >= 0 ? lastIdx + 1 : 0;
+    const missedEvents = ledger.slice(startIdx);
+
+    if (missedEvents.length > 0) {
+      console.log(`[SSE] Reconnect session ${sessionId}: replaying ${missedEvents.length} missed events after ${lastEventId}`);
+      for (const msg of missedEvents) {
+        const eventData = {
+          id: msg.id,
+          type: msg.type,
+          role: msg.role,
+          sessionId,
+          timestamp: msg.timestamp,
+        };
+        if (msg.content) eventData.text = msg.content;
+        if (msg.content) eventData.fullResponse = msg.content;
+        if (msg.content) eventData.response = msg.content;
+        if (msg.fullThinking) eventData.fullThinking = msg.fullThinking;
+        if (msg.tool) eventData.tool = msg.tool;
+        if (msg.params) eventData.params = msg.params;
+        if (msg.result) eventData.result = msg.result;
+        if (msg.messageId) eventData.messageId = msg.messageId;
+        if (msg.type === 'error') eventData.error = msg.content;
+        if (msg.role === 'user') {
+          eventData.content = msg.content;
+          if (msg.files && msg.files.length > 0) eventData.files = msg.files;
+        }
+        sendSSE(res, msg.type, eventData, { id: msg.id });
+        replayedCount++;
+      }
+    }
+  }
+
+  // Send connected event with replay info
+  sendSSE(res, 'connected', { type: 'connected', sessionId, replayed: replayedCount });
 
   const keepAlive = setInterval(() => {
     res.write(':keepalive\n\n');
@@ -533,7 +587,7 @@ router.get('/api/chat/stream', async (req, res) => {
         if (msg.files && msg.files.length > 0) eventData.files = msg.files;
       }
 
-      sendSSE(res, msg.type, eventData);
+      sendSSE(res, msg.type, eventData, { id: msg.id });
     }
     lastMsgIndex = session.messages.length;
   }, 100);
@@ -555,6 +609,33 @@ router.get('/api/chat/stream', async (req, res) => {
       sseConnections.delete(sessionId);
     }
   });
+});
+
+// POST /api/chat/ack — v10.13: Frontend acknowledges received events
+router.post('/api/chat/ack', (req, res) => {
+  const { sessionId, eventId, eventIds } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
+  }
+  const session = getWebSession(sessionId);
+  if (!session) {
+    return res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
+  }
+
+  // Update lastAckedEventId
+  if (eventId) {
+    session.lastAckedEventId = eventId;
+  }
+  if (Array.isArray(eventIds) && eventIds.length > 0) {
+    session.lastAckedEventId = eventIds[eventIds.length - 1];
+    // Remove acked events from ledger
+    if (session.eventLedger) {
+      const ackedSet = new Set(eventIds);
+      session.eventLedger = session.eventLedger.filter(ev => !ackedSet.has(ev.id));
+    }
+  }
+
+  res.json({ ok: true, acked: eventId || (eventIds ? eventIds.length : 0), ledgerSize: session.eventLedger?.length || 0 });
 });
 
 // GET /api/chat/sessions — busca do PostgreSQL (persistência entre reinícios)
@@ -922,14 +1003,21 @@ router.post('/api/plan', async (req, res) => {
   res.json({ ok: true, sessionId: session.id, status: 'investigating' });
 
   // Process in background
+  console.log(`[PLAN MODE] Starting plan mode for session ${session.id}, userId: web-plan-${session.id}`);
   try {
     const luna = await getLunaSoul();
+    console.log(`[PLAN MODE] Got LunaSoul, starting stream...`);
     const stream = luna.processPlanModeStream(message, {
       sessionId: session.id,
       userId: 'web-plan-' + session.id,
     });
 
+    let eventCount = 0;
+    let planEventSeq = 0; // v10.13-fix: unique incremental IDs to prevent deduplication collisions
     for await (const ev of stream) {
+      eventCount++;
+      planEventSeq++;
+      console.log(`[PLAN MODE] Event #${eventCount}: type=${ev.type}`);
       const planMeta = planModeSessions.get(session.id);
       if (!planMeta) break;
 
@@ -944,7 +1032,7 @@ router.post('/api/plan', async (req, res) => {
       } else if (['thinking_delta', 'action_start', 'action_end', 'error', 'login_required'].includes(ev.type)) {
         // Forward to SSE via session messages
         addMessageToSession(session.id, {
-          id: 'plan-ev-' + Date.now(),
+          id: `plan-ev-${Date.now()}-${planEventSeq}`,
           role: 'assistant',
           type: ev.type,
           content: ev.text || ev.message || ev.error || '',
@@ -959,7 +1047,7 @@ router.post('/api/plan', async (req, res) => {
       // Also emit via SSE by adding as a message
       if (['plan_start', 'plan_delta', 'plan_display', 'plan_awaiting_approval'].includes(ev.type)) {
         addMessageToSession(session.id, {
-          id: 'plan-' + Date.now(),
+          id: `plan-${Date.now()}-${planEventSeq}`,
           role: 'assistant',
           type: ev.type,
           content: ev.plan || ev.message || '',
@@ -970,7 +1058,7 @@ router.post('/api/plan', async (req, res) => {
       }
     }
   } catch (e) {
-    console.error('[WEB] Erro no plan mode:', e.message);
+    console.error('[PLAN MODE] Error:', e.message, e.stack);
     planModeSessions.set(session.id, { status: 'error', error: e.message });
     addMessageToSession(session.id, {
       id: 'plan-err-' + Date.now(),
@@ -1125,6 +1213,17 @@ function getServiceStatus() {
   } catch {
     results['kimi-bridge'] = { status: 'disconnected', label: 'Kimi Bridge' };
   }
+  // Luna Soul status
+  try {
+    results['luna-soul'] = {
+      status: lunaReady && lunaSoul ? 'ready' : 'not-ready',
+      label: 'Luna Soul',
+      ready: lunaReady,
+      hasSessionManager: lunaSoul?.sessionManager !== undefined,
+    };
+  } catch {
+    results['luna-soul'] = { status: 'not-ready', label: 'Luna Soul' };
+  }
   return results;
 }
 
@@ -1157,6 +1256,56 @@ router.get('/api/system/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     lunaSoulReady: lunaReady,
   });
+});
+
+// v10.2: Agent status — simplified for frontend polling
+router.get('/api/system/agent', async (req, res) => {
+  const status = getServiceStatus();
+  const soul = status['luna-soul'];
+  const bridge = status['kimi-bridge'];
+  const server = status['luna-web-server'];
+  res.json({
+    ok: true,
+    agent: {
+      state: soul?.status === 'ready' && bridge?.status === 'connected' ? 'online' :
+             soul?.status === 'ready' ? 'degraded' :
+             server?.status === 'running' ? 'starting' : 'offline',
+      lunaSoul: soul?.status || 'unknown',
+      bridge: bridge?.status || 'unknown',
+      server: server?.status || 'unknown',
+      pages: bridge?.pages || 0,
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// v10.2: Visible mode control — make all shell commands open in terminal
+router.post('/api/system/visible', async (req, res) => {
+  try {
+    const lunaTools = require('../.luna-kernel/luna-tools.cjs');
+    if (lunaTools.setVisibleMode) {
+      lunaTools.setVisibleMode(true);
+      res.json({ ok: true, mode: 'visible', message: '🖥️ Modo visível ATIVADO — todos os comandos abrirão em terminal' });
+    } else {
+      res.status(500).json({ ok: false, error: 'setVisibleMode não disponível' });
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+router.post('/api/system/invisible', async (req, res) => {
+  try {
+    const lunaTools = require('../.luna-kernel/luna-tools.cjs');
+    if (lunaTools.setVisibleMode) {
+      lunaTools.setVisibleMode(false);
+      res.json({ ok: true, mode: 'invisible', message: '👻 Modo invisível ATIVADO — comandos rodarão em background' });
+    } else {
+      res.status(500).json({ ok: false, error: 'setVisibleMode não disponível' });
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 router.get('/api/system/logs', async (req, res) => {
@@ -1495,6 +1644,46 @@ router.post('/api/system/turnoff', async (req, res) => {
   } catch (e) {
     console.error('[TURNOFF] Error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/luna/compact — Manual context compaction ──
+// v10.16: Allows user to force compaction on-demand via button/command
+router.post('/api/luna/compact', async (req, res) => {
+  try {
+    const { sessionId, userId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ ok: false, error: 'sessionId obrigatório' });
+    }
+
+    const luna = await getLunaSoul();
+    if (!luna) {
+      return res.status(503).json({ ok: false, error: 'Luna Soul não disponível' });
+    }
+
+    // SSE setup
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const uid = userId || 'web-default';
+    const stream = luna._autoCompact(sessionId, uid);
+
+    for await (const ev of stream) {
+      res.write(`data: ${JSON.stringify(ev)}\n\n`);
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+    res.end();
+  } catch (e) {
+    console.error('[LunaCompact] Erro:', e.message);
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: e.message })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   }
 });
 
