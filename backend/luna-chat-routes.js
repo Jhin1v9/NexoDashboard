@@ -114,10 +114,10 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
   // Persistir no PostgreSQL (fire-and-forget with retry). Usa ON CONFLICT
   // para não falhar quando o client fornece um sessionId que já existe.
   dbRunWithRetry(
-    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())
+    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, event_ledger, last_acked_event_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, NOW(), NOW())
      ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
-    [sessionId, 'anonymous', title, mode, persona, JSON.stringify([])]
+    [sessionId, 'anonymous', title, mode, persona, JSON.stringify([]), JSON.stringify([]), null]
   ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
   return session;
 }
@@ -125,7 +125,7 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
 async function loadSessionFromDB(id) {
   try {
     const row = await db.get(
-      `SELECT id, title, mode, persona, messages, created_at, updated_at 
+      `SELECT id, title, mode, persona, messages, event_ledger, last_acked_event_id, created_at, updated_at
        FROM luna_chat_sessions WHERE id = $1`,
       [id]
     );
@@ -136,6 +136,8 @@ async function loadSessionFromDB(id) {
       mode: row.mode,
       persona: row.persona || 'default',
       messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
+      eventLedger: Array.isArray(row.event_ledger) ? row.event_ledger : (typeof row.event_ledger === 'string' ? JSON.parse(row.event_ledger) : []),
+      lastAckedEventId: row.last_acked_event_id || null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -194,9 +196,10 @@ function addMessageToSession(sessionId, message) {
     }
     session.updatedAt = new Date().toISOString();
     // Persistir no PostgreSQL (fire-and-forget with retry)
+    // v10.16-fix: Also persist eventLedger so reconnects don't lose unacked events
     dbRunWithRetry(
-      `UPDATE luna_chat_sessions SET messages = $1::jsonb, updated_at = NOW() WHERE id = $2`,
-      [JSON.stringify(session.messages), sessionId]
+      `UPDATE luna_chat_sessions SET messages = $1::jsonb, event_ledger = $2::jsonb, last_acked_event_id = $3, updated_at = NOW() WHERE id = $4`,
+      [JSON.stringify(session.messages), JSON.stringify(session.eventLedger), session.lastAckedEventId || null, sessionId]
     ).catch(e => console.error('[DB] Erro ao salvar mensagem:', e.message));
   }
 }
@@ -296,10 +299,15 @@ function writeSystemPrompt(newPrompt) {
 // v10.13: SSE with id + retry for resilient reconnection
 function sendSSE(res, event, data, options = {}) {
   const { id, retry = 3000 } = options;
+  // v10.16-fix: Keep event: message for frontend compat (EventSource.onmessage).
+  // The real event type is inside JSON data.type. When frontend migrates to
+  // addEventListener per-type, switch this to event: ${event}
   res.write(`event: message\n`);
   if (id) res.write(`id: ${id}\n`);
   if (retry) res.write(`retry: ${retry}\n`);
   res.write(`data: ${JSON.stringify({ ...data, type: event })}\n\n`);
+  // v10.16-fix: Flush immediately to prevent proxy buffering
+  if (typeof res.flush === 'function') res.flush();
 }
 
 // ============================================================
@@ -372,7 +380,8 @@ router.post('/api/chat', async (req, res) => {
   }
 
   const streamToken = (activeStreams.get(session.id)?.token || 0) + 1;
-  activeStreams.set(session.id, { cancelled: false, createdAt: Date.now(), messageId, token: streamToken });
+  const myStreamMeta = { cancelled: false, createdAt: Date.now(), messageId, token: streamToken };
+  activeStreams.set(session.id, myStreamMeta);
 
   res.json({ ok: true, sessionId: session.id, status: 'processing' });
 
@@ -391,8 +400,9 @@ router.post('/api/chat', async (req, res) => {
     const emittedEventHashes = new Set();
 
     for await (const ev of stream) {
-      const streamMeta = activeStreams.get(session.id);
-      if (!streamMeta || streamMeta.cancelled) break;
+      // v10.16-fix: Check OUR captured meta, not activeStreams.get() which may return
+      // a newer stream object if user sent a new message while this one runs.
+      if (myStreamMeta.cancelled) break;
 
       if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
@@ -407,10 +417,12 @@ router.post('/api/chat', async (req, res) => {
         emittedEventHashes.add(dedupKey);
         
         // v6.1-fix: Attach messageId so frontend can validate against stale events
+        // v10.16-fix: Translate response_done → done so only ONE final message is stored
+        const storeType = ev.type === 'response_done' ? 'done' : ev.type;
         addMessageToSession(session.id, {
           id: 'ev-' + Date.now(),
           role: 'assistant',
-          type: ev.type,
+          type: storeType,
           content: content,
           fullThinking: ev.fullThinking || undefined,
           tool: ev.tool,
@@ -419,19 +431,6 @@ router.post('/api/chat', async (req, res) => {
           messageId: messageId,
           timestamp: new Date().toISOString(),
         });
-
-        // v6.3-fix: luna-soul emits 'response_done' instead of 'done' — translate it
-        if (ev.type === 'response_done') {
-          addMessageToSession(session.id, {
-            id: 'done-' + Date.now(),
-            role: 'assistant',
-            type: 'done',
-            content: content,
-            result: { response: content },
-            messageId: messageId,
-            timestamp: new Date().toISOString(),
-          });
-        }
       }
     }
   } catch (e) {
@@ -447,14 +446,16 @@ router.post('/api/chat', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } finally {
+    // v10.16-fix: Use session.id (guaranteed) instead of raw sessionId which may be undefined
+    const finalSessionId = session.id;
     // v5.7-fix: Guarantee a final event so frontend knows streaming is done
-    const session = getWebSession(sessionId);
-    if (session) {
-      const hasFinalEvent = session.messages.some(m => 
+    const finalSession = getWebSession(finalSessionId);
+    if (finalSession) {
+      const hasFinalEvent = finalSession.messages.some(m =>
         m.type === 'done' || m.type === 'error' || m.type === 'login_required' || m.type === 'context_limit'
       );
       if (!hasFinalEvent) {
-        addMessageToSession(sessionId, {
+        addMessageToSession(finalSessionId, {
           id: 'done-' + Date.now(),
           role: 'assistant',
           type: 'done',
@@ -464,7 +465,7 @@ router.post('/api/chat', async (req, res) => {
         });
       }
     }
-    activeStreams.delete(sessionId);
+    activeStreams.delete(finalSessionId);
   }
 });
 
@@ -634,6 +635,12 @@ router.post('/api/chat/ack', (req, res) => {
       session.eventLedger = session.eventLedger.filter(ev => !ackedSet.has(ev.id));
     }
   }
+
+  // v10.16-fix: Persist ACK state to PostgreSQL so reconnects after restart don't replay old events
+  dbRunWithRetry(
+    `UPDATE luna_chat_sessions SET event_ledger = $1::jsonb, last_acked_event_id = $2, updated_at = NOW() WHERE id = $3`,
+    [JSON.stringify(session.eventLedger || []), session.lastAckedEventId || null, sessionId]
+  ).catch(e => console.error('[DB] Erro ao salvar ACK:', e.message));
 
   res.json({ ok: true, acked: eventId || (eventIds ? eventIds.length : 0), ledgerSize: session.eventLedger?.length || 0 });
 });
