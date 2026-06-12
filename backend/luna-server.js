@@ -27,6 +27,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
@@ -182,6 +183,122 @@ if (extHandler) {
     });
   }
 }
+
+// v10.18: Self-update endpoint — checks GitHub vs local, pulls if behind, rebuilds and restarts luna-vite
+function requireSystemAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const internalToken = process.env.INTERNAL_API_TOKEN || '';
+  if (internalToken && token === internalToken) return next();
+  try {
+    jwt.verify(token, JWT_SECRET);
+    return next();
+  } catch {
+    return res.status(401).json({ success: false, error: 'Não autorizado' });
+  }
+}
+
+function runCommand(command, cwd, timeout = 120000) {
+  try {
+    const output = execSync(command, {
+      cwd,
+      encoding: 'utf8',
+      timeout,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+    });
+    return { success: true, output: output.trim() };
+  } catch (e) {
+    return { success: false, output: (e.stdout || '').trim(), error: e.message, code: e.status };
+  }
+}
+
+app.post('/api/system/update', requireSystemAuth, async (req, res) => {
+  const result = {
+    success: false,
+    localCommit: null,
+    remoteCommit: null,
+    pulled: false,
+    built: false,
+    restarted: false,
+    messages: []
+  };
+
+  try {
+    // 1. Fetch latest from origin
+    const fetchResult = runCommand('git fetch origin main', LUNA_DIR);
+    result.messages.push(fetchResult.success ? 'Fetch OK' : `Fetch: ${fetchResult.error}`);
+    if (!fetchResult.success) {
+      return res.status(500).json({ ...result, success: false, error: 'Falha ao buscar atualizações do GitHub' });
+    }
+
+    // 2. Compare local HEAD with origin/main
+    const localCommit = runCommand('git rev-parse HEAD', LUNA_DIR);
+    const remoteCommit = runCommand('git rev-parse origin/main', LUNA_DIR);
+    result.localCommit = localCommit.success ? localCommit.output : null;
+    result.remoteCommit = remoteCommit.success ? remoteCommit.output : null;
+
+    if (!result.localCommit || !result.remoteCommit) {
+      return res.status(500).json({ ...result, success: false, error: 'Não foi possível ler commits local/remoto' });
+    }
+
+    if (result.localCommit === result.remoteCommit) {
+      result.success = true;
+      result.messages.push('Já está na versão mais recente do GitHub');
+      return res.json(result);
+    }
+
+    // 3. Check if remote is ahead (fast-forward)
+    const mergeBase = runCommand('git merge-base HEAD origin/main', LUNA_DIR);
+    if (!mergeBase.success || mergeBase.output !== result.localCommit) {
+      result.messages.push('Atenção: histórico local diverge do remoto (não é fast-forward)');
+      return res.status(409).json({ ...result, success: false, error: 'Divergência detectada. Resolva manualmente antes de atualizar.' });
+    }
+
+    // 4. Pull updates
+    const pullResult = runCommand('git pull origin main', LUNA_DIR);
+    result.pulled = pullResult.success;
+    result.messages.push(pullResult.success ? `Pull OK: ${pullResult.output}` : `Pull falhou: ${pullResult.error}`);
+    if (!pullResult.success) {
+      return res.status(500).json({ ...result, success: false, error: 'Falha ao fazer pull' });
+    }
+
+    // 5. Build frontend
+    const webDir = path.join(LUNA_DIR, 'luna-web');
+    const buildResult = runCommand('npm run build', webDir, 300000);
+    result.built = buildResult.success;
+    result.messages.push(buildResult.success ? 'Build OK' : `Build falhou: ${buildResult.error}`);
+    if (!buildResult.success) {
+      return res.status(500).json({ ...result, success: false, error: 'Build falhou após pull' });
+    }
+
+    // 6. Restart luna-vite
+    const restartResult = runCommand('pm2 restart luna-vite', LUNA_DIR, 60000);
+    result.restarted = restartResult.success;
+    result.messages.push(restartResult.success ? 'luna-vite reiniciado' : `Reinício falhou: ${restartResult.error}`);
+
+    result.success = result.pulled && result.built && result.restarted;
+    return res.json(result);
+  } catch (e) {
+    result.messages.push(`Erro inesperado: ${e.message}`);
+    return res.status(500).json({ ...result, success: false, error: e.message });
+  }
+});
+
+app.get('/api/system/update/status', requireSystemAuth, async (req, res) => {
+  const localCommit = runCommand('git rev-parse HEAD', LUNA_DIR);
+  const remoteCommit = runCommand('git rev-parse origin/main', LUNA_DIR);
+  const logResult = runCommand('git log --oneline -5', LUNA_DIR);
+  const statusResult = runCommand('git status --short', LUNA_DIR);
+
+  res.json({
+    success: true,
+    localCommit: localCommit.success ? localCommit.output : null,
+    remoteCommit: remoteCommit.success ? remoteCommit.output : null,
+    upToDate: localCommit.success && remoteCommit.success && localCommit.output === remoteCommit.output,
+    recentLog: logResult.success ? logResult.output.split('\n') : [],
+    workingTreeChanges: statusResult.success ? statusResult.output : null
+  });
+});
 
 // SPA fallback — MUST be after all API routes
 app.get('*', (req, res) => {
