@@ -435,6 +435,7 @@ router.post('/api/chat', async (req, res) => {
     }
   } catch (e) {
     console.error('[WEB] Erro no processamento:', e.message);
+    console.error('[WEB] Stack:', e.stack);
     const isLoginRequired = e.message === 'KIMI_LOGIN_REQUIRED' || e.message?.includes('login');
     addMessageToSession(session.id, {
       id: 'err-' + Date.now(),
