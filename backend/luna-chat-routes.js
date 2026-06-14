@@ -406,8 +406,11 @@ router.post('/api/chat', async (req, res) => {
 
       if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress'].includes(ev.type)) {
         // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
-        const content = ev.type === 'done' ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '') : (ev.text || ev.fullResponse || '');
-        
+        // v10.25-fix: response_done carries the final text in ev.response, not ev.text/fullResponse
+        const content = ev.type === 'done' || ev.type === 'response_done'
+          ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
+          : (ev.text || ev.fullResponse || '');
+
         // v5.4-fix: Skip duplicate events (same type + content within 5s window)
         // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
         const dedupKey = `${ev.type}:${content.slice(0, 200)}:${ev.tool || ''}`;
@@ -415,10 +418,12 @@ router.post('/api/chat', async (req, res) => {
           continue;
         }
         emittedEventHashes.add(dedupKey);
-        
+
         // v6.1-fix: Attach messageId so frontend can validate against stale events
         // v10.16-fix: Translate response_done → done so only ONE final message is stored
         const storeType = ev.type === 'response_done' ? 'done' : ev.type;
+        // v10.25-fix: Ensure response_done stores result.response so the frontend can finalize
+        const finalResult = ev.result || (ev.type === 'response_done' && content ? { response: content, mode: 'CHAT' } : undefined);
         addMessageToSession(session.id, {
           id: 'ev-' + Date.now(),
           role: 'assistant',
@@ -427,7 +432,7 @@ router.post('/api/chat', async (req, res) => {
           fullThinking: ev.fullThinking || undefined,
           tool: ev.tool,
           params: ev.params,
-          result: ev.result,
+          result: finalResult,
           messageId: messageId,
           timestamp: new Date().toISOString(),
         });
