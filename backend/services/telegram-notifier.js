@@ -232,8 +232,9 @@ function buildRejected(session, url) {
 // BOTÕES INLINE PREMIUM
 // ═══════════════════════════════════════════════════════════════════════════
 
-function votingButtons(sessionId, showButtons = true) {
+function votingButtons(sessionId, showButtons = true, baseUrl = '') {
   if (!showButtons) return null;
+  const url = baseUrl || process.env.DASHBOARD_PUBLIC_URL || 'https://nexodashboard.onrender.com';
   return {
     inline_keyboard: [
       [
@@ -241,7 +242,7 @@ function votingButtons(sessionId, showButtons = true) {
         { text: `${E.cross} REJEITAR`, callback_data: `vote:${sessionId}:no` }
       ],
       [
-        { text: `${E.link} Abrir Dashboard`, url: `${baseUrl}/votacao` }
+        { text: `${E.link} Abrir Dashboard`, url: `${url}/votacao` }
       ]
     ]
   };
