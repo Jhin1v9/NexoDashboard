@@ -1766,7 +1766,7 @@ router.post('/api/luna/compact', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     const uid = userId || 'web-default';
-    const stream = luna._autoCompact(sessionId, uid);
+    const stream = luna._compactContext(sessionId, uid);
 
     for await (const ev of stream) {
       res.write(`data: ${JSON.stringify(ev)}\n\n`);
