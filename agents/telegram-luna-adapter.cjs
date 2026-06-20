@@ -25,7 +25,7 @@ const SESSION_DIR = path.join(__dirname, '..', 'data', 'telegram-sessions');
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 
 const LUNA_API_URL = process.env.LUNA_API_URL || 'http://localhost:3458';
-const STREAM_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — algumas respostas do Kimi demoram
+const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // v4.2-fix: 5 min é suficiente; sem eventos por 90s já encerra
 
 function sanitizeChatId(chatId) {
   return String(chatId).replace(/[^a-zA-Z0-9_-]/g, '');
@@ -45,8 +45,10 @@ class TelegramLunaAdapter {
     // Isso evita 409 Conflict com o dashboard (que usa polling=false).
     this.bot = getTelegramBot(TOKEN, { polling: true });
     this.activeStreams = new Map(); // chatId → { messageId, lastEdit }
-    this.activeUsers = new Set();   // evita overlapping requests
+    this.activeUsers = new Map();   // v4.2-fix: userId → { since, messageId } para expirar locks travados
     this.awakeChats = new Set();    // chats em modo persistente (wake)
+    this.processedMessageIds = new Set(); // v4.2-fix: deduplica mensagens do Telegram
+    this.sleepingNotified = new Set(); // v4.2-fix: evita spam quando dormindo
     this._loadAwakeState();
   }
 
@@ -64,7 +66,14 @@ class TelegramLunaAdapter {
     }
 
     this._setupHandlers();
-    console.log('✅ Telegram polling ativo');
+
+    // v4.2-fix: garante que não há webhook ativo causando 409 no polling
+    try {
+      await this.bot.setWebHook('');
+      console.log('✅ Webhook removido, polling ativo');
+    } catch (e) {
+      console.warn('[TG] Não foi possível remover webhook:', e.message);
+    }
 
     const me = await this.bot.getMe();
     console.log(`🤖 Bot: @${me.username}`);
@@ -90,11 +99,26 @@ class TelegramLunaAdapter {
     this.bot.onText(/^\/persona\s+(.+)/, (msg, match) => this._cmdModo(msg, match));
     this.bot.onText(/^\/status/, (msg) => this._cmdStatus(msg));
     this.bot.onText(/^\/newaba/, (msg) => this._cmdNewAba(msg));
+    this.bot.onText(/^\/reiniciar/, (msg) => this._cmdReiniciar(msg));
+    this.bot.onText(/^\/cancel/, (msg) => this._cmdCancel(msg));
     this.bot.onText(/^\/kimi(?:\s+(on|off))?/, (msg, match) => this._cmdKimi(msg, match));
 
     // ── Mensagens genéricas ──
     this.bot.on('message', async (msg) => {
       if (!msg.text || msg.text.startsWith('/')) return;
+      // v4.2-fix: deduplica mensagens reenviadas pelo Telegram em caso de 409/restart
+      if (msg.message_id) {
+        if (this.processedMessageIds.has(msg.message_id)) {
+          console.log(`[TG] Ignorando mensagem duplicada ${msg.message_id}`);
+          return;
+        }
+        this.processedMessageIds.add(msg.message_id);
+        // limpa cache para não crescer indefinidamente
+        if (this.processedMessageIds.size > 1000) {
+          const first = this.processedMessageIds.values().next().value;
+          this.processedMessageIds.delete(first);
+        }
+      }
       await this._handleUserMessage(msg);
     });
 
@@ -105,7 +129,12 @@ class TelegramLunaAdapter {
 
     // ── Erros ──
     this.bot.on('polling_error', (err) => {
-      console.warn('[TG] Polling error:', err.message || err);
+      const msg = err.message || err.code || String(err);
+      console.warn('[TG] Polling error:', msg);
+      // v4.2-fix: 409 geralmente significa outra instância fazendo polling
+      if (msg.includes('409') || msg.includes('Conflict')) {
+        console.error('[TG] ⚠️  Outra instância do bot parece estar rodando. Verifique processos duplicados no PM2.');
+      }
     });
   }
 
@@ -143,7 +172,9 @@ class TelegramLunaAdapter {
       `• \`/kimi on\` — eu acordo e respondo todas as mensagens\n` +
       `• \`/kimi off\` — eu durmo e ignoro mensagens automáticas\n` +
       `• \`/status\` — ver status atual\n` +
-      `• \`/newaba\` — nova sessão de chat`,
+      `• \`/newaba\` — nova sessão de chat\n` +
+      `• \`/reiniciar\` — limpa tudo e reinicia a Luna\n` +
+      `• \`/cancel\` — cancela uma resposta travada`,
       { parse_mode: 'Markdown' }
     );
   }
@@ -185,10 +216,60 @@ class TelegramLunaAdapter {
       this.sessionManager.clearContext(sessionId);
       this.activeStreams.delete(chatId);
       this.activeUsers.delete(userId);
+      this.processedMessageIds.clear();
       await this.bot.sendMessage(chatId, '🆕 *Nova sessão iniciada!*', { parse_mode: 'Markdown' });
     } catch (e) {
       await this.bot.sendMessage(chatId, `❌ Erro: ${e.message}`);
     }
+  }
+
+  async _cmdReiniciar(msg) {
+    const chatId = msg.chat.id;
+    const userId = `telegram-${chatId}`;
+    const sessionId = userId;
+    try {
+      // Cancela stream ativo no servidor e limpa estado local
+      await this._callServerCancel(sessionId);
+      this.sessionManager.clearContext(sessionId);
+      this.activeStreams.delete(chatId);
+      this.activeUsers.delete(userId);
+      this.processedMessageIds.clear();
+      this.awakeChats.add(chatId);
+      this._saveAwakeState();
+      await this.bot.sendMessage(chatId,
+        '🔄 *Luna reiniciada!*\n\nSessão zerada e estado limpo. Pode falar comigo agora.',
+        { parse_mode: 'Markdown', reply_to_message_id: msg.message_id }
+      );
+    } catch (e) {
+      console.error('[TG] /reiniciar error:', e);
+      // Mesmo se o server falhar, limpa estado local
+      this.sessionManager.clearContext(sessionId);
+      this.activeStreams.delete(chatId);
+      this.activeUsers.delete(userId);
+      this.awakeChats.add(chatId);
+      this._saveAwakeState();
+      await this.bot.sendMessage(chatId,
+        '⚠️ *Reinício parcial.*\n\nO servidor não respondeu, mas limpei o estado local. Tente novamente.',
+        { parse_mode: 'Markdown', reply_to_message_id: msg.message_id }
+      );
+    }
+  }
+
+  async _cmdCancel(msg) {
+    const chatId = msg.chat.id;
+    const userId = `telegram-${chatId}`;
+    const sessionId = userId;
+    try {
+      await this._callServerCancel(sessionId);
+    } catch (e) {
+      console.warn('[TG] /cancel server call failed:', e.message);
+    }
+    this.activeUsers.delete(userId);
+    this.activeStreams.delete(chatId);
+    await this.bot.sendMessage(chatId,
+      '✋ *Cancelado.* Se a Luna estava travada, agora pode mandar uma nova mensagem.',
+      { parse_mode: 'Markdown', reply_to_message_id: msg.message_id }
+    );
   }
 
   async _cmdKimi(msg, match) {
@@ -263,12 +344,19 @@ class TelegramLunaAdapter {
             console.log(`[TG] SSE progress: ${ev.type} (events=${events.length})`);
           }
         }
+        // v4.2-fix: encerra o stream assim que o servidor sinaliza done ou error
+        if (ev.type === 'done' || ev.type === 'error' || ev.type === 'stream_end') {
+          done = true;
+          sse.close();
+        }
       } catch (e) {
         console.warn('[TG] SSE parse error:', e.message);
       }
     };
     sse.onerror = (e) => {
       error = e;
+      done = true;
+      sse.close();
     };
     sse.addEventListener('close', () => {
       done = true;
@@ -302,8 +390,10 @@ class TelegramLunaAdapter {
 
     // Consome até ver done/error ou timeout
     const deadline = Date.now() + STREAM_TIMEOUT_MS;
+    let lastEventAt = Date.now();
     while (Date.now() < deadline) {
       while (events.length) {
+        lastEventAt = Date.now();
         yield events.shift();
       }
       if (done) break;
@@ -311,9 +401,33 @@ class TelegramLunaAdapter {
         sse.close();
         throw new Error('Erro na conexão SSE com Luna');
       }
+      // v4.2-fix: se ficar mais de 90s sem eventos, encerra para não travar o chat
+      if (Date.now() - lastEventAt > 90000) {
+        sse.close();
+        throw new Error('A Luna parou de enviar dados. Use /reiniciar ou /cancel se persistir.');
+      }
       await new Promise(r => setTimeout(r, 200));
     }
     sse.close();
+  }
+
+  /** Envia cancelamento de stream para o luna-server. */
+  async _callServerCancel(sessionId) {
+    return new Promise((resolve, reject) => {
+      const req = http.request(`${LUNA_API_URL}/api/chat/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 8000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => data += chunk);
+        res.on('end', () => resolve({ status: res.statusCode, data }));
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('cancel timeout')); });
+      req.write(JSON.stringify({ sessionId }));
+      req.end();
+    });
   }
 
   /** Garante que a sessão exista no luna-server (cria se não existir). */
@@ -353,10 +467,19 @@ class TelegramLunaAdapter {
     const userId = `telegram-${chatId}`;
     const text = msg.text;
 
-    // Se o chat NÃO está no modo persistente, ignora mensagens genéricas
+    // Se o chat NÃO está no modo persistente, avisa uma vez e ignora
     if (!this.awakeChats.has(chatId)) {
+      if (!this.sleepingNotified.has(chatId)) {
+        this.sleepingNotified.add(chatId);
+        await this.bot.sendMessage(chatId,
+          '😴 *Luna dormindo.*\n\nMande `/kimi on` para eu acordar e responder suas mensagens.',
+          { parse_mode: 'Markdown', reply_to_message_id: msg.message_id }
+        );
+      }
       return;
     }
+    // Se acordou, reseta flag de notificação
+    this.sleepingNotified.delete(chatId);
 
     // Health-check rápido
     const serverOk = await this._healthCheck();
@@ -368,14 +491,16 @@ class TelegramLunaAdapter {
       return;
     }
 
-    // Evita overlapping
+    // Evita overlapping, mas expira lock travado após 3 min
+    this._clearStaleLocks();
     if (this.activeUsers.has(userId)) {
-      await this.bot.sendMessage(chatId, '⏳ Aguarde a resposta anterior...', {
-        reply_to_message_id: msg.message_id,
-      });
+      await this.bot.sendMessage(chatId,
+        '⏳ Aguarde a resposta anterior...\nSe travou, use /cancel ou /reiniciar.',
+        { reply_to_message_id: msg.message_id }
+      );
       return;
     }
-    this.activeUsers.add(userId);
+    this.activeUsers.set(userId, { since: Date.now(), messageId: msg.message_id });
 
     // Carrega persona salva
     const prefPath = path.join(SESSION_DIR, `${sanitizeChatId(chatId)}-persona.json`);
@@ -506,6 +631,18 @@ class TelegramLunaAdapter {
       clearTimeout(timeoutId);
       this.activeUsers.delete(userId);
       this.activeStreams.delete(chatId);
+    }
+  }
+
+  /** Remove locks de usuários que travaram por mais de 3 minutos. */
+  _clearStaleLocks() {
+    const staleThreshold = Date.now() - 3 * 60 * 1000;
+    for (const [userId, meta] of this.activeUsers.entries()) {
+      if (meta.since < staleThreshold) {
+        console.warn(`[TG] Removendo lock travado de ${userId}`);
+        this.activeUsers.delete(userId);
+        this.activeStreams.delete(userId.replace('telegram-', ''));
+      }
     }
   }
 

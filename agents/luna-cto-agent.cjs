@@ -9,6 +9,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 const { LunaBrain } = require('./LunaBrain_v16.js');
 const { SmartClassifier, resolveAuthor } = require('./SmartClassifier_v16.js');
 const { IntentParser } = require('./core/IntentParser.js');
@@ -141,6 +142,107 @@ const isAuthorizedChat = (chatId) => {
 };
 
 const SESSION_DATA_PATH = path.join(__dirname, '..', 'ARTIFACTS', 'wwebjs-auth');
+const PROFILE_DIR = path.join(SESSION_DATA_PATH, 'session-luna-main');
+const LOCK_FILE = path.join(PROFILE_DIR, 'SingletonLock');
+
+/**
+ * Detecta se o profile do Chromium/WhatsApp já está bloqueado por outro processo.
+ * O Puppeteer/Chrome cria o arquivo SingletonLock enquanto o profile está em uso.
+ */
+function isProfileLocked() {
+  try {
+    return fs.existsSync(LOCK_FILE);
+  } catch (e) {
+    return false;
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Tenta liberar o profile encontrando e encerrando processos antigos que o usam.
+ * Evita matar o próprio processo.
+ */
+async function releaseProfileLock() {
+  try {
+    log.warn(`[LOCK] Profile parece estar em uso: ${LOCK_FILE}`);
+    let pids = [];
+    try {
+      const stdout = execSync(`fuser ${PROFILE_DIR} 2>/dev/null || true`, { encoding: 'utf8', timeout: 5000 });
+      pids = stdout.split(/\s+/).map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n !== process.pid);
+    } catch (e) {
+      log.info('[LOCK] fuser não encontrou processos ou não está disponível.');
+    }
+    if (pids.length === 0) {
+      try {
+        const stdout = execSync(`lsof +D ${PROFILE_DIR} 2>/dev/null | awk 'NR>1 {print $2}' || true`, { encoding: 'utf8', timeout: 5000 });
+        pids = stdout.split(/\s+/).map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n !== process.pid);
+      } catch (e) {
+        log.info('[LOCK] lsof não encontrou processos ou não está disponível.');
+      }
+    }
+    if (pids.length === 0) {
+      // Fallback: procura por processos conhecidos do scheduler/agente
+      try {
+        const stdout = execSync(`ps aux | grep -E "luna-scheduler|luna-cto-agent|nexo-whatsapp-agent" | grep -v grep | awk '{print $2}'`, { encoding: 'utf8', timeout: 5000 });
+        pids = stdout.split(/\s+/).map(s => parseInt(s, 10)).filter(n => Number.isInteger(n) && n !== process.pid);
+      } catch (e) {
+        log.info('[LOCK] ps/grep não encontrou processos do scheduler/agente.');
+      }
+    }
+    if (pids.length > 0) {
+      log.warn(`[LOCK] Encerrando processos que seguram o profile: ${pids.join(', ')}`);
+      for (const pid of pids) {
+        try {
+          process.kill(pid, 'SIGTERM');
+        } catch (e) {
+          log.info(`[LOCK] Processo ${pid} já encerrou (SIGTERM).`);
+        }
+      }
+      await sleep(2000);
+      // Força SIGKILL para processos que não encerraram
+      for (const pid of pids) {
+        try {
+          process.kill(pid, 0); // verifica se existe
+          process.kill(pid, 'SIGKILL');
+        } catch (e) {
+          log.info(`[LOCK] Processo ${pid} já encerrou (SIGKILL).`);
+        }
+      }
+    }
+    // Remove o lock file se sobrou (cauteloso: só se o PID não existir)
+    if (fs.existsSync(LOCK_FILE)) {
+      try {
+        fs.unlinkSync(LOCK_FILE);
+        log.warn('[LOCK] SingletonLock removido manualmente após cleanup.');
+      } catch (e) {
+        log.warn(`[LOCK] Não foi possível remover SingletonLock: ${e.message}`);
+      }
+    }
+  } catch (e) {
+    log.warn(`[LOCK] Erro ao tentar liberar profile: ${e.message}`);
+  }
+}
+
+async function ensureProfileAvailable(maxAttempts = 3, baseDelayMs = 1000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (!isProfileLocked()) {
+      log.info('[LOCK] Profile livre. Prosseguindo com inicialização.');
+      return true;
+    }
+    log.warn(`[LOCK] Profile bloqueado (tentativa ${attempt}/${maxAttempts}). Aguardando ${baseDelayMs * attempt}ms...`);
+    if (attempt === maxAttempts) {
+      await releaseProfileLock();
+      await sleep(1000);
+      if (!isProfileLocked()) return true;
+      throw new Error(`Profile WhatsApp ainda bloqueado após ${maxAttempts} tentativas: ${LOCK_FILE}`);
+    }
+    await sleep(baseDelayMs * attempt);
+  }
+  return true;
+}
 
 const CONFIG = {
   REPORT_TO: 'Production',
@@ -809,6 +911,14 @@ class LunaAgent {
     const isHeadless = headless || process.argv.includes('--headless');
     log.extraordinary('=== LUNA v19.0 "MODO CONCIERGE" ===');
     log.info(`whatsapp-web.js + Playwright CDP hibrido (headless: ${isHeadless})`);
+
+    // v19.1-fix: evita crash loop "browser is already running" detectando/mutex do profile
+    try {
+      await ensureProfileAvailable(3, 1500);
+    } catch (lockErr) {
+      log.error(`[LOCK] Não foi possível obter o profile WhatsApp: ${lockErr.message}`);
+      throw lockErr;
+    }
 
     this.client = new Client({
       authStrategy: new LocalAuth({ clientId: 'luna-main', dataPath: SESSION_DATA_PATH, rmMaxRetries: 1 }),

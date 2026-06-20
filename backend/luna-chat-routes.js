@@ -5,10 +5,12 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { execSync, exec } = require('child_process');
+const { execSync, exec, execFileSync } = require('child_process');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const db = require('./db');
 const JSZip = require('jszip');
+const { resolveJwtSecret } = require('./config-validator');
 
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
@@ -346,7 +348,7 @@ router.post('/api/chat', async (req, res) => {
     }];
     finalMessage = `[Arquivo anexado: message.txt (${messageBytes} bytes)]`;
     console.log(`[WEB] Message ${messageBytes} bytes converted to message.txt for session ${session.id}`);
-    setTimeout(() => { try { fs.unlinkSync(tmpFile); } catch {} }, 60000);
+    setTimeout(() => { try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore cleanup errors */ } }, 60000);
   }
 
   // v6.1-fix: Use client-provided messageId for deduplication, or generate one
@@ -959,7 +961,7 @@ async function testTelegram(token) {
 
 function testNode() {
   try {
-    const version = execSync('node -v', { encoding: 'utf-8', timeout: 5000 }).trim();
+    const version = execFileSync('node', ['-v'], { encoding: 'utf-8', timeout: 5000 }).trim();
     const major = parseInt(version.replace('v', '').split('.')[0]);
     return { ok: true, version, sufficient: major >= 20, message: major >= 20 ? `Node.js ${version} ✅` : `Node.js ${version} — precisa v20+` };
   } catch (e) { return { ok: false, error: 'Node.js não encontrado no PATH' }; }
@@ -969,7 +971,7 @@ function testChrome() {
   const commands = ['google-chrome', 'chromium-browser', 'chromium', 'google-chrome-stable'];
   for (const cmd of commands) {
     try {
-      const version = execSync(`${cmd} --version 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 }).trim();
+      const version = execFileSync(cmd, ['--version'], { encoding: 'utf-8', timeout: 5000 }).trim();
       return { ok: true, command: cmd, version };
     } catch (e) { /* try next */ }
   }
@@ -1166,22 +1168,81 @@ router.post('/api/plan/revise', (req, res) => {
 // ============================================================
 
 const LUNA_NEXO_SCRIPT = '/home/jhin/NEXO_DASHBOARD_PRO/luna-nexo.sh';
+const ALLOWED_SCRIPT_ACTIONS = new Set(['start', 'stop', 'restart']);
+
+function isPortListening(port) {
+  return new Promise((resolve) => {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return resolve(false);
+    const server = require('net').createServer();
+    server.once('error', (err) => {
+      resolve(err.code === 'EADDRINUSE');
+    });
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+async function pgrepFirstPidSafe(pattern) {
+  if (typeof pattern !== 'string' || !/^[a-zA-Z0-9_.\-\/]+$/.test(pattern)) return null;
+  return new Promise((resolve) => {
+    let stdout = '';
+    const child = require('child_process').spawn('pgrep', ['-f', pattern], { stdio: ['ignore', 'pipe', 'ignore'] });
+    child.stdout.on('data', d => stdout += d.toString());
+    child.on('close', (code) => {
+      if (code !== 0) return resolve(null);
+      const pids = stdout.trim().split('\n').filter(Boolean);
+      const pid = pids.length > 0 ? parseInt(pids[0], 10) : null;
+      resolve(Number.isFinite(pid) && pid > 0 ? pid : null);
+    });
+    child.on('error', () => resolve(null));
+  });
+}
+
+async function processUptime(pid) {
+  if (!Number.isFinite(pid) || pid <= 0) return '?';
+  return new Promise((resolve) => {
+    let stdout = '';
+    const child = require('child_process').spawn('ps', ['-p', String(pid), '-o', 'etime='], { stdio: ['ignore', 'pipe', 'ignore'] });
+    child.stdout.on('data', d => stdout += d.toString());
+    child.on('close', (code) => resolve(code === 0 ? stdout.trim() : '?'));
+    child.on('error', () => resolve('?'));
+  });
+}
 
 function runScript(action, timeoutMs = 30000) {
+  if (!ALLOWED_SCRIPT_ACTIONS.has(action)) {
+    console.warn(`[LunaSystem] Ação não permitida: ${action}`);
+    return Promise.resolve({ ok: false, error: 'Ação não permitida' });
+  }
+  if (!fs.existsSync(LUNA_NEXO_SCRIPT)) {
+    return Promise.resolve({ ok: false, error: `Script não encontrado: ${LUNA_NEXO_SCRIPT}` });
+  }
+  console.warn(`[LunaSystem] Executando script: bash ${LUNA_NEXO_SCRIPT} ${action}`);
   return new Promise((resolve) => {
-    const cmd = `bash "${LUNA_NEXO_SCRIPT}" ${action} 2>&1`;
-    exec(cmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
-      if (error && error.killed) {
-        resolve({ ok: false, error: 'Timeout — comando demorou demais' });
-        return;
-      }
-      const output = stdout || stderr || '';
-      resolve({ ok: !error, output: output.trim(), error: error?.message });
+    const child = require('child_process').spawn('bash', [LUNA_NEXO_SCRIPT, action], { timeout: timeoutMs });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve({ ok: false, error: 'Timeout — comando demorou demais' });
+    }, timeoutMs);
+    child.stdout.on('data', d => stdout += d.toString());
+    child.stderr.on('data', d => stderr += d.toString());
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ ok: code === 0, output: (stdout || stderr || '').trim(), error: code === 0 ? null : stderr || 'exit code ' + code });
+    });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: err.message });
     });
   });
 }
 
-function getServiceStatus() {
+async function getServiceStatus() {
   const results = {};
   const services = [
     { name: 'nexo-dashboard', port: 3456, label: 'Dashboard NEXO PRO' },
@@ -1189,23 +1250,19 @@ function getServiceStatus() {
     { name: 'luna-web-vite', port: 5173, label: 'Luna Web Vite' },
   ];
   for (const svc of services) {
-    try {
-      execSync(`ss -tlnp | grep -q ':${svc.port} '`, { timeout: 3000 });
-      results[svc.name] = { status: 'running', port: svc.port, label: svc.label };
-    } catch {
-      results[svc.name] = { status: 'stopped', port: svc.port, label: svc.label };
-    }
+    const listening = await isPortListening(svc.port);
+    results[svc.name] = { status: listening ? 'running' : 'stopped', port: svc.port, label: svc.label };
   }
   // Telegram bot
   try {
-    const tgPid = execSync("pgrep -f 'telegram-luna-adapter.cjs' | head -1", { encoding: 'utf-8', timeout: 3000 }).trim();
+    const tgPid = await pgrepFirstPidSafe('telegram-luna-adapter.cjs');
     if (tgPid) {
-      const uptime = execSync(`ps -p ${tgPid} -o etime= 2>/dev/null || echo '?'`, { encoding: 'utf-8', timeout: 3000 }).trim();
-      results['telegram-bot'] = { status: 'running', pid: parseInt(tgPid), uptime, label: 'Bot do Telegram' };
+      const uptime = await processUptime(tgPid);
+      results['telegram-bot'] = { status: 'running', pid: tgPid, uptime, label: 'Bot do Telegram' };
     } else {
       results['telegram-bot'] = { status: 'stopped', label: 'Bot do Telegram' };
     }
-  } catch {
+  } catch (e) {
     results['telegram-bot'] = { status: 'stopped', label: 'Bot do Telegram' };
   }
   // Kimi Bridge status via Luna Soul
@@ -1223,7 +1280,7 @@ function getServiceStatus() {
     } else {
       results['kimi-bridge'] = { status: 'disconnected', label: 'Kimi Bridge' };
     }
-  } catch {
+  } catch (e) {
     results['kimi-bridge'] = { status: 'disconnected', label: 'Kimi Bridge' };
   }
   // Luna Soul status
@@ -1234,7 +1291,7 @@ function getServiceStatus() {
       ready: lunaReady,
       hasSessionManager: lunaSoul?.sessionManager !== undefined,
     };
-  } catch {
+  } catch (e) {
     results['luna-soul'] = { status: 'not-ready', label: 'Luna Soul' };
   }
   return results;
@@ -1256,12 +1313,12 @@ router.post('/api/system/start', async (req, res) => {
 });
 
 router.get('/api/system/status', async (req, res) => {
-  const status = getServiceStatus();
+  const status = await getServiceStatus();
   res.json({ ok: true, status });
 });
 
 router.get('/api/system/health', async (req, res) => {
-  const status = getServiceStatus();
+  const status = await getServiceStatus();
   const allRunning = Object.values(status).every(s => s.status === 'running' || s.status === 'connected');
   res.json({
     ok: allRunning,
@@ -1273,7 +1330,7 @@ router.get('/api/system/health', async (req, res) => {
 
 // v10.2: Agent status — simplified for frontend polling
 router.get('/api/system/agent', async (req, res) => {
-  const status = getServiceStatus();
+  const status = await getServiceStatus();
   const soul = status['luna-soul'];
   const bridge = status['kimi-bridge'];
   const server = status['luna-web-server'];
@@ -1323,9 +1380,28 @@ router.post('/api/system/invisible', async (req, res) => {
 
 router.get('/api/system/logs', async (req, res) => {
   const lines = parseInt(req.query.lines) || 50;
+  if (!Number.isInteger(lines) || lines < 1 || lines > 1000) {
+    return res.status(400).json({ ok: false, error: 'lines deve estar entre 1 e 1000' });
+  }
+  console.warn(`[LunaSystem] Executando journalctl --user -u luna-server -n ${lines}`);
   const result = await new Promise((resolve) => {
-    exec(`journalctl --user -u luna-server -n ${lines} --no-pager 2>&1 || echo "Logs não disponíveis via journalctl"`, { timeout: 10000 }, (error, stdout) => {
-      resolve({ output: stdout?.trim() || 'Nenhum log disponível' });
+    const child = require('child_process').spawn('journalctl', ['--user', '-u', 'luna-server', '-n', String(lines), '--no-pager'], { timeout: 10000 });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve({ output: 'Timeout ao ler logs' });
+    }, 10000);
+    child.stdout.on('data', d => stdout += d.toString());
+    child.stderr.on('data', d => stderr += d.toString());
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const output = stdout.trim() || stderr.trim() || 'Nenhum log disponível';
+      resolve({ output: code === 0 ? output : (output + '\n(journalctl pode não estar disponível)') });
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve({ output: 'Logs não disponíveis via journalctl' });
     });
   });
   res.json({ ok: true, logs: result.output });
@@ -1364,7 +1440,7 @@ router.post('/api/system/test-connection', async (req, res) => {
     const token = req.body.token;
     if (!token) return res.status(400).json({ ok: false, error: 'token obrigatório' });
     try {
-      jwt.verify(token, process.env.JWT_SECRET || 'nexo-test-secret-2026');
+      jwt.verify(token, resolveJwtSecret());
       res.json({ ok: true, message: 'Token válido' });
     } catch (e) {
       res.json({ ok: false, error: 'Token inválido: ' + e.message });
@@ -1426,7 +1502,7 @@ router.post('/api/selfhost/download', async (req, res) => {
 
 TELEGRAM_BOT_TOKEN=${env.TELEGRAM_BOT_TOKEN || 'your_telegram_bot_token_here'}
 INTERNAL_API_TOKEN=${env.INTERNAL_API_TOKEN || 'your_dashboard_api_token_here'}
-JWT_SECRET=${env.JWT_SECRET || require('crypto').randomBytes(32).toString('hex')}
+JWT_SECRET=${env.JWT_SECRET || 'REQUIRED_DEFINE_JWT_SECRET'}
 
 # ── OPTIONAL ──
 
@@ -1491,18 +1567,29 @@ node luna-server.js
 
     // Create zip
     const zipPath = `${tmpDir}.zip`;
+    console.warn(`[SelfHost] Executando zip -r ${zipPath} .`);
     await new Promise((resolve, reject) => {
-      exec(`cd ${tmpDir} && zip -r ${zipPath} .`, { timeout: 30000 }, (err) => {
-        if (err) reject(err);
-        else resolve();
+      const child = require('child_process').spawn('zip', ['-r', zipPath, '.'], { cwd: tmpDir, timeout: 30000 });
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error('Timeout ao criar zip'));
+      }, 30000);
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code === 0) resolve();
+        else reject(new Error(`zip falhou com código ${code}`));
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
       });
     });
 
     res.download(zipPath, 'luna-selfhost.zip', (err) => {
       // Cleanup temp files after sending
       setTimeout(() => {
-        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-        try { fs.unlinkSync(zipPath); } catch {}
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ignore cleanup errors */ }
+        try { fs.unlinkSync(zipPath); } catch (e) { /* ignore cleanup errors */ }
       }, 30000);
       if (err) console.error('Download error:', err.message);
     });
@@ -1538,9 +1625,7 @@ setInterval(async () => {
     }
 
     // Also check if port 3458 is listening
-    const portOpen = await new Promise((resolve) => {
-      exec('ss -tlnp | grep -q ":3458 "', { timeout: 5000 }, (err) => resolve(!err));
-    });
+    const portOpen = await isPortListening(3458);
     if (!portOpen) {
       healthCheckConsecutiveFailures++;
       console.error(`[AUTO-HEALTH] Porta 3458 fechada! Falha #${healthCheckConsecutiveFailures}`);

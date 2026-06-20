@@ -28,7 +28,19 @@ const express = require('express');
 const { KimiBridge } = require('./kimi-bridge.cjs');
 
 const PORT = parseInt(process.env.KIMI_BRIDGE_API_PORT, 10) || 9223;
-const API_KEY = process.env.KIMI_BRIDGE_API_KEY || 'nexo-kimi-local-2026';
+
+let API_KEY = process.env.KIMI_BRIDGE_API_KEY;
+if (!API_KEY || String(API_KEY).trim().length === 0) {
+  if (process.env.NODE_ENV === 'test') {
+    console.warn('[SECURITY] KIMI_BRIDGE_API_KEY não definida. Modo teste — usando fallback inseguro.');
+    API_KEY = 'nexo-kimi-local-2026';
+  } else {
+    console.error('\n❌❌❌ FATAL: KIMI_BRIDGE_API_KEY não está definida no ambiente ❌❌❌');
+    console.error('   A Bridge API não pode iniciar sem uma chave secreta em produção.');
+    console.error(`   NODE_ENV atual: ${process.env.NODE_ENV || '(não definido)'}`);
+    process.exit(1);
+  }
+}
 const CDP_URL = process.env.KIMI_CDP_URL || 'http://localhost:9222';
 
 const app = express();

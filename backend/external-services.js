@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ExternalServices - Wrapper cacheado para CLI tools externos
  * Todas as operações usam spawn com timeout + fallback para cache
  */
@@ -48,7 +48,9 @@ class ExternalServices {
               offline: true,
               parseError: e.message
             };
-          } catch {}
+          } catch (parseErr) {
+            console.warn('[ExternalServices] Cache corrompido em getGitHubRepos:', parseErr.message);
+          }
         }
         return { repos: [], error: 'Falha ao parsear resposta do GitHub CLI', raw: result.data };
       }
@@ -67,7 +69,9 @@ class ExternalServices {
           spawnError: result.error,
           code: result.code
         };
-      } catch {}
+      } catch (parseErr) {
+        console.warn('[ExternalServices] Cache corrompido em getGitHubRepos fallback:', parseErr.message);
+      }
     }
 
     return { repos: [], error: 'GitHub CLI não disponível. Configure com `gh auth login`.' };

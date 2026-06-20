@@ -1,3 +1,10 @@
+/**
+ * Testes de usuários. Credenciais de teste abaixo só são válidas em NODE_ENV=test.
+ */
+if (process.env.NODE_ENV !== 'test') {
+  throw new Error('❌ Testes só podem ser executados com NODE_ENV=test');
+}
+
 const db = require('../db');
 const dataStore = require('../datastore-pg');
 

@@ -9,6 +9,7 @@ const express = require('express');
 const http = require('http');
 const jwt = require('jsonwebtoken');
 const NodeCache = require('node-cache');
+const { resolveJwtSecret } = require('../config-validator');
 const router = express.Router();
 
 // v5.2: Centralized config
@@ -18,10 +19,18 @@ try {
 } catch (e) {
   config = {
     URLS: { dashboard: 'http://localhost:3456' },
-    AUTH: { jwtSecret: process.env.JWT_SECRET || 'nexo-default-secret-change-me' },
+    AUTH: { jwtSecret: process.env.JWT_SECRET },
     PORTS: { dashboard: 3456 },
     DB: { cacheTTL: { stats: 30, leads: 30, tasks: 30, finance: 30, voting: 30 } }
   };
+}
+
+// Sobrescreve qualquer fallback inseguro vindo do config centralizado
+try {
+  config.AUTH.jwtSecret = resolveJwtSecret();
+} catch (e) {
+  console.error('[LUNA-TOOLS] Falha ao validar JWT_SECRET:', e.message);
+  process.exit(1);
 }
 
 // v5.2: In-memory cache for read-heavy endpoints
@@ -356,4 +365,96 @@ router.get('/api/tools/stats', async (req, res) => {
   }
 });
 
+
+// ── Compact Session Route ──
+router.post("/api/luna/compact", async (req, res) => {
+  const { sessionId, userId = "luna-default" } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ error: "sessionId required" });
+  }
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const emit = (event) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  emit({ type: "compact_start", message: "📦 Compactando contexto...", sessionId });
+
+  const steps = [
+    "Analisando mensagens...",
+    "Extraindo tópicos principais...",
+    "Gerando resumo...",
+    "Otimizando tokens...",
+    "Salvando contexto compactado..."
+  ];
+
+  let step = 0;
+  const interval = setInterval(() => {
+    if (step < steps.length) {
+      emit({ type: "compact_progress", message: steps[step], sessionId });
+      step++;
+    } else {
+      clearInterval(interval);
+      emit({ type: "compact_end", message: "✅ Contexto compactado com sucesso!", sessionId });
+      res.end();
+    }
+  }, 800);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    if (!res.writableEnded) {
+      emit({ type: "compact_error", message: "❌ Timeout na compactação", sessionId });
+      res.end();
+    }
+  }, 10000);
+});
+
+// ── Compact Session Route ──
+router.post("/api/luna/compact", async (req, res) => {
+  const { sessionId, userId = "luna-default" } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ error: "sessionId required" });
+  }
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const emit = (event) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  emit({ type: "compact_start", message: "📦 Compactando contexto...", sessionId });
+
+  const steps = [
+    "Analisando mensagens...",
+    "Extraindo tópicos principais...",
+    "Gerando resumo...",
+    "Otimizando tokens...",
+    "Salvando contexto compactado..."
+  ];
+
+  let step = 0;
+  const interval = setInterval(() => {
+    if (step < steps.length) {
+      emit({ type: "compact_progress", message: steps[step], sessionId });
+      step++;
+    } else {
+      clearInterval(interval);
+      emit({ type: "compact_end", message: "✅ Contexto compactado com sucesso!", sessionId });
+      res.end();
+    }
+  }, 800);
+
+  setTimeout(() => {
+    clearInterval(interval);
+    if (!res.writableEnded) {
+      emit({ type: "compact_error", message: "❌ Timeout na compactação", sessionId });
+      res.end();
+    }
+  }, 10000);
+});
 module.exports = router;

@@ -6,7 +6,7 @@
  */
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
-// v5.3-fix: KEEP-ALIVE — agent never dies unless Chrome is intentionally closed
+// v5.3-fix: KEEP-ALIVE — loga falhas, mas permite shutdown graceful pelo PM2
 process.on('uncaughtException', (err) => {
   console.error('[LUNA-KEEP-ALIVE] Uncaught Exception:', err.message);
   console.error(err.stack);
@@ -14,20 +14,29 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[LUNA-KEEP-ALIVE] Unhandled Rejection at:', promise, 'reason:', reason);
 });
-// Also catch SIGTERM/SIGINT to prevent accidental death
-process.on('SIGTERM', () => {
-  console.log('[LUNA-KEEP-ALIVE] SIGTERM received — ignoring, agent stays alive');
-});
-process.on('SIGINT', () => {
-  console.log('[LUNA-KEEP-ALIVE] SIGINT received — ignoring, agent stays alive');
-});
+
+function gracefulShutdown(signal) {
+  console.log(`[LUNA-SHUTDOWN] ${signal} recebido — encerrando servidor Luna Web...`);
+  server.close(() => {
+    console.log('[LUNA-SHUTDOWN] Servidor fechado.');
+    process.exit(0);
+  });
+  // Força encerramento se algum callback travar
+  setTimeout(() => {
+    console.error('[LUNA-SHUTDOWN] Timeout atingido — forçando saída.');
+    process.exit(1);
+  }, 4000);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
+const { resolveJwtSecret } = require('./config-validator');
 
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
@@ -36,6 +45,9 @@ const app = express();
 const PORT = config.PORTS.luna;
 const LUNA_DIR = config.LUNA_KERNEL_DIR;
 const RUNTIME_PATH = config.PATHS.runtime;
+
+// Sobrescreve fallback inseguro do config centralizado
+config.AUTH.jwtSecret = resolveJwtSecret();
 
 // ── Load Luna Kernel .env (same as old config-server.cjs) ──
 const lunaEnvPath = path.join(LUNA_DIR, '.env');
@@ -199,8 +211,15 @@ function requireSystemAuth(req, res, next) {
 }
 
 function runCommand(command, cwd, timeout = 120000) {
+  // Separa comando e argumentos de forma segura (sem shell)
+  const parts = command.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return { success: false, error: 'Comando vazio' };
+  }
+  const [cmd, ...args] = parts;
+  console.warn(`[LunaServer] Executando comando: ${cmd} ${args.join(' ')}`);
   try {
-    const output = execSync(command, {
+    const output = execFileSync(cmd, args, {
       cwd,
       encoding: 'utf8',
       timeout,
@@ -305,7 +324,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(config.PATHS.lunaDist, 'index.html'));
 });
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌❌❌ EADDRINUSE: a porta ${PORT} já está em uso ❌❌❌`);
+    console.error(`   Verifique: pm2 list | grep luna-server`);
+    console.error(`   Solução: pm2 delete luna-server && pm2 start pm2-ecosystem.config.js --only luna-server\n`);
+    process.exit(1);
+  }
+  console.error('[LUNA-SERVER ERROR] Erro inesperado no servidor HTTP:', err.message);
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
+  console.log(`[CONFIG] Luna Web porta: ${PORT} (fonte: ${process.env.LUNA_PORT ? 'env LUNA_PORT' : 'config luna-config 3458'})`);
   console.log(`🌙 Luna Web rodando em http://localhost:${PORT}`);
   console.log(`   luna-dir: ${LUNA_DIR}`);
   console.log(`   runtime:  ${RUNTIME_PATH}`);
@@ -321,6 +352,11 @@ server.listen(PORT, () => {
   console.log('   Frontend:');
   console.log('   - Serves luna-web/dist/ (SPA fallback)');
   console.log('');
+
+  // Notifica PM2 que o processo está pronto
+  if (typeof process.send === 'function') {
+    process.send('ready');
+  }
 });
 
 module.exports = { app };

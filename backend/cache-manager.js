@@ -1,10 +1,18 @@
-﻿/**
+/**
  * Cache Manager Assíncrono para dados externos (GitHub, Vercel, CLI Tools)
  * Usa spawn com timeout + file-based persistence
  */
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+const ALLOWED_SHELL_COMMANDS = new Set([
+  'node', 'npm', 'npx', 'git', 'gh', 'vercel', 'supabase', 'python', 'python3', 'php'
+]);
+
+function isValidArg(arg) {
+  return typeof arg === 'string' && arg.length > 0 && !/[;&|<>$`\n\r]/.test(arg);
+}
 
 class CacheManager {
   constructor(dataDir, defaultTTL = 600000) { // 10 minutos default
@@ -34,7 +42,9 @@ class CacheManager {
         }
         return { data: raw.data, fresh: false, source: 'file', stale: true };
       }
-    } catch {}
+    } catch (e) {
+      console.warn(`[CacheManager] Falha ao ler cache de ${key}: ${e.message}`);
+    }
     return null;
   }
 
@@ -44,7 +54,11 @@ class CacheManager {
   set(key, data, ttl = this.defaultTTL) {
     const entry = { data, ts: Date.now(), ttl };
     this.memory.set(key, entry);
-    fs.writeFileSync(this._file(key), JSON.stringify(entry, null, 2));
+    try {
+      fs.writeFileSync(this._file(key), JSON.stringify(entry, null, 2));
+    } catch (e) {
+      console.warn(`[CacheManager] Falha ao salvar cache de ${key}: ${e.message}`);
+    }
   }
 
   /**
@@ -55,15 +69,31 @@ class CacheManager {
     try {
       const file = this._file(key);
       if (fs.existsSync(file)) fs.unlinkSync(file);
-    } catch {}
+    } catch (e) {
+      console.warn(`[CacheManager] Falha ao invalidar cache de ${key}: ${e.message}`);
+    }
   }
 
   /**
-   * Executa comando via spawn com timeout e retorna resultado
+   * Executa comando via spawn com timeout e retorna resultado.
+   * Não utiliza shell=true; comandos e argumentos são validados contra whitelist.
    */
   async spawn(command, args = [], options = {}, timeout = 15000) {
+    // Validação de comando
+    const cmdName = path.basename(command);
+    if (!ALLOWED_SHELL_COMMANDS.has(cmdName)) {
+      console.warn(`[CacheManager] Comando não permitido: ${command}`);
+      return { ok: false, error: `Comando não permitido: ${command}` };
+    }
+    if (!Array.isArray(args) || !args.every(isValidArg)) {
+      console.warn(`[CacheManager] Argumentos inválidos para ${command}`);
+      return { ok: false, error: 'Argumentos inválidos' };
+    }
+
+    console.warn(`[CacheManager] Executando shell: ${command} ${args.join(' ')}`);
+
     return new Promise((resolve) => {
-      const proc = spawn(command, args, { ...options, shell: true });
+      const proc = spawn(command, args, { ...options, shell: false });
       let stdout = '';
       let stderr = '';
       const timer = setTimeout(() => {
