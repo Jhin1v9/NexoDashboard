@@ -13,14 +13,6 @@ const DATA_DIR = path.join(__dirname, 'data');
 const SERVERS_FILE = path.join(DATA_DIR, 'dev-servers.json');
 const LOGS_DIR = path.join(DATA_DIR, 'dev-logs');
 
-const ALLOWED_PROCESS_COMMANDS = new Set([
-  'npm', 'npx', 'node', 'php', 'python', 'python3'
-]);
-
-function isValidProcessArg(arg) {
-  return typeof arg === 'string' && arg.length > 0 && !/[;&|<>$`\n\r]/.test(arg);
-}
-
 // ── Real-time log subscribers (SSE) ──
 const logSubscribers = new Map(); // serverId -> Set<callback>
 
@@ -41,7 +33,7 @@ function broadcastLog(serverId, line, isError = false) {
   const subs = logSubscribers.get(serverId);
   if (subs) {
     subs.forEach(cb => {
-      try { cb(line, isError); } catch (e) { /* ignore closed connections */ }
+      try { cb(line, isError); } catch { /* ignore closed connections */ }
     });
   }
 }
@@ -76,10 +68,7 @@ function readJSON(filePath, defaultValue = {}) {
   try {
     if (!fs.existsSync(filePath)) return defaultValue;
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (e) {
-    console.warn(`[ProcessManager] Falha ao ler JSON ${filePath}: ${e.message}`);
-    return defaultValue;
-  }
+  } catch { return defaultValue; }
 }
 
 function writeJSON(filePath, data) {
@@ -148,9 +137,7 @@ function isProcessAlive(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e) {
-    return false;
-  }
+  } catch { return false; }
 }
 
 // ── LOGS ──
@@ -303,7 +290,7 @@ function stopServer(serverId) {
   if (isProcessAlive(srv.pid)) {
     try {
       process.kill(srv.pid, 'SIGTERM');
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   // Aguarda 2s e força kill se ainda vivo
@@ -311,7 +298,7 @@ function stopServer(serverId) {
     if (isProcessAlive(srv.pid)) {
       try {
         process.kill(srv.pid, 'SIGKILL');
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     }
   }, 2000);
 
@@ -324,23 +311,10 @@ function stopServer(serverId) {
 // ── HELPERS ──
 
 function runCommand(cmd, args, options = {}) {
-  const cmdName = path.basename(cmd);
-  if (!ALLOWED_PROCESS_COMMANDS.has(cmdName)) {
-    console.warn(`[ProcessManager] Comando não permitido: ${cmd}`);
-    return Promise.resolve({ success: false, stdout: '', stderr: `Comando não permitido: ${cmd}` });
-  }
-  if (!Array.isArray(args) || !args.every(isValidProcessArg)) {
-    console.warn(`[ProcessManager] Argumentos inválidos para ${cmd}`);
-    return Promise.resolve({ success: false, stdout: '', stderr: 'Argumentos inválidos' });
-  }
-
-  console.warn(`[ProcessManager] Executando comando: ${cmd} ${args.join(' ')}`);
-
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
       cwd: options.cwd || process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false
+      stdio: ['ignore', 'pipe', 'pipe']
     });
     let stdout = '';
     let stderr = '';

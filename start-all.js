@@ -91,9 +91,9 @@ startService('nexo', COLORS.nexo, 'node', ['server.js'], nexoBackend, {
   BIND_IP: '127.0.0.1'
 });
 
-// 2. Luna Config Server (porta 3458)
-const lunaKernel = path.resolve('/home/jhin/.luna-kernel');
-startService('luna', COLORS.luna, 'node', ['config-server.cjs'], lunaKernel);
+// 2. Luna Web Server (porta 3458)
+const lunaBackend = path.resolve('/home/jhin/NEXO_DASHBOARD_PRO/backend');
+startService('luna', COLORS.luna, 'node', ['luna-server.js'], lunaBackend);
 
 // 3. Luna Web Vite (porta 5173) — opcional, só se node_modules existir
 const lunaWeb = path.resolve(__dirname, 'agents', 'luna-web');

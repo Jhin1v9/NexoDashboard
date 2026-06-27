@@ -6,7 +6,7 @@ import http from 'http';
 
 /**
  * Auto-discover the Luna backend port.
- * 1. Reads .luna-runtime.json written by config-server.cjs
+ * 1. Reads .luna-runtime.json written by luna-server.js
  * 2. Falls back to common ports if not found
  */
 function discoverBackendPort() {
@@ -34,7 +34,7 @@ function discoverBackendPort() {
   return fallbackPorts[0];
 }
 
-const BACKEND_PORT = process.env.LUNA_CONFIG_PORT || discoverBackendPort();
+const BACKEND_PORT = process.env.LUNA_PORT || discoverBackendPort();
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 
 export default defineConfig({

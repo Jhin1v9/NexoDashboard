@@ -2,14 +2,7 @@
 /**
  * NEXO Dashboard — E2E Teste em Produção (Render)
  * Testa login de todos usuários e cria dados reais.
- *
- * ⚠️  Este script contém credenciais de teste. Deve ser executado apenas com NODE_ENV=test.
  */
-
-if (process.env.NODE_ENV !== 'test') {
-  console.error('❌ Este script de teste só pode ser executado com NODE_ENV=test');
-  process.exit(1);
-}
 
 const { chromium } = require('playwright');
 
