@@ -12,24 +12,8 @@ const path = require('path');
 const RENDER_URL = 'postgresql://nexo_postgres_rjyq_user:5UmNaxmQxG1Qn5tkAfNEm5CAv3nZvAGP@dpg-d89tk2f7f7vs73cipf30-a.frankfurt-postgres.render.com:5432/nexo_postgres_rjyq?sslmode=require';
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'backend', 'migrations');
 
-// Resolve hash padrão: exige variável de ambiente em produção; fallback inseguro apenas em teste.
-function resolveDefaultPasswordHash() {
-  const envHash = process.env.NEXO_DEFAULT_ADMIN_PASSWORD_HASH;
-  if (envHash && String(envHash).trim().length > 0) {
-    return String(envHash).trim();
-  }
-  if (process.env.NODE_ENV === 'test') {
-    console.warn('[SECURITY] NEXO_DEFAULT_ADMIN_PASSWORD_HASH não definido. Modo teste — usando fallback inseguro de 4 dígitos.');
-    return '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // SHA-256 de "7741"
-  }
-  console.error('\n❌❌❌ FATAL: NEXO_DEFAULT_ADMIN_PASSWORD_HASH não está definido no ambiente ❌❌❌');
-  console.error('   Este script de setup não pode criar usuários com senha padrão em produção.');
-  console.error('   Defina um hash SHA-256 de uma senha forte antes de executar.');
-  console.error(`   NODE_ENV atual: ${process.env.NODE_ENV || '(não definido)'}`);
-  process.exit(1);
-}
-
-const DEFAULT_PASSWORD_HASH = resolveDefaultPasswordHash();
+// Hash SHA-256 de "7741" (senha padrão dos CEOs)
+const DEFAULT_PASSWORD_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
 
 async function withPool(connectionString, fn) {
   const pool = new Pool({ connectionString, connectionTimeoutMillis: 30000 });

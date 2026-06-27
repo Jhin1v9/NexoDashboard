@@ -67,6 +67,52 @@ const webSessions = new Map();
 const activeStreams = new Map();
 const sseConnections = new Map(); // sessionId -> Set of {res, keepAlive, checkInterval}
 
+// v10.32: Local JSON fallback when PostgreSQL is unreachable.
+const SESSIONS_FILE_PATH = path.join(__dirname, 'data', 'luna-chat-sessions.json');
+
+function loadSessionsFromJson() {
+  try {
+    if (!fs.existsSync(SESSIONS_FILE_PATH)) return [];
+    const raw = fs.readFileSync(SESSIONS_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('[JSON] Erro ao carregar sessões:', e.message);
+    return [];
+  }
+}
+
+function saveSessionsToJson(sessions) {
+  try {
+    const dir = path.dirname(SESSIONS_FILE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SESSIONS_FILE_PATH, JSON.stringify(sessions, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[JSON] Erro ao salvar sessões:', e.message);
+  }
+}
+
+function upsertSessionInJson(session) {
+  try {
+    const sessions = loadSessionsFromJson();
+    const idx = sessions.findIndex(s => s.id === session.id);
+    if (idx >= 0) sessions[idx] = session;
+    else sessions.push(session);
+    saveSessionsToJson(sessions);
+  } catch (e) {
+    console.warn('[JSON] Erro ao atualizar sessão:', e.message);
+  }
+}
+
+function removeSessionFromJson(id) {
+  try {
+    const sessions = loadSessionsFromJson().filter(s => s.id !== id);
+    saveSessionsToJson(sessions);
+  } catch (e) {
+    console.warn('[JSON] Erro ao remover sessão:', e.message);
+  }
+}
+
 // Periodic cleanup of orphaned activeStreams (e.g. client disconnect without close event)
 setInterval(() => {
   const now = Date.now();
@@ -113,6 +159,8 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
     updatedAt: new Date().toISOString(),
   };
   webSessions.set(sessionId, session);
+  // v10.32: Persistir no JSON fallback imediatamente (fonte primária quando DB indisponível).
+  upsertSessionInJson(session);
   // Persistir no PostgreSQL (fire-and-forget with retry). Usa ON CONFLICT
   // para não falhar quando o client fornece um sessionId que já existe.
   dbRunWithRetry(
@@ -120,35 +168,49 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, NOW(), NOW())
      ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
     [sessionId, 'anonymous', title, mode, persona, JSON.stringify([]), JSON.stringify([]), null]
-  ).catch(e => console.error('[DB] Erro ao criar sessão:', e.message));
+  ).catch(e => console.warn('[DB] Erro ao criar sessão (mantendo fallback JSON):', e.message));
   return session;
 }
 
 async function loadSessionFromDB(id) {
+  // Try PostgreSQL first.
   try {
     const row = await db.get(
       `SELECT id, title, mode, persona, messages, event_ledger, last_acked_event_id, created_at, updated_at
        FROM luna_chat_sessions WHERE id = $1`,
       [id]
     );
-    if (!row) return null;
-    const session = {
-      id: row.id,
-      title: row.title,
-      mode: row.mode,
-      persona: row.persona || 'default',
-      messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
-      eventLedger: Array.isArray(row.event_ledger) ? row.event_ledger : (typeof row.event_ledger === 'string' ? JSON.parse(row.event_ledger) : []),
-      lastAckedEventId: row.last_acked_event_id || null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
-    webSessions.set(id, session);
-    return session;
+    if (row) {
+      const session = {
+        id: row.id,
+        title: row.title,
+        mode: row.mode,
+        persona: row.persona || 'default',
+        messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
+        eventLedger: Array.isArray(row.event_ledger) ? row.event_ledger : (typeof row.event_ledger === 'string' ? JSON.parse(row.event_ledger) : []),
+        lastAckedEventId: row.last_acked_event_id || null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+      webSessions.set(id, session);
+      return session;
+    }
   } catch (e) {
-    console.error('[DB] Erro ao carregar sessão:', e.message);
-    return null;
+    console.warn('[DB] Erro ao carregar sessão do PG:', e.message);
   }
+
+  // Fallback to JSON cache.
+  try {
+    const sessions = loadSessionsFromJson();
+    const found = sessions.find(s => s.id === id);
+    if (found) {
+      webSessions.set(id, found);
+      return found;
+    }
+  } catch (e) {
+    console.warn('[JSON] Erro ao carregar sessão do JSON:', e.message);
+  }
+  return null;
 }
 
 function getWebSession(id) {
@@ -162,11 +224,13 @@ function deleteWebSession(id) {
     activeStreams.delete(id);
   }
   const result = webSessions.delete(id);
+  // Deletar do JSON fallback.
+  removeSessionFromJson(id);
   // Deletar do PostgreSQL (fire-and-forget with retry)
   dbRunWithRetry(
     `DELETE FROM luna_chat_sessions WHERE id = $1`,
     [id]
-  ).catch(e => console.error('[DB] Erro ao deletar sessão:', e.message));
+  ).catch(e => console.warn('[DB] Erro ao deletar sessão no PG:', e.message));
   return result;
 }
 
@@ -175,11 +239,13 @@ function renameWebSession(id, title) {
   if (session) {
     session.title = title;
     session.updatedAt = new Date().toISOString();
+    // Atualizar no JSON fallback.
+    upsertSessionInJson(session);
     // Atualizar no PostgreSQL (fire-and-forget with retry)
     dbRunWithRetry(
       `UPDATE luna_chat_sessions SET title = $1, updated_at = NOW() WHERE id = $2`,
       [title, id]
-    ).catch(e => console.error('[DB] Erro ao renomear sessão:', e.message));
+    ).catch(e => console.warn('[DB] Erro ao renomear sessão no PG:', e.message));
     return true;
   }
   return false;
@@ -197,12 +263,14 @@ function addMessageToSession(sessionId, message) {
       session.eventLedger = session.eventLedger.slice(-200);
     }
     session.updatedAt = new Date().toISOString();
+    // v10.32: Persistir no JSON fallback imediatamente.
+    upsertSessionInJson(session);
     // Persistir no PostgreSQL (fire-and-forget with retry)
     // v10.16-fix: Also persist eventLedger so reconnects don't lose unacked events
     dbRunWithRetry(
       `UPDATE luna_chat_sessions SET messages = $1::jsonb, event_ledger = $2::jsonb, last_acked_event_id = $3, updated_at = NOW() WHERE id = $4`,
       [JSON.stringify(session.messages), JSON.stringify(session.eventLedger), session.lastAckedEventId || null, sessionId]
-    ).catch(e => console.error('[DB] Erro ao salvar mensagem:', e.message));
+    ).catch(e => console.warn('[DB] Erro ao salvar mensagem no PG:', e.message));
   }
 }
 
@@ -395,6 +463,7 @@ router.post('/api/chat', async (req, res) => {
       userId: 'web-' + session.id,
       mode: ['instant', 'thinking', 'agent', 'swarm'].includes(mode) ? mode : 'instant',
       persona: session.persona || 'default',
+      provider: session.provider || 'kimi',
       files: finalFiles,
     });
 
@@ -653,37 +722,68 @@ router.post('/api/chat/ack', (req, res) => {
   res.json({ ok: true, acked: eventId || (eventIds ? eventIds.length : 0), ledgerSize: session.eventLedger?.length || 0 });
 });
 
-// GET /api/chat/sessions — busca do PostgreSQL (persistência entre reinícios)
+// GET /api/chat/sessions — resposta imediata da memória/JSON; sync com PG em background.
 router.get('/api/chat/sessions', async (req, res) => {
+  // Primary source: in-memory map + JSON fallback (merged by id).
+  let sessions = Array.from(webSessions.values());
   try {
-    const rows = await db.query(
-      `SELECT id, title, mode, messages, created_at, updated_at 
-       FROM luna_chat_sessions ORDER BY updated_at DESC LIMIT 100`
-    );
-    const sessions = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      mode: row.mode || 'instant',
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      messageCount: Array.isArray(row.messages) ? row.messages.length : 0,
-    }));
-    res.json({ ok: true, sessions });
+    const jsonSessions = loadSessionsFromJson();
+    const seen = new Set(sessions.map(s => s.id));
+    for (const s of jsonSessions) {
+      if (!seen.has(s.id)) {
+        sessions.push(s);
+        webSessions.set(s.id, s);
+      }
+    }
   } catch (e) {
-    console.error('[DB] Erro ao listar sessões:', e.message);
-    // Fallback para memória
-    const sessions = Array.from(webSessions.values())
-      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-      .map(s => ({
-        id: s.id,
-        title: s.title,
-        mode: s.mode || 'instant',
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt,
-        messageCount: s.messages.length,
-      }));
-    res.json({ ok: true, sessions });
+    console.warn('[JSON] Erro ao carregar sessões para listagem:', e.message);
   }
+
+  const responseSessions = sessions
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 100)
+    .map(s => ({
+      id: s.id,
+      title: s.title,
+      mode: s.mode || 'instant',
+      provider: s.provider || 'kimi',
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      messageCount: Array.isArray(s.messages) ? s.messages.length : 0,
+    }));
+
+  res.json({ ok: true, sessions: responseSessions });
+
+  // Background: attempt to sync from PostgreSQL without blocking the response.
+  (async () => {
+    try {
+      const rows = await db.query(
+        `SELECT id, title, mode, persona, provider, messages, created_at, updated_at 
+         FROM luna_chat_sessions ORDER BY updated_at DESC LIMIT 100`
+      );
+      for (const row of rows) {
+        const session = {
+          id: row.id,
+          title: row.title,
+          mode: row.mode,
+          persona: row.persona || 'default',
+          provider: row.provider || 'kimi',
+          messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
+          eventLedger: [],
+          lastAckedEventId: null,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+        const existing = webSessions.get(session.id);
+        if (!existing || new Date(session.updatedAt) > new Date(existing.updatedAt)) {
+          webSessions.set(session.id, session);
+        }
+      }
+      saveSessionsToJson(Array.from(webSessions.values()));
+    } catch (e) {
+      console.warn('[DB] Background sync de sessões falhou:', e.message);
+    }
+  })();
 });
 
 // GET /api/chat/session/:id/messages
@@ -698,12 +798,12 @@ router.get('/api/chat/session/:id/messages', async (req, res) => {
 
 // POST /api/chat/session — create/rename/delete
 router.post('/api/chat/session', async (req, res) => {
-  const { action, sessionId, title, persona } = req.body;
+  const { action, sessionId, title, persona, provider } = req.body;
 
   switch (action) {
     case 'create': {
-      const session = createWebSession(title || 'Nova conversa', 'instant', persona || 'default', sessionId || undefined);
-      res.json({ ok: true, session: { id: session.id, title: session.title } });
+      const session = createWebSession(title || 'Nova conversa', 'instant', persona || 'default', sessionId || undefined, provider || 'kimi');
+      res.json({ ok: true, session: { id: session.id, title: session.title, provider: session.provider } });
       break;
     }
     case 'rename': {
@@ -743,8 +843,25 @@ router.post('/api/chat/session', async (req, res) => {
       }
       break;
     }
+    case 'resetAll': {
+      // v10.32: Limpar todas as sessões web.
+      webSessions.clear();
+      saveSessionsToJson([]);
+      activeStreams.clear();
+      // Tentar limpar PostgreSQL sem bloquear a resposta.
+      dbRunWithRetry('TRUNCATE TABLE luna_chat_sessions', [])
+        .then(() => console.log('[DB] Tabela luna_chat_sessions truncada'))
+        .catch(e => {
+          console.warn('[DB] Não foi possível truncar luna_chat_sessions:', e.message);
+          dbRunWithRetry('DELETE FROM luna_chat_sessions', [])
+            .then(() => console.log('[DB] Registros de luna_chat_sessions removidos'))
+            .catch(e2 => console.warn('[DB] Não foi possível deletar de luna_chat_sessions:', e2.message));
+        });
+      res.json({ ok: true, message: 'Todas as conversas foram resetadas' });
+      break;
+    }
     default:
-      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, setPersona, delete' });
+      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, setPersona, delete, resetAll' });
   }
 });
 

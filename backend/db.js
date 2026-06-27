@@ -4,11 +4,19 @@
  */
 const { Pool } = require('pg');
 
+const isRender = process.env.DATABASE_URL?.includes('render.com');
+const isNeon = process.env.DATABASE_URL?.includes('neon.tech');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('neon.tech')
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 10000,
+  max: 5,
+  ssl: (isNeon || isRender)
     ? { rejectUnauthorized: false }
     : false,
+  // Render/Neon require short statement_timeout to avoid hanging on unreachable hosts.
+  options: (isNeon || isRender) ? '-c statement_timeout=5000' : '',
 });
 
 // Log connection events

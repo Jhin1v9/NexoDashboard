@@ -93,10 +93,6 @@ start_chrome() {
 start_bridge_api() {
   log "Starting Bridge API..."
   cd "$PROJECT_DIR"
-  if [ -z "${KIMI_BRIDGE_API_KEY}" ] && [ "${NODE_ENV}" != "test" ]; then
-    error "KIMI_BRIDGE_API_KEY não está definida. Defina uma chave forte antes de iniciar."
-    exit 1
-  fi
   NODE_PATH="$PROJECT_DIR/node_modules" \
   KIMI_BRIDGE_API_PORT=9223 \
   KIMI_CDP_URL=http://localhost:9222 \

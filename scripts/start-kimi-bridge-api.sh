@@ -21,19 +21,7 @@ set -e
 
 API_PORT="${KIMI_BRIDGE_API_PORT:-9223}"
 CDP_URL="${KIMI_CDP_URL:-http://localhost:9222}"
-
-if [ -z "${KIMI_BRIDGE_API_KEY}" ]; then
-  if [ "${NODE_ENV}" = "test" ]; then
-    API_KEY="nexo-kimi-local-2026"
-    echo -e "${YELLOW}[KimiBridgeAPI]${NC} Modo teste detectado — usando API_KEY fallback inseguro."
-  else
-    echo -e "${RED}[KimiBridgeAPI]${NC} FATAL: KIMI_BRIDGE_API_KEY não está definida."
-    echo -e "${RED}[KimiBridgeAPI]${NC} Defina uma chave forte e reinicie o script."
-    exit 1
-  fi
-else
-  API_KEY="${KIMI_BRIDGE_API_KEY}"
-fi
+API_KEY="${KIMI_BRIDGE_API_KEY:-nexo-kimi-local-2026}"
 
 # Colors
 GREEN='\033[0;32m'

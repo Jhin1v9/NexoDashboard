@@ -12,7 +12,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const workspaceManager = require('./workspace-manager');
-const { resolveJwtSecret } = require('./config-validator');
 // ── Cache + External Services (assíncrono, non-blocking) ──
 const CacheManager = require('./cache-manager');
 const ExternalServices = require('./external-services');
@@ -34,7 +33,6 @@ const { sendMentionNotification, setWebhookUrl } = require('./services/discord-n
 
 // ── Voting Routes ──
 const setupVotingRoutes = require('./voting-routes');
-const lunaToolsRouter = require("./routes/luna-tools");
 
 const app = express();
 const server = http.createServer(app);
@@ -143,7 +141,16 @@ const writeJSON = (file, data) => {
 };
 
 // ── AUTH & SECURITY CONFIG ──
-const JWT_SECRET = resolveJwtSecret();
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  // Fallback: gera secret aleatório na memória (tokens válidos só durante esta sessão)
+  // ⚠️ DEFINIR JWT_SECRET no Render Dashboard para persistência entre reinicializações
+  const crypto = require('crypto');
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  console.warn('[SECURITY] JWT_SECRET não definido no ambiente. Usando valor aleatório temporário.');
+  console.warn('[SECURITY] Todos os tokens serão invalidados após reinicialização do servidor.');
+  console.warn('[SECURITY] Ação recomendada: defina JWT_SECRET no Render Dashboard.');
+}
 const JWT_EXPIRES_IN = '8h';
 
 // Token de serviço interno para o ActionExecutor acessar endpoints protegidos
@@ -1188,23 +1195,7 @@ const VC_USERS_FILE = path.join(DATA_DIR, 'vercel_users.json');
 // (tasks are now persisted in PostgreSQL via datastore-pg.js)
 
 // Ensure default users exist in PostgreSQL
-function resolveDefaultPasswordHash() {
-  const envHash = process.env.NEXO_DEFAULT_ADMIN_PASSWORD_HASH;
-  if (envHash && String(envHash).trim().length > 0) {
-    return String(envHash).trim();
-  }
-  if (process.env.NODE_ENV === 'test') {
-    console.warn('[SECURITY] NEXO_DEFAULT_ADMIN_PASSWORD_HASH não definido. Modo teste — usando fallback inseguro de 4 dígitos.');
-    return '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla'; // hash de '7741'
-  }
-  console.error('\n❌❌❌ FATAL: NEXO_DEFAULT_ADMIN_PASSWORD_HASH não está definido no ambiente ❌❌❌');
-  console.error('   Crie um hash bcrypt de uma senha forte e defina essa variável de ambiente.');
-  console.error("   Exemplo: NEXO_DEFAULT_ADMIN_PASSWORD_HASH=$(node -e \"console.log(require('bcryptjs').hashSync('SENHA_FORTE',10))\")");
-  console.error(`   NODE_ENV atual: ${process.env.NODE_ENV || '(não definido)'}`);
-  process.exit(1);
-}
-
-const DEFAULT_PASSWORD_HASH = resolveDefaultPasswordHash();
+const DEFAULT_PASSWORD_HASH = '$2b$10$KnJlQTb9opcUu2EVPkw56ez410v9.LNBFLNGV200EiXskvMjjnUla'; // hash de '7741'
 (async () => {
   try {
     const usersData = await dataStore.getUsers();
@@ -3154,7 +3145,6 @@ app.use('/api/roadmaps', roadmapsRouter(dataStore, { requireAuth }));
 
 // ── Voting Routes ──
 setupVotingRoutes(app, { requireAuth, dataStore });
-app.use("/api/luna", lunaToolsRouter);
 
 // Catch-all -> SPA
 // ── Quotes / Orçamentos ──
@@ -3530,180 +3520,31 @@ app.get('/luna-control', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'luna-control.html'));
 });
 
-// Helpers seguros para controle de processos Luna
-const { spawn: _spawn } = require('child_process');
-
-function isValidProcessPattern(pattern) {
-    return typeof pattern === 'string' && /^[a-zA-Z0-9_.\-\/]+$/.test(pattern);
-}
-
-async function pgrepFirstPid(pattern) {
-    if (!isValidProcessPattern(pattern)) return null;
-    return new Promise((resolve) => {
-        let stdout = '';
-        const child = _spawn('pgrep', ['-f', pattern], { stdio: ['ignore', 'pipe', 'ignore'] });
-        child.stdout.on('data', d => stdout += d.toString());
-        child.on('close', (code) => {
-            if (code !== 0) return resolve(null);
-            const pids = stdout.trim().split('\n').filter(Boolean);
-            const pid = pids.length > 0 ? parseInt(pids[0], 10) : null;
-            resolve(Number.isFinite(pid) && pid > 0 ? pid : null);
-        });
-        child.on('error', () => resolve(null));
-    });
-}
-
-async function pkillPattern(pattern) {
-    if (!isValidProcessPattern(pattern)) return;
-    console.warn(`[LunaControl] Executando pkill -f ${pattern}`);
-    return new Promise((resolve) => {
-        const child = _spawn('pkill', ['-f', pattern], { stdio: 'ignore' });
-        child.on('close', () => resolve());
-        child.on('error', (err) => {
-            console.warn(`[LunaControl] pkill ${pattern} falhou: ${err.message}`);
-            resolve();
-        });
-    });
-}
-
-async function lunaAgentExists() {
-    for (const pattern of ['luna-daemon.mjs', 'luna-scheduler.mjs', 'luna-cto-agent.cjs']) {
-        const pid = await pgrepFirstPid(pattern);
-        if (pid) return pid;
-    }
-    return null;
-}
-
-function startLunaAgentDetached() {
-    const ROOT = path.join(__dirname, '..');
-    const agentPath = path.join(ROOT, 'agents', 'luna-cto-agent.cjs');
-    if (!fs.existsSync(agentPath)) {
-        console.warn(`[LunaControl] Agente não encontrado: ${agentPath}`);
-        return;
-    }
-    const logPath = path.join(ROOT, 'luna-run.log');
-    const logStream = fs.openSync(logPath, 'a');
-    console.warn(`[LunaControl] Iniciando agente Luna em background: ${agentPath}`);
-    const child = _spawn('node', [agentPath], {
-        cwd: path.join(ROOT, 'agents'),
-        detached: true,
-        stdio: ['ignore', logStream, logStream],
-        env: { ...process.env, DISPLAY: ':0' },
-        windowsHide: true
-    });
-    child.unref();
-    fs.closeSync(logStream);
-}
-
-function checkPortOpen(port) {
-    return new Promise((resolve) => {
-        if (!Number.isInteger(port) || port < 1 || port > 65535) return resolve(false);
-        const http = require('http');
-        const req = http.get({ hostname: '127.0.0.1', port, path: '/', timeout: 2000 }, (resp) => {
-            resolve(resp.statusCode < 500);
-            req.destroy();
-        });
-        req.on('error', () => {
-            const server = require('net').createServer();
-            server.once('error', (err) => {
-                resolve(err.code === 'EADDRINUSE');
-            });
-            server.once('listening', () => {
-                server.close();
-                resolve(false);
-            });
-            server.listen(port, '127.0.0.1');
-        });
-        req.on('timeout', () => {
-            req.destroy();
-            resolve(false);
-        });
-    });
-}
-
-function startBackendDetached() {
-    const ROOT = path.join(__dirname, '..');
-    const backendDir = path.join(ROOT, 'backend');
-    const serverPath = path.join(backendDir, 'server.js');
-    if (!fs.existsSync(serverPath)) {
-        console.warn(`[SystemControl] server.js não encontrado: ${serverPath}`);
-        return;
-    }
-    const logPath = path.join(ROOT, 'backend.log');
-    const logStream = fs.openSync(logPath, 'a');
-    console.warn(`[SystemControl] Iniciando backend em background`);
-    const child = _spawn('node', [serverPath], {
-        cwd: backendDir,
-        detached: true,
-        stdio: ['ignore', logStream, logStream],
-        windowsHide: true
-    });
-    child.unref();
-    fs.closeSync(logStream);
-}
-
-function startFrontendDetached() {
-    const ROOT = path.join(__dirname, '..');
-    const frontendDir = path.join(ROOT, 'frontend');
-    const pkgPath = path.join(frontendDir, 'package.json');
-    if (!fs.existsSync(pkgPath)) {
-        console.warn(`[SystemControl] package.json não encontrado em: ${frontendDir}`);
-        return;
-    }
-    const logPath = path.join(ROOT, 'frontend.log');
-    const logStream = fs.openSync(logPath, 'a');
-    console.warn(`[SystemControl] Iniciando frontend em background`);
-    const child = _spawn('npm', ['run', 'dev'], {
-        cwd: frontendDir,
-        detached: true,
-        stdio: ['ignore', logStream, logStream],
-        windowsHide: true
-    });
-    child.unref();
-    fs.closeSync(logStream);
-}
-
-function startLunaDaemonDetached() {
-    const ROOT = path.join(__dirname, '..');
-    const daemonPath = path.join(ROOT, 'agents', 'luna-daemon.mjs');
-    if (!fs.existsSync(daemonPath)) {
-        console.warn(`[SystemControl] luna-daemon.mjs não encontrado: ${daemonPath}`);
-        return;
-    }
-    console.warn(`[SystemControl] Iniciando luna-daemon em background`);
-    const child = _spawn('node', [daemonPath], {
-        cwd: path.join(ROOT, 'agents'),
-        detached: true, stdio: 'ignore', windowsHide: true
-    });
-    child.unref();
-}
-
-function startSupervisorDetached() {
-    const ROOT = path.join(__dirname, '..');
-    const supervisorPath = path.join(ROOT, 'supervisor.sh');
-    if (!fs.existsSync(supervisorPath)) {
-        console.warn(`[SystemControl] supervisor.sh não encontrado: ${supervisorPath}`);
-        return;
-    }
-    console.warn(`[SystemControl] Iniciando supervisor em background`);
-    const child = _spawn('bash', [supervisorPath], {
-        cwd: ROOT,
-        detached: true, stdio: 'ignore', windowsHide: true
-    });
-    child.unref();
-}
-
 // 1. Status do Luna
 app.get('/api/luna/status', async (req, res) => {
     try {
         const checkpoint = await dataStore.getLunaCheckpoint();
         const buffer = await dataStore.getLunaBuffer();
 
-        const agentPid = await lunaAgentExists();
+        // Verificar se o processo do agente está rodando (daemon ou scheduler)
+        const { execSync } = require('child_process');
+        let isRunning = false;
+        let agentPid = null;
+        for (const pattern of ['luna-daemon.mjs', 'luna-scheduler.mjs', 'luna-cto-agent.cjs']) {
+            try {
+                const pidBuf = execSync(`pgrep -f "${pattern}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                const pids = pidBuf.trim().split('\n').filter(Boolean);
+                if (pids.length > 0) {
+                    isRunning = true;
+                    agentPid = parseInt(pids[0], 10);
+                    break;
+                }
+            } catch (e) { /* não está rodando */ }
+        }
 
         res.json({
             success: true,
-            status: agentPid ? 'running' : 'stopped',
+            status: isRunning ? 'running' : 'stopped',
             pid: agentPid,
             version: checkpoint?.version || '18.0',
             lastScan: checkpoint?.lastScan || buffer?.lastBufferUpdate || null,
@@ -3738,34 +3579,41 @@ app.get('/api/luna/logs', (req, res) => {
 });
 
 // 3. Controle Start/Stop/Restart
-app.post('/api/luna/control', async (req, res) => {
+app.post('/api/luna/control', (req, res) => {
     try {
         const { action } = req.body;
-        const VALID_ACTIONS = ['start', 'stop', 'restart'];
-        if (!VALID_ACTIONS.includes(action)) {
-            return res.status(400).json({ success: false, error: 'Acao invalida. Use: start, stop, restart' });
-        }
-
+        const { execSync } = require('child_process');
+        const ROOT = path.join(__dirname, '..');
+        
         if (action === 'stop') {
-            await pkillPattern('luna-cto-agent.cjs');
-            await pkillPattern('luna-watchdog.sh');
+            try {
+                execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
+                execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
+            } catch (e) {}
             return res.json({ success: true, action: 'stop', message: 'Luna desligada.' });
         }
-
+        
         if (action === 'start') {
-            const existingPid = await pgrepFirstPid('luna-cto-agent.cjs');
-            if (existingPid) {
+            try {
+                execSync('pgrep -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
                 return res.json({ success: true, action: 'start', message: 'Luna ja estava ligada.' });
+            } catch (e) {
+                const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
+                execSync(script, { stdio: 'ignore' });
+                return res.json({ success: true, action: 'start', message: 'Luna iniciada.' });
             }
-            startLunaAgentDetached();
-            return res.json({ success: true, action: 'start', message: 'Luna iniciada.' });
         }
-
+        
         if (action === 'restart') {
-            await pkillPattern('luna-cto-agent.cjs');
-            await pkillPattern('luna-watchdog.sh');
+            try {
+                execSync('pkill -f "luna-cto-agent.cjs"', { stdio: 'ignore' });
+                execSync('pkill -f "luna-watchdog.sh"', { stdio: 'ignore' });
+            } catch (e) {}
             setTimeout(() => {
-                startLunaAgentDetached();
+                try {
+                    const script = `cd ${ROOT}/agents && DISPLAY=:0 nohup node luna-cto-agent.cjs > ${ROOT}/luna-run.log 2>&1 &`;
+                    execSync(script, { stdio: 'ignore' });
+                } catch (e) {}
             }, 2000);
             return res.json({ success: true, action: 'restart', message: 'Luna reiniciando em 2 segundos...' });
         }
@@ -3886,24 +3734,20 @@ app.post('/api/luna/start', (req, res) => {
   }
 });
 
-app.post('/api/luna/stop', async (req, res) => {
-  try {
-    console.warn('[LunaStop] Parando processos luna-daemon e luna-scheduler');
+app.post('/api/luna/stop', (req, res) => {
+  exec('tasklist /FI "IMAGENAME eq node.exe" /FO CSV', (err, stdout) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    const lines = (stdout || '').split(/\r?\n/).filter(Boolean);
     const killed = [];
-    for (const pattern of ['luna-daemon.mjs', 'luna-scheduler.mjs']) {
-      let pid = await pgrepFirstPid(pattern);
-      while (pid) {
-        try {
-          process.kill(pid, 'SIGTERM');
-          killed.push(pid);
-        } catch (e) { /* ignore */ }
-        pid = await pgrepFirstPid(pattern);
+    for (const line of lines) {
+      if (!line.includes('luna-daemon.mjs') && !line.includes('luna-scheduler.mjs')) continue;
+      const pid = Number(line.split(',').pop());
+      if (Number.isFinite(pid) && pid > 0) {
+        try { process.kill(pid); killed.push(pid); } catch (e) {}
       }
     }
     res.json({ success: true, message: 'Luna parado', killed });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
+  });
 });
 
 // ============================================================================
@@ -6457,16 +6301,14 @@ app.post('/api/luna/command', async (req, res) => {
         break;
       }
       case 'stop': {
-        (async () => {
-          console.warn('[LunaCommand] Parando processos luna');
-          for (const pattern of ['luna-daemon.mjs', 'luna-scheduler.mjs']) {
-            let pid = await pgrepFirstPid(pattern);
-            while (pid) {
-              try { process.kill(pid, 'SIGTERM'); } catch (e) { /* ignore */ }
-              pid = await pgrepFirstPid(pattern);
-            }
+        const { exec } = require('child_process');
+        exec('ps aux | grep -E "luna-daemon|luna-scheduler" | grep -v grep | awk \'{print $2}\'', (err, stdout) => {
+          const lines = (stdout || '').split(/\r?\n/).filter(Boolean);
+          for (const line of lines) {
+            const pid = Number(line.trim());
+            if (Number.isFinite(pid) && pid > 0) { try { process.kill(pid); } catch (e) {} }
           }
-        })();
+        });
         result = { status: 'stopping' };
         break;
       }
@@ -7799,13 +7641,17 @@ function isProcessRunning(pattern) {
     return getProcessPid(pattern) !== null;
 }
 
-app.get('/api/system/status', async (req, res) => {
+app.get('/api/system/status', (req, res) => {
     try {
         const backendPid = getProcessPid('node backend/server.js');
         const frontendPid = getProcessPid('vite --port 3457');
         const lunaPid = getProcessPid('luna-scheduler.mjs') || getProcessPid('luna-daemon.mjs');
         const supervisorPid = getProcessPid('supervisor.sh');
-        const chromeConnected = await checkPortOpen(9223);
+        let chromeConnected = false;
+        try {
+            execSync('curl -s http://localhost:9223/json/version > /dev/null', { timeout: 2000, stdio: 'ignore' });
+            chromeConnected = true;
+        } catch (e) {}
         res.json({
             success: true,
             timestamp: new Date().toISOString(),
@@ -7845,7 +7691,7 @@ app.get('/api/system/logs', (req, res) => {
     }
 });
 
-app.post('/api/system/control', async (req, res) => {
+app.post('/api/system/control', (req, res) => {
     try {
         const { service, action } = req.body;
         const VALID_SERVICES = ['backend', 'frontend', 'luna', 'supervisor'];
@@ -7856,45 +7702,70 @@ app.post('/api/system/control', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Acao invalida. Use: start, stop, restart' });
         }
 
+        const backendScript = `cd ${ROOT_DIR}/backend && nohup node server.js > ${ROOT_DIR}/backend.log 2>&1 &`;
+        const frontendScript = `cd ${ROOT_DIR}/frontend && nohup npm run dev > ${ROOT_DIR}/frontend.log 2>&1 &`;
+
         if (service === 'backend') {
             if (action === 'stop' || action === 'restart') {
-                console.warn('[SystemControl] Executando pkill -f "node server.js"');
-                await pkillPattern('node server.js');
+                try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
-                setTimeout(() => startBackendDetached(), action === 'restart' ? 2000 : 0);
+                setTimeout(() => {
+                    try { execSync(backendScript, { stdio: 'ignore' }); } catch (e) {}
+                }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'frontend') {
             if (action === 'stop' || action === 'restart') {
-                console.warn('[SystemControl] Executando pkill -f "vite --port 3457"');
-                await pkillPattern('vite --port 3457');
+                try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
-                setTimeout(() => startFrontendDetached(), action === 'restart' ? 2000 : 0);
+                setTimeout(() => {
+                    try { execSync(frontendScript, { stdio: 'ignore' }); } catch (e) {}
+                }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'luna') {
             if (action === 'stop' || action === 'restart') {
-                console.warn('[SystemControl] Executando pkill em processos luna');
-                await pkillPattern('luna-daemon.mjs');
-                await pkillPattern('luna-scheduler.mjs');
+                try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch (e) {}
+                try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
-                setTimeout(() => startLunaDaemonDetached(), action === 'restart' ? 2000 : 0);
+                setTimeout(() => {
+                    try {
+                        const daemonPath = path.join(ROOT_DIR, 'agents', 'luna-daemon.mjs');
+                        if (fs.existsSync(daemonPath)) {
+                            const p = spawn('node', [daemonPath], {
+                                cwd: path.join(ROOT_DIR, 'agents'),
+                                detached: true, stdio: 'ignore', windowsHide: true
+                            });
+                            p.unref();
+                        }
+                    } catch (e) {}
+                }, action === 'restart' ? 2000 : 0);
             }
         }
 
         if (service === 'supervisor') {
             if (action === 'stop' || action === 'restart') {
-                console.warn('[SystemControl] Executando pkill em processos supervisor');
-                await pkillPattern('supervisor.sh');
-                await pkillPattern('supervisor.js');
+                try { execSync('pkill -f "supervisor.sh"', { stdio: 'ignore' }); } catch (e) {}
+                try { execSync('pkill -f "supervisor.js"', { stdio: 'ignore' }); } catch (e) {}
             }
             if (action === 'start' || action === 'restart') {
-                setTimeout(() => startSupervisorDetached(), action === 'restart' ? 2000 : 0);
+                setTimeout(() => {
+                    try {
+                        const supervisorPath = path.join(ROOT_DIR, 'supervisor.sh');
+                        if (fs.existsSync(supervisorPath)) {
+                            const p = spawn('bash', [supervisorPath], {
+                                cwd: ROOT_DIR,
+                                detached: true, stdio: 'ignore', windowsHide: true
+                            });
+                            p.unref();
+                        }
+                    } catch (e) {}
+                }, action === 'restart' ? 2000 : 0);
             }
         }
 
@@ -7913,45 +7784,24 @@ app.post('/api/system/control', async (req, res) => {
 // Stack Status & Auto-Fix APIs (para StackStatus.tsx e AutoFixPanel.tsx)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/api/stack-status', async (req, res) => {
+app.get('/api/stack-status', (req, res) => {
   try {
     const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {}) || {};
     const backendPid = process.pid;
     const frontendPid = lunaStatus.frontendPid || null;
     const lunaPid = lunaStatus.pid || null;
-
-    const isPortOpen = (port) => new Promise((resolve) => {
-      if (!Number.isInteger(port) || port < 1 || port > 65535) return resolve(false);
-      const http = require('http');
-      const req = http.get({ hostname: '127.0.0.1', port, path: '/', timeout: 2000 }, (resp) => {
-        resolve(resp.statusCode < 500);
-        req.destroy();
-      });
-      req.on('error', () => {
-        // Fallback: se a porta estiver em uso mas não responder HTTP, considera online
-        const server = require('net').createServer();
-        server.once('error', (err) => {
-          resolve(err.code === 'EADDRINUSE');
-        });
-        server.once('listening', () => {
-          server.close();
-          resolve(false);
-        });
-        server.listen(port, '127.0.0.1');
-      });
-      req.on('timeout', () => {
-        req.destroy();
-        resolve(false);
-      });
-    });
+    
+    const isPortOpen = (port) => {
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
+    };
 
     res.json({
       timestamp: new Date().toISOString(),
       overall: 'healthy',
       services: {
         backend: { status: 'online', port: 3456, uptime: process.uptime(), last_checkpoint: null },
-        frontend: { status: (await isPortOpen(3457)) ? 'online' : 'offline', port: 3457, uptime: null, last_checkpoint: null },
-        chrome_cdp: { status: (await isPortOpen(9223)) ? 'online' : 'offline', port: 9223, uptime: null, last_checkpoint: null },
+        frontend: { status: isPortOpen(3457) ? 'online' : 'offline', port: 3457, uptime: null, last_checkpoint: null },
+        chrome_cdp: { status: isPortOpen(9223) ? 'online' : 'offline', port: 9223, uptime: null, last_checkpoint: null },
         luna_daemon: { status: lunaPid ? 'online' : 'offline', port: null, uptime: null, last_checkpoint: lunaStatus.lastScan || null }
       }
     });
@@ -8002,20 +7852,21 @@ app.get('/api/auto-fix/history', (req, res) => {
   });
 });
 
-app.post('/api/auto-fix/check-now', async (req, res) => {
+app.post('/api/auto-fix/check-now', (req, res) => {
   try {
     const lunaStatus = readJSON(path.join(DATA_DIR, 'luna-status.json'), {});
-    const [frontendOpen, chromeOpen, daemonPid] = await Promise.all([
-      checkPortOpen(3457),
-      checkPortOpen(9223),
-      lunaAgentExists()
-    ]);
+    const isPortOpen = (port) => {
+      try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
+    };
+    const hasDaemon = () => {
+      try { execSync('pgrep -f "luna-daemon.mjs"', { stdio: 'ignore' }); return true; } catch (e) { return false; }
+    };
 
     const results = {
       backend: { status: 'online', details: `PID ${process.pid}` },
-      frontend: { status: frontendOpen ? 'online' : 'offline', details: frontendOpen ? 'Porta 3457 ativa' : 'Porta 3457 inativa' },
-      chrome_cdp: { status: chromeOpen ? 'online' : 'offline', details: chromeOpen ? 'CDP conectado' : 'CDP desconectado' },
-      luna_daemon: { status: daemonPid ? 'online' : 'offline', details: daemonPid ? `Daemon ativo (PID ${daemonPid})` : 'Daemon inativo' }
+      frontend: { status: isPortOpen(3457) ? 'online' : 'offline', details: isPortOpen(3457) ? 'Porta 3457 ativa' : 'Porta 3457 inativa' },
+      chrome_cdp: { status: isPortOpen(9223) ? 'online' : 'offline', details: isPortOpen(9223) ? 'CDP conectado' : 'CDP desconectado' },
+      luna_daemon: { status: hasDaemon() ? 'online' : 'offline', details: hasDaemon() ? 'Daemon ativo' : 'Daemon inativo' }
     };
 
     const entry = {
@@ -8035,7 +7886,7 @@ app.post('/api/auto-fix/check-now', async (req, res) => {
   }
 });
 
-app.post('/api/auto-fix/fix/:service', async (req, res) => {
+app.post('/api/auto-fix/fix/:service', (req, res) => {
   try {
     const { service } = req.params;
     const VALID = ['backend', 'frontend', 'luna_daemon', 'chrome_cdp'];
@@ -8047,30 +7898,54 @@ app.post('/api/auto-fix/fix/:service', async (req, res) => {
     let details = '';
 
     if (service === 'backend') {
-      await pkillPattern('node server.js');
-      setTimeout(() => startBackendDetached(), 2000);
+      try { execSync('pkill -f "node server.js"', { stdio: 'ignore' }); } catch (e) {}
+      setTimeout(() => {
+        try {
+          const script = `cd ${ROOT_DIR}/backend && nohup node server.js > ${ROOT_DIR}/backend.log 2>&1 &`;
+          execSync(script, { stdio: 'ignore' });
+        } catch (e) {}
+      }, 2000);
       success = true;
       details = 'Backend reiniciado';
     }
 
     if (service === 'frontend') {
-      await pkillPattern('vite --port 3457');
-      setTimeout(() => startFrontendDetached(), 2000);
+      try { execSync('pkill -f "vite --port 3457"', { stdio: 'ignore' }); } catch (e) {}
+      setTimeout(() => {
+        try {
+          const script = `cd ${ROOT_DIR}/frontend && nohup npm run dev > ${ROOT_DIR}/frontend.log 2>&1 &`;
+          execSync(script, { stdio: 'ignore' });
+        } catch (e) {}
+      }, 2000);
       success = true;
       details = 'Frontend reiniciado';
     }
 
     if (service === 'luna_daemon') {
-      await pkillPattern('luna-daemon.mjs');
-      await pkillPattern('luna-scheduler.mjs');
-      setTimeout(() => startLunaDaemonDetached(), 2000);
+      try { execSync('pkill -f "luna-daemon.mjs"', { stdio: 'ignore' }); } catch (e) {}
+      try { execSync('pkill -f "luna-scheduler.mjs"', { stdio: 'ignore' }); } catch (e) {}
+      setTimeout(() => {
+        try {
+          const daemonPath = path.join(ROOT_DIR, 'agents', 'luna-daemon.mjs');
+          if (fs.existsSync(daemonPath)) {
+            const p = spawn('node', [daemonPath], {
+              cwd: path.join(ROOT_DIR, 'agents'),
+              detached: true, stdio: 'ignore', windowsHide: true
+            });
+            p.unref();
+          }
+        } catch (e) {}
+      }, 2000);
       success = true;
       details = 'Luna daemon reiniciado';
     }
 
     if (service === 'chrome_cdp') {
       // Tentar reconectar ao Chrome CDP — não podemos iniciar o Chrome do nada sem saber o caminho
-      if (await checkPortOpen(9223)) {
+      const isPortOpen = (port) => {
+        try { execSync(`nc -z localhost ${port} 2>/dev/null || curl -s -o /dev/null -w '%{http_code}' http://localhost:${port} | grep -q 200`, { stdio: 'ignore' }); return true; } catch (e) { return false; }
+      };
+      if (isPortOpen(9223)) {
         success = true;
         details = 'Chrome CDP ja estava conectado na porta 9223';
       } else {
@@ -8987,28 +8862,9 @@ async function startServer() {
       }
     }
   }
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\n❌❌❌ EADDRINUSE: a porta ${PORT} já está em uso em ${BIND_IP} ❌❌❌`);
-      console.error(`   Motivo comum: outra instância do NEXO Dashboard já está rodando (PM2, terminal ou serviço).`);
-      console.error(`   Verifique: pm2 list | grep nexo-dashboard`);
-      console.error(`   Solução: pm2 delete nexo-dashboard && pm2 start pm2-ecosystem.config.js\n`);
-      // Não reinicia em loop; PM2 fará o retry controlado pelo ecosystem/backoff.
-      process.exit(1);
-    }
-    console.error('[SERVER ERROR] Erro inesperado no servidor HTTP:', err.message);
-    process.exit(1);
-  });
-
   server.listen(PORT, BIND_IP, async () => {
-    console.log(`[CONFIG] Porta configurada: ${PORT} (fonte: ${process.env.PORT ? 'env PORT' : 'fallback 3456'})`);
     console.log(`🔥 NEXO DASHBOARD PRO rodando em http://${BIND_IP}:${PORT}`);
     console.log(`🌙 Luna Web integrada em http://${BIND_IP}:${PORT}`);
-
-    // Notifica PM2 que o processo está pronto (habilita wait_ready: true)
-    if (typeof process.send === 'function') {
-      process.send('ready');
-    }
 
     // ── Preload NLU model (BLOQUEANTE — backend só fica online quando NLU estiver pronto) ──
     if (lunaNLU && typeof lunaNLU.process === 'function') {
