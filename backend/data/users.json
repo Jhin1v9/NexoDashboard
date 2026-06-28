@@ -20,6 +20,12 @@
       "color": "#ffa502",
       "password": "$2b$10$Yw5pRKQxLCrzp9Bkny0g0uS9oiefl3Knqlwom97bmO7Kj7OpKX/Zm",
       "discordId": "1429801695071834190"
+    },
+    "teste": {
+      "name": "Teste",
+      "role": "Admin",
+      "color": "#00d2d3",
+      "password": "$2b$10$QRfIq3hCQoU.pgRw5B151.sze.kmdCOYfZdfp0IxNmKdlq3udhsNK"
     }
   },
   "active": "abner"

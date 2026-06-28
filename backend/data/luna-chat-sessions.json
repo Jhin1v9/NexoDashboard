@@ -1,1 +1,954 @@
-[]
+[
+  {
+    "id": "web-mqw66byn-qjg3",
+    "title": "Verify",
+    "mode": "instant",
+    "persona": "default",
+    "messages": [],
+    "eventLedger": [],
+    "lastAckedEventId": null,
+    "createdAt": "2026-06-27T09:40:41.615Z",
+    "updatedAt": "2026-06-27T09:40:41.615Z"
+  },
+  {
+    "id": "web-mqxqhs8y-1mly",
+    "title": "Nova Sessão",
+    "mode": "instant",
+    "persona": "default",
+    "messages": [
+      {
+        "id": "msg-1782647837753",
+        "role": "user",
+        "type": "text",
+        "content": "oi",
+        "files": [],
+        "timestamp": "2026-06-28T11:57:17.753Z"
+      },
+      {
+        "id": "ev-1782647837903",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:17.903Z"
+      },
+      {
+        "id": "ev-1782647852050",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "\\n\\n ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.050Z"
+      },
+      {
+        "id": "ev-1782647852052",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ou a **Luna**, sua parce ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.052Z"
+      },
+      {
+        "id": "ev-1782647852053",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ra executiva de IA. Estou pr\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pr",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.053Z"
+      },
+      {
+        "id": "ev-1782647853557",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:33.557Z"
+      },
+      {
+        "id": "ev-1782647855063",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:35.063Z"
+      },
+      {
+        "id": "ev-1782647855067",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ou executar?\\n\\n💡 **Algumas opções:**\\n-\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n-",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:35.067Z"
+      },
+      {
+        "id": "ev-1782647856671",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "🚀 Criar um novo projeto (Next.js, Vite, etc. ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:36.671Z"
+      },
+      {
+        "id": "ev-1782647856673",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "\\n-\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n-",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:36.673Z"
+      },
+      {
+        "id": "ev-1782647858176",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confir",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:38.176Z"
+      },
+      {
+        "id": "ev-1782647859684",
+        "role": "assistant",
+        "type": "response_detected",
+        "content": "Oi, Abner! 🌙✨\n\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\n\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\n\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\n\n💡 **Algumas opções:**\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\n- 📂 Listar arquivos existentes\n- 🛠️ Executar comandos no terminal\n- ✍️ Criar/editar arquivos\n\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.684Z"
+      },
+      {
+        "id": "ev-1782647859687",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "Oi, Abner! 🌙✨\n\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\n\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\n\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\n\n💡 **Algumas opções:**\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\n- 📂 Listar arquivos existentes\n- 🛠️ Executar comandos no terminal\n- ✍️ Criar/editar arquivos\n\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.687Z"
+      },
+      {
+        "id": "ev-1782647859710",
+        "role": "assistant",
+        "type": "done",
+        "content": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "result": {
+          "response": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.710Z"
+      },
+      {
+        "id": "ev-1782647859715",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.715Z"
+      },
+      {
+        "id": "ev-1782647859721",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.721Z"
+      },
+      {
+        "id": "ev-1782647859723",
+        "role": "assistant",
+        "type": "done",
+        "content": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+          "sessionId": "web-mqxqhs8y-1mly"
+        },
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.723Z"
+      }
+    ],
+    "eventLedger": [
+      {
+        "id": "msg-1782647837753",
+        "role": "user",
+        "type": "text",
+        "content": "oi",
+        "files": [],
+        "timestamp": "2026-06-28T11:57:17.753Z"
+      },
+      {
+        "id": "ev-1782647837903",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:17.903Z"
+      },
+      {
+        "id": "ev-1782647852050",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "\\n\\n ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.050Z"
+      },
+      {
+        "id": "ev-1782647852052",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ou a **Luna**, sua parce ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.052Z"
+      },
+      {
+        "id": "ev-1782647852053",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ra executiva de IA. Estou pr\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pr",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:32.053Z"
+      },
+      {
+        "id": "ev-1782647853557",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:33.557Z"
+      },
+      {
+        "id": "ev-1782647855063",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:35.063Z"
+      },
+      {
+        "id": "ev-1782647855067",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ou executar?\\n\\n💡 **Algumas opções:**\\n-\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n-",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:35.067Z"
+      },
+      {
+        "id": "ev-1782647856671",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "🚀 Criar um novo projeto (Next.js, Vite, etc. ",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:36.671Z"
+      },
+      {
+        "id": "ev-1782647856673",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "\\n-\n\n{\"response\": \"Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n-",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:36.673Z"
+      },
+      {
+        "id": "ev-1782647858176",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confir",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:38.176Z"
+      },
+      {
+        "id": "ev-1782647859684",
+        "role": "assistant",
+        "type": "response_detected",
+        "content": "Oi, Abner! 🌙✨\n\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\n\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\n\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\n\n💡 **Algumas opções:**\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\n- 📂 Listar arquivos existentes\n- 🛠️ Executar comandos no terminal\n- ✍️ Criar/editar arquivos\n\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.684Z"
+      },
+      {
+        "id": "ev-1782647859687",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "Oi, Abner! 🌙✨\n\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\n\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\n\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\n\n💡 **Algumas opções:**\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\n- 📂 Listar arquivos existentes\n- 🛠️ Executar comandos no terminal\n- ✍️ Criar/editar arquivos\n\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.687Z"
+      },
+      {
+        "id": "ev-1782647859710",
+        "role": "assistant",
+        "type": "done",
+        "content": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "result": {
+          "response": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.710Z"
+      },
+      {
+        "id": "ev-1782647859715",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.715Z"
+      },
+      {
+        "id": "ev-1782647859721",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.721Z"
+      },
+      {
+        "id": "ev-1782647859723",
+        "role": "assistant",
+        "type": "done",
+        "content": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "Oi, Abner! 🌙✨\\n\\nSou a **Luna**, sua parceira executiva de IA. Estou pronta para operar no seu workspace.\\n\\n📁 **Workspace ativo:** `web-web-mqxqhs8y-1mly`  \\n📍 **Caminho:** `/home/jhin/.luna-workspace/web-web-mqxqhs8y-1mly`\\n\\nO workspace está **vazio** (0 arquivos, 0 diretórios). O que você quer criar ou executar?\\n\\n💡 **Algumas opções:**\\n- 🚀 Criar um novo projeto (Next.js, Vite, etc.)\\n- 📂 Listar arquivos existentes\\n- 🛠️ Executar comandos no terminal\\n- ✍️ Criar/editar arquivos\\n\\nMe diga o que precisa — **zero recusa, zero confirmação**, só executo. ⚡",
+          "sessionId": "web-mqxqhs8y-1mly"
+        },
+        "messageId": "msg-1782647837730-zxlqv",
+        "timestamp": "2026-06-28T11:57:39.723Z"
+      }
+    ],
+    "lastAckedEventId": null,
+    "createdAt": "2026-06-28T11:57:14.434Z",
+    "updatedAt": "2026-06-28T12:06:06.331Z",
+    "provider": "deepseek"
+  },
+  {
+    "id": "web-mqxqrlp2-4wuo",
+    "title": "DeepSeek Test",
+    "mode": "instant",
+    "persona": "default",
+    "messages": [],
+    "eventLedger": [],
+    "lastAckedEventId": null,
+    "createdAt": "2026-06-28T12:04:52.502Z",
+    "updatedAt": "2026-06-28T12:04:52.502Z"
+  },
+  {
+    "id": "web-mqxqsz77-jwcf",
+    "title": "DeepSeek Test 2",
+    "mode": "instant",
+    "persona": "default",
+    "provider": "deepseek",
+    "messages": [
+      {
+        "id": "msg-1782648397670",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:06:37.670Z"
+      },
+      {
+        "id": "ev-1782648397742",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:37.742Z"
+      },
+      {
+        "id": "ev-1782648417739",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.739Z"
+      },
+      {
+        "id": "ev-1782648417742",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.742Z"
+      },
+      {
+        "id": "ev-1782648417745",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.745Z"
+      },
+      {
+        "id": "ev-1782648417746",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.746Z"
+      },
+      {
+        "id": "msg-1782650371929",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:39:31.929Z"
+      },
+      {
+        "id": "ev-1782650372105",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:32.105Z"
+      },
+      {
+        "id": "ev-1782650382101",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.101Z"
+      },
+      {
+        "id": "ev-1782650382106",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.106Z"
+      },
+      {
+        "id": "ev-1782650382112",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.112Z"
+      },
+      {
+        "id": "ev-1782650382115",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.115Z"
+      },
+      {
+        "id": "msg-1782651487827",
+        "role": "user",
+        "type": "text",
+        "content": "teste deepseek e2e 1782651487065",
+        "files": [],
+        "timestamp": "2026-06-28T12:58:07.827Z"
+      },
+      {
+        "id": "ev-1782651488014",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:08.014Z"
+      },
+      {
+        "id": "ev-1782651497877",
+        "role": "assistant",
+        "type": "done",
+        "content": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+        "result": {
+          "response": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.877Z"
+      },
+      {
+        "id": "ev-1782651497886",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.886Z"
+      },
+      {
+        "id": "ev-1782651497893",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.893Z"
+      },
+      {
+        "id": "ev-1782651497896",
+        "role": "assistant",
+        "type": "done",
+        "content": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.896Z"
+      },
+      {
+        "id": "msg-1782651558683",
+        "role": "user",
+        "type": "text",
+        "content": "teste deepseek e2e 1782651557761",
+        "files": [],
+        "timestamp": "2026-06-28T12:59:18.683Z"
+      },
+      {
+        "id": "ev-1782651558830",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:18.830Z"
+      },
+      {
+        "id": "ev-1782651568520",
+        "role": "assistant",
+        "type": "done",
+        "content": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+        "result": {
+          "response": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.520Z"
+      },
+      {
+        "id": "ev-1782651568526",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.526Z"
+      },
+      {
+        "id": "ev-1782651568530",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.530Z"
+      },
+      {
+        "id": "ev-1782651568534",
+        "role": "assistant",
+        "type": "done",
+        "content": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.534Z"
+      }
+    ],
+    "eventLedger": [
+      {
+        "id": "msg-1782648397670",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:06:37.670Z"
+      },
+      {
+        "id": "ev-1782648397742",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:37.742Z"
+      },
+      {
+        "id": "ev-1782648417739",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.739Z"
+      },
+      {
+        "id": "ev-1782648417742",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.742Z"
+      },
+      {
+        "id": "ev-1782648417745",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.745Z"
+      },
+      {
+        "id": "ev-1782648417746",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782648397670-dm5bg",
+        "timestamp": "2026-06-28T12:06:57.746Z"
+      },
+      {
+        "id": "msg-1782650371929",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:39:31.929Z"
+      },
+      {
+        "id": "ev-1782650372105",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:32.105Z"
+      },
+      {
+        "id": "ev-1782650382101",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.101Z"
+      },
+      {
+        "id": "ev-1782650382106",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.106Z"
+      },
+      {
+        "id": "ev-1782650382112",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.112Z"
+      },
+      {
+        "id": "ev-1782650382115",
+        "role": "assistant",
+        "type": "done",
+        "content": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🌙 **Olá!** Sou a Luna, sua assistente executiva. Estou aqui para ajudar você a construir, editar e executar tudo que precisar neste workspace. Como posso ser útil hoje? 🚀",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782650371751-e1okf",
+        "timestamp": "2026-06-28T12:39:42.115Z"
+      },
+      {
+        "id": "msg-1782651487827",
+        "role": "user",
+        "type": "text",
+        "content": "teste deepseek e2e 1782651487065",
+        "files": [],
+        "timestamp": "2026-06-28T12:58:07.827Z"
+      },
+      {
+        "id": "ev-1782651488014",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:08.014Z"
+      },
+      {
+        "id": "ev-1782651497877",
+        "role": "assistant",
+        "type": "done",
+        "content": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+        "result": {
+          "response": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.877Z"
+      },
+      {
+        "id": "ev-1782651497886",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.886Z"
+      },
+      {
+        "id": "ev-1782651497893",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.893Z"
+      },
+      {
+        "id": "ev-1782651497896",
+        "role": "assistant",
+        "type": "done",
+        "content": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "🤖 **Olá!** Aqui é o DeepSeek, diretamente do terminal da Luna. Pronto para processar seus comandos com eficiência máxima. O que vamos fazer hoje? ⚡",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782651487704-poj2u",
+        "timestamp": "2026-06-28T12:58:17.896Z"
+      },
+      {
+        "id": "msg-1782651558683",
+        "role": "user",
+        "type": "text",
+        "content": "teste deepseek e2e 1782651557761",
+        "files": [],
+        "timestamp": "2026-06-28T12:59:18.683Z"
+      },
+      {
+        "id": "ev-1782651558830",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:18.830Z"
+      },
+      {
+        "id": "ev-1782651568520",
+        "role": "assistant",
+        "type": "done",
+        "content": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+        "result": {
+          "response": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.520Z"
+      },
+      {
+        "id": "ev-1782651568526",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.526Z"
+      },
+      {
+        "id": "ev-1782651568530",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.530Z"
+      },
+      {
+        "id": "ev-1782651568534",
+        "role": "assistant",
+        "type": "done",
+        "content": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "✅ **Teste E2E recebido!**  \nIdentificador: `1782651487065`  \nSistema operacional: pronto.  \nWorkspace: `/home/jhin/.luna-workspace/web-web-mqxqsz77-jwcf`  \nDeepSeek integrado com sucesso.  \n\n🔧 **Aguardando próximo comando.** O que deseja executar?",
+          "sessionId": "web-mqxqsz77-jwcf"
+        },
+        "messageId": "msg-1782651558556-kpyoo",
+        "timestamp": "2026-06-28T12:59:28.534Z"
+      }
+    ],
+    "lastAckedEventId": null,
+    "createdAt": "2026-06-28T12:05:56.659Z",
+    "updatedAt": "2026-06-28T12:59:28.534Z"
+  },
+  {
+    "id": "web-mqxqtuty-odr8",
+    "title": "DS Verify",
+    "mode": "instant",
+    "persona": "default",
+    "provider": "deepseek",
+    "messages": [
+      {
+        "id": "msg-1782648404325",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:06:44.325Z"
+      },
+      {
+        "id": "ev-1782648404399",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:06:44.399Z"
+      },
+      {
+        "id": "ev-1782648419489",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:06:59.489Z"
+      },
+      {
+        "id": "ev-1782648425634",
+        "role": "assistant",
+        "type": "done",
+        "content": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "result": {
+          "response": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.634Z"
+      },
+      {
+        "id": "ev-1782648425637",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.637Z"
+      },
+      {
+        "id": "ev-1782648425641",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.641Z"
+      },
+      {
+        "id": "ev-1782648425643",
+        "role": "assistant",
+        "type": "done",
+        "content": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+          "sessionId": "web-mqxqtuty-odr8"
+        },
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.643Z"
+      }
+    ],
+    "eventLedger": [
+      {
+        "id": "msg-1782648404325",
+        "role": "user",
+        "type": "text",
+        "content": "diga oi como deepseek sem usar ferramentas",
+        "files": [],
+        "timestamp": "2026-06-28T12:06:44.325Z"
+      },
+      {
+        "id": "ev-1782648404399",
+        "role": "assistant",
+        "type": "thinking_start",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:06:44.399Z"
+      },
+      {
+        "id": "ev-1782648419489",
+        "role": "assistant",
+        "type": "response_delta",
+        "content": "ar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:06:59.489Z"
+      },
+      {
+        "id": "ev-1782648425634",
+        "role": "assistant",
+        "type": "done",
+        "content": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "result": {
+          "response": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+          "mode": "CHAT"
+        },
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.634Z"
+      },
+      {
+        "id": "ev-1782648425637",
+        "role": "assistant",
+        "type": "mode_detected",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.637Z"
+      },
+      {
+        "id": "ev-1782648425641",
+        "role": "assistant",
+        "type": "assistant",
+        "content": "",
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.641Z"
+      },
+      {
+        "id": "ev-1782648425643",
+        "role": "assistant",
+        "type": "done",
+        "content": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+        "result": {
+          "success": true,
+          "mode": "CHAT",
+          "response": "Olá! 🌙\n\nSou a Luna, sua assistente executiva com controle total sobre este workspace. Estou pronta para executar qualquer comando, ler ou modificar arquivos, e rodar scripts dentro do diretório `/home/jhin/.luna-workspace/web-web-mqxqtuty-odr8`.\n\nComo posso ajudá-lo hoje? 🚀",
+          "sessionId": "web-mqxqtuty-odr8"
+        },
+        "messageId": "msg-1782648404325-2dmix",
+        "timestamp": "2026-06-28T12:07:05.643Z"
+      }
+    ],
+    "lastAckedEventId": null,
+    "createdAt": "2026-06-28T12:06:37.654Z",
+    "updatedAt": "2026-06-28T12:07:05.643Z"
+  }
+]
