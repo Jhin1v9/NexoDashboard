@@ -1,5 +1,19 @@
 # Changelog — NEXO Dashboard Pro
 
+## [Unreleased] — 2026-06-28 — DeepSeek Response Cleanup + Mirror Agent Docs
+
+### Fixed (Luna Kernel — DeepSeek Streaming)
+- **Respostas DeepSeek apareciam com JSON cru, duplicadas ou truncadas no frontend**
+  - `luna-soul.cjs`: `_stripJsonResponseWrapper()` reescrito com scanner de chaves robusto; agora remove wrappers `{"response":"..."}` / `{"message":"..."}` e converte objetos stray `{"status":"processed","id":"..."}` em mensagem amigável.
+  - `NEXO_DASHBOARD_PRO/backend/luna-chat-routes.js`: eventos `assistant` agora preservam `ev.response` (antes o conteúdo final era perdido no histórico).
+  - `luna-web/src/components/ChatArea.svelte`: no evento `done`, se a bolha do assistente já existir mas contiver texto quebrado/vazado, ela é substituída pelo `finalResponse` limpo do backend.
+  - Build do frontend regerado e servido pelo `luna-server`.
+
+### Changed (Luna Kernel — Mirror Agent Architecture)
+- **`AGENTS.md` atualizado com a arquitetura *mirror agent***
+  - Luna não possui modelo interno; reflete ações do LLM externo via JSON code blocks.
+  - Tags legadas `[[action]]` estão obsoletas; apenas JSON code blocks são válidos para ferramentas.
+
 ## [Unreleased] — 2026-05-31 — Leads Fix + Plan Mode + Auto-Health + No Limits
 
 ### Fixed (Dashboard — Leads Pipeline)

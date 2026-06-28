@@ -66,6 +66,26 @@ bash /home/jhin/NEXO_DASHBOARD_PRO/luna-nexo.sh [start|stop|restart|status|logs]
 # - Telegram Bot (@lunanexobot)
 ```
 
+### Mirror Agent — Arquitetura sem cérebro próprio
+
+> **Luna não tem modelo interno.** Ela é um *mirror agent*: reflete ações do LLM externo (Kimi Web / DeepSeek Web) para o PC do usuário.
+
+```
+Usuário → Luna Web (Svelte) → luna-server → luna-soul.cjs → kimi-bridge.cjs → Kimi/DeepSeek Web
+                                                                             ↓
+                                                      LLM emite JSON code blocks (não tags [[action]])
+                                                                             ↓
+                                              Chrome Extension (MAIN world) ou Playwright DOM mirror
+                                                                             ↓
+                                                luna-soul.cjs parseia JSON e executa via luna-tools.cjs
+                                                                             ↓
+                                                Resultado da tool é espelhado de volta ao chat do LLM
+```
+
+- **Apenas JSON code blocks** são válidos para ferramentas. As tags legadas `[[action]]` / `[[response]]` estão obsoletas.
+- O LLM pode envolver a resposta de chat em `{"response":"..."}` ou `{"message":"..."}`; `luna-soul.cjs` e `ChatArea.svelte` removem esse wrapper antes de exibir.
+- O papel da Luna é: ler DOM/rede do LLM → detectar JSON de ação → executar localmente → devolver o resultado.
+
 ### Resumo — O que editar para cada mudança
 | Se você quer mudar... | Edite este arquivo |
 |-----------------------|-------------------|

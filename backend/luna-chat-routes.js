@@ -478,35 +478,39 @@ router.post('/api/chat', async (req, res) => {
       // a newer stream object if user sent a new message while this one runs.
       if (myStreamMeta.cancelled) break;
 
-      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'response_done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress'].includes(ev.type)) {
-        // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
-        // v10.25-fix: response_done carries the final text in ev.response, not ev.text/fullResponse
-        const content = ev.type === 'done' || ev.type === 'response_done'
-          ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
-          : (ev.text || ev.fullResponse || '');
+      // v10.35-fix: Ignore response_done intermediate events. LunaSoul emits both
+      // response_done and done for the same turn; storing both creates duplicate
+      // final messages in session history. The final 'done' event carries the
+      // definitive result.response, so we let that be the only persisted final.
+      if (ev.type === 'response_done') {
+        continue;
+      }
 
-        // v5.4-fix: Skip duplicate events (same type + content within 5s window)
-        // v6.3-fix: Never deduplicate 'done' events — they signal stream completion
+      if (['response_delta', 'response_detected', 'action_start', 'action_end', 'error', 'done', 'thinking_start', 'thinking_delta', 'login_required', 'system', 'context_limit', 'compact_start', 'compact_progress', 'compact_end', 'compact_error', 'assistant', 'plan_start', 'plan_step', 'plan_complete', 'plan_error', 'mode_detected', 'action_progress'].includes(ev.type)) {
+        // v4.0-fix: For 'done' events, capture the final response from ev.result.response or ev.response
+        const content = ev.type === 'done'
+          ? (ev.result?.response || ev.response || ev.text || ev.fullResponse || '')
+          : ev.type === 'assistant'
+            ? (ev.response || ev.text || ev.fullResponse || '')
+            : (ev.text || ev.fullResponse || '');
+
+        // v5.4-fix: Skip duplicate non-final events (same type + content within 5s window)
         const dedupKey = `${ev.type}:${content.slice(0, 200)}:${ev.tool || ''}`;
-        if (ev.type !== 'done' && ev.type !== 'response_done' && emittedEventHashes.has(dedupKey)) {
+        if (ev.type !== 'done' && emittedEventHashes.has(dedupKey)) {
           continue;
         }
         emittedEventHashes.add(dedupKey);
 
         // v6.1-fix: Attach messageId so frontend can validate against stale events
-        // v10.16-fix: Translate response_done → done so only ONE final message is stored
-        const storeType = ev.type === 'response_done' ? 'done' : ev.type;
-        // v10.25-fix: Ensure response_done stores result.response so the frontend can finalize
-        const finalResult = ev.result || (ev.type === 'response_done' && content ? { response: content, mode: 'CHAT' } : undefined);
         addMessageToSession(session.id, {
           id: 'ev-' + Date.now(),
           role: 'assistant',
-          type: storeType,
+          type: ev.type,
           content: content,
           fullThinking: ev.fullThinking || undefined,
           tool: ev.tool,
           params: ev.params,
-          result: finalResult,
+          result: ev.result,
           messageId: messageId,
           timestamp: new Date().toISOString(),
         });
