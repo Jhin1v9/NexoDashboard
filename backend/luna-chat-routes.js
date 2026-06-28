@@ -11,6 +11,7 @@ const router = express.Router();
 const db = require('./db');
 const JSZip = require('jszip');
 const { resolveJwtSecret } = require('./config-validator');
+const providerLoader = require('/home/jhin/.luna-kernel/provider-loader.cjs');
 
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
@@ -145,13 +146,14 @@ function generateWebSessionId() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 
-function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default', id = null) {
+function createWebSession(title = 'Nova conversa', mode = 'instant', persona = 'default', id = null, provider = 'kimi') {
   const sessionId = id || generateWebSessionId();
   const session = {
     id: sessionId,
     title,
     mode,
     persona,
+    provider,
     messages: [],
     eventLedger: [], // v10.13: Unacked events for reliable delivery
     lastAckedEventId: null, // v10.13: Last event ID acknowledged by frontend
@@ -164,10 +166,10 @@ function createWebSession(title = 'Nova conversa', mode = 'instant', persona = '
   // Persistir no PostgreSQL (fire-and-forget with retry). Usa ON CONFLICT
   // para não falhar quando o client fornece um sessionId que já existe.
   dbRunWithRetry(
-    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, messages, event_ledger, last_acked_event_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, NOW(), NOW())
+    `INSERT INTO luna_chat_sessions (id, user_id, title, mode, persona, provider, messages, event_ledger, last_acked_event_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, NOW(), NOW())
      ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
-    [sessionId, 'anonymous', title, mode, persona, JSON.stringify([]), JSON.stringify([]), null]
+    [sessionId, 'anonymous', title, mode, persona, provider, JSON.stringify([]), JSON.stringify([]), null]
   ).catch(e => console.warn('[DB] Erro ao criar sessão (mantendo fallback JSON):', e.message));
   return session;
 }
@@ -176,7 +178,7 @@ async function loadSessionFromDB(id) {
   // Try PostgreSQL first.
   try {
     const row = await db.get(
-      `SELECT id, title, mode, persona, messages, event_ledger, last_acked_event_id, created_at, updated_at
+      `SELECT id, title, mode, persona, provider, messages, event_ledger, last_acked_event_id, created_at, updated_at
        FROM luna_chat_sessions WHERE id = $1`,
       [id]
     );
@@ -186,6 +188,7 @@ async function loadSessionFromDB(id) {
         title: row.title,
         mode: row.mode,
         persona: row.persona || 'default',
+        provider: row.provider || 'kimi',
         messages: Array.isArray(row.messages) ? row.messages : (typeof row.messages === 'string' ? JSON.parse(row.messages) : []),
         eventLedger: Array.isArray(row.event_ledger) ? row.event_ledger : (typeof row.event_ledger === 'string' ? JSON.parse(row.event_ledger) : []),
         lastAckedEventId: row.last_acked_event_id || null,
@@ -824,11 +827,30 @@ router.post('/api/chat/session', async (req, res) => {
       if (session) {
         session.persona = persona;
         session.updatedAt = new Date().toISOString();
+        upsertSessionInJson(session);
         dbRunWithRetry(
           `UPDATE luna_chat_sessions SET persona = $1, updated_at = NOW() WHERE id = $2`,
           [persona, sessionId]
-        ).catch(e => console.error('[DB] Erro ao atualizar persona:', e.message));
+        ).catch(e => console.warn('[DB] Erro ao atualizar persona:', e.message));
         res.json({ ok: true, persona });
+      } else {
+        res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
+      }
+      break;
+    }
+    case 'setProvider': {
+      if (!sessionId || !provider) return res.status(400).json({ ok: false, error: 'sessionId e provider obrigatórios' });
+      let session = getWebSession(sessionId);
+      if (!session) session = await loadSessionFromDB(sessionId);
+      if (session) {
+        session.provider = provider;
+        session.updatedAt = new Date().toISOString();
+        upsertSessionInJson(session);
+        dbRunWithRetry(
+          `UPDATE luna_chat_sessions SET provider = $1, updated_at = NOW() WHERE id = $2`,
+          [provider, sessionId]
+        ).catch(e => console.warn('[DB] Erro ao atualizar provider:', e.message));
+        res.json({ ok: true, provider });
       } else {
         res.status(404).json({ ok: false, error: 'Sessão não encontrada' });
       }
@@ -861,7 +883,7 @@ router.post('/api/chat/session', async (req, res) => {
       break;
     }
     default:
-      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, setPersona, delete, resetAll' });
+      res.status(400).json({ ok: false, error: 'Ação inválida. Use: create, rename, setPersona, setProvider, delete, resetAll' });
   }
 });
 
@@ -1808,6 +1830,25 @@ router.get('/api/personas', (req, res) => {
   } catch (e) {
     console.error('[PERSONAS] Error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /api/providers — list available providers from luna-kernel provider-configs
+router.get('/api/providers', (req, res) => {
+  try {
+    const names = providerLoader.listProviders();
+    const providers = names.map(name => {
+      try {
+        const cfg = providerLoader.loadProviderConfig(name);
+        return { name, displayName: cfg.displayName || name, baseUrl: cfg.baseUrl || '' };
+      } catch (e) {
+        return { name, displayName: name, baseUrl: '' };
+      }
+    });
+    res.json({ ok: true, providers });
+  } catch (e) {
+    console.error('[PROVIDERS] Error:', e.message);
+    res.status(500).json({ ok: false, error: e.message, providers: [] });
   }
 });
 
