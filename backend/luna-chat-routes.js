@@ -11,10 +11,10 @@ const router = express.Router();
 const db = require('./db');
 const JSZip = require('jszip');
 const { resolveJwtSecret } = require('./config-validator');
-const providerLoader = require('/home/jhin/.luna-kernel/provider-loader.cjs');
 
 // v5.2: Centralized config
 const config = require('../../.luna-kernel/config/luna-config');
+const providerLoader = require(path.join(config.LUNA_KERNEL_DIR, 'provider-loader.cjs'));
 
 // ============================================================
 // Luna Soul lazy initialization
