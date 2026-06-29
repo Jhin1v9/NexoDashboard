@@ -1310,7 +1310,7 @@ router.post('/api/plan/revise', (req, res) => {
 // Local System Commands (/api/system/*)
 // ============================================================
 
-const LUNA_NEXO_SCRIPT = '/home/jhin/NEXO_DASHBOARD_PRO/luna-nexo.sh';
+const LUNA_NEXO_SCRIPT = path.join(config.NEXO_DIR || path.resolve(__dirname, '..'), 'luna-nexo.sh');
 const ALLOWED_SCRIPT_ACTIONS = new Set(['start', 'stop', 'restart']);
 
 function isPortListening(port) {

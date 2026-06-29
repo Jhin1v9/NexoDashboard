@@ -1,5 +1,7 @@
 const http = require('http');
 const WebSocket = require('ws');
+const path = require('path');
+const lunaConfig = require('../../.luna-kernel/config/luna-config');
 
 async function check() {
   const pageList = await new Promise((resolve, reject) => {
@@ -27,7 +29,7 @@ async function check() {
 
     // Read injected.js content
     const fs = require('fs');
-    const injectedCode = fs.readFileSync('/home/jhin/.luna-kernel/luna-extension/injected.js', 'utf8');
+    const injectedCode = fs.readFileSync(path.join(lunaConfig.LUNA_KERNEL_DIR, 'luna-extension', 'injected.js'), 'utf8');
 
     // Inject into main world (contextId 10)
     ws.send(JSON.stringify({

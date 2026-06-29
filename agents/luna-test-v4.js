@@ -1,12 +1,13 @@
-process.env.NODE_PATH = '/home/jhin/NEXO_DASHBOARD_PRO/node_modules';
+const path = require('path');
+process.env.NODE_PATH = path.resolve(__dirname, '..', 'node_modules');
 require('module').Module._initPaths();
 
-const { LunaSoul } = require('./luna-soul.cjs');
-const { SessionManager } = require('./session-manager.cjs');
+const { LunaSoul } = require(path.resolve(__dirname, 'luna-soul.cjs'));
+const { SessionManager } = require(path.resolve(__dirname, 'session-manager.cjs'));
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 
-const TOKEN = fs.readFileSync('/home/jhin/.luna/.telegram_token', 'utf8').trim();
+const TOKEN = fs.readFileSync(path.join(require('os').homedir(), '.luna', '.telegram_token'), 'utf8').trim();
 const CHAT_ID = '8037713238';
 const bot = new TelegramBot(TOKEN, { polling: false });
 
@@ -52,7 +53,7 @@ async function run() {
     console.log('[TEST] Result mode:', result.mode);
     await send('✅ *Resposta recebida!*\nModo: `' + (result.mode || '?') + '`\n\n```\n' + (result.response || 'sem resposta').slice(0, 600) + '\n```');
 
-    const demoDir = '/home/jhin/Documentos/luna-v4-demo';
+    const demoDir = path.join(require('os').homedir(), 'Documentos', 'luna-v4-demo');
     if (fs.existsSync(demoDir)) {
       const allFiles = [];
       function walk(dir, prefix) {

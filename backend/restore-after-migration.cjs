@@ -1,12 +1,13 @@
 require('dotenv').config();
 const { Client } = require('pg');
 const fs = require('fs');
+const path = require('path');
 
 async function restore() {
   const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   await client.connect();
 
-  const backups = JSON.parse(fs.readFileSync('/home/jhin/NEXO_DASHBOARD_PRO/backend/backup-pre-005.json', 'utf-8'));
+  const backups = JSON.parse(fs.readFileSync(path.join(__dirname, 'backup-pre-005.json'), 'utf-8'));
 
   // Restore ideas
   if (backups.ideas && backups.ideas.length > 0) {

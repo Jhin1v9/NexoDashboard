@@ -1,12 +1,15 @@
 #!/bin/bash
 # NEXO + LUNA — Unified Control Script
 # Uso: ./luna-nexo.sh [start|stop|status|logs|restart]
+# v10.28-fix: portable across PCs (Elias, Abner, VPS). Uses script location.
 
 set -e
 
-NEXO_DIR="/home/jhin/NEXO_DASHBOARD_PRO"
-LUNA_KERNEL="/home/jhin/.luna-kernel"
-LUNA_WEB="$HOME/.luna-kernel/luna-web"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NEXO_DIR="${NEXO_DIR:-$SCRIPT_DIR}"
+LUNA_HOME="${LUNA_HOME:-$HOME/.luna}"
+LUNA_KERNEL="${LUNA_KERNEL_DIR:-$LUNA_HOME/kernel}"
+LUNA_WEB="$LUNA_KERNEL/luna-web"
 PID_DIR="/tmp/luna-nexo-pids"
 
 mkdir -p "$PID_DIR"
@@ -70,11 +73,11 @@ start_services() {
 
   # Use PM2 for robust process management (replaces nohup)
   echo -e "${BOLD}Verificando PM2...${NC}"
-  
+
   # Ensure Caddy is running
   if ! ss -tlnp 2>/dev/null | grep -q ':5173 '; then
     echo -e "${YELLOW}▶ Caddy não está rodando — iniciando...${NC}"
-    nohup /usr/bin/caddy run --config /home/jhin/.config/caddy/Caddyfile > /dev/null 2>&1 &
+    nohup /usr/bin/caddy run --config "$HOME/.config/caddy/Caddyfile" > /dev/null 2>&1 &
     sleep 2
   fi
 
@@ -115,9 +118,9 @@ start_services() {
 stop_services() {
   colors
   echo -e "${BOLD}${RED}Encerrando todos os serviços via PM2...${NC}"
-  
+
   pm2 stop luna-server nexo-dashboard luna-vite telegram-bot 2>/dev/null || true
-  
+
   echo -e "${GREEN}✓ Todos os serviços parados (use 'pm2 delete all' para remover).${NC}"
 }
 
@@ -125,7 +128,7 @@ status_services() {
   colors
   echo -e "${BOLD}Status dos Serviços (PM2):${NC}\n"
   pm2 status
-  
+
   echo ""
   echo -e "${DIM}URLs:${NC}"
   echo -e "  ${CYAN}http://localhost:3456${NC} — Dashboard"
