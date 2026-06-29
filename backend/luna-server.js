@@ -52,6 +52,10 @@ if (fs.existsSync(lunaEnvPath)) {
 }
 
 // Write runtime config so frontend dev server can discover our port
+const runtimeDir = path.dirname(RUNTIME_PATH);
+if (!fs.existsSync(runtimeDir)) {
+  fs.mkdirSync(runtimeDir, { recursive: true });
+}
 fs.writeFileSync(RUNTIME_PATH, JSON.stringify({ apiPort: PORT, apiUrl: `http://localhost:${PORT}` }));
 const JWT_SECRET = config.AUTH.jwtSecret;
 const JWT_EXPIRES_IN = config.AUTH.jwtExpiresIn;
