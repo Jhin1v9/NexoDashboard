@@ -12,9 +12,11 @@ const NodeCache = require('node-cache');
 const router = express.Router();
 
 // v5.2: Centralized config
+const path = require('path');
 let config;
 try {
-  config = require('../../../.luna-kernel/config/luna-config');
+  const { LUNA_KERNEL_DIR } = require('../lib/resolve-luna.cjs');
+  config = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
 } catch (e) {
   config = {
     URLS: { dashboard: 'http://localhost:3456' },

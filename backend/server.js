@@ -95,7 +95,8 @@ let lunaSoulReady = false;
 async function getLunaSoul() {
   if (lunaSoulInstance && lunaSoulReady) return lunaSoulInstance;
   try {
-    const { LunaSoul } = require('../../.luna-kernel/luna-soul.cjs');
+    const { LUNA_KERNEL_DIR } = require('./lib/resolve-luna.cjs');
+    const { LunaSoul } = require(path.join(LUNA_KERNEL_DIR, 'luna-soul.cjs'));
     lunaSoulInstance = new LunaSoul({});
     await lunaSoulInstance.init();
     lunaSoulReady = true;

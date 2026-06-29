@@ -1,7 +1,8 @@
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const lunaConfig = require('../../.luna-kernel/config/luna-config');
+const { LUNA_KERNEL_DIR } = require('./lib/resolve-luna.cjs');
+const lunaConfig = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
 
 async function check() {
   const pageList = await new Promise((resolve, reject) => {

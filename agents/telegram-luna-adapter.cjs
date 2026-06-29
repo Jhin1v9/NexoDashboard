@@ -15,8 +15,9 @@ module.paths.unshift(path.join(__dirname, '..', 'node_modules'));
 const { EventSource } = require('eventsource');
 
 // v10.11-fix: Carrega .env do diretório correto.
-// O .env real fica em ~/.luna-kernel/.env (compartilhado entre kernel e dashboard).
-require('dotenv').config({ path: path.join(os.homedir(), '.luna-kernel', '.env') });
+// O .env real fica em LUNA_KERNEL_DIR/.env (compartilhado entre kernel e dashboard).
+const { LUNA_KERNEL_DIR } = require('../backend/lib/resolve-luna.cjs');
+require('dotenv').config({ path: path.join(LUNA_KERNEL_DIR, '.env') });
 
 const getTelegramBot = require('../backend/services/telegram-bot-client.cjs');
 const { SessionManager } = require('./session-manager.cjs');

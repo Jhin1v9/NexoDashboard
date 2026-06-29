@@ -13,8 +13,11 @@ const JSZip = require('jszip');
 const { resolveJwtSecret } = require('./config-validator');
 
 // v5.2: Centralized config
-const config = require('../../.luna-kernel/config/luna-config');
-const providerLoader = require(path.join(config.LUNA_KERNEL_DIR, 'provider-loader.cjs'));
+// v10.28-fix: support both local layout (.luna-kernel next to NEXO_DASHBOARD_PRO)
+// and VPS layout (luna-kernel repo next to NexoDashboard, driven by env vars).
+const LUNA_KERNEL_DIR = process.env.LUNA_KERNEL_DIR || path.resolve(__dirname, '..', '..', '.luna-kernel');
+const config = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
+const providerLoader = require(path.join(config.LUNA_KERNEL_DIR || LUNA_KERNEL_DIR, 'provider-loader.cjs'));
 
 // ============================================================
 // Luna Soul lazy initialization
@@ -1495,7 +1498,7 @@ router.get('/api/system/agent', async (req, res) => {
 // v10.2: Visible mode control — make all shell commands open in terminal
 router.post('/api/system/visible', async (req, res) => {
   try {
-    const lunaTools = require('../.luna-kernel/luna-tools.cjs');
+    const lunaTools = require(path.join(LUNA_KERNEL_DIR, 'luna-tools.cjs'));
     if (lunaTools.setVisibleMode) {
       lunaTools.setVisibleMode(true);
       res.json({ ok: true, mode: 'visible', message: '🖥️ Modo visível ATIVADO — todos os comandos abrirão em terminal' });
@@ -1509,7 +1512,7 @@ router.post('/api/system/visible', async (req, res) => {
 
 router.post('/api/system/invisible', async (req, res) => {
   try {
-    const lunaTools = require('../.luna-kernel/luna-tools.cjs');
+    const lunaTools = require(path.join(LUNA_KERNEL_DIR, 'luna-tools.cjs'));
     if (lunaTools.setVisibleMode) {
       lunaTools.setVisibleMode(false);
       res.json({ ok: true, mode: 'invisible', message: '👻 Modo invisível ATIVADO — comandos rodarão em background' });

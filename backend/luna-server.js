@@ -30,7 +30,8 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 
 // v5.2: Centralized config
-const config = require('../../.luna-kernel/config/luna-config');
+const { LUNA_KERNEL_DIR } = require('./lib/resolve-luna.cjs');
+const config = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
 
 const app = express();
 const PORT = config.PORTS.luna;

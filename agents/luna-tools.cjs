@@ -4,5 +4,5 @@
  * that imports from this path. The source of truth is in ~/.luna-kernel/.
  */
 const path = require('path');
-const os = require('os');
-module.exports = require(path.join(os.homedir(), '.luna-kernel', 'luna-tools.cjs'));
+const { LUNA_KERNEL_DIR } = require('../backend/lib/resolve-luna.cjs');
+module.exports = require(path.join(LUNA_KERNEL_DIR, 'luna-tools.cjs'));
