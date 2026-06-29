@@ -1928,13 +1928,19 @@ router.post('/api/luna/compact', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     const uid = userId || 'web-default';
-    const stream = luna._compactContext(sessionId, uid);
+    const stream = luna._autoCompact(sessionId, uid);
 
+    let lastUrl = null;
     for await (const ev of stream) {
+      if (ev?.type === 'compact_end' && ev?.chatUrl) {
+        lastUrl = ev.chatUrl;
+      }
       res.write(`data: ${JSON.stringify(ev)}\n\n`);
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+    const doneEvent = { type: 'done' };
+    if (lastUrl) doneEvent.chatUrl = lastUrl;
+    res.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
     res.end();
   } catch (e) {
     console.error('[LunaCompact] Erro:', e.message);
