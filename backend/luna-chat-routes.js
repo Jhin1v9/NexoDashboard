@@ -1931,7 +1931,7 @@ router.post('/api/luna/compact', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     const uid = userId || 'web-default';
-    const stream = luna._autoCompact(sessionId, uid);
+    const stream = luna._compactContext(sessionId, uid);
 
     let lastUrl = null;
     for await (const ev of stream) {
