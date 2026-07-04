@@ -17,14 +17,14 @@ const { resolveJwtSecret } = require('./config-validator');
 // and VPS layout (luna-kernel repo next to NexoDashboard, driven by env vars).
 const LUNA_KERNEL_DIR = process.env.LUNA_KERNEL_DIR || path.resolve(__dirname, '..', '..', '.luna-kernel');
 const config = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
-const providerLoader = require(path.join(config.LUNA_KERNEL_DIR || LUNA_KERNEL_DIR, 'provider-loader.cjs'));
+const providerLoader = require(path.join(LUNA_KERNEL_DIR, 'provider-loader.cjs'));
 
 // ============================================================
 // Luna Soul lazy initialization
 // ============================================================
-const LUNA_DIR = config.LUNA_KERNEL_DIR;
+const LUNA_DIR = LUNA_KERNEL_DIR;
 const SOUL_PATH = path.join(LUNA_DIR, 'luna-soul.cjs');
-const ENV_PATH = config.PATHS.env;
+const ENV_PATH = path.join(LUNA_DIR, '.env');
 let lunaSoul = null;
 let lunaReady = false;
 

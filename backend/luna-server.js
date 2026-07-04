@@ -35,8 +35,8 @@ const config = require(path.join(LUNA_KERNEL_DIR, 'config', 'luna-config'));
 
 const app = express();
 const PORT = config.PORTS.luna;
-const LUNA_DIR = config.LUNA_KERNEL_DIR;
-const RUNTIME_PATH = config.PATHS.runtime;
+const LUNA_DIR = LUNA_KERNEL_DIR;
+const RUNTIME_PATH = path.join(LUNA_DIR, '.luna-runtime.json');
 
 // ── Load Luna Kernel .env (same as old config-server.cjs) ──
 const lunaEnvPath = path.join(LUNA_DIR, '.env');
@@ -129,7 +129,7 @@ const lunaToolsRouter = require('./routes/luna-tools');
 app.use(lunaToolsRouter);
 
 // Static files
-const STATIC_DIR = config.PATHS.lunaDist;
+const STATIC_DIR = path.join(LUNA_DIR, 'luna-web', 'dist');
 console.log('[Luna Server] Serving static from:', STATIC_DIR, 'exists:', fs.existsSync(STATIC_DIR));
 console.log('[Luna Server] Assets exists:', fs.existsSync(path.join(STATIC_DIR, 'assets')));
 console.log('[Luna Server] __dirname:', __dirname);
@@ -307,7 +307,7 @@ app.get('/api/system/update/status', requireSystemAuth, async (req, res) => {
 
 // SPA fallback — MUST be after all API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(config.PATHS.lunaDist, 'index.html'));
+  res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
 
 server.listen(PORT, () => {
