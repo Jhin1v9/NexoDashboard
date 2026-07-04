@@ -1,5 +1,12 @@
-cat > README.md << 'EOF'
 # 🔥 NEXO DASHBOARD PRO
+
+> **⚠️ Este repositório foi movido.**  
+> O dashboard foi incorporado ao monorepo [`luna-kernel`](https://github.com/Jhin1v9/luna-kernel).  
+> O código equivalente agora está em [`apps/dashboard`](https://github.com/Jhin1v9/luna-kernel/tree/main/apps/dashboard).
+>
+> Não faça alterações neste repositório — elas não serão sincronizadas automaticamente com o monorepo.
+
+---
 
 Dashboard operacional da **NEXO DIGITAL S.L.** — Barcelona, Espanha
 
@@ -17,7 +24,5 @@ Dashboard profissional para gerenciar:
 
 ## 🚀 COMO RODAR
 
-```bash
-cd backend
-npm install
-node server.js
+Veja as instruções atualizadas no monorepo:  
+https://github.com/Jhin1v9/luna-kernel/blob/main/README.md
